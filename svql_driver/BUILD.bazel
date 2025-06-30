@@ -1,28 +1,58 @@
-load("@rules_rust//rust:defs.bzl", "rust_binary")   # only for the build-time test
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "cpp_toolchain_info")
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "genrule")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 package(default_visibility = ["//visibility:public"])
 
-# ----------------------------------------------------------------------------
-# (a)  Build the shared object (.so / .dylib) that Yosys loads at runtime
-# ----------------------------------------------------------------------------
-cc_binary(
-    name = "svql",                     # results in “svql.so”
-    srcs = glob(["src/*.cpp"]),
-    hdrs = glob(["include/**/*.h"]),
-    linkshared = 1,
+# ---------------------------------------------------------------------------
+#  Yosys plug-in  (produces  svql.so / svql.dylib)
+# ---------------------------------------------------------------------------
+cmake(
+    name = "svql",
+    # Everything CMake needs:   the project file, the C/C++ sources and (if
+    # they exist) the public headers.  The glob is allowed to be empty so it
+    # does not fail when there are no *.h files.
+    lib_source = ".",
+    # deps = glob(
+    #     ["CMakeLists.txt",
+    #      "src/**/*.cpp",
+    #      "include/**/*.h"],
+    #     allow_empty = True,
+    # ),
+
+    # What this external build depends on -----------------------------------
     deps = [
-        "//svql_common:ffi",
-        "@yosys_src//:lib",
+        # Rust static library + generated header
+        "//svql_common:svql_common",
+        "//svql_common:header",
+
+        # Up-stream Yosys that we link against / query for flags
+        "//yosys:yosys_build",
     ],
-    copts = ["-std=c++23", "-D_YOSYS_"],
+
+    # CMake cache entries expected by the upstream script -------------------
+    cache_entries = {
+        # ----- paths to the Rust artefacts ---------------------------------
+        #   • static library produced by rules_rust
+        "SVQL_COMMON_LIB"     : "$(location //svql_common:svql_common)",
+        #   • directory that contains   include/source.h
+        "SVQL_COMMON_INCLUDE" : "$(location //svql_common:header)/..",
+
+        # ----- Yosys executables queried by CMake --------------------------
+        "YOSYS_BIN"           : "$(rootpath @yosys_src//:yosys_build)/bin/yosys",
+        "YOSYS_CONFIG"        : "$(rootpath @yosys_src//:yosys_build)/bin/yosys-config",
+
+        # ----- Yosys source tree, needed only for #include paths -----------
+        "YOSYS_SOURCE_ROOT"   : "$(rootpath @yosys_src//:all_src)",
+    },
+
+    # Tell Bazel what file the build will produce (no “lib” prefix, keep
+    # the real extension so this works on Linux and macOS).
+    out_shared_libs = ["svql.so"],
 )
 
-# ----------------------------------------------------------------------------
-#  Test target (now lives in //scripts).  Keep an alias for convenience
-# ----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+#  Keep the convenience alias that the shell test depends on
+# ---------------------------------------------------------------------------
 alias(
-    name = "test_example",
+    name   = "test_example",
     actual = "//scripts:test_svql_driver",
 )

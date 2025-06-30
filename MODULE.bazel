@@ -10,8 +10,9 @@ module(
 # External rule sets – tell Bazel where to get them
 ##############################################################################
 bazel_dep(name = "platforms", version = "0.0.6")
-bazel_dep(name = "rules_rust", version = "0.32.0")
+bazel_dep(name = "rules_rust", version = "0.62.0")
 bazel_dep(name = "rules_foreign_cc", version = "0.9.0")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 
 # rules_rust is NOT (yet) on BCR → fetch directly from GitHub
 git_override(
@@ -43,15 +44,22 @@ use_repo(rust_ext, "rust")
 ##############################################################################
 # crates from Cargo.toml -> Bazel repos
 ##############################################################################
-crate_universe = use_extension(
-    "@rules_rust//crate_universe:extension.bzl",
-    "crate_universe",
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = ["//:Cargo.toml"],
+)
+use_repo(crate, "crates")
+
+bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+
+bindeps.spec(package = "cbindgen", version = "=0.29.0", artifact = "bin")
+bindeps.annotation(crate = "cbindgen", gen_all_binaries = True)
+
+bindeps.from_specs(
+  name = "bindeps",
+  host_tools = "@rust_host_tools_nightly",
 )
 
-crate_universe.generate(
-    name = "crates_index",
-    cargo_toml_files = [
-        "svql_common/Cargo.toml",
-    ],
-)
-use_repo(crate_universe, "crates_index")
+use_repo(bindeps, "bindeps")
