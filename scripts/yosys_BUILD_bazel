@@ -9,11 +9,10 @@ filegroup(
 
 make(
     name = "yosys_build",
-    srcs = [":all_src"],
+    lib_source = ":all_src",
     out_binaries = ["yosys", "yosys-config"],      # what we need at runtime
-    out_static_libs = ["libyosys.a"],              # what plug-ins link against
-    out_includes = ["kernel", "frontends", "backends"],  # exported headers
-    tools = ["make"],
+    # out_static_libs = ["libyosys.a"],              # what plug-ins link against
+    out_include_dir = ".",  # exported headers
 )
 
 # Convenience targets that higher layers depend on
