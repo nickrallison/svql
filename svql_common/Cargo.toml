@@ -1,0 +1,15 @@
+[package]
+name = "svql_common"
+version = "0.1.0"
+edition = "2024"
+links   = "svql_common"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+lazy_static = "1.5.0"
+regex = "1.11.1"
+
+[build-dependencies]
+cbindgen = "0.29"

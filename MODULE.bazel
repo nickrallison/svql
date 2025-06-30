@@ -1,0 +1,57 @@
+##############################################################################
+# MODULE.bazel – Bzlmod configuration
+##############################################################################
+module(
+    name = "svql",
+    version = "0.1.0",
+)
+
+##############################################################################
+# External rule sets – tell Bazel where to get them
+##############################################################################
+bazel_dep(name = "platforms", version = "0.0.6")
+bazel_dep(name = "rules_rust", version = "0.32.0")
+bazel_dep(name = "rules_foreign_cc", version = "0.9.0")
+
+# rules_rust is NOT (yet) on BCR → fetch directly from GitHub
+git_override(
+    module_name = "rules_rust",
+    remote      = "https://github.com/bazelbuild/rules_rust.git",
+    tag         = "0.62.0",
+)
+
+# rules_foreign_cc is also not on BCR
+git_override(
+    module_name = "rules_foreign_cc",
+    remote      = "https://github.com/bazelbuild/rules_foreign_cc.git",
+    tag         = "0.15.1",
+)
+
+##############################################################################
+# rules_rust – register a toolchain
+##############################################################################
+rust_ext = use_extension(
+    "@rules_rust//rust:extensions.bzl",
+    "rust_toolchain",
+)
+rust_ext.toolchain(
+    version = "1.78.0",          # any recent stable works
+    targets = ["@platforms//:all"],
+)
+use_repo(rust_ext, "rust")
+
+##############################################################################
+# crates from Cargo.toml -> Bazel repos
+##############################################################################
+crate_universe = use_extension(
+    "@rules_rust//crate_universe:extension.bzl",
+    "crate_universe",
+)
+
+crate_universe.generate(
+    name = "crates_index",
+    cargo_toml_files = [
+        "svql_common/Cargo.toml",
+    ],
+)
+use_repo(crate_universe, "crates_index")

@@ -1,0 +1,28 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")   # only for the build-time test
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "cpp_toolchain_info")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "genrule")
+
+package(default_visibility = ["//visibility:public"])
+
+# ----------------------------------------------------------------------------
+# (a)  Build the shared object (.so / .dylib) that Yosys loads at runtime
+# ----------------------------------------------------------------------------
+cc_binary(
+    name = "svql",                     # results in “svql.so”
+    srcs = glob(["src/*.cpp"]),
+    hdrs = glob(["include/**/*.h"]),
+    linkshared = 1,
+    deps = [
+        "//svql_common:ffi",
+        "@yosys_src//:lib",
+    ],
+    copts = ["-std=c++23", "-D_YOSYS_"],
+)
+
+# ----------------------------------------------------------------------------
+#  Test target (now lives in //scripts).  Keep an alias for convenience
+# ----------------------------------------------------------------------------
+alias(
+    name = "test_example",
+    actual = "//scripts:test_svql_driver",
+)

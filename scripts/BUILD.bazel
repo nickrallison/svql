@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_test(
+    name = "test_svql_driver",
+    srcs = ["test_svql_driver.sh"],
+    data = [
+        "//svql_driver:svql",                                   # the plug-in .so
+        "//svql_driver:examples/cwe1234/variant1.v",
+        "//svql_driver:examples/cwe1234/locked_register_pat.v",
+        "@yosys_src//:yosys",                                   # the yosys binary
+    ],
+)

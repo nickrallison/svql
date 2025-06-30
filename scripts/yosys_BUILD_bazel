@@ -1,0 +1,22 @@
+# Yosys is entirely unmodified upstream source code.
+# We just hand it to rules_foreign_cc::make to let the regular Makefile do the work.
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
+
+filegroup(
+    name = "all_src",
+    srcs = glob(["**/*"], exclude = ["BUILD.bazel"]),
+)
+
+make(
+    name = "yosys_build",
+    srcs = [":all_src"],
+    out_binaries = ["yosys", "yosys-config"],      # what we need at runtime
+    out_static_libs = ["libyosys.a"],              # what plug-ins link against
+    out_includes = ["kernel", "frontends", "backends"],  # exported headers
+    tools = ["make"],
+)
+
+# Convenience targets that higher layers depend on
+alias(name = "yosys",       actual = ":yosys_build")
+alias(name = "lib",         actual = ":yosys_build")
+alias(name = "headers",     actual = ":yosys_build")

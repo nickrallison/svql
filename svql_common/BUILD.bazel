@@ -1,0 +1,62 @@
+load("@rules_rust//rust:defs.bzl",
+     "rust_library", "rust_static_library")
+load("@rules_foreign_cc//tools/build_defs:toolchain_utils.bzl",
+     "create_cc_toolchain_config_info")
+
+# ---------------------------------------------------------------------------
+# Step (a) – run cbindgen once per build to create “include/source.h”.
+#
+# We build the *CLI* version of cbindgen in a tiny helper crate – that keeps
+# everything self-contained and cross-platform.
+# ---------------------------------------------------------------------------
+rust_binary(
+    name = "cbindgen_bin",
+    srcs = ["//:empty.rs"],       # empty file, we just depend on the real crate
+    crate_features = ["cli"],
+    deps = ["@crates_index//:cbindgen"],   # rules_rust pulls crates.io automatically
+)
+
+genrule(
+    name = "header",
+    srcs = glob(["src/**/*.rs"]) + [":cbindgen_bin"],
+    outs = ["include/source.h"],
+    cmd = """
+    mkdir -p $(dirname $@)
+    $(location :cbindgen_bin) --crate svql_common \
+        --lang C           \
+        --include-guard SVQL_COMMON_SOURCE_H \
+        --output $@
+    """,
+    tools = [":cbindgen_bin"],
+    visibility = ["//visibility:public"],
+)
+
+# ---------------------------------------------------------------------------
+# Step (b) – the actual Rust code, compiled as a static library suitable
+# for *native* (C/C++) linking.
+# ---------------------------------------------------------------------------
+rust_static_library(
+    name = "svql_common",
+    crate_root = "src/lib.rs",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    # build.rs is kept – it still sets cfg! flags etc.
+    build_script = "build.rs",
+    deps = [
+        "@crates_index//:lazy_static",
+        "@crates_index//:regex",
+    ],
+    crate_features = [],
+    visibility = ["//visibility:public"],
+)
+
+# ---------------------------------------------------------------------------
+# Step (c) – a cc_library wrapper that re-exports the generated header.  This
+# is what downstream C / C++ code depends on.
+# ---------------------------------------------------------------------------
+cc_library(
+    name = "ffi",
+    hdrs = [":header"],
+    deps  = [":svql_common"],
+    visibility = ["//visibility:public"],
+)
