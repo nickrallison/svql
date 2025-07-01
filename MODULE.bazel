@@ -14,20 +14,6 @@ bazel_dep(name = "rules_rust", version = "0.62.0")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 
-# rules_rust is NOT (yet) on BCR → fetch directly from GitHub
-# git_override(
-#     module_name = "rules_rust",
-#     remote      = "https://github.com/bazelbuild/rules_rust.git",
-#     tag         = "0.62.0",
-# )
-
-# # rules_foreign_cc is also not on BCR
-# git_override(
-#     module_name = "rules_foreign_cc",
-#     remote      = "https://github.com/bazelbuild/rules_foreign_cc.git",
-#     tag         = "0.15.1",
-# )
-
 ##############################################################################
 # rules_rust – register a toolchain
 ##############################################################################
@@ -51,15 +37,3 @@ crate.from_cargo(
     manifests = ["//:Cargo.toml", "//:svql_common/Cargo.toml"],
 )
 use_repo(crate, "crates")
-
-bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
-
-bindeps.spec(package = "cbindgen", version = "=0.29.0", artifact = "bin")
-bindeps.annotation(crate = "cbindgen", gen_all_binaries = True)
-
-bindeps.from_specs(
-  name = "bindeps",
-  host_tools = "@rust_host_tools_nightly",
-)
-
-use_repo(bindeps, "bindeps")

@@ -1,0 +1,2 @@
+# .bazelignore
+yosys/libs/cxxopts

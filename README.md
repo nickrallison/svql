@@ -1,0 +1,6 @@
+# svql
+
+## Depends
+
+- `bazel`
+- `cbindgen`

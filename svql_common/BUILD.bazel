@@ -2,11 +2,11 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
 
 run_binary(
-    name = "svql_common_header",
+    name = "header",
     srcs = glob(["src/**/*.rs"]),
     outs = ["include/source.h"],
     args = ["--crate", "svql_common", "--lang", "C", "--include-guard", "SVQL_COMMON_SOURCE_H", "--output", "include/source.h"],
-    tool = "@bindeps//:cbindgen__cbindgen",
+    tool = "cbindgen",
     visibility = ["//visibility:public"],
 )
 
@@ -31,9 +31,10 @@ rust_library(
 # Step (c) – a cc_library wrapper that re-exports the generated header.  This
 # is what downstream C / C++ code depends on.
 # ---------------------------------------------------------------------------
+
 cc_library(
     name = "ffi",
-    hdrs = [":header"],
+    hdrs = [":svql_common_header"],
     deps  = [":svql_common"],
     visibility = ["//visibility:public"],
 )
