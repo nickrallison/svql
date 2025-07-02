@@ -8,13 +8,25 @@ alias(
     tags = ["manual"],
 )
 
-run_binary(
+genrule(
     name = "header",
-    srcs = glob(["src/**/*.rs"]) + glob(["**/Cargo.toml"]) + ["//:Cargo.lock"],
+    # Note the more explicit paths. "Cargo.toml" is relative to this package.
+    srcs = glob(["src/**/*.rs"]) + [
+        "Cargo.toml",
+        "//:Cargo.lock",
+    ],
     outs = ["include/source.h"],
-    # args = ["--crate", "svql_common", "--lang", "C", "--include-guard", "SVQL_COMMON_SOURCE_H", "--output", "include/source.h"],
-    args = ["--crate", "svql_common", "--lang", "C", "--output", "include/source.h"],
-    tool = ":cbindgen",
+    # The tool we need to run.
+    tools = [":cbindgen"],
+    # The shell command to execute.
+    cmd = """
+        
+        $(location :cbindgen) \\
+            --lang C \\
+            --output $(location include/source.h) \\
+            svql_common
+        
+    """,
     visibility = ["//visibility:public"],
 )
 

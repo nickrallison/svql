@@ -2,7 +2,6 @@
 name = "svql_common"
 version = "0.1.0"
 edition = "2024"
-links   = "svql_common"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
