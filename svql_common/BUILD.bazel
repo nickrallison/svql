@@ -54,7 +54,8 @@ rust_library(
 
 cc_library(
     name = "ffi",
-    hdrs = [":svql_common_header"],
+    # CORRECTED: Point to the 'header' genrule, not a non-existent target.
+    hdrs = [":header"],
     deps  = [":svql_common"],
     visibility = ["//visibility:public"],
 )
