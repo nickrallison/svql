@@ -1,25 +1,39 @@
 # yosys/BUILD.bazel
 
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
-
 exports_files(["BUILD.bazel"])
 
 filegroup(
     name = "all_src",
-    srcs = glob(["**"], exclude = ["BUILD.bazel"]),
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+# Replaced the 'make' rule with a standard 'genrule'.
+# This rule compiles yosys and produces the 'yosys' and 'yosys-config' binaries.
+genrule(
+    name = "yosys_make",
+    srcs = [":all_src"],
+    outs = [
+        "yosys",
+        "yosys-config",
+    ],
+    cmd = """
+        set -e
+        # The 'yosys' source directory is present in the execution root
+        # because of the glob in the ':all_src' filegroup.
+        cd yosys & make -j$$(nproc)
+        # Copy the compiled binaries to the locations Bazel expects for the 'outs'.
+        cp yosys/yosys $(location yosys)
+        cp yosys/yosys-config $(location yosys-config)
+    """,
     visibility = ["//visibility:public"],
 )
 
-make(
-    name = "yosys_make",
-    lib_source = ":all_src",
-    out_binaries = ["yosys", "yosys-config"],
-    # out_include_dir = ".",
-    visibility = ["//visibility:public"],
-)
+# This filegroup now wraps the outputs of the genrule.
+# The 'output_group' attribute was removed as it is specific to the 'make'
+# rule and not applicable to 'genrule'. The default outputs of the genrule
+# are the two binaries, so the behavior remains consistent.
 filegroup(
     name = "yosys_bin",
-    srcs = [":yosys_make" ],
-    output_group = "yosys_bin",
+    srcs = [":yosys_make"],
     visibility = ["//visibility:public"],
 )
