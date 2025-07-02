@@ -4,7 +4,7 @@ exports_files(["BUILD.bazel"])
 
 filegroup(
     name = "all_src",
-    srcs = glob(["**"]),
+    srcs = glob(["**"], exclude = ["**/*.o", "**/yosys", "**/yosys-config"]),
     visibility = ["//visibility:public"],
 )
 # Replaced the 'make' rule with a standard 'genrule'.
