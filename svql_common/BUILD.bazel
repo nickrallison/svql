@@ -1,12 +1,20 @@
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@rules_rust//rust:repositories.bzl", "rust_toolchain_tools_repository")
 load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
+
+alias(
+    name = "cbindgen",
+    actual = "@crate_index_cargo_bindeps//:cbindgen__cbindgen",
+    tags = ["manual"],
+)
 
 run_binary(
     name = "header",
-    srcs = glob(["src/**/*.rs"]),
+    srcs = glob(["src/**/*.rs"]) + glob(["**/Cargo.toml"]) + ["//:Cargo.lock"],
     outs = ["include/source.h"],
-    args = ["--crate", "svql_common", "--lang", "C", "--include-guard", "SVQL_COMMON_SOURCE_H", "--output", "include/source.h"],
-    tool = "cbindgen",
+    # args = ["--crate", "svql_common", "--lang", "C", "--include-guard", "SVQL_COMMON_SOURCE_H", "--output", "include/source.h"],
+    args = ["--crate", "svql_common", "--lang", "C", "--output", "include/source.h"],
+    tool = ":cbindgen",
     visibility = ["//visibility:public"],
 )
 
