@@ -4,7 +4,7 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "all_cmake_sources",
+    name = "srcs",
     srcs = glob(
         ["**/*"],
         exclude = ["BUILD.bazel"],
@@ -13,29 +13,13 @@ filegroup(
 
 cmake(
     name = "svql",
-    lib_source = ":all_cmake_sources",
-    # Depend on the cc_library wrapper. rules_foreign_cc will automatically
-    # consume its CcInfo provider to make the headers and library available
-    # to the CMake build process.
+    lib_source = ":srcs",
+    # Depend on the main 'yosys_build' rule, not a specific output file.
+    # rules_foreign_cc will automatically consume its CcInfo provider.
     deps = [
         "//svql_common:ffi",
-        "//yosys:yosys_lib",
-    ],
-    # The dependency on the header is now handled by '//svql_common:ffi'.
-    # The raw rust_library is no longer needed here.
-    data = [
         "//yosys:yosys",
-        "//yosys:yosys-config",
-        # "//yosys:BUILD.bazel",
     ],
-    # The SVQL_COMMON_* variables are no longer needed. rules_foreign_cc
-    # generates a toolchain file for CMake that makes the 'svql_common'
-    # library target available automatically.
-    cache_entries = {
-        "YOSYS_BIN": "$(location //yosys:yosys)",
-        "YOSYS_CONFIG": "$(location //yosys:yosys-config)",
-        # "YOSYS_SOURCE_ROOT": "$$(dirname $(locations //yosys:yosys_lib))",
-    },
     out_shared_libs = ["svql.so"],
 )
 

@@ -1,37 +1,46 @@
 # yosys/BUILD.bazel
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
-exports_files(["BUILD.bazel"])
+package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "all_src",
-    srcs = glob(["**"], exclude = ["**/*.o", "**/yosys", "**/yosys-config"]),
-    visibility = ["//visibility:public"],
-)
-# Replaced the 'make' rule with a standard 'genrule'.
-# This rule compiles yosys and produces the 'yosys' and 'yosys-config' binaries.
-genrule(
-    name = "yosys_make",
-    srcs = [":all_src"],
-    outs = [
-        "yosys",
-        "yosys-config",
-    ],
-    cmd = """
-        set -e
-        make -C yosys -j$$(nproc) ENABLE_LIBYOSYS=1
-        cp yosys/yosys $(location yosys)
-        cp yosys/yosys-config $(location yosys-config)
-    """,
-    visibility = ["//visibility:public"],
-    local = True,  # Ensures the command runs in the local execution environment
+    name = "cxxopts_srcs",
+    srcs = glob(
+        ["libs/cxxopts/**"],   # everything that lives *inside* the sub-module
+        exclude = ["libs/cxxopts/.git"],  # don’t copy the VCS marker
+    ),
 )
 
-# This filegroup now wraps the outputs of the genrule.
-# The 'output_group' attribute was removed as it is specific to the 'make'
-# rule and not applicable to 'genrule'. The default outputs of the genrule
-# are the two binaries, so the behavior remains consistent.
 filegroup(
-    name = "yosys_bin",
-    srcs = [":yosys_make"],
-    visibility = ["//visibility:public"],
+    name = "srcs",
+    srcs = [":cxxopts_srcs"]   + glob(["**/*"], exclude = ["BUILD.bazel"]),
+)
+
+# filegroup(
+#     name = "srcs",
+#     srcs = glob(["**/*"], exclude = ["BUILD.bazel"]),
+# )
+
+cmake(
+    name             = "yosys",
+    lib_source       = ":srcs",
+    cache_entries    = {"ENABLE_LIBYOSYS": "1"},
+    out_binaries     = ["yosys", "yosys-config"],
+    out_shared_libs  = ["libyosys.so"],
+)
+
+# cmake(
+#     name = "yosys",
+#     lib_source = ":srcs",
+#     cache_entries = {
+#         "ENABLE_LIBYOSYS": "1",
+#     },
+#     out_binaries = ["yosys", "yosys-config"],
+#     out_shared_libs = ["libyosys.so"],
+
+# )
+
+alias(
+    name = "test_example",
+    actual = "//scripts:test_svql_driver",
 )

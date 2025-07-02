@@ -10,30 +10,21 @@ alias(
 
 genrule(
     name = "header",
-    # Note the more explicit paths. "Cargo.toml" is relative to this package.
     srcs = glob(["src/**/*.rs"]) + [
         "Cargo.toml",
         "//:Cargo.lock",
     ],
     outs = ["include/source.h"],
-    # The tool we need to run.
     tools = [":cbindgen"],
-    # The shell command to execute.
     cmd = """
-        
         $(location :cbindgen) \\
             --lang C \\
             --output $(location include/source.h) \\
             svql_common
-        
     """,
     visibility = ["//visibility:public"],
 )
 
-# ---------------------------------------------------------------------------
-# Step (b) – the actual Rust code, compiled as a static library suitable
-# for *native* (C/C++) linking.
-# ---------------------------------------------------------------------------
 rust_library(
     name = "svql_common",
     crate_root = "src/lib.rs",
@@ -47,14 +38,8 @@ rust_library(
     visibility = ["//visibility:public"],
 )
 
-# ---------------------------------------------------------------------------
-# Step (c) – a cc_library wrapper that re-exports the generated header.  This
-# is what downstream C / C++ code depends on.
-# ---------------------------------------------------------------------------
-
 cc_library(
     name = "ffi",
-    # CORRECTED: Point to the 'header' genrule, not a non-existent target.
     hdrs = [":header"],
     deps  = [":svql_common"],
     visibility = ["//visibility:public"],
