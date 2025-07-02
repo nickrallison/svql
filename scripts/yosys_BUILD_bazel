@@ -18,10 +18,7 @@ genrule(
     ],
     cmd = """
         set -e
-        # The 'yosys' source directory is present in the execution root
-        # because of the glob in the ':all_src' filegroup.
-        make -C yosys -j$$(nproc)
-        # Copy the compiled binaries to the locations Bazel expects for the 'outs'.
+        make -C yosys -j$$(nproc) ENABLE_LIBYOSYS=1
         cp yosys/yosys $(location yosys)
         cp yosys/yosys-config $(location yosys-config)
     """,

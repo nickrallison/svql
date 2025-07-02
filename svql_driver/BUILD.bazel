@@ -19,14 +19,14 @@ cmake(
     # to the CMake build process.
     deps = [
         "//svql_common:ffi",
+        "//yosys:yosys_lib",
     ],
     # The dependency on the header is now handled by '//svql_common:ffi'.
     # The raw rust_library is no longer needed here.
     data = [
         "//yosys:yosys",
         "//yosys:yosys-config",
-        "//yosys:BUILD.bazel",
-        "//yosys:all_src",
+        # "//yosys:BUILD.bazel",
     ],
     # The SVQL_COMMON_* variables are no longer needed. rules_foreign_cc
     # generates a toolchain file for CMake that makes the 'svql_common'
@@ -34,7 +34,7 @@ cmake(
     cache_entries = {
         "YOSYS_BIN": "$(location //yosys:yosys)",
         "YOSYS_CONFIG": "$(location //yosys:yosys-config)",
-        "YOSYS_SOURCE_ROOT": "$$(dirname $(location //yosys:BUILD.bazel))",
+        # "YOSYS_SOURCE_ROOT": "$$(dirname $(locations //yosys:yosys_lib))",
     },
     out_shared_libs = ["svql.so"],
 )
