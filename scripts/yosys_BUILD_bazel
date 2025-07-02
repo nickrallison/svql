@@ -20,12 +20,13 @@ genrule(
         set -e
         # The 'yosys' source directory is present in the execution root
         # because of the glob in the ':all_src' filegroup.
-        cd yosys & make -j$$(nproc)
+        make -C yosys -j$$(nproc)
         # Copy the compiled binaries to the locations Bazel expects for the 'outs'.
         cp yosys/yosys $(location yosys)
         cp yosys/yosys-config $(location yosys-config)
     """,
     visibility = ["//visibility:public"],
+    local = True,  # Ensures the command runs in the local execution environment
 )
 
 # This filegroup now wraps the outputs of the genrule.
