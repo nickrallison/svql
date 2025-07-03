@@ -8,7 +8,9 @@ filegroup(
     srcs = glob(
         ["**/*"],
         exclude = ["BUILD.bazel"],
-    ),
+    ) + glob(
+        [".git/**"],
+    )
 )
 
 cmake(
@@ -21,6 +23,7 @@ cmake(
         "//yosys:yosys",
     ],
     out_shared_libs = ["svql.so"],
+    local = True,
 )
 
 alias(

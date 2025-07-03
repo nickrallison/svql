@@ -4,41 +4,28 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "cxxopts_srcs",
+    name = "srcs",
     srcs = glob(
-        ["libs/cxxopts/**"],   # everything that lives *inside* the sub-module
-        exclude = ["libs/cxxopts/.git"],  # don’t copy the VCS marker
+        ["**/*"],
+        # Explicitly exclude the cxxopts directory, since it's now a separate dependency.
+        exclude = [
+            "BUILD.bazel",
+            "libs/cxxopts/**",
+        ],
     ),
 )
-
-filegroup(
-    name = "srcs",
-    srcs = [":cxxopts_srcs"]   + glob(["**/*"], exclude = ["BUILD.bazel"]),
-)
-
-# filegroup(
-#     name = "srcs",
-#     srcs = glob(["**/*"], exclude = ["BUILD.bazel"]),
-# )
 
 cmake(
     name             = "yosys",
     lib_source       = ":srcs",
+    # Depend on the cxxopts library from its own repository.
+    deps             = ["@cxxopts//:cxxopts"],
     cache_entries    = {"ENABLE_LIBYOSYS": "1"},
+    # The yosys CMake scripts still have hardcoded paths. This creates a dummy
+    # directory to prevent CMake from failing its path existence checks.
     out_binaries     = ["yosys", "yosys-config"],
     out_shared_libs  = ["libyosys.so"],
 )
-
-# cmake(
-#     name = "yosys",
-#     lib_source = ":srcs",
-#     cache_entries = {
-#         "ENABLE_LIBYOSYS": "1",
-#     },
-#     out_binaries = ["yosys", "yosys-config"],
-#     out_shared_libs = ["libyosys.so"],
-
-# )
 
 alias(
     name = "test_example",
