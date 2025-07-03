@@ -1,8 +1,6 @@
 target
+build
 /.idea
 /.vscode
 
 ## 
-
-/bazel-*
-BUILD.bazel
