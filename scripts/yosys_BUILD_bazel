@@ -4,20 +4,20 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 package(default_visibility = ["//visibility:public"])
 
 
-genrule(
-    name = "header",
-    srcs = ["libs/cxxopts/include/cxxopts.hpp"],
-    outs = ["cxxopts.hpp"],
-    tools = [],
-    cmd = """
-        cp libs/cxxopts/include/cxxopts.hpp $(location cxxopts.hpp)
-    """,
-    visibility = ["//visibility:public"],
-)
+# genrule(
+#     name = "header",
+#     srcs = ["libs/cxxopts/include/cxxopts.hpp"],
+#     outs = ["cxxopts.hpp"],
+#     tools = [],
+#     cmd = """
+#         cp yosys/libs/cxxopts/include/cxxopts.hpp $(location cxxopts.hpp)
+#     """,
+#     visibility = ["//visibility:public"],
+# )
 
 cc_library(
     name = "cxxopts_header",
-    hdrs = [":header"],
+    hdrs = ["libs/cxxopts/include/cxxopts.hpp"],
     deps  = [],
     visibility = ["//visibility:public"],
 )
