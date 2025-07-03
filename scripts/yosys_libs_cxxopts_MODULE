@@ -1,7 +1,0 @@
-# yosys/libs/cxxopts/MODULE.bazel
-module(
-    name = "cxxopts",
-    version = "3.1.1", # Use the version from its changelog or a placeholder
-)
-
-bazel_dep(name = "rules_cc", version = "0.0.9")
