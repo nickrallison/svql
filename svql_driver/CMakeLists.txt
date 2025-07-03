@@ -39,13 +39,15 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
         DESTINATION include
         FILES_MATCHING PATTERN "*.h")
 
-add_custom_target (test
-        COMMAND ${YOSYS_BIN}
-        -m $<TARGET_FILE:svql_driver>
-        ${CMAKE_CURRENT_SOURCE_DIR}/examples/cwe1234/variant1.v
-        -p "hierarchy -top locked_register_example"
-        -p "proc"
-        -p "svql -map ./examples/cwe1234/locked_register_pat.v -verbose"
-        DEPENDS svql_driver
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Running example flow with freshly built svql plug-in")
+add_test(
+        NAME    svql_driver_test
+        COMMAND $<TARGET_FILE:yosys_exe>
+                -m $<TARGET_FILE:svql_driver>
+                ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
+                -p "hierarchy -top locked_register_example"
+                -p "proc"
+                -p "svql -map ${CMAKE_SOURCE_DIR}/examples/cwe1234/locked_register_pat.v -verbose"
+    )
+    set_tests_properties(svql_driver_test PROPERTIES
+                         DEPENDS svql_driver 
+                         DEPENDS yosys_exe)
