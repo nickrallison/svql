@@ -1,8 +1,7 @@
 git submodule update --init --recursive
 
 cp scripts/yosys_BUILD_bazel yosys/BUILD.bazel
-# cp scripts/yosys_libs_cxxopts_MODULE yosys/libs/cxxopts/MODULE.bazel
-# cp scripts/yosys_libs_cxxopts_BUILD yosys/libs/cxxopts/BUILD.bazel
+cp scripts/yosys_abc_CMakeLists yosys/abc/CMakeLists.txt
 
 # rm yosys/libs/cxxopts/WORKSPACE
 # Remove vendored cxxopts bazel file, should be found by glob
