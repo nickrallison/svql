@@ -12,25 +12,24 @@ set (SVQL_SRC
         src/SvqlPass.cpp
 )
 
-add_library (svql SHARED ${SVQL_SRC})
+add_library (svql_driver SHARED ${SVQL_SRC})
 
-target_include_directories (svql
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>)
+target_include_directories (svql_driver
+        PUBLIC  
+                ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-set_target_properties (svql PROPERTIES
+set_target_properties (svql_driver PROPERTIES
         PREFIX ""
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out")
 
 # The necessary flags and include paths from Yosys are propagated automatically
 # by Bazel through the generated CMake toolchain.
-target_compile_options(svql PRIVATE -D_YOSYS_)
+target_compile_options(svql_driver PRIVATE -D_YOSYS_)
 
 # Simply link against the imported targets 'yosys' and 'svql_common'.
-target_link_libraries(svql PRIVATE yosys svql_common)
+target_link_libraries(svql_driver PRIVATE yosys svql_common)
 
-install(TARGETS svql
+install(TARGETS svql_driver
         LIBRARY DESTINATION .
         ARCHIVE DESTINATION .
         RUNTIME DESTINATION .
@@ -42,11 +41,11 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
 add_custom_target (test
         COMMAND ${YOSYS_BIN}
-        -m $<TARGET_FILE:svql>
+        -m $<TARGET_FILE:svql_driver>
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/cwe1234/variant1.v
         -p "hierarchy -top locked_register_example"
         -p "proc"
         -p "svql -map ./examples/cwe1234/locked_register_pat.v -verbose"
-        DEPENDS svql
+        DEPENDS svql_driver
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Running example flow with freshly built svql plug-in")
