@@ -3,6 +3,26 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 package(default_visibility = ["//visibility:public"])
 
+
+genrule(
+    name = "header",
+    srcs = ["libs/cxxopts/include/cxxopts.hpp"],
+    outs = ["cxxopts.hpp"],
+    tools = [],
+    cmd = """
+        cp libs/cxxopts/include/cxxopts.hpp $(location cxxopts.hpp)
+    """,
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "cxxopts_header",
+    hdrs = [":header"],
+    deps  = [],
+    visibility = ["//visibility:public"],
+)
+
+
 filegroup(
     name = "srcs",
     srcs = glob(
@@ -19,7 +39,7 @@ cmake(
     name             = "yosys",
     lib_source       = ":srcs",
     # Depend on the cxxopts library from its own repository.
-    deps             = ["@cxxopts//:cxxopts"],
+    deps             = [":cxxopts_header"],
     cache_entries    = {"ENABLE_LIBYOSYS": "1"},
     # The yosys CMake scripts still have hardcoded paths. This creates a dummy
     # directory to prevent CMake from failing its path existence checks.
