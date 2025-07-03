@@ -40,7 +40,7 @@ cmake(
     lib_source       = ":srcs",
     # Depend on the cxxopts library from its own repository.
     deps             = [":cxxopts_header"],
-    cache_entries    = {"ENABLE_LIBYOSYS": "1"},
+    # cache_entries    = {"ENABLE_LIBYOSYS": "1"},
     # The yosys CMake scripts still have hardcoded paths. This creates a dummy
     # directory to prevent CMake from failing its path existence checks.
     out_binaries     = ["yosys", "yosys-config"],
