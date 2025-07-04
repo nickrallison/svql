@@ -4,6 +4,22 @@ project (svql_driver LANGUAGES CXX)
 # ----------------------------------------------------------------------------
 set (CMAKE_CXX_STANDARD 17)
 
+# ----------------------------------------------------------------------------
+set (YOSYS_BIN     "${yosys_BINARY_DIR}/yosys" CACHE FILEPATH "yosys executable")
+set (YOSYS_CONFIG  "${yosys_BINARY_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
+# set (YOSYS_SOURCE_ROOT "${yosys_SOURCE_DIR}/" CACHE PATH "Root of the Yosys source tree")
+
+# Query yosys-config
+execute_process (COMMAND ${YOSYS_CONFIG} --cxxflags   OUTPUT_VARIABLE YOSYS_CXXFLAGS   OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process (COMMAND ${YOSYS_CONFIG} --ldflags    OUTPUT_VARIABLE YOSYS_LDFLAGS    OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process (COMMAND ${YOSYS_CONFIG} --ldlibs     OUTPUT_VARIABLE YOSYS_LDLIBS     OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process (COMMAND ${YOSYS_CONFIG} --datdir     OUTPUT_VARIABLE YOSYS_DATDIR     OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# Convert the flag strings to proper CMake lists
+separate_arguments (YOSYS_CXXFLAGS_LIST  UNIX_COMMAND "${YOSYS_CXXFLAGS}")
+separate_arguments (YOSYS_LDFLAGS_LIST   UNIX_COMMAND "${YOSYS_LDFLAGS}")
+separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
+
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
         src/GraphConversion.cpp
@@ -19,11 +35,9 @@ target_include_directories (svql_driver
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
                 ${yosys_SOURCE_DIR})
 
-# set_target_properties (svql_driver PROPERTIES
-#         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out")
-
-target_compile_options(svql_driver PRIVATE -D_YOSYS_)
-target_link_libraries(svql_driver PUBLIC svql_common)
+target_compile_options    (svql_driver PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)
+target_link_options       (svql_driver PRIVATE ${YOSYS_LDFLAGS_LIST})
+target_link_libraries     (svql_driver PRIVATE ${YOSYS_LDLIBS_LIST})
 
 
 install(TARGETS svql_driver
