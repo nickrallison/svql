@@ -16,14 +16,15 @@ add_library (svql_driver SHARED ${SVQL_SRC})
 
 target_include_directories (svql_driver
         PUBLIC  
-                ${CMAKE_CURRENT_SOURCE_DIR}/include)
+                ${CMAKE_CURRENT_SOURCE_DIR}/include
+                ${yosys_SOURCE_DIR})
 
-set_target_properties (svql_driver PROPERTIES
-        PREFIX ""
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out")
+# set_target_properties (svql_driver PROPERTIES
+#         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out")
 
 target_compile_options(svql_driver PRIVATE -D_YOSYS_)
-target_link_libraries(svql_driver PUBLIC yosys svql_common)
+target_link_libraries(svql_driver PUBLIC svql_common)
+
 
 install(TARGETS svql_driver
         LIBRARY DESTINATION .
