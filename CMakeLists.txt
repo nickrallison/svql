@@ -5,5 +5,6 @@ enable_testing()
 
 add_subdirectory(svql_common)
 add_subdirectory(yosys)
+#add_subdirectory(subcircuit)
 add_subdirectory(svql_driver)
 

@@ -7,7 +7,6 @@ set (CMAKE_CXX_STANDARD 17)
 # ----------------------------------------------------------------------------
 set (YOSYS_BIN     "${yosys_BINARY_DIR}/yosys" CACHE FILEPATH "yosys executable")
 set (YOSYS_CONFIG  "${yosys_BINARY_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
-# set (YOSYS_SOURCE_ROOT "${yosys_SOURCE_DIR}/" CACHE PATH "Root of the Yosys source tree")
 
 # Query yosys-config
 execute_process (COMMAND ${YOSYS_CONFIG} --cxxflags   OUTPUT_VARIABLE YOSYS_CXXFLAGS   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -26,6 +25,8 @@ set (SVQL_SRC
         src/RegexMap.cpp
         src/SubCircuitReSolver.cpp
         src/SvqlPass.cpp
+        # 
+        ${yosys_SOURCE_DIR}/libs/subcircuit/subcircuit.cc
 )
 
 add_library (svql_driver SHARED ${SVQL_SRC})
@@ -33,7 +34,8 @@ add_library (svql_driver SHARED ${SVQL_SRC})
 target_include_directories (svql_driver
         PUBLIC  
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
-                ${yosys_SOURCE_DIR})
+                ${yosys_SOURCE_DIR}
+        )
 
 target_compile_options    (svql_driver PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)
 target_link_options       (svql_driver PRIVATE ${YOSYS_LDFLAGS_LIST})
