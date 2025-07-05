@@ -25,8 +25,9 @@ set (SVQL_SRC
         src/RegexMap.cpp
         src/SubCircuitReSolver.cpp
         src/SvqlPass.cpp
-        # 
-        ${yosys_SOURCE_DIR}/libs/subcircuit/subcircuit.cc
+        # # 
+        # ${yosys_SOURCE_DIR}/libs/subcircuit/subcircuit.cc
+
 )
 
 add_library (svql_driver SHARED ${SVQL_SRC})
@@ -34,12 +35,15 @@ add_library (svql_driver SHARED ${SVQL_SRC})
 target_include_directories (svql_driver
         PUBLIC  
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
-                ${yosys_SOURCE_DIR}
+                ${yosys_SOURCE_DIR}/libs/subcircuit
         )
 
 target_compile_options    (svql_driver PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)
+# target_link_options       (svql_driver PRIVATE ${YOSYS_LDFLAGS_LIST} "-Wl,--no-undefined")
 target_link_options       (svql_driver PRIVATE ${YOSYS_LDFLAGS_LIST})
-target_link_libraries     (svql_driver PRIVATE ${YOSYS_LDLIBS_LIST})
+target_link_libraries     (svql_driver PRIVATE ${YOSYS_LDLIBS_LIST} 
+        yosys
+)
 
 
 install(TARGETS svql_driver

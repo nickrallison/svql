@@ -1,7 +1,7 @@
 #pragma once
 // #include <nlohmann/json_fwd.hpp>
 #include "RegexMap.hpp"
-#include "libs/subcircuit/subcircuit.h"
+#include "subcircuit.h"
 
 using namespace Yosys;
 
@@ -14,11 +14,11 @@ namespace svql
         SubCircuitReSolver();
 
         void setVerbose(bool enable = true);
-        void setRegexMap (RegexMap m);
+        void setRegexMap(RegexMap m);
         void joinRegexMap(const RegexMap &other);
 
         // Attribute / parameter knobs ------------------------------------
-        bool  ignoreParameters = false;
+        bool ignoreParameters = false;
         std::set<std::pair<RTLIL::IdString, RTLIL::IdString>> ignoredParams;
         std::set<RTLIL::IdString> cell_attr;
         std::set<RTLIL::IdString> wire_attr;
@@ -30,7 +30,7 @@ namespace svql
                               const std::string &, void *needleUser,
                               const std::string &,
                               const std::string &, void *haystackUser,
-                              const std::map<std::string,std::string> &portMap) override;
+                              const std::map<std::string, std::string> &portMap) override;
 
         // helpers ---------------------------------------------------------
         bool matchesRegex(RTLIL::IdString signal, const std::regex &r) const;
