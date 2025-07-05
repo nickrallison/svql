@@ -25,9 +25,6 @@ set (SVQL_SRC
         src/RegexMap.cpp
         src/SubCircuitReSolver.cpp
         src/SvqlPass.cpp
-        # # 
-        # ${yosys_SOURCE_DIR}/libs/subcircuit/subcircuit.cc
-
 )
 
 add_library (svql_driver SHARED ${SVQL_SRC})
@@ -58,7 +55,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
 add_test(
         NAME    svql_driver_test
-        COMMAND $<TARGET_FILE:yosys_exe>
+        COMMAND ${yosys_SOURCE_DIR}/yosys
                 -m $<TARGET_FILE:svql_driver>
                 ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
                 -p "hierarchy -top locked_register_example"
@@ -67,4 +64,4 @@ add_test(
     )
     set_tests_properties(svql_driver_test PROPERTIES
                          DEPENDS svql_driver 
-                         DEPENDS yosys_exe)
+                         DEPENDS yosys)
