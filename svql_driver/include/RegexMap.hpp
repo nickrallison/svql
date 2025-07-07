@@ -6,6 +6,8 @@
 #include <string>
 
 #include "kernel/yosys.h"
+#include "kernel/yosys.h"
+#include "kernel/rtlil.h"
 
 using namespace Yosys;
 

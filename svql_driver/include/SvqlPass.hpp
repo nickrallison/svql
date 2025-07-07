@@ -1,6 +1,8 @@
 #pragma once
 
 #include "kernel/register.h"
+#include "kernel/yosys.h"
+#include "kernel/rtlil.h"
 
 using namespace Yosys;
 

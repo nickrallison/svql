@@ -1,5 +1,8 @@
 #pragma once
 
+#include "kernel/yosys.h"
+#include "kernel/rtlil.h"
+
 using namespace Yosys;
 
 namespace svql

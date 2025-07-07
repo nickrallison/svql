@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
+
+#include "libs/subcircuit/subcircuit.h"
+#include "kernel/yosys.h"
 #include "kernel/rtlil.h"
-#include "subcircuit.h"
 
 using namespace Yosys;
 

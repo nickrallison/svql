@@ -17,6 +17,7 @@
             gcc 
             cmake
             ninja
+            pkg-config
 
             ## Rust
             cargo 

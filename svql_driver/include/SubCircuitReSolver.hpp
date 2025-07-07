@@ -1,7 +1,9 @@
 #pragma once
-// #include <nlohmann/json_fwd.hpp>
+
 #include "RegexMap.hpp"
-#include "subcircuit.h"
+#include "libs/subcircuit/subcircuit.h"
+#include "kernel/yosys.h"
+#include "kernel/rtlil.h"
 
 using namespace Yosys;
 

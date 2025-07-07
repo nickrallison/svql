@@ -5,7 +5,7 @@
 
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
-#include "subcircuit.h"
+#include "libs/subcircuit/subcircuit.h"
 
 #include "SubCircuitReSolver.hpp"
 #include "GraphConversion.hpp"
