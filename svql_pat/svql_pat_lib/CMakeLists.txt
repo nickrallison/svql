@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.16)
-project (svql_driver LANGUAGES CXX)
+project (svql_pat_lib LANGUAGES CXX)
 
 # ----------------------------------------------------------------------------
 set (CMAKE_CXX_STANDARD 17)
@@ -21,10 +21,7 @@ separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
 
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
-        src/GraphConversion.cpp
-        src/RegexMap.cpp
-        src/SubCircuitReSolver.cpp
-        src/SvqlPass.cpp
+        src/SvqlPatPass.cpp
 )
 
 add_library (${PROJECT_NAME} SHARED ${SVQL_SRC})
@@ -41,7 +38,6 @@ target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST}
         yosys
 )
 
-
 install(TARGETS ${PROJECT_NAME}
         LIBRARY DESTINATION .
         ARCHIVE DESTINATION .
@@ -52,15 +48,15 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
         DESTINATION include
         FILES_MATCHING PATTERN "*.h")
 
-add_test(
-        NAME    ${PROJECT_NAME}_test
-        COMMAND ${yosys_SOURCE_DIR}/yosys
-                -m $<TARGET_FILE:${PROJECT_NAME}>
-                ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
-                -p "hierarchy -top locked_register_example"
-                -p "proc"
-                -p "svql -map ${CMAKE_SOURCE_DIR}/examples/cwe1234/locked_register_pat.v -verbose"
-    )
-    set_tests_properties(${PROJECT_NAME}_test PROPERTIES
-                         DEPENDS ${PROJECT_NAME}
-                         DEPENDS yosys)
+# add_test(
+#         NAME    ${PROJECT_NAME}_test
+#         COMMAND ${yosys_SOURCE_DIR}/yosys
+#                 -m $<TARGET_FILE:${PROJECT_NAME}>
+#                 ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
+#                 -p "hierarchy -top locked_register_example"
+#                 -p "proc"
+#                 -p "svql -map ${CMAKE_SOURCE_DIR}/examples/cwe1234/locked_register_pat.v -verbose"
+#     )
+#     set_tests_properties(${PROJECT_NAME}_test PROPERTIES
+#                          DEPENDS ${PROJECT_NAME}
+#                          DEPENDS yosys)

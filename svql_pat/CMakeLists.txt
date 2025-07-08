@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(svql_common NONE)
+project(svql_pat NONE)
 
 include(ExternalProject)
 
@@ -39,3 +39,5 @@ set_target_properties(
 )
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_build)
+
+add_subdirectory(svql_pat_lib)

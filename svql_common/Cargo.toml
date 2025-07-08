@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-lazy_static = "1.5.0"
-regex = "1.11.1"
+lazy_static = { workspace = true }
+regex = { workspace = true }
 
 [build-dependencies]
-cbindgen = "0.29"
+cbindgen = { workspace = true }
