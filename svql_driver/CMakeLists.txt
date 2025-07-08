@@ -5,8 +5,8 @@ project (svql_driver LANGUAGES CXX)
 set (CMAKE_CXX_STANDARD 17)
 
 # ----------------------------------------------------------------------------
-set (YOSYS_BIN     "${yosys_BINARY_DIR}/yosys" CACHE FILEPATH "yosys executable")
-set (YOSYS_CONFIG  "${yosys_BINARY_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
+set (YOSYS_BIN     "${yosys_SOURCE_DIR}/yosys" CACHE FILEPATH "yosys executable")
+set (YOSYS_CONFIG  "${yosys_SOURCE_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
 
 # Query yosys-config
 execute_process (COMMAND ${YOSYS_CONFIG} --cxxflags   OUTPUT_VARIABLE YOSYS_CXXFLAGS   OUTPUT_STRIP_TRAILING_WHITESPACE)
