@@ -7,6 +7,8 @@
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
 
+// #include "svql_common.h"
+
 using namespace Yosys;
 
 SvqlPatPass::SvqlPatPass() : Pass("svql_pat", "takes a verilog file and prints a pattern of its interface for the svql pass") {}
@@ -54,4 +56,22 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	}
 
 	log_pop();
+}
+
+std::vector<CPattern *> get_patterns_from_file(const std::string &file_path)
+{
+	const char* file_loc = file_path.c_str();
+
+	// std::vector<CPattern *> patterns;
+
+	std::string cmd = "read_verilog " + file_path;
+	Yosys::run_pass(cmd);
+	// Assuming the file has been read and patterns are extracted
+
+
+	// Read the file and extract patterns
+	// This is a placeholder implementation
+	// You need to replace it with your actual file reading and pattern extraction logic
+
+	return patterns;
 }

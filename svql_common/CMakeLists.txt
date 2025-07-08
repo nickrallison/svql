@@ -26,7 +26,7 @@ ExternalProject_Add(
                 ${CMAKE_CURRENT_SOURCE_DIR}
     BUILD_BYPRODUCTS
         ${SVQL_COMMON_TARGET_DIR}/release/lib${PROJECT_NAME}.a
-        ${SVQL_COMMON_HEADER_DIR}/source.h
+        ${SVQL_COMMON_HEADER_DIR}/svql_common.h
     INSTALL_COMMAND ""
 )
 
