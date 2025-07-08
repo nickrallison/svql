@@ -5,8 +5,8 @@ project (svql_pat_lib LANGUAGES CXX)
 set (CMAKE_CXX_STANDARD 17)
 
 # ----------------------------------------------------------------------------
-set (YOSYS_BIN     "${yosys_BINARY_DIR}/yosys" CACHE FILEPATH "yosys executable")
-set (YOSYS_CONFIG  "${yosys_BINARY_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
+set (YOSYS_BIN     "${yosys_SOURCE_DIR}/yosys" CACHE FILEPATH "yosys executable")
+set (YOSYS_CONFIG  "${yosys_SOURCE_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
 
 # Query yosys-config
 execute_process (COMMAND ${YOSYS_CONFIG} --cxxflags   OUTPUT_VARIABLE YOSYS_CXXFLAGS   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -20,22 +20,22 @@ separate_arguments (YOSYS_LDFLAGS_LIST   UNIX_COMMAND "${YOSYS_LDFLAGS}")
 separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
 
 # --- Source files ----------------------------------------------------------
-set (SVQL_SRC
+set (SVQL_PAT_SRC
         src/SvqlPatPass.cpp
 )
 
-add_library (${PROJECT_NAME} SHARED ${SVQL_SRC})
+add_library (${PROJECT_NAME} SHARED ${SVQL_PAT_SRC})
 
 target_include_directories (${PROJECT_NAME}
         PUBLIC
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
-                ${yosys_SOURCE_DIR}/
+                ${CMAKE_SOURCE_DIR}/yosys
         )
 
 target_compile_options    (${PROJECT_NAME} PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)
 target_link_options       (${PROJECT_NAME} PRIVATE ${YOSYS_LDFLAGS_LIST})
 target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST} 
-        yosys
+        svql_common
 )
 
 install(TARGETS ${PROJECT_NAME}

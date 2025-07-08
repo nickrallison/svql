@@ -3,6 +3,7 @@
 #include <fstream>
 #include <regex>
 
+#include "kernel/register.h"
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
 
