@@ -129,7 +129,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	// Serialize pattern to JSON and log it
 	char *json_str = cpattern_to_json(pattern);
 	if (json_str) {
-		log("Pattern JSON:\n%s\n", json_str);
+		log("```\n%s\n```\n", json_str);
 		cpattern_json_free(json_str);
 	} else {
 		log("Failed to serialize pattern to JSON\n");
