@@ -21,6 +21,7 @@ ExternalProject_Add(
             ${CARGO_EXECUTABLE} build --release --lib
         COMMAND
             ${CBINDGEN_EXECUTABLE}
+                --config ${CMAKE_CURRENT_SOURCE_DIR}/cbindgen.toml
                 --lang C
                 --output ${SVQL_COMMON_HEADER_DIR}/svql_common.h
                 ${CMAKE_CURRENT_SOURCE_DIR}

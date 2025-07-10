@@ -22,6 +22,3 @@ struct SvqlPatPass : public Pass
 //                               uintptr_t out_ports_len,
 //                               const char *const *inout_ports,
 //                               uintptr_t inout_ports_len);
-
-std::vector<CPattern *> get_patterns_from_file(const std::string &file_path);
-

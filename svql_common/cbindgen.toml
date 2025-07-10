@@ -1,0 +1,14 @@
+# cbindgen configuration for svql_common
+language = "C"
+
+header = """
+#ifdef __cplusplus
+extern "C" {
+#endif
+"""
+
+trailer = """
+#ifdef __cplusplus
+}
+#endif
+"""
