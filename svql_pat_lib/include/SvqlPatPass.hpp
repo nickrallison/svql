@@ -4,7 +4,7 @@
 #include "kernel/yosys.h"
 #include "kernel/rtlil.h"
 
-// #include "svql_common.h"
+#include "svql_common.h"
 
 using namespace Yosys;
 

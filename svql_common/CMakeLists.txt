@@ -22,7 +22,7 @@ ExternalProject_Add(
         COMMAND
             ${CBINDGEN_EXECUTABLE}
                 --lang C
-                --output ${SVQL_COMMON_HEADER_DIR}/source.h
+                --output ${SVQL_COMMON_HEADER_DIR}/svql_common.h
                 ${CMAKE_CURRENT_SOURCE_DIR}
     BUILD_BYPRODUCTS
         ${SVQL_COMMON_TARGET_DIR}/release/lib${PROJECT_NAME}.a
