@@ -59,14 +59,8 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 		log_error("No module name specified. Use -module <module_name>\n");
 	}
 
-	// Ensure module name is properly escaped for RTLIL
-	std::string rtlil_module_name = module_name;
-	if (rtlil_module_name[0] != '\\' && rtlil_module_name[0] != '$') {
-		rtlil_module_name = "\\" + rtlil_module_name;
-	}
-
 	// Find the module in the design
-	RTLIL::Module *module = design->module(RTLIL::IdString(rtlil_module_name));
+	RTLIL::Module *module = design->module(RTLIL::IdString(module_name));
 	if (!module) {
 		log_error("Module '%s' not found in design\n", module_name.c_str());
 	}
