@@ -126,6 +126,15 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	log("Created pattern for module '%s' with %zu input(s), %zu output(s), and %zu inout(s) ports\n",
 		module_name.c_str(), input_ports.size(), output_ports.size(), inout_ports.size());
 
+	// Serialize pattern to JSON and log it
+	char *json_str = cpattern_to_json(pattern);
+	if (json_str) {
+		log("Pattern JSON:\n%s\n", json_str);
+		cpattern_json_free(json_str);
+	} else {
+		log("Failed to serialize pattern to JSON\n");
+	}
+
 	// TODO: Further processing will be added later
 	// For now, just clean up the pattern
 	cpattern_free(pattern);

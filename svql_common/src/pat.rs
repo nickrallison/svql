@@ -5,7 +5,9 @@ use std::{
     os::raw::c_char,
     ptr,
 };
+use serde::{Serialize, Deserialize};
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pattern {
     pub file_loc: PathBuf,
     pub in_ports: Vec<String>,
@@ -176,4 +178,58 @@ pub unsafe extern "C" fn cpattern_free(ptr: *mut CPattern) {
     // Re-cast the address back to the boxed wrapper and drop it.
     let _boxed: Box<CPatternBoxed> = Box::from_raw(ptr as *mut CPatternBoxed);
     // dropping `_boxed` frees everything (CString buffers, Vecs, etc.)
+}
+
+/// Serialize a CPattern to JSON string
+/// Returns a pointer to a C string that must be freed with cpattern_json_free
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_char {
+    if pattern.is_null() {
+        return ptr::null_mut();
+    }
+
+    let rust_pattern = Pattern::from(&*pattern);
+    match serde_json::to_string_pretty(&rust_pattern) {
+        Ok(json_string) => {
+            match CString::new(json_string) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Deserialize a JSON string to CPattern
+/// Takes ownership of the JSON string and returns a CPattern pointer
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cpattern_from_json(json_str: *const c_char) -> *mut CPattern {
+    if json_str.is_null() {
+        return ptr::null_mut();
+    }
+
+    let json_cstr = CStr::from_ptr(json_str);
+    let json_string = match json_cstr.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let pattern: Pattern = match serde_json::from_str(json_string) {
+        Ok(p) => p,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    // Convert to C representation and leak the box so C can hold a pointer
+    let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
+    Box::into_raw(boxed) as *mut CPattern
+}
+
+/// Free a JSON string returned by cpattern_to_json
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cpattern_json_free(json_str: *mut c_char) {
+    if json_str.is_null() {
+        return;
+    }
+    let _c_string = CString::from_raw(json_str);
+    // CString will be dropped and memory freed
 }
