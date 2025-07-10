@@ -56,6 +56,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	extra_args(args, argidx, design);
 
 	if (module_name.empty()) {
+		log("SVQL_PAT_ERROR: No module name specified. Use -module <module_name>\n");
 		log_error("No module name specified. Use -module <module_name>\n");
 	}
 
@@ -66,6 +67,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	// Find the module in the design
 	RTLIL::Module *module = design->module(RTLIL::IdString(module_name));
 	if (!module) {
+		log("SVQL_PAT_ERROR: Module '%s' not found in design\n", module_name.c_str());
 		log_error("Module '%s' not found in design\n", module_name.c_str());
 	}
 
@@ -120,6 +122,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	);
 
 	if (!pattern) {
+		log("SVQL_PAT_ERROR: Failed to create pattern\n");
 		log_error("Failed to create pattern\n");
 	}
 
@@ -129,10 +132,10 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	// Serialize pattern to JSON and log it
 	char *json_str = cpattern_to_json(pattern);
 	if (json_str) {
-		log("```\n%s\n```\n", json_str);
+		log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
 		cpattern_json_free(json_str);
 	} else {
-		log("Failed to serialize pattern to JSON\n");
+		log("SVQL_PAT_ERROR: Failed to serialize pattern to JSON\n");
 	}
 
 	// TODO: Further processing will be added later
