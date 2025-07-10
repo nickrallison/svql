@@ -1,6 +1,62 @@
 
 // svql_pat/src/lib.rs
 
+//! # SVQL Pattern Extraction Library
+//!
+//! This library provides functionality to extract interface patterns from Verilog files
+//! using the yosys synthesis tool with the `svql_pat_lib` plugin. It can analyze Verilog
+//! modules and extract information about their input, output, and inout ports.
+//!
+//! ## Features
+//!
+//! - Extract module interface patterns from Verilog files
+//! - Comprehensive error handling for common failure modes
+//! - Support for custom yosys and plugin paths
+//! - JSON serialization of extracted patterns
+//! - Detailed error reporting with helpful suggestions
+//!
+//! ## Usage
+//!
+//! ### Basic usage with default paths:
+//! ```no_run
+//! # use svql_pat::extract_pattern_default;
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let pattern = extract_pattern_default("path/to/file.v", "module_name")?;
+//! println!("Input ports: {:?}", pattern.in_ports);
+//! println!("Output ports: {:?}", pattern.out_ports);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Advanced usage with custom paths:
+//! ```no_run
+//! # use svql_pat::extract_pattern;
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let pattern = extract_pattern(
+//!     "path/to/file.v",
+//!     "module_name",
+//!     Some("/path/to/yosys"),
+//!     Some("/path/to/libsvql_pat_lib.so")
+//! )?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Error Handling
+//!
+//! The library provides detailed error types that help diagnose issues:
+//! - `FileNotFound`: Verilog file doesn't exist
+//! - `ModuleNotFound`: Module not found in the file
+//! - `SyntaxError`: Verilog syntax errors
+//! - `YosysExecutionError`: Problems running yosys
+//! - `ParseError`: Issues parsing yosys output
+//!
+//! ## Requirements
+//!
+//! - Yosys synthesis tool must be installed and accessible
+//! - The `svql_pat_lib.so` plugin must be built and available
+//! - Input Verilog files must be syntactically correct
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use regex::Regex;
