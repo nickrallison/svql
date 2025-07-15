@@ -1,4 +1,6 @@
+use std::ffi::OsStr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use crate::connection::Connection;
 use crate::file_info::Match;
 
@@ -6,8 +8,8 @@ use crate::file_info::Match;
 pub struct InPort(String);
 
 impl InPort {
-    pub fn new(s: String) -> InPort {
-        InPort(s)
+    pub fn new<S: Into<String>>(s: S) -> InPort {
+        InPort(s.into())
     }
     pub fn connect_to(&self, out_port: &OutPort) -> Connection {
         Connection::new(self.clone(), out_port.clone())
@@ -18,8 +20,8 @@ impl InPort {
 pub struct OutPort(String);
 
 impl OutPort {
-    pub fn new(s: String) -> OutPort {
-        OutPort(s)
+    pub fn new<S: Into<String>>(s: S) -> OutPort {
+        OutPort(s.into())
     }
 
     pub fn connect_to(&self, in_port: &InPort) -> Connection {

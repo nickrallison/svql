@@ -16,18 +16,18 @@
 using namespace svql;
 using namespace Yosys;
 
-SvqlPass::SvqlPass() : Pass("svql", "find subcircuits and replace them with cells") {}
+SvqlPass::SvqlPass() : Pass("svql_driver", "find subcircuits and replace them with cells") {}
 
 void SvqlPass::help()
 {
 	log("\n");
-	log("    svql -map <map_file> [options] [selection]\n");
+	log("    svql_driver -pat <pat_file> [options] [selection]\n");
 	log("\n");
 	log("This pass looks for subcircuits that are isomorphic to any of the modules\n");
 	log("in the given map file.\n");
 	log("map file can be a Verilog source file (*.v) or an RTLIL source file (*.il).\n");
 	log("\n");
-	log("    -map <map_file>\n");
+	log("    -pat <pat_file>\n");
 	log("        use the modules in this file as reference. This option can be used\n");
 	log("        multiple times.\n");
 	log("\n");
@@ -88,7 +88,7 @@ void SvqlPass::help()
 
 void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 {
-	log_header(design, "Executing SVQL pass (find matching subcircuits).\n");
+	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
 	log_push();
 
 	SubCircuitReSolver solver;
