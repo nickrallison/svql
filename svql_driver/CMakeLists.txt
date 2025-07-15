@@ -21,47 +21,53 @@ separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
 
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
-        src/GraphConversion.cpp
-        src/RegexMap.cpp
-        src/SubCircuitReSolver.cpp
-        src/SvqlPass.cpp
+    src/GraphConversion.cpp
+    src/RegexMap.cpp
+    src/SubCircuitReSolver.cpp
+    src/SvqlPass.cpp
 )
 
 add_library (${PROJECT_NAME} SHARED ${SVQL_SRC})
 
 target_include_directories (${PROJECT_NAME}
-        PUBLIC
-                ${CMAKE_CURRENT_SOURCE_DIR}/include
-                ${yosys_SOURCE_DIR}/
-        )
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${yosys_SOURCE_DIR}/
+    )
 
 target_compile_options    (${PROJECT_NAME} PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)
 target_link_options       (${PROJECT_NAME} PRIVATE ${YOSYS_LDFLAGS_LIST})
 target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST} 
-        yosys
-        svql_common
+    yosys
+    svql_common
 )
 
+# AddressSanitizer options - only enable in debug builds to avoid runtime issues
+# if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+#     target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address -fno-omit-frame-pointer)
+#     target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address)
+# endif()
 
 install(TARGETS ${PROJECT_NAME}
-        LIBRARY DESTINATION .
-        ARCHIVE DESTINATION .
-        RUNTIME DESTINATION .
+    LIBRARY DESTINATION .
+    ARCHIVE DESTINATION .
+    RUNTIME DESTINATION .
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
-        DESTINATION include
-        FILES_MATCHING PATTERN "*.h")
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h")
 
 add_test(
-        NAME    ${PROJECT_NAME}_test
-        COMMAND ${yosys_SOURCE_DIR}/yosys
-                -m $<TARGET_FILE:${PROJECT_NAME}>
-                ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
-                -p "hierarchy -top locked_register_example"
-                -p "proc"
-                -p "svql -map ${CMAKE_SOURCE_DIR}/examples/cwe1234/locked_register_pat.v -verbose"
+    NAME    ${PROJECT_NAME}_test
+    COMMAND ${yosys_SOURCE_DIR}/yosys
+        -m $<TARGET_FILE:${PROJECT_NAME}>
+        ${CMAKE_SOURCE_DIR}/examples/cwe1234/variant1.v
+        -p "hierarchy -top locked_register_example"
+        -p "proc"
+        -p "svql -map ${CMAKE_SOURCE_DIR}/examples/cwe1234/locked_register_pat.v -verbose"
     )
     set_tests_properties(${PROJECT_NAME}_test PROPERTIES
-                         DEPENDS ${PROJECT_NAME}
-                         DEPENDS yosys)
+        DEPENDS ${PROJECT_NAME}
+        DEPENDS yosys
+        )

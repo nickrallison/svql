@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::file_info::Match;
+use svql_common::mat::Match;
 
 pub trait Module {
     fn file_path(&self) -> PathBuf;
@@ -39,7 +39,7 @@ pub trait Module {
 
 
 pub trait Query {
-    fn query<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<crate::file_info::Match>;
+    fn query<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<Match>;
 }
 
 impl<T: Module> Query for T {

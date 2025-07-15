@@ -91,142 +91,21 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
 	log_push();
 
-	SubCircuitReSolver solver;
-
-	std::vector<std::string> pat_filenames;
-	std::vector<std::string> regex_filenames;
-	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes;
-	bool constports = false;
-	bool nodefaultswaps = false;
-	bool verbose = false;
-
 	size_t argidx;
-	for (argidx = 1; argidx < args.size(); argidx++)
-	{
 
-		if (args[argidx] == "-pat" && argidx + 1 < args.size())
-		{
-			pat_filenames.push_back(args[++argidx]);
-			continue;
-		}
-
-		if (args[argidx] == "-re" && argidx + 1 < args.size())
-		{
-			regex_filenames.push_back(args[++argidx]);
-			continue;
-		}
-		if (args[argidx] == "-verbose")
-		{
-			solver.setVerbose();
-			continue;
-		}
-		if (args[argidx] == "-constports")
-		{
-			constports = true;
-			continue;
-		}
-		if (args[argidx] == "-nodefaultswaps")
-		{
-			nodefaultswaps = true;
-			continue;
-		}
-		if (args[argidx] == "-compat" && argidx + 2 < args.size())
-		{
-			std::string needle_type = RTLIL::escape_id(args[++argidx]);
-			std::string haystack_type = RTLIL::escape_id(args[++argidx]);
-			solver.addCompatibleTypes(needle_type, haystack_type);
-			continue;
-		}
-		if (args[argidx] == "-swap" && argidx + 2 < args.size())
-		{
-			std::string type = RTLIL::escape_id(args[++argidx]);
-			std::set<std::string> ports;
-			std::string ports_str = args[++argidx], p;
-			while (!(p = next_token(ports_str, ",\t\r\n ")).empty())
-				ports.insert(RTLIL::escape_id(p));
-			solver.addSwappablePorts(type, ports);
-			continue;
-		}
-		if (args[argidx] == "-perm" && argidx + 3 < args.size())
-		{
-			std::string type = RTLIL::escape_id(args[++argidx]);
-			std::vector<std::string> map_left, map_right;
-			std::string left_str = args[++argidx];
-			std::string right_str = args[++argidx], p;
-			while (!(p = next_token(left_str, ",\t\r\n ")).empty())
-				map_left.push_back(RTLIL::escape_id(p));
-			while (!(p = next_token(right_str, ",\t\r\n ")).empty())
-				map_right.push_back(RTLIL::escape_id(p));
-			if (map_left.size() != map_right.size())
-				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-			std::map<std::string, std::string> map;
-			for (size_t i = 0; i < map_left.size(); i++)
-				map[map_left[i]] = map_right[i];
-			std::sort(map_left.begin(), map_left.end());
-			std::sort(map_right.begin(), map_right.end());
-			if (map_left != map_right)
-				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-			solver.addSwappablePortsPermutation(type, map);
-			continue;
-		}
-		if (args[argidx] == "-cell_attr" && argidx + 1 < args.size())
-		{
-			solver.cell_attr.insert(RTLIL::escape_id(args[++argidx]));
-			continue;
-		}
-		if (args[argidx] == "-wire_attr" && argidx + 1 < args.size())
-		{
-			solver.wire_attr.insert(RTLIL::escape_id(args[++argidx]));
-			continue;
-		}
-		if (args[argidx] == "-ignore_parameters")
-		{
-			solver.ignoreParameters = true;
-			continue;
-		}
-		if (args[argidx] == "-ignore_param" && argidx + 2 < args.size())
-		{
-			solver.ignoredParams.insert(std::pair<RTLIL::IdString, RTLIL::IdString>(RTLIL::escape_id(args[argidx + 1]), RTLIL::escape_id(args[argidx + 2])));
-			argidx += 2;
-			continue;
-		}
-		break;
-	}
+	SvqlConfig config = configure(args, design, argidx);
+	auto &solver = *config.solver;
+	std::vector<std::string> pat_filenames = config.pat_filenames;
+	std::vector<std::string> regex_filenames = config.regex_filenames;
+	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes = config.pat_regexes;
+	bool constports = config.constports;
+	bool nodefaultswaps = config.nodefaultswaps;
+	bool verbose = config.verbose;
 
 	extra_args(args, argidx, design);
 
-	if (!nodefaultswaps)
-	{
-		solver.addSwappablePorts("$and", "\\A", "\\B");
-		solver.addSwappablePorts("$or", "\\A", "\\B");
-		solver.addSwappablePorts("$xor", "\\A", "\\B");
-		solver.addSwappablePorts("$xnor", "\\A", "\\B");
-		solver.addSwappablePorts("$eq", "\\A", "\\B");
-		solver.addSwappablePorts("$ne", "\\A", "\\B");
-		solver.addSwappablePorts("$eqx", "\\A", "\\B");
-		solver.addSwappablePorts("$nex", "\\A", "\\B");
-		solver.addSwappablePorts("$add", "\\A", "\\B");
-		solver.addSwappablePorts("$mul", "\\A", "\\B");
-		solver.addSwappablePorts("$logic_and", "\\A", "\\B");
-		solver.addSwappablePorts("$logic_or", "\\A", "\\B");
-		solver.addSwappablePorts("$_AND_", "\\A", "\\B");
-		solver.addSwappablePorts("$_OR_", "\\A", "\\B");
-		solver.addSwappablePorts("$_XOR_", "\\A", "\\B");
-	}
-
 	if (pat_filenames.empty())
-		log_cmd_error("Missing option -map <verilog_or_rtlil_file>.\n");
-
-	for (auto &filename : regex_filenames)
-	{
-		std::map<std::string, std::map<RTLIL::IdString, std::pair<std::regex, std::string>>> regex_map = load_regex_map(filename);
-		solver.joinRegexMap(regex_map);
-	}
-
-	if (verbose)
-	{
-		solver.setVerbose();
-	}
+		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
 
 	RTLIL::Design *map = nullptr;
 	map = new RTLIL::Design;
@@ -314,21 +193,168 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 		for (int i = 0; i < int(results.size()); i++)
 		{
 			auto &result = results[i];
+
+			for (const auto &it : result.mappings)
+			{
+				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
+				if (c == nullptr)
+					continue;
+
+				log("Found match for %s in s.\n", it.first.c_str());
+			}
 			log("\nMatch #%d: (%s in %s)\n", i, result.needleGraphId.c_str(), result.haystackGraphId.c_str());
 			for (const auto &it : result.mappings)
 			{
 				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-//				std::vector<RTLIL::Wire *> wires = get_output_wires(c);
-//				throw std::runtime_error("CSourceLoc not implemented yet");
-			    CSourceLoc* source_loc = svql_source_loc_parse(c->get_src_attribute().c_str(), '|');
-                char *source_loc_str = svql_source_loc_to_json(source_loc);
-                log("```\n%s\n```", source_loc_str);
-                svql_free_string(source_loc_str);
-                svql_source_loc_free(source_loc);
+				CSourceLoc *source_loc = svql_source_loc_parse(c->get_src_attribute().c_str(), '|');
+				char *source_loc_str = svql_source_loc_to_json(source_loc);
+				log("```\n%s\n```", source_loc_str);
+				svql_free_string(source_loc_str);
+				svql_source_loc_free(source_loc);
 			}
 		}
 	}
 
 	delete map;
 	log_pop();
+}
+
+SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx)
+{
+
+	auto solver = std::make_unique<SubCircuitReSolver>();
+
+	std::vector<std::string> pat_filenames;
+	std::vector<std::string> regex_filenames;
+	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes;
+	bool constports = false;
+	bool nodefaultswaps = false;
+	bool verbose = false;
+
+	for (argidx = 1; argidx < args.size(); argidx++)
+	{
+
+		if (args[argidx] == "-pat" && argidx + 1 < args.size())
+		{
+			pat_filenames.push_back(args[++argidx]);
+			continue;
+		}
+
+		if (args[argidx] == "-re" && argidx + 1 < args.size())
+		{
+			regex_filenames.push_back(args[++argidx]);
+			continue;
+		}
+		if (args[argidx] == "-verbose")
+		{
+			solver->setVerbose();
+			continue;
+		}
+		if (args[argidx] == "-constports")
+		{
+			constports = true;
+			continue;
+		}
+		if (args[argidx] == "-nodefaultswaps")
+		{
+			nodefaultswaps = true;
+			continue;
+		}
+		if (args[argidx] == "-compat" && argidx + 2 < args.size())
+		{
+			std::string needle_type = RTLIL::escape_id(args[++argidx]);
+			std::string haystack_type = RTLIL::escape_id(args[++argidx]);
+			solver->addCompatibleTypes(needle_type, haystack_type);
+			continue;
+		}
+		if (args[argidx] == "-swap" && argidx + 2 < args.size())
+		{
+			std::string type = RTLIL::escape_id(args[++argidx]);
+			std::set<std::string> ports;
+			std::string ports_str = args[++argidx], p;
+			while (!(p = next_token(ports_str, ",\t\r\n ")).empty())
+				ports.insert(RTLIL::escape_id(p));
+			solver->addSwappablePorts(type, ports);
+			continue;
+		}
+		if (args[argidx] == "-perm" && argidx + 3 < args.size())
+		{
+			std::string type = RTLIL::escape_id(args[++argidx]);
+			std::vector<std::string> map_left, map_right;
+			std::string left_str = args[++argidx];
+			std::string right_str = args[++argidx], p;
+			while (!(p = next_token(left_str, ",\t\r\n ")).empty())
+				map_left.push_back(RTLIL::escape_id(p));
+			while (!(p = next_token(right_str, ",\t\r\n ")).empty())
+				map_right.push_back(RTLIL::escape_id(p));
+			if (map_left.size() != map_right.size())
+				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+			std::map<std::string, std::string> map;
+			for (size_t i = 0; i < map_left.size(); i++)
+				map[map_left[i]] = map_right[i];
+			std::sort(map_left.begin(), map_left.end());
+			std::sort(map_right.begin(), map_right.end());
+			if (map_left != map_right)
+				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+			solver->addSwappablePortsPermutation(type, map);
+			continue;
+		}
+		if (args[argidx] == "-cell_attr" && argidx + 1 < args.size())
+		{
+			solver->cell_attr.insert(RTLIL::escape_id(args[++argidx]));
+			continue;
+		}
+		if (args[argidx] == "-wire_attr" && argidx + 1 < args.size())
+		{
+			solver->wire_attr.insert(RTLIL::escape_id(args[++argidx]));
+			continue;
+		}
+		if (args[argidx] == "-ignore_parameters")
+		{
+			solver->ignoreParameters = true;
+			continue;
+		}
+		if (args[argidx] == "-ignore_param" && argidx + 2 < args.size())
+		{
+			solver->ignoredParams.insert(std::pair<RTLIL::IdString, RTLIL::IdString>(RTLIL::escape_id(args[argidx + 1]), RTLIL::escape_id(args[argidx + 2])));
+			argidx += 2;
+			continue;
+		}
+		break;
+	}
+
+	if (!nodefaultswaps)
+	{
+		solver->addSwappablePorts("$and", "\\A", "\\B");
+		solver->addSwappablePorts("$or", "\\A", "\\B");
+		solver->addSwappablePorts("$xor", "\\A", "\\B");
+		solver->addSwappablePorts("$xnor", "\\A", "\\B");
+		solver->addSwappablePorts("$eq", "\\A", "\\B");
+		solver->addSwappablePorts("$ne", "\\A", "\\B");
+		solver->addSwappablePorts("$eqx", "\\A", "\\B");
+		solver->addSwappablePorts("$nex", "\\A", "\\B");
+		solver->addSwappablePorts("$add", "\\A", "\\B");
+		solver->addSwappablePorts("$mul", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_and", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_or", "\\A", "\\B");
+		solver->addSwappablePorts("$_AND_", "\\A", "\\B");
+		solver->addSwappablePorts("$_OR_", "\\A", "\\B");
+		solver->addSwappablePorts("$_XOR_", "\\A", "\\B");
+	}
+
+	if (verbose)
+	{
+		solver->setVerbose();
+	}
+
+	SvqlConfig config;
+	config.solver = std::move(solver);
+	config.pat_filenames = pat_filenames;
+	config.regex_filenames = regex_filenames;
+	config.pat_regexes = pat_regexes;
+	config.constports = constports;
+	config.nodefaultswaps = nodefaultswaps;
+	config.verbose = verbose;
+
+	return config;
 }

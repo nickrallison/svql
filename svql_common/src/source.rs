@@ -22,6 +22,7 @@ pub struct CSourceRange {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct CSourceLoc {
     pub ranges: *const CSourceRange,
     pub len: usize,

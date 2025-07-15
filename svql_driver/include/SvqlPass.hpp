@@ -4,11 +4,19 @@
 #include "kernel/yosys.h"
 #include "kernel/rtlil.h"
 
+#include "SvqlConfig.hpp"
+
 using namespace Yosys;
+
+namespace svql
+{
 
 struct SvqlPass : public Pass
 {
 	SvqlPass();
 	void help() override;
 	void execute(std::vector<std::string> args, RTLIL::Design *design) override;
+	SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);
 } SvqlPass;
+
+} // namespace svql

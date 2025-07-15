@@ -1,4 +1,4 @@
 #!/bin/sh
 
-cmake -B build; 
-cmake --build build --parallel 32
+cmake -DCMAKE_BUILD_TYPE=Debug -B build;
+cmake --build build --parallel 32;

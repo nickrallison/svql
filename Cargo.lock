@@ -379,6 +379,9 @@ dependencies = [
 [[package]]
 name = "svql_query"
 version = "0.1.0"
+dependencies = [
+ "svql_common",
+]
 
 [[package]]
 name = "syn"

@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
 use crate::connection::Connection;
-use crate::file_info::Match;
+use svql_common::mat::Match;
 use crate::ports::{InPort, OutPort};
 use crate::query::{Module, Query};
 
 mod query;
 mod ports;
 mod connection;
-mod file_info;
 
 struct CAdd {
     in1: InPort,
