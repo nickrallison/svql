@@ -7,7 +7,7 @@ use std::{
     os::raw::c_char,
     slice,
 };
-
+use serde::{Deserialize, Serialize};
 //
 // FFI‐Safe Structs
 //
@@ -31,6 +31,7 @@ pub struct CSourceLoc {
 // Native Rust Types
 //
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SourceRange {
     pub file: String,
     pub line_begin: usize,
@@ -39,6 +40,7 @@ pub struct SourceRange {
     pub col_end: usize,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SourceLoc {
     pub ranges: Vec<SourceRange>,
 }
@@ -250,7 +252,9 @@ pub unsafe extern "C" fn svql_source_range_to_string(r: *const CSourceRange) -> 
     CString::new(sr.to_string()).unwrap().into_raw()
 }
 
-/// Turn a CSourceRange into its “pretty” multi‐line form.  
+
+
+/// Turn a CSourceRange into its “pretty” multi‐line form.
 /// Returns a malloc’d C string (must be freed by `svql_free_string`).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_range_to_string_pretty(r: *const CSourceRange) -> *mut c_char {
@@ -285,7 +289,7 @@ pub unsafe extern "C" fn svql_source_range_free(ptr: *mut CSourceRange) {
     // Box drops here
 }
 
-/// Parse a SourceLoc (a list of ranges) from a C‐string, using separator `sep`.  
+/// Parse a SourceLoc (a list of ranges) from a C‐string, using separator `sep`.
 /// Returns null on error. Caller must free with `svql_source_loc_free`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_parse(s: *const c_char, sep: c_char) -> *mut CSourceLoc {
@@ -383,6 +387,38 @@ pub unsafe extern "C" fn svql_source_loc_to_string_pretty(loc: *const CSourceLoc
     let sl = SourceLoc { ranges };
     CString::new(sl.to_string_pretty()).unwrap().into_raw()
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn svql_source_loc_to_json(s: *mut CSourceLoc) -> *mut c_char {
+    if s.is_null() {
+        return std::ptr::null_mut();
+    }
+    let cl = &*s;
+    let mut ranges = Vec::with_capacity(cl.len);
+    if !cl.ranges.is_null() {
+        let slice = slice::from_raw_parts(cl.ranges, cl.len);
+        for cr in slice {
+            if cr.file.is_null() {
+                continue;
+            }
+            let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
+            ranges.push(SourceRange {
+                file,
+                line_begin: cr.line_begin,
+                col_begin: cr.col_begin,
+                line_end: cr.line_end,
+                col_end: cr.col_end,
+            });
+        }
+    }
+    let sl = SourceLoc { ranges };
+    match serde_json::to_string(&sl) {
+        Ok(json) => CString::new(json).unwrap().into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+
 
 /// Free a CSourceLoc and all of its inner allocations.
 #[unsafe(no_mangle)]

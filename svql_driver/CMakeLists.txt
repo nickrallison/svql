@@ -39,6 +39,7 @@ target_compile_options    (${PROJECT_NAME} PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOS
 target_link_options       (${PROJECT_NAME} PRIVATE ${YOSYS_LDFLAGS_LIST})
 target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST} 
         yosys
+        svql_common
 )
 
 

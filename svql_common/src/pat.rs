@@ -32,9 +32,7 @@ pub struct CPattern {
 #[repr(C)]                 // <-- c_repr must be the first field!
 struct CPatternBoxed {
     c_repr: CPattern,
-
-    // Everything below is invisible for C but makes sure the pointers
-    // inside `c_repr` stay valid for the life-time of the object.
+    
     file_loc_buf:   CString,
 
     in_bufs:        Vec<CString>,

@@ -11,7 +11,7 @@
 #include "GraphConversion.hpp"
 #include "RegexMap.hpp"
 #include "detail.hpp"
-// #include "SourceLoc.h"
+#include "svql_common.h"
 
 using namespace svql;
 using namespace Yosys;
@@ -318,14 +318,12 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 			for (const auto &it : result.mappings)
 			{
 				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-				std::vector<RTLIL::Wire *> wires = get_output_wires(c);
-				throw std::runtime_error("CSourceLoc not implemented yet");
-				// SourceLoc source_loc = SourceLoc::parse(c->get_src_attribute());
-
-				// log("%s: %s",
-				// 	c->type.str().c_str(),
-				// 	source_loc.toStringPretty().c_str());
-				// log("\n");
+//				std::vector<RTLIL::Wire *> wires = get_output_wires(c);
+//				throw std::runtime_error("CSourceLoc not implemented yet");
+			    SourceLoc source_loc = SourceLoc::parse(c->get_src_attribute());
+                char *source_loc_str = svql_source_loc_to_json(source_loc.c_source_loc);
+                log("```\n%s\n```", source_loc_str);
+                svql_free_string(source_loc_str);
 			}
 		}
 	}

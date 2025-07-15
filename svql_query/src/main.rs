@@ -1,9 +1,13 @@
-use crate::ports::{Connection, InPort, OutPort};
+use std::path::Path;
+use crate::connection::Connection;
+use crate::file_info::Match;
+use crate::ports::{InPort, OutPort};
+use crate::query::{Module, Query};
 
 mod query;
 mod ports;
-mod pat;
-mod graph;
+mod connection;
+mod file_info;
 
 struct CAdd {
     in1: InPort,
@@ -12,19 +16,36 @@ struct CAdd {
     c: OutPort
 }
 
+impl Module for CAdd {
+    fn file_path(&self) -> &std::path::PathBuf {
+        unimplemented!()
+    }
+}
+
 struct Combined {
     
     connections: Vec<Connection>,
+    modules: Vec<Box<dyn Module>>,
     cadd1: CAdd,
     cadd2: CAdd,
 }
 
 impl Combined {
     fn connect(mut self) -> Self {
-        self = connect!(self, &self.cadd1.in1, &self.cadd2.out);
-        connect!(self, &self.cadd2.c, &self.cadd1.in2)
+        connect!(self, &self.cadd1.in1, &self.cadd2.out);
+        connect!(self, &self.cadd2.c, &self.cadd1.in2);
+        self
     }
 }
+
+impl Query for Combined {
+    fn query(&self, rtlil: &Path, top: String) -> Vec<Match> {
+        // Implement the query logic here
+        vec![]
+    }
+}
+
+
 
 
 
