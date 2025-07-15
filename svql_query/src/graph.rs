@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use crate::ports::{InPort, OutPort};
 
 pub trait Graph {
     fn get_pattern_path() -> PathBuf;

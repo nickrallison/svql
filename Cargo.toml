@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "svql_common" , "svql_pat" ]
+members = [ "svql_common" , "svql_pat", "svql_query" ]
 
 [workspace.dependencies]
 cbindgen = "0.29"

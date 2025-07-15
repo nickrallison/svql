@@ -377,6 +377,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "svql_query"
+version = "0.1.0"
+
+[[package]]
 name = "syn"
 version = "2.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
