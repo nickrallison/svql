@@ -14,11 +14,13 @@ pub trait Module {
             .arg("-m")
             .arg("build/svql_driver/libsvql_driver.so")
             .arg("-p")
-            .arg(format!("read_verilog {}", file_path.to_string_lossy()))
+            .arg(format!("read_verilog {}", design_path.to_string_lossy()))
             .arg("-p")
             .arg(format!("hierarchy -top {}", top))
             .arg("-p")
-            .arg(format!("svql_driver -pat {}", file_path.display()));
+            .arg("proc")
+            .arg("-p")
+            .arg(format!("svql_driver -pat {} -verbose", file_path.display()));
         let output = cmd
             .output()
             .expect("Failed to execute yosys command");

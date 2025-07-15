@@ -93,9 +93,9 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	SubCircuitReSolver solver;
 
-	std::vector<std::string> map_filenames;
+	std::vector<std::string> pat_filenames;
 	std::vector<std::string> regex_filenames;
-	std::map<std::string, std::map<RTLIL::IdString, std::regex>> map_regexes;
+	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes;
 	bool constports = false;
 	bool nodefaultswaps = false;
 	bool verbose = false;
@@ -104,9 +104,9 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	for (argidx = 1; argidx < args.size(); argidx++)
 	{
 
-		if (args[argidx] == "-map" && argidx + 1 < args.size())
+		if (args[argidx] == "-pat" && argidx + 1 < args.size())
 		{
-			map_filenames.push_back(args[++argidx]);
+			pat_filenames.push_back(args[++argidx]);
 			continue;
 		}
 
@@ -214,7 +214,7 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 		solver.addSwappablePorts("$_XOR_", "\\A", "\\B");
 	}
 
-	if (map_filenames.empty())
+	if (pat_filenames.empty())
 		log_cmd_error("Missing option -map <verilog_or_rtlil_file>.\n");
 
 	for (auto &filename : regex_filenames)
@@ -230,7 +230,7 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	RTLIL::Design *map = nullptr;
 	map = new RTLIL::Design;
-	for (auto &filename : map_filenames)
+	for (auto &filename : pat_filenames)
 	{
 		if (filename.compare(0, 1, "%") == 0)
 		{
@@ -320,10 +320,11 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
 //				std::vector<RTLIL::Wire *> wires = get_output_wires(c);
 //				throw std::runtime_error("CSourceLoc not implemented yet");
-			    SourceLoc source_loc = SourceLoc::parse(c->get_src_attribute());
-                char *source_loc_str = svql_source_loc_to_json(source_loc.c_source_loc);
+			    CSourceLoc* source_loc = svql_source_loc_parse(c->get_src_attribute().c_str(), '|');
+                char *source_loc_str = svql_source_loc_to_json(source_loc);
                 log("```\n%s\n```", source_loc_str);
                 svql_free_string(source_loc_str);
+                svql_source_loc_free(source_loc);
 			}
 		}
 	}
