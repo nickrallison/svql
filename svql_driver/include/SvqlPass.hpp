@@ -6,6 +6,8 @@
 
 #include "SvqlConfig.hpp"
 
+#include "svql_common.h"
+
 using namespace Yosys;
 
 namespace svql
@@ -16,20 +18,20 @@ namespace svql
 		SvqlPass();
 		void help() override;
 		void execute(std::vector<std::string> args, RTLIL::Design *design) override;
-		SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);
+		void setup(SvqlConfig &config);
+		void terminate();
+		void terminate(std::string error_message);
+
+		CMatchList *run_query(std::string pat_filename, std::string pat_module_name);
+
+		// ####
+		static SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);
+
+		// ####
+		RTLIL::Design *design = nullptr;
+		RTLIL::Design *needle_design = nullptr;
+
 	} SvqlPass;
-
-	struct Match
-	{
-
-		// maps needle ports to haystack ports
-		std::map<RTLIL::IdString, RTLIL::IdString> port_mapping;
-		// maps needle cells to haystack cells
-		std::map<RTLIL::IdString, RTLIL::IdString> cell_mapping;
-
-		// ###
-		SubCircuit::Solver::Result result;
-	};
 
 	void print_wire(RTLIL::Wire *wire);
 	std::string escape_needle_name(const std::string &name);

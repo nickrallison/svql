@@ -4,7 +4,6 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchList {
     pub matches: Vec<Match>,
@@ -189,10 +188,7 @@ impl From<MatchList> for CMatchList {
             Box::into_raw(match_ptrs.into_boxed_slice()) as *mut *mut CMatch
         };
 
-        CMatchList {
-            matches,
-            len,
-        }
+        CMatchList { matches, len }
     }
 }
 
@@ -447,19 +443,23 @@ pub extern "C" fn cmatchlist_add_match(cmatch_list: *mut CMatchList, cmatch: *mu
 
     unsafe {
         let cmatch_list_ref = &mut *cmatch_list;
-        
+
         // Convert current array to Vec, add new match, convert back
         let mut matches_vec = if cmatch_list_ref.matches.is_null() || cmatch_list_ref.len == 0 {
             Vec::new()
         } else {
-            Vec::from_raw_parts(cmatch_list_ref.matches, cmatch_list_ref.len, cmatch_list_ref.len)
+            Vec::from_raw_parts(
+                cmatch_list_ref.matches,
+                cmatch_list_ref.len,
+                cmatch_list_ref.len,
+            )
         };
-        
+
         matches_vec.push(cmatch);
-        
+
         let new_len = matches_vec.len();
         let new_matches = Box::into_raw(matches_vec.into_boxed_slice()) as *mut *mut CMatch;
-        
+
         cmatch_list_ref.matches = new_matches;
         cmatch_list_ref.len = new_len;
     }
@@ -495,14 +495,19 @@ pub extern "C" fn cmatchlist_free(cmatch_list: *mut CMatchList) {
 
         // Free all CMatch entries
         if !cmatch_list_ref.matches.is_null() && cmatch_list_ref.len > 0 {
-            let match_ptrs = std::slice::from_raw_parts_mut(cmatch_list_ref.matches, cmatch_list_ref.len);
+            let match_ptrs =
+                std::slice::from_raw_parts_mut(cmatch_list_ref.matches, cmatch_list_ref.len);
             for &mut match_ptr in match_ptrs {
                 if !match_ptr.is_null() {
                     cmatch_free(match_ptr);
                 }
             }
             // Free the array of pointers
-            let _ = Vec::from_raw_parts(cmatch_list_ref.matches, cmatch_list_ref.len, cmatch_list_ref.len);
+            let _ = Vec::from_raw_parts(
+                cmatch_list_ref.matches,
+                cmatch_list_ref.len,
+                cmatch_list_ref.len,
+            );
         }
 
         // Free the CMatchList struct

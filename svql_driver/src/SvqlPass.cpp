@@ -142,6 +142,53 @@ void SvqlPass::help()
 	log("\n");
 }
 
+void SvqlPass::setup(SvqlConfig &config)
+{
+	this->needle_design = new RTLIL::Design;
+
+	if (config.pat_filename.compare(0, 1, "%") == 0)
+	{
+		if (!saved_designs.count(config.pat_filename.substr(1)))
+		{
+			std::string error_msg = "Saved design `" + config.pat_filename.substr(1) + "` not found.";
+			terminate(error_msg);
+		}
+		for (auto mod : saved_designs.at(config.pat_filename.substr(1))->modules())
+			if (!this->needle_design->has(mod->name))
+				this->needle_design->add(mod->clone());
+	}
+	else
+	{
+		std::ifstream f;
+		rewrite_filename(config.pat_filename);
+		f.open(config.pat_filename.c_str());
+		if (f.fail())
+		{
+			std::string error_msg = "Can't open map file `" + config.pat_filename + "`.";
+			terminate(error_msg);
+		}
+		Frontend::frontend_call(this->needle_design, &f, config.pat_filename, (config.pat_filename.size() > 3 && config.pat_filename.compare(config.pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
+		f.close();
+
+		if (config.pat_filename.size() <= 3 || config.pat_filename.compare(config.pat_filename.size() - 3, std::string::npos, ".il") != 0)
+		{
+			Pass::call(this->needle_design, "proc");
+			Pass::call(this->needle_design, "opt_clean");
+		}
+	}
+}
+
+void SvqlPass::terminate()
+{
+	terminate(std::string("SVQL pass terminated without error."));
+}
+
+void SvqlPass::terminate(std::string error_message)
+{
+	delete this->needle_design;
+	log_error("%s\n", error_message.c_str());
+}
+
 void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 {
 	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
@@ -162,39 +209,7 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	if (pat_filename.empty())
 		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
 
-	RTLIL::Design *map = nullptr;
-	map = new RTLIL::Design;
-
-	if (pat_filename.compare(0, 1, "%") == 0)
-	{
-		if (!saved_designs.count(pat_filename.substr(1)))
-		{
-			delete map;
-			log_cmd_error("Can't saved design `%s'.\n", pat_filename.c_str() + 1);
-		}
-		for (auto mod : saved_designs.at(pat_filename.substr(1))->modules())
-			if (!map->has(mod->name))
-				map->add(mod->clone());
-	}
-	else
-	{
-		std::ifstream f;
-		rewrite_filename(pat_filename);
-		f.open(pat_filename.c_str());
-		if (f.fail())
-		{
-			delete map;
-			log_cmd_error("Can't open map file `%s'.\n", pat_filename.c_str());
-		}
-		Frontend::frontend_call(map, &f, pat_filename, (pat_filename.size() > 3 && pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
-		f.close();
-
-		if (pat_filename.size() <= 3 || pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") != 0)
-		{
-			Pass::call(map, "proc");
-			Pass::call(map, "opt_clean");
-		}
-	}
+	SvqlPass::setup(config);
 
 	// Setting Up Pattern
 	RTLIL::Module *needle = map->module(pat_module_name);
@@ -458,6 +473,15 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 	config.verbose = verbose;
 
 	return config;
+}
+CMatchList *SvqlPass::run_query(std::string pat_filename, std::string pat_module_name)
+{
+	// ...
+	if (this->needle_design == nullptr)
+	{
+		log_error("Needle design is not set up. Call setup() before running queries.\n");
+		return nullptr;
+	}
 }
 
 std::string svql::escape_needle_name(const std::string &name)
