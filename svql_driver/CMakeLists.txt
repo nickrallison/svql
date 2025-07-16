@@ -22,7 +22,6 @@ separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
     src/GraphConversion.cpp
-    src/RegexMap.cpp
     src/SubCircuitReSolver.cpp
     src/SvqlPass.cpp
 )

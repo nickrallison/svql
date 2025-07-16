@@ -1,6 +1,5 @@
 #pragma once
 
-#include "RegexMap.hpp"
 #include "libs/subcircuit/subcircuit.h"
 #include "kernel/yosys.h"
 #include "kernel/rtlil.h"
@@ -16,8 +15,6 @@ namespace svql
         SubCircuitReSolver();
 
         void setVerbose(bool enable = true);
-        void setRegexMap(RegexMap m);
-        void joinRegexMap(const RegexMap &other);
 
         // Attribute / parameter knobs ------------------------------------
         bool ignoreParameters = false;
@@ -39,7 +36,6 @@ namespace svql
         RTLIL::Const unifiedParam(RTLIL::IdString cell_type, RTLIL::IdString param, RTLIL::Const value);
 
         bool myVerbose = false;
-        RegexMap regexMap;
     };
 
 } // namespace svql

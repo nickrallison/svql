@@ -12,7 +12,6 @@
 
 #include "SubCircuitReSolver.hpp"
 #include "GraphConversion.hpp"
-#include "RegexMap.hpp"
 #include "detail.hpp"
 #include "svql_common.h"
 
@@ -274,8 +273,6 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	if (results.size() > 0)
 	{
-		// log_header(design, "Found SubCircuits.\n");
-
 		for (int i = 0; i < int(results.size()); i++)
 		{
 			Match match;
