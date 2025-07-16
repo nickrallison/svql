@@ -21,7 +21,14 @@ namespace svql
 
 	struct Match
 	{
+
+		// maps needle ports to haystack ports
 		std::map<RTLIL::IdString, RTLIL::IdString> port_mapping;
+		// maps needle cells to haystack cells
+		std::map<RTLIL::IdString, RTLIL::IdString> cell_mapping;
+
+		// ###
+		SubCircuit::Solver::Result result;
 	};
 
 	void print_wire(RTLIL::Wire *wire);

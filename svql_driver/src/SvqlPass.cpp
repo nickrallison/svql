@@ -206,7 +206,6 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	for (auto wire : needle->wires())
 	{
-		print_wire(wire);
 		if (wire->port_input && !wire->port_output)
 		{
 			pat_in_ports.push_back(wire);
@@ -279,6 +278,7 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 		for (int i = 0; i < int(results.size()); i++)
 		{
+			Match match;
 			auto &result = results[i];
 
 			for (const auto &it : result.mappings)
@@ -289,42 +289,32 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
 				std::vector<RTLIL::Wire *> haystack_cell_connections = get_cell_wires(graphCell);
 
-				// sort by
-
-				// zip together
-
 				std::vector<std::pair<RTLIL::Wire *, RTLIL::Wire *>> connections;
 				for (size_t j = 0; j < std::min(needle_cell_connections.size(), haystack_cell_connections.size()); j++)
 				{
 					connections.emplace_back(needle_cell_connections[j], haystack_cell_connections[j]);
 				}
 
+				match.result = result;
+				match.cell_mapping[needleCell->name] = graphCell->name;
+
 				for (const auto &pair : connections)
 				{
-					log("Needle cell %s has wire %s with id %d, Haystack cell %s has wire %s with id %d\n",
-						needleCell->name.c_str(), pair.first->name.c_str(), pair.first->name.index_,
-						graphCell->name.c_str(), pair.second->name.c_str(), pair.second->name.index_);
-					print_wire(pair.first);
-					print_wire(pair.second);
-
-					if (pair.first->name != pair.second->name)
-					{
-						log("Mismatch in wire names: %s != %s\n", pair.first->name.c_str(), pair.second->name.c_str());
-					}
-
-					// if needle ports contains the port, then add a log statement
 					if (needle_ports.find(pair.first->name) != needle_ports.end())
 					{
 						log("Needle port %s found in haystack cell %s.\n", pair.first->name.c_str(), graphCell->name.c_str());
-					}
-					else
-					{
-						log("Needle port %s not found in haystack cell %s.\n", pair.first->name.c_str(), graphCell->name.c_str());
+						match.port_mapping[pair.first->name] = pair.second->name;
 					}
 				}
 			}
-			log("\nMatch #%d: (%s in %s)\n", i, result.needleGraphId.c_str(), result.haystackGraphId.c_str());
-			for (const auto &it : result.mappings)
+			matches.emplace_back(match);
+		}
+
+		for (int i = 0; i < int(results.size()); i++)
+		{
+			auto &match = matches[i];
+			log("\nMatch #%d: (%s in %s)\n", i, match.result.needleGraphId.c_str(), match.result.haystackGraphId.c_str());
+			for (const auto &it : match.result.mappings)
 			{
 				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
 				CSourceLoc *source_loc = svql_source_loc_parse(graphCell->get_src_attribute().c_str(), '|');
