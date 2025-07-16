@@ -1,11 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::{
-    slice,
-    path::PathBuf,
-    ffi::{CString, CStr},
+    ffi::{CStr, CString},
     os::raw::c_char,
-    ptr,
+    path::PathBuf,
+    ptr, slice,
 };
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pattern {
@@ -17,31 +16,31 @@ pub struct Pattern {
 
 #[repr(C)]
 pub struct CPattern {
-    file_loc:      *const c_char,
+    file_loc: *const c_char,
 
-    in_ports:      *const *const c_char,
-    in_ports_len:  usize,
+    in_ports: *const *const c_char,
+    in_ports_len: usize,
 
-    out_ports:     *const *const c_char,
+    out_ports: *const *const c_char,
     out_ports_len: usize,
 
-    inout_ports:     *const *const c_char,
+    inout_ports: *const *const c_char,
     inout_ports_len: usize,
 }
 
-#[repr(C)]                 // <-- c_repr must be the first field!
+#[repr(C)] // <-- c_repr must be the first field!
 struct CPatternBoxed {
     c_repr: CPattern,
-    
-    file_loc_buf:   CString,
 
-    in_bufs:        Vec<CString>,
-    out_bufs:       Vec<CString>,
-    inout_bufs:     Vec<CString>,
+    file_loc_buf: CString,
 
-    in_ptrs:        Vec<*const c_char>,
-    out_ptrs:       Vec<*const c_char>,
-    inout_ptrs:     Vec<*const c_char>,
+    in_bufs: Vec<CString>,
+    out_bufs: Vec<CString>,
+    inout_bufs: Vec<CString>,
+
+    in_ptrs: Vec<*const c_char>,
+    out_ptrs: Vec<*const c_char>,
+    inout_ptrs: Vec<*const c_char>,
 }
 
 impl From<Pattern> for CPatternBoxed {
@@ -60,21 +59,21 @@ impl From<Pattern> for CPatternBoxed {
             (bufs, ptrs)
         }
 
-        let (in_bufs,   in_ptrs)   = convert_list(p.in_ports);
-        let (out_bufs,  out_ptrs)  = convert_list(p.out_ports);
-        let (inout_bufs,inout_ptrs)= convert_list(p.inout_ports);
+        let (in_bufs, in_ptrs) = convert_list(p.in_ports);
+        let (out_bufs, out_ptrs) = convert_list(p.out_ports);
+        let (inout_bufs, inout_ptrs) = convert_list(p.inout_ports);
 
         // Fill the public C struct ------------------------------------------
         let c_repr = CPattern {
             file_loc: file_loc_buf.as_ptr(),
 
-            in_ports:     in_ptrs.as_ptr(),
+            in_ports: in_ptrs.as_ptr(),
             in_ports_len: in_ptrs.len(),
 
-            out_ports:     out_ptrs.as_ptr(),
+            out_ports: out_ptrs.as_ptr(),
             out_ports_len: out_ptrs.len(),
 
-            inout_ports:     inout_ptrs.as_ptr(),
+            inout_ports: inout_ptrs.as_ptr(),
             inout_ports_len: inout_ptrs.len(),
         };
 
@@ -94,9 +93,7 @@ impl From<Pattern> for CPatternBoxed {
 impl From<&CPattern> for Pattern {
     fn from(c: &CPattern) -> Self {
         unsafe {
-            let file_loc = PathBuf::from(
-                CStr::from_ptr(c.file_loc).to_string_lossy().into_owned()
-            );
+            let file_loc = PathBuf::from(CStr::from_ptr(c.file_loc).to_string_lossy().into_owned());
 
             let make_vec = |ptr: *const *const c_char, len: usize| -> Vec<String> {
                 if ptr.is_null() {
@@ -111,9 +108,9 @@ impl From<&CPattern> for Pattern {
 
             Self {
                 file_loc,
-                in_ports:   make_vec(c.in_ports  , c.in_ports_len),
-                out_ports:  make_vec(c.out_ports , c.out_ports_len),
-                inout_ports:make_vec(c.inout_ports, c.inout_ports_len),
+                in_ports: make_vec(c.in_ports, c.in_ports_len),
+                out_ports: make_vec(c.out_ports, c.out_ports_len),
+                inout_ports: make_vec(c.inout_ports, c.inout_ports_len),
             }
         }
     }
@@ -121,25 +118,24 @@ impl From<&CPattern> for Pattern {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_new(
-    file_loc:       *const c_char,
+    file_loc: *const c_char,
 
-    in_ports:       *const *const c_char,
-    in_ports_len:   usize,
+    in_ports: *const *const c_char,
+    in_ports_len: usize,
 
-    out_ports:      *const *const c_char,
-    out_ports_len:  usize,
+    out_ports: *const *const c_char,
+    out_ports_len: usize,
 
-    inout_ports:    *const *const c_char,
-    inout_ports_len:usize,
+    inout_ports: *const *const c_char,
+    inout_ports_len: usize,
 ) -> *mut CPattern {
-    // Basic parameter validation --------------------------------------------
-    if file_loc.is_null() {
-        return ptr::null_mut();
-    }
+    unsafe {
+        // Basic parameter validation --------------------------------------------
+        if file_loc.is_null() {
+            return ptr::null_mut();
+        }
 
-    // Build a Pattern from the incoming raw data ----------------------------
-    let make_vec =
-        |ptr: *const *const c_char, len: usize| -> Vec<String> {
+        let make_vec = |ptr: *const *const c_char, len: usize| -> Vec<String> {
             if ptr.is_null() || len == 0 {
                 Vec::new()
             } else {
@@ -150,51 +146,47 @@ pub unsafe extern "C" fn cpattern_new(
             }
         };
 
-    let pattern = Pattern {
-        file_loc: PathBuf::from(
-            CStr::from_ptr(file_loc).to_string_lossy().into_owned()
-        ),
-        in_ports:   make_vec(in_ports  , in_ports_len),
-        out_ports:  make_vec(out_ports , out_ports_len),
-        inout_ports:make_vec(inout_ports, inout_ports_len),
-    };
+        let pattern = Pattern {
+            file_loc: PathBuf::from(CStr::from_ptr(file_loc).to_string_lossy().into_owned()),
+            in_ports: make_vec(in_ports, in_ports_len),
+            out_ports: make_vec(out_ports, out_ports_len),
+            inout_ports: make_vec(inout_ports, inout_ports_len),
+        };
 
-    // Convert to C representation and leak the box so C can hold a pointer --
-    let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
-    let ptr: *const CPattern = &boxed.c_repr;
-
-    // We turn the same address into a fat pointer for later `free`
-    // SAFETY: `c_repr` is the first field, so addresses coincide.
-    Box::into_raw(boxed) as *mut CPattern
+        let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
+        Box::into_raw(boxed) as *mut CPattern
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_free(ptr: *mut CPattern) {
-    if ptr.is_null() {
-        return;
+    unsafe {
+        if ptr.is_null() {
+            return;
+        }
+        // Re-cast the address back to the boxed wrapper and drop it.
+        let _boxed: Box<CPatternBoxed> = Box::from_raw(ptr as *mut CPatternBoxed);
+        // dropping `_boxed` frees everything (CString buffers, Vecs, etc.)
     }
-    // Re-cast the address back to the boxed wrapper and drop it.
-    let _boxed: Box<CPatternBoxed> = Box::from_raw(ptr as *mut CPatternBoxed);
-    // dropping `_boxed` frees everything (CString buffers, Vecs, etc.)
 }
 
 /// Serialize a CPattern to JSON string
 /// Returns a pointer to a C string that must be freed with cpattern_json_free
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_char {
-    if pattern.is_null() {
-        return ptr::null_mut();
-    }
+    unsafe {
+        if pattern.is_null() {
+            return ptr::null_mut();
+        }
 
-    let rust_pattern = Pattern::from(&*pattern);
-    match serde_json::to_string_pretty(&rust_pattern) {
-        Ok(json_string) => {
-            match CString::new(json_string) {
+        let rust_pattern = Pattern::from(&*pattern);
+        match serde_json::to_string_pretty(&rust_pattern) {
+            Ok(json_string) => match CString::new(json_string) {
                 Ok(c_string) => c_string.into_raw(),
                 Err(_) => ptr::null_mut(),
-            }
+            },
+            Err(_) => ptr::null_mut(),
         }
-        Err(_) => ptr::null_mut(),
     }
 }
 
@@ -202,32 +194,36 @@ pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_ch
 /// Takes ownership of the JSON string and returns a CPattern pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_from_json(json_str: *const c_char) -> *mut CPattern {
-    if json_str.is_null() {
-        return ptr::null_mut();
+    unsafe {
+        if json_str.is_null() {
+            return ptr::null_mut();
+        }
+
+        let json_cstr = CStr::from_ptr(json_str);
+        let json_string = match json_cstr.to_str() {
+            Ok(s) => s,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let pattern: Pattern = match serde_json::from_str(json_string) {
+            Ok(p) => p,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        // Convert to C representation and leak the box so C can hold a pointer
+        let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
+        Box::into_raw(boxed) as *mut CPattern
     }
-
-    let json_cstr = CStr::from_ptr(json_str);
-    let json_string = match json_cstr.to_str() {
-        Ok(s) => s,
-        Err(_) => return ptr::null_mut(),
-    };
-
-    let pattern: Pattern = match serde_json::from_str(json_string) {
-        Ok(p) => p,
-        Err(_) => return ptr::null_mut(),
-    };
-
-    // Convert to C representation and leak the box so C can hold a pointer
-    let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
-    Box::into_raw(boxed) as *mut CPattern
 }
 
 /// Free a JSON string returned by cpattern_to_json
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_json_free(json_str: *mut c_char) {
-    if json_str.is_null() {
-        return;
+    unsafe {
+        if json_str.is_null() {
+            return;
+        }
+        let _c_string = CString::from_raw(json_str);
+        // CString will be dropped and memory freed
     }
-    let _c_string = CString::from_raw(json_str);
-    // CString will be dropped and memory freed
 }

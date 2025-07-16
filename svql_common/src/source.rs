@@ -1,13 +1,12 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::{
     ffi::{CStr, CString},
     fs,
-    io::BufRead,
     os::raw::c_char,
     slice,
 };
-use serde::{Deserialize, Serialize};
 //
 // FFI‐Safe Structs
 //
@@ -198,8 +197,10 @@ impl SourceLoc {
 /// Free a string previously returned by any of the `*_to_string*` functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_free_string(s: *mut c_char) {
-    if !s.is_null() {
-        let _ = CString::from_raw(s);
+    unsafe {
+        if !s.is_null() {
+            let _ = CString::from_raw(s);
+        }
     }
 }
 
@@ -208,123 +209,131 @@ pub unsafe extern "C" fn svql_free_string(s: *mut c_char) {
 /// Caller owns the returned CSourceRange* and must call `svql_source_range_free`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_range_parse(s: *const c_char) -> *mut CSourceRange {
-    if s.is_null() {
-        return std::ptr::null_mut();
+    unsafe {
+        if s.is_null() {
+            return std::ptr::null_mut();
+        }
+        let s = match CStr::from_ptr(s).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let sr = match SourceRange::parse(s) {
+            Some(sr) => sr,
+            None => return std::ptr::null_mut(),
+        };
+        let cs = CString::new(sr.file).unwrap();
+        let file_ptr = cs.into_raw();
+        let cr = CSourceRange {
+            file: file_ptr,
+            line_begin: sr.line_begin,
+            col_begin: sr.col_begin,
+            line_end: sr.line_end,
+            col_end: sr.col_end,
+        };
+        Box::into_raw(Box::new(cr))
     }
-    let s = match CStr::from_ptr(s).to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-    let sr = match SourceRange::parse(s) {
-        Some(sr) => sr,
-        None => return std::ptr::null_mut(),
-    };
-    let cs = CString::new(sr.file).unwrap();
-    let file_ptr = cs.into_raw();
-    let cr = CSourceRange {
-        file: file_ptr,
-        line_begin: sr.line_begin,
-        col_begin: sr.col_begin,
-        line_end: sr.line_end,
-        col_end: sr.col_end,
-    };
-    Box::into_raw(Box::new(cr))
 }
 
 /// Turn a CSourceRange into its compact string form.  
 /// Returns a malloc’d C string (must be freed by `svql_free_string`).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_range_to_string(r: *const CSourceRange) -> *mut c_char {
-    if r.is_null() {
-        return std::ptr::null_mut();
+    unsafe {
+        if r.is_null() {
+            return std::ptr::null_mut();
+        }
+        let r = &*r;
+        if r.file.is_null() {
+            return std::ptr::null_mut();
+        }
+        let file = CStr::from_ptr(r.file).to_string_lossy().into_owned();
+        let sr = SourceRange {
+            file,
+            line_begin: r.line_begin,
+            col_begin: r.col_begin,
+            line_end: r.line_end,
+            col_end: r.col_end,
+        };
+        CString::new(sr.to_string()).unwrap().into_raw()
     }
-    let r = &*r;
-    if r.file.is_null() {
-        return std::ptr::null_mut();
-    }
-    let file = CStr::from_ptr(r.file).to_string_lossy().into_owned();
-    let sr = SourceRange {
-        file,
-        line_begin: r.line_begin,
-        col_begin: r.col_begin,
-        line_end: r.line_end,
-        col_end: r.col_end,
-    };
-    CString::new(sr.to_string()).unwrap().into_raw()
 }
-
-
 
 /// Turn a CSourceRange into its “pretty” multi‐line form.
 /// Returns a malloc’d C string (must be freed by `svql_free_string`).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_range_to_string_pretty(r: *const CSourceRange) -> *mut c_char {
-    if r.is_null() {
-        return std::ptr::null_mut();
+    unsafe {
+        if r.is_null() {
+            return std::ptr::null_mut();
+        }
+        let r = &*r;
+        if r.file.is_null() {
+            return std::ptr::null_mut();
+        }
+        let file = CStr::from_ptr(r.file).to_string_lossy().into_owned();
+        let sr = SourceRange {
+            file,
+            line_begin: r.line_begin,
+            col_begin: r.col_begin,
+            line_end: r.line_end,
+            col_end: r.col_end,
+        };
+        CString::new(sr.to_string_pretty()).unwrap().into_raw()
     }
-    let r = &*r;
-    if r.file.is_null() {
-        return std::ptr::null_mut();
-    }
-    let file = CStr::from_ptr(r.file).to_string_lossy().into_owned();
-    let sr = SourceRange {
-        file,
-        line_begin: r.line_begin,
-        col_begin: r.col_begin,
-        line_end: r.line_end,
-        col_end: r.col_end,
-    };
-    CString::new(sr.to_string_pretty()).unwrap().into_raw()
 }
 
 /// Free a CSourceRange previously returned by `svql_source_range_parse`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_range_free(ptr: *mut CSourceRange) {
-    if ptr.is_null() {
-        return;
+    unsafe {
+        if ptr.is_null() {
+            return;
+        }
+        let cr = Box::from_raw(ptr);
+        if !cr.file.is_null() {
+            let _ = CString::from_raw(cr.file as *mut c_char);
+        }
+        // Box drops here
     }
-    let cr = Box::from_raw(ptr);
-    if !cr.file.is_null() {
-        let _ = CString::from_raw(cr.file as *mut c_char);
-    }
-    // Box drops here
 }
 
 /// Parse a SourceLoc (a list of ranges) from a C‐string, using separator `sep`.
 /// Returns null on error. Caller must free with `svql_source_loc_free`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_parse(s: *const c_char, sep: c_char) -> *mut CSourceLoc {
-    if s.is_null() {
-        return std::ptr::null_mut();
-    }
-    let s = match CStr::from_ptr(s).to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-    let sep = sep as u8 as char;
-    let sl = match SourceLoc::parse(s, sep) {
-        Some(sl) => sl,
-        None => return std::ptr::null_mut(),
-    };
+    unsafe {
+        if s.is_null() {
+            return std::ptr::null_mut();
+        }
+        let s = match CStr::from_ptr(s).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let sep = sep as u8 as char;
+        let sl = match SourceLoc::parse(s, sep) {
+            Some(sl) => sl,
+            None => return std::ptr::null_mut(),
+        };
 
-    // deep‐copy into a Vec<CSourceRange>
-    let mut v: Vec<CSourceRange> = Vec::with_capacity(sl.ranges.len());
-    for r in sl.ranges {
-        let cs = CString::new(r.file).unwrap();
-        v.push(CSourceRange {
-            file: cs.into_raw(),
-            line_begin: r.line_begin,
-            col_begin: r.col_begin,
-            line_end: r.line_end,
-            col_end: r.col_end,
-        });
-    }
-    let len = v.len();
-    let ptr = v.as_mut_ptr();
-    std::mem::forget(v);
+        // deep‐copy into a Vec<CSourceRange>
+        let mut v: Vec<CSourceRange> = Vec::with_capacity(sl.ranges.len());
+        for r in sl.ranges {
+            let cs = CString::new(r.file).unwrap();
+            v.push(CSourceRange {
+                file: cs.into_raw(),
+                line_begin: r.line_begin,
+                col_begin: r.col_begin,
+                line_end: r.line_end,
+                col_end: r.col_end,
+            });
+        }
+        let len = v.len();
+        let ptr = v.as_mut_ptr();
+        std::mem::forget(v);
 
-    let cl = CSourceLoc { ranges: ptr, len };
-    Box::into_raw(Box::new(cl))
+        let cl = CSourceLoc { ranges: ptr, len };
+        Box::into_raw(Box::new(cl))
+    }
 }
 
 /// Turn a CSourceLoc into its compact string form (using `sep`).  
@@ -334,145 +343,176 @@ pub unsafe extern "C" fn svql_source_loc_to_string(
     loc: *const CSourceLoc,
     sep: c_char,
 ) -> *mut c_char {
-    if loc.is_null() {
-        return std::ptr::null_mut();
-    }
-    let cl = &*loc;
-    let sep = sep as u8 as char;
-    let mut ranges = Vec::with_capacity(cl.len);
-    if !cl.ranges.is_null() {
-        let slice = slice::from_raw_parts(cl.ranges, cl.len);
-        for cr in slice {
-            if cr.file.is_null() {
-                continue;
-            }
-            let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
-            ranges.push(SourceRange {
-                file,
-                line_begin: cr.line_begin,
-                col_begin: cr.col_begin,
-                line_end: cr.line_end,
-                col_end: cr.col_end,
-            });
+    unsafe {
+        if loc.is_null() {
+            return std::ptr::null_mut();
         }
+        let cl = &*loc;
+        let sep = sep as u8 as char;
+        let mut ranges = Vec::with_capacity(cl.len);
+        if !cl.ranges.is_null() {
+            let slice = slice::from_raw_parts(cl.ranges, cl.len);
+            for cr in slice {
+                if cr.file.is_null() {
+                    continue;
+                }
+                let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
+                ranges.push(SourceRange {
+                    file,
+                    line_begin: cr.line_begin,
+                    col_begin: cr.col_begin,
+                    line_end: cr.line_end,
+                    col_end: cr.col_end,
+                });
+            }
+        }
+        let sl = SourceLoc { ranges };
+        CString::new(sl.to_string(sep)).unwrap().into_raw()
     }
-    let sl = SourceLoc { ranges };
-    CString::new(sl.to_string(sep)).unwrap().into_raw()
 }
 
 /// Turn a CSourceLoc into its “pretty” multi‐line form.  
 /// Returns malloc’d C string, free with `svql_free_string`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_to_string_pretty(loc: *const CSourceLoc) -> *mut c_char {
-    if loc.is_null() {
-        return std::ptr::null_mut();
-    }
-    let cl = &*loc;
-    let mut ranges = Vec::with_capacity(cl.len);
-    if !cl.ranges.is_null() {
-        let slice = slice::from_raw_parts(cl.ranges, cl.len);
-        for cr in slice {
-            if cr.file.is_null() {
-                continue;
-            }
-            let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
-            ranges.push(SourceRange {
-                file,
-                line_begin: cr.line_begin,
-                col_begin: cr.col_begin,
-                line_end: cr.line_end,
-                col_end: cr.col_end,
-            });
+    unsafe {
+        if loc.is_null() {
+            return std::ptr::null_mut();
         }
+        let cl = &*loc;
+        let mut ranges = Vec::with_capacity(cl.len);
+        if !cl.ranges.is_null() {
+            let slice = slice::from_raw_parts(cl.ranges, cl.len);
+            for cr in slice {
+                if cr.file.is_null() {
+                    continue;
+                }
+                let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
+                ranges.push(SourceRange {
+                    file,
+                    line_begin: cr.line_begin,
+                    col_begin: cr.col_begin,
+                    line_end: cr.line_end,
+                    col_end: cr.col_end,
+                });
+            }
+        }
+        let sl = SourceLoc { ranges };
+        CString::new(sl.to_string_pretty()).unwrap().into_raw()
     }
-    let sl = SourceLoc { ranges };
-    CString::new(sl.to_string_pretty()).unwrap().into_raw()
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_to_json(s: *mut CSourceLoc) -> *mut c_char {
-    if s.is_null() {
-        return std::ptr::null_mut();
-    }
-    let cl = &*s;
-    let mut ranges = Vec::with_capacity(cl.len);
-    if !cl.ranges.is_null() {
-        let slice = slice::from_raw_parts(cl.ranges, cl.len);
-        for cr in slice {
-            if cr.file.is_null() {
-                continue;
+    unsafe {
+        if s.is_null() {
+            return std::ptr::null_mut();
+        }
+        let cl = &*s;
+        let mut ranges = Vec::with_capacity(cl.len);
+        if !cl.ranges.is_null() {
+            let slice = slice::from_raw_parts(cl.ranges, cl.len);
+            for cr in slice {
+                if cr.file.is_null() {
+                    continue;
+                }
+                let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
+                ranges.push(SourceRange {
+                    file,
+                    line_begin: cr.line_begin,
+                    col_begin: cr.col_begin,
+                    line_end: cr.line_end,
+                    col_end: cr.col_end,
+                });
             }
-            let file = CStr::from_ptr(cr.file).to_string_lossy().into_owned();
-            ranges.push(SourceRange {
-                file,
-                line_begin: cr.line_begin,
-                col_begin: cr.col_begin,
-                line_end: cr.line_end,
-                col_end: cr.col_end,
-            });
+        }
+        let sl = SourceLoc { ranges };
+        match serde_json::to_string(&sl) {
+            Ok(json) => CString::new(json).unwrap().into_raw(),
+            Err(_) => std::ptr::null_mut(),
         }
     }
-    let sl = SourceLoc { ranges };
-    match serde_json::to_string(&sl) {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
 }
-
-
 
 /// Free a CSourceLoc and all of its inner allocations.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_free(ptr: *mut CSourceLoc) {
-    if ptr.is_null() {
-        return;
-    }
-    let cl = Box::from_raw(ptr);
-    let arr = cl.ranges as *mut CSourceRange;
-    let len = cl.len;
-    if !arr.is_null() {
-        // free each file‐string
-        for cr in slice::from_raw_parts(arr, len) {
-            if !cr.file.is_null() {
-                let _ = CString::from_raw(cr.file as *mut c_char);
-            }
+    unsafe {
+        if ptr.is_null() {
+            return;
         }
-        // free the array itself
-        let _ = Vec::from_raw_parts(arr, len, len);
+        let cl = Box::from_raw(ptr);
+        let arr = cl.ranges as *mut CSourceRange;
+        let len = cl.len;
+        if !arr.is_null() {
+            // free each file‐string
+            for cr in slice::from_raw_parts(arr, len) {
+                if !cr.file.is_null() {
+                    let _ = CString::from_raw(cr.file as *mut c_char);
+                }
+            }
+            // free the array itself
+            let _ = Vec::from_raw_parts(arr, len, len);
+        }
+        // cl drops here
     }
-    // cl drops here
 }
 
 /// Is this SourceLoc empty?
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_empty(loc: *const CSourceLoc) -> bool {
-    if loc.is_null() {
-        true
-    } else {
-        (&*loc).len == 0
+    unsafe {
+        if loc.is_null() {
+            true
+        } else {
+            (&*loc).len == 0
+        }
     }
 }
 
 /// Append one CSourceRange to a CSourceLoc (deep‐copies all strings).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn svql_source_loc_append(loc: *mut CSourceLoc, range: *const CSourceRange) {
-    if loc.is_null() || range.is_null() {
-        return;
-    }
-    let cl = &mut *loc;
-    let old_ptr = cl.ranges as *mut CSourceRange;
-    let old_len = cl.len;
+    unsafe {
+        if loc.is_null() || range.is_null() {
+            return;
+        }
+        let cl = &mut *loc;
+        let old_ptr = cl.ranges as *mut CSourceRange;
+        let old_len = cl.len;
 
-    // build a new Vec<CSourceRange> with capacity+1
-    let mut nv: Vec<CSourceRange> = Vec::with_capacity(old_len + 1);
+        // build a new Vec<CSourceRange> with capacity+1
+        let mut nv: Vec<CSourceRange> = Vec::with_capacity(old_len + 1);
 
-    // copy old entries
-    if !old_ptr.is_null() {
-        let slice = slice::from_raw_parts(old_ptr, old_len);
-        for cr in slice {
-            if cr.file.is_null() {
-                continue;
+        // copy old entries
+        if !old_ptr.is_null() {
+            let slice = slice::from_raw_parts(old_ptr, old_len);
+            for cr in slice {
+                if cr.file.is_null() {
+                    continue;
+                }
+                let bytes = CStr::from_ptr(cr.file).to_bytes();
+                let cs = CString::new(bytes).unwrap();
+                nv.push(CSourceRange {
+                    file: cs.into_raw(),
+                    line_begin: cr.line_begin,
+                    col_begin: cr.col_begin,
+                    line_end: cr.line_end,
+                    col_end: cr.col_end,
+                });
             }
+            // drop old
+            for cr in slice {
+                if !cr.file.is_null() {
+                    let _ = CString::from_raw(cr.file as *mut c_char);
+                }
+            }
+            let _ = Vec::from_raw_parts(old_ptr, old_len, old_len);
+        }
+
+        // copy the new one
+        let cr = &*range;
+        if !cr.file.is_null() {
             let bytes = CStr::from_ptr(cr.file).to_bytes();
             let cs = CString::new(bytes).unwrap();
             nv.push(CSourceRange {
@@ -483,34 +523,13 @@ pub unsafe extern "C" fn svql_source_loc_append(loc: *mut CSourceLoc, range: *co
                 col_end: cr.col_end,
             });
         }
-        // drop old
-        for cr in slice {
-            if !cr.file.is_null() {
-                let _ = CString::from_raw(cr.file as *mut c_char);
-            }
-        }
-        let _ = Vec::from_raw_parts(old_ptr, old_len, old_len);
+
+        // leak the new Vec
+        let ptr = nv.as_mut_ptr();
+        let len = nv.len();
+        std::mem::forget(nv);
+
+        cl.ranges = ptr;
+        cl.len = len;
     }
-
-    // copy the new one
-    let cr = &*range;
-    if !cr.file.is_null() {
-        let bytes = CStr::from_ptr(cr.file).to_bytes();
-        let cs = CString::new(bytes).unwrap();
-        nv.push(CSourceRange {
-            file: cs.into_raw(),
-            line_begin: cr.line_begin,
-            col_begin: cr.col_begin,
-            line_end: cr.line_end,
-            col_end: cr.col_end,
-        });
-    }
-
-    // leak the new Vec
-    let ptr = nv.as_mut_ptr();
-    let len = nv.len();
-    std::mem::forget(nv);
-
-    cl.ranges = ptr;
-    cl.len = len;
 }
