@@ -28,7 +28,7 @@ pub struct CPattern {
     inout_ports_len: usize,
 }
 
-#[repr(C)] // <-- c_repr must be the first field!
+#[repr(C)]
 struct CPatternBoxed {
     c_repr: CPattern,
 
@@ -45,11 +45,9 @@ struct CPatternBoxed {
 
 impl From<Pattern> for CPatternBoxed {
     fn from(p: Pattern) -> Self {
-        // Turn path into CString --------------------------------------------
         let file_loc_buf = CString::new(p.file_loc.to_string_lossy().into_owned())
             .expect("Path contained an interior NUL byte");
 
-        // Helper closure to turn Vec<String> --> (Vec<CString>, Vec<*const>)
         fn convert_list(src: Vec<String>) -> (Vec<CString>, Vec<*const c_char>) {
             let bufs: Vec<CString> = src
                 .into_iter()
@@ -63,7 +61,6 @@ impl From<Pattern> for CPatternBoxed {
         let (out_bufs, out_ptrs) = convert_list(p.out_ports);
         let (inout_bufs, inout_ptrs) = convert_list(p.inout_ports);
 
-        // Fill the public C struct ------------------------------------------
         let c_repr = CPattern {
             file_loc: file_loc_buf.as_ptr(),
 
@@ -130,7 +127,6 @@ pub unsafe extern "C" fn cpattern_new(
     inout_ports_len: usize,
 ) -> *mut CPattern {
     unsafe {
-        // Basic parameter validation --------------------------------------------
         if file_loc.is_null() {
             return ptr::null_mut();
         }
@@ -164,14 +160,10 @@ pub unsafe extern "C" fn cpattern_free(ptr: *mut CPattern) {
         if ptr.is_null() {
             return;
         }
-        // Re-cast the address back to the boxed wrapper and drop it.
         let _boxed: Box<CPatternBoxed> = Box::from_raw(ptr as *mut CPatternBoxed);
-        // dropping `_boxed` frees everything (CString buffers, Vecs, etc.)
     }
 }
 
-/// Serialize a CPattern to JSON string
-/// Returns a pointer to a C string that must be freed with cpattern_json_free
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_char {
     unsafe {
@@ -190,8 +182,6 @@ pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_ch
     }
 }
 
-/// Deserialize a JSON string to CPattern
-/// Takes ownership of the JSON string and returns a CPattern pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_from_json(json_str: *const c_char) -> *mut CPattern {
     unsafe {
@@ -210,20 +200,17 @@ pub unsafe extern "C" fn cpattern_from_json(json_str: *const c_char) -> *mut CPa
             Err(_) => return ptr::null_mut(),
         };
 
-        // Convert to C representation and leak the box so C can hold a pointer
         let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
         Box::into_raw(boxed) as *mut CPattern
     }
 }
 
-/// Free a JSON string returned by cpattern_to_json
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cpattern_json_free(json_str: *mut c_char) {
     unsafe {
         if json_str.is_null() {
             return;
         }
-        let _c_string = CString::from_raw(json_str);
-        // CString will be dropped and memory freed
+        let _c_string: CString = CString::from_raw(json_str);
     }
 }
