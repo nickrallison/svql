@@ -25,7 +25,6 @@ set (SVQL_SRC
     src/RegexMap.cpp
     src/SubCircuitReSolver.cpp
     src/SvqlPass.cpp
-    src/rtlil_backend.cc
 )
 
 add_library (${PROJECT_NAME} SHARED ${SVQL_SRC})

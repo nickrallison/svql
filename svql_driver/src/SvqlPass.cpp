@@ -14,10 +14,26 @@
 #include "detail.hpp"
 #include "svql_common.h"
 
-#include "rtlil_backend.h"
-
 using namespace svql;
 using namespace Yosys;
+
+std::vector<RTLIL::Wire *> svql::get_cell_wires(RTLIL::Cell *cell)
+{
+	std::set<RTLIL::Wire *> wire_set;
+
+	for (const auto &conn : cell->connections())
+	{
+		for (const RTLIL::SigBit &bit : conn.second)
+		{
+			if (bit.is_wire() && bit.wire != nullptr)
+			{
+				wire_set.insert(bit.wire);
+			}
+		}
+	}
+
+	return std::vector<RTLIL::Wire *>(wire_set.begin(), wire_set.end());
+}
 
 SvqlPass::SvqlPass() : Pass("svql_driver", "find subcircuits and replace them with cells") {}
 
@@ -143,8 +159,34 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 		}
 	}
 
-	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
+	// Setting Up Pattern
 	RTLIL::Module *needle = map->module(pat_module_name);
+	std::vector<RTLIL::Wire *> pat_in_ports = std::vector<RTLIL::Wire *>();
+	std::vector<RTLIL::Wire *> pat_out_ports = std::vector<RTLIL::Wire *>();
+	std::vector<RTLIL::Wire *> pat_inout_ports = std::vector<RTLIL::Wire *>();
+
+	for (auto wire : needle->wires())
+	{
+		if (wire->port_input && !wire->port_output)
+		{
+			log("input %d ", wire->port_id);
+			pat_in_ports.push_back(wire);
+		}
+		if (!wire->port_input && wire->port_output)
+		{
+			log("output %d ", wire->port_id);
+			pat_out_ports.push_back(wire);
+		}
+		if (wire->port_input && wire->port_output)
+		{
+			log("inout %d ", wire->port_id);
+			pat_inout_ports.push_back(wire);
+		}
+		log("%s\n", wire->name.c_str());
+	}
+
+	// Setting up the graph solver
+	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
 	std::set<RTLIL::IdString> needle_ports;
 
 	log_header(design, "Creating graphs for SubCircuit library.\n");
@@ -156,14 +198,9 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 		needle_ports.insert(port);
 	}
 
-	std::ostream f = std::cout;
-
 	for (auto it = needle->connections().begin(); it != needle->connections().end(); ++it)
 	{
-
-		f << stringf("\n");
-		dump_conn(f, indent + "  ", it->first, it->second);
-		first_conn_line = false;
+		log("%s %s", it->first, it->second);
 	}
 
 	// #### Create Needle Graph
@@ -382,37 +419,16 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 	return config;
 }
 
-std::string escape_needle_name(const std::string &name)
+std::string svql::escape_needle_name(const std::string &name)
 {
-	// if starts with needle_ then remove it
 	if (name.compare(0, 7, "needle_") == 0)
 	{
 		return name.substr(7);
 	}
 
-	// if starts with haystack_ then remove it
 	if (name.compare(0, 8, "haystack_") == 0)
 	{
 		return name.substr(8);
 	}
-	// otherwise return the name as is
 	return name;
-}
-
-std::vector<RTLIL::Wire *> get_cell_wires(RTLIL::Cell *cell)
-{
-	std::set<RTLIL::Wire *> wire_set;
-
-	for (const auto &conn : cell->connections())
-	{
-		for (const RTLIL::SigBit &bit : conn.second)
-		{
-			if (bit.is_wire() && bit.wire != nullptr)
-			{
-				wire_set.insert(bit.wire);
-			}
-		}
-	}
-
-	return std::vector<RTLIL::Wire *>(wire_set.begin(), wire_set.end());
 }
