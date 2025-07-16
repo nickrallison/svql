@@ -4,6 +4,12 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MatchList {
+    pub matches: Vec<Match>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Match {
     pub port_map: HashMap<String, String>,
@@ -168,6 +174,55 @@ impl From<CCellData> for CellData {
     }
 }
 
+impl From<MatchList> for CMatchList {
+    fn from(match_list: MatchList) -> Self {
+        let len = match_list.matches.len();
+        let match_ptrs: Vec<*mut CMatch> = match_list
+            .matches
+            .into_iter()
+            .map(|m| Box::into_raw(Box::new(CMatch::from(m))))
+            .collect();
+
+        let matches = if match_ptrs.is_empty() {
+            ptr::null_mut()
+        } else {
+            Box::into_raw(match_ptrs.into_boxed_slice()) as *mut *mut CMatch
+        };
+
+        CMatchList {
+            matches,
+            len,
+        }
+    }
+}
+
+impl From<&CMatchList> for MatchList {
+    fn from(cmatch_list: &CMatchList) -> Self {
+        let mut matches = Vec::new();
+
+        if !cmatch_list.matches.is_null() && cmatch_list.len > 0 {
+            unsafe {
+                let match_ptrs = std::slice::from_raw_parts(cmatch_list.matches, cmatch_list.len);
+                for &match_ptr in match_ptrs {
+                    if !match_ptr.is_null() {
+                        let cmatch = &*match_ptr;
+                        matches.push(Match::from(cmatch));
+                    }
+                }
+            }
+        }
+
+        MatchList { matches }
+    }
+}
+
+impl From<CMatchList> for MatchList {
+    fn from(cmatch_list: CMatchList) -> Self {
+        let cmatch_list_ref = &cmatch_list;
+        MatchList::from(cmatch_list_ref)
+    }
+}
+
 #[repr(C)]
 pub struct CMatch {
     pub port_map: *mut CStringMap,
@@ -199,6 +254,13 @@ pub struct CCellDataMapEntry {
 #[repr(C)]
 pub struct CCellDataMap {
     pub entries: *mut CCellDataMapEntry,
+    pub len: usize,
+}
+
+/// C FFI representation of MatchList
+#[repr(C)]
+pub struct CMatchList {
+    pub matches: *mut *mut CMatch,
     pub len: usize,
 }
 
@@ -360,5 +422,90 @@ pub extern "C" fn free_json_string(json_str: *mut c_char) {
         unsafe {
             let _ = CString::from_raw(json_str);
         }
+    }
+}
+
+// C FFI functions for CMatchList
+
+/// Create a new CMatchList
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatchlist_new() -> *mut CMatchList {
+    let cmatch_list = CMatchList {
+        matches: ptr::null_mut(),
+        len: 0,
+    };
+
+    Box::into_raw(Box::new(cmatch_list))
+}
+
+/// Add a CMatch to a CMatchList
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatchlist_add_match(cmatch_list: *mut CMatchList, cmatch: *mut CMatch) {
+    if cmatch_list.is_null() || cmatch.is_null() {
+        return;
+    }
+
+    unsafe {
+        let cmatch_list_ref = &mut *cmatch_list;
+        
+        // Convert current array to Vec, add new match, convert back
+        let mut matches_vec = if cmatch_list_ref.matches.is_null() || cmatch_list_ref.len == 0 {
+            Vec::new()
+        } else {
+            Vec::from_raw_parts(cmatch_list_ref.matches, cmatch_list_ref.len, cmatch_list_ref.len)
+        };
+        
+        matches_vec.push(cmatch);
+        
+        let new_len = matches_vec.len();
+        let new_matches = Box::into_raw(matches_vec.into_boxed_slice()) as *mut *mut CMatch;
+        
+        cmatch_list_ref.matches = new_matches;
+        cmatch_list_ref.len = new_len;
+    }
+}
+
+/// Serialize CMatchList to JSON C string
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatchlist_serialize(cmatch_list: *const CMatchList) -> *mut c_char {
+    if cmatch_list.is_null() {
+        return ptr::null_mut();
+    }
+
+    let cmatch_list = unsafe { &*cmatch_list };
+    let match_list = MatchList::from(cmatch_list);
+
+    match serde_json::to_string(&match_list) {
+        Ok(json) => CString::new(json)
+            .unwrap_or_else(|_| CString::new("{}").unwrap())
+            .into_raw(),
+        Err(_) => CString::new("{}").unwrap().into_raw(),
+    }
+}
+
+/// Free CMatchList memory
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatchlist_free(cmatch_list: *mut CMatchList) {
+    if cmatch_list.is_null() {
+        return;
+    }
+
+    unsafe {
+        let cmatch_list_ref = &*cmatch_list;
+
+        // Free all CMatch entries
+        if !cmatch_list_ref.matches.is_null() && cmatch_list_ref.len > 0 {
+            let match_ptrs = std::slice::from_raw_parts_mut(cmatch_list_ref.matches, cmatch_list_ref.len);
+            for &mut match_ptr in match_ptrs {
+                if !match_ptr.is_null() {
+                    cmatch_free(match_ptr);
+                }
+            }
+            // Free the array of pointers
+            let _ = Vec::from_raw_parts(cmatch_list_ref.matches, cmatch_list_ref.len, cmatch_list_ref.len);
+        }
+
+        // Free the CMatchList struct
+        let _ = Box::from_raw(cmatch_list);
     }
 }
