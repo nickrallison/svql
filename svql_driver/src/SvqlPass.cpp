@@ -1,5 +1,7 @@
 #include "SvqlPass.hpp"
 
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <regex>
 #include <set>
@@ -19,20 +21,58 @@ using namespace Yosys;
 
 std::vector<RTLIL::Wire *> svql::get_cell_wires(RTLIL::Cell *cell)
 {
-	std::set<RTLIL::Wire *> wire_set;
-
+	std::vector<RTLIL::Wire *> wires;
+	
+	// Create a vector of connections and sort them alphabetically by name
+	std::vector<std::pair<RTLIL::IdString, RTLIL::SigSpec>> sorted_connections;
 	for (const auto &conn : cell->connections())
+	{
+		sorted_connections.emplace_back(conn.first, conn.second);
+	}
+	
+	// Sort connections alphabetically by connection name
+	std::sort(sorted_connections.begin(), sorted_connections.end(),
+		[](const auto &a, const auto &b) {
+			return strcmp(a.first.c_str(), b.first.c_str()) < 0;
+		});
+	
+	// Process connections in alphabetical order
+	for (const auto &conn : sorted_connections)
 	{
 		for (const RTLIL::SigBit &bit : conn.second)
 		{
 			if (bit.is_wire() && bit.wire != nullptr)
 			{
-				wire_set.insert(bit.wire);
+				wires.emplace_back(bit.wire);
 			}
 		}
 	}
 
-	return std::vector<RTLIL::Wire *>(wire_set.begin(), wire_set.end());
+	return wires;
+}
+
+void svql::print_wire(RTLIL::Wire *wire)
+{
+	std::string output = "wire ";
+	if (wire->width != 1)
+		output += "width " + std::to_string(wire->width) + " ";
+	if (wire->upto)
+		output += "upto ";
+	if (wire->start_offset != 0)
+		output += "offset " + std::to_string(wire->start_offset) + " ";
+	if (wire->port_input && !wire->port_output)
+		output += "input " + std::to_string(wire->port_id) + " ";
+	if (!wire->port_input && wire->port_output)
+		output += "output " + std::to_string(wire->port_id) + " ";
+	if (wire->port_input && wire->port_output)
+		output += "inout " + std::to_string(wire->port_id) + " ";
+	if (wire->is_signed)
+		output += "signed ";
+	output += wire->name.c_str();
+	output += ":";
+	// int to string
+	output += std::to_string(wire->name.index_);
+	log("%s\n", output.c_str());
 }
 
 SvqlPass::SvqlPass() : Pass("svql_driver", "find subcircuits and replace them with cells") {}
@@ -164,25 +204,23 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::vector<RTLIL::Wire *> pat_in_ports = std::vector<RTLIL::Wire *>();
 	std::vector<RTLIL::Wire *> pat_out_ports = std::vector<RTLIL::Wire *>();
 	std::vector<RTLIL::Wire *> pat_inout_ports = std::vector<RTLIL::Wire *>();
+	std::vector<Match> matches = std::vector<Match>();
 
 	for (auto wire : needle->wires())
 	{
+		print_wire(wire);
 		if (wire->port_input && !wire->port_output)
 		{
-			log("input %d ", wire->port_id);
 			pat_in_ports.push_back(wire);
 		}
 		if (!wire->port_input && wire->port_output)
 		{
-			log("output %d ", wire->port_id);
 			pat_out_ports.push_back(wire);
 		}
 		if (wire->port_input && wire->port_output)
 		{
-			log("inout %d ", wire->port_id);
 			pat_inout_ports.push_back(wire);
 		}
-		log("%s\n", wire->name.c_str());
 	}
 
 	// Setting up the graph solver
@@ -250,24 +288,42 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
 				auto *needleCell = static_cast<RTLIL::Cell *>(it.second.needleUserData);
 
-				for (const auto &port : needle_ports)
-				{
-					auto cell_wires = get_cell_wires(graphCell);
-					for (auto *wire : cell_wires)
-					{
-						if (wire->name == port)
-						{
-							log("Haystack cell %s has port %s with id %d.\n", graphCell->name.c_str(), port.c_str(), port.index_);
-						}
-					}
+				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
+				std::vector<RTLIL::Wire *> haystack_cell_connections = get_cell_wires(graphCell);
 
-					if (needleCell->hasPort(port))
-					{
-						log("Needle cell %s has port %s with id %d.\n", needleCell->name.c_str(), port.c_str(), port.index_);
-					}
+				// sort by
+
+				// zip together
+
+				std::vector<std::pair<RTLIL::Wire *, RTLIL::Wire *>> connections;
+				for (size_t j = 0; j < std::min(needle_cell_connections.size(), haystack_cell_connections.size()); j++)
+				{
+					connections.emplace_back(needle_cell_connections[j], haystack_cell_connections[j]);
 				}
 
-				log("Found match for %s.\n", it.first.c_str());
+				for (const auto &pair : connections)
+				{
+					log("Needle cell %s has wire %s with id %d, Haystack cell %s has wire %s with id %d\n",
+						needleCell->name.c_str(), pair.first->name.c_str(), pair.first->name.index_,
+						graphCell->name.c_str(), pair.second->name.c_str(), pair.second->name.index_);
+					print_wire(pair.first);
+					print_wire(pair.second);
+
+					if (pair.first->name != pair.second->name)
+					{
+						log("Mismatch in wire names: %s != %s\n", pair.first->name.c_str(), pair.second->name.c_str());
+					}
+
+					// if needle ports contains the port, then add a log statement
+					if (needle_ports.find(pair.first->name) != needle_ports.end())
+					{
+						log("Needle port %s found in haystack cell %s.\n", pair.first->name.c_str(), graphCell->name.c_str());
+					}
+					else
+					{
+						log("Needle port %s not found in haystack cell %s.\n", pair.first->name.c_str(), graphCell->name.c_str());
+					}
+				}
 			}
 			log("\nMatch #%d: (%s in %s)\n", i, result.needleGraphId.c_str(), result.haystackGraphId.c_str());
 			for (const auto &it : result.mappings)

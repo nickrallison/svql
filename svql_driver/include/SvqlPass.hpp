@@ -19,6 +19,12 @@ namespace svql
 		SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);
 	} SvqlPass;
 
+	struct Match
+	{
+		std::map<RTLIL::IdString, RTLIL::IdString> port_mapping;
+	};
+
+	void print_wire(RTLIL::Wire *wire);
 	std::string escape_needle_name(const std::string &name);
 	std::vector<RTLIL::Wire *> get_cell_wires(RTLIL::Cell *cell);
 
