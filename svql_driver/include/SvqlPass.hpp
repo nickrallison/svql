@@ -22,7 +22,7 @@ namespace svql
 		void terminate();
 		void terminate(std::string error_message);
 
-		CMatchList *run_query(std::string pat_filename, std::string pat_module_name);
+		CMatchList *run_query(const SvqlConfig &config);
 
 		// ####
 		static SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);

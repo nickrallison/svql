@@ -21,6 +21,23 @@ pub struct CellData {
     pub cell_index: usize,
 }
 
+impl Match {
+    pub fn new() -> Self {
+        Match {
+            port_map: HashMap::new(),
+            cell_map: HashMap::new(),
+        }
+    }
+
+    pub fn add_port(&mut self, key: String, value: String) {
+        self.port_map.insert(key, value);
+    }
+
+    pub fn add_cell(&mut self, key: CellData, value: CellData) {
+        self.cell_map.insert(key, value);
+    }
+}
+
 impl From<Match> for CMatch {
     fn from(match_data: Match) -> Self {
         let port_entries: Vec<CStringMapEntry> = match_data
@@ -335,6 +352,122 @@ pub extern "C" fn cmatch_new() -> *mut CMatch {
     };
 
     Box::into_raw(Box::new(cmatch))
+}
+
+/// Add a port to CMatch
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatch_add_port(cmatch: *mut CMatch, key: *const c_char, value: *const c_char) {
+    if cmatch.is_null() || key.is_null() || value.is_null() {
+        return;
+    }
+
+    unsafe {
+        let cmatch_ref = &mut *cmatch;
+
+        // Convert C strings to Rust strings
+        let key_str = CStr::from_ptr(key).to_string_lossy().to_string();
+        let value_str = CStr::from_ptr(value).to_string_lossy().to_string();
+
+        // Get current port_map
+        let port_map_ref = &mut *cmatch_ref.port_map;
+
+        // Convert current entries to Vec, add new entry, convert back
+        let mut entries_vec = if port_map_ref.entries.is_null() || port_map_ref.len == 0 {
+            Vec::new()
+        } else {
+            Vec::from_raw_parts(port_map_ref.entries, port_map_ref.len, port_map_ref.len)
+        };
+
+        // Create new entry
+        let key_cstring = CString::new(key_str)
+            .unwrap_or_else(|_| CString::new("").unwrap())
+            .into_raw();
+        let value_cstring = CString::new(value_str)
+            .unwrap_or_else(|_| CString::new("").unwrap())
+            .into_raw();
+
+        let new_entry = CStringMapEntry {
+            key: key_cstring,
+            value: value_cstring,
+        };
+
+        entries_vec.push(new_entry);
+
+        let new_len = entries_vec.len();
+        let new_entries = Box::into_raw(entries_vec.into_boxed_slice()) as *mut CStringMapEntry;
+
+        port_map_ref.entries = new_entries;
+        port_map_ref.len = new_len;
+    }
+}
+
+/// Add a celldata to CMatch
+#[unsafe(no_mangle)]
+pub extern "C" fn cmatch_add_celldata(
+    cmatch: *mut CMatch,
+    key: *const CCellData,
+    value: *const CCellData,
+) {
+    if cmatch.is_null() || key.is_null() || value.is_null() {
+        return;
+    }
+
+    unsafe {
+        let cmatch_ref = &mut *cmatch;
+
+        // Convert CCellData to owned CCellData for storage
+        let key_ccell_data = CCellData {
+            cell_name: if (*key).cell_name.is_null() {
+                CString::new("").unwrap().into_raw()
+            } else {
+                let key_str = CStr::from_ptr((*key).cell_name)
+                    .to_string_lossy()
+                    .to_string();
+                CString::new(key_str)
+                    .unwrap_or_else(|_| CString::new("").unwrap())
+                    .into_raw()
+            },
+            cell_index: (*key).cell_index,
+        };
+
+        let value_ccell_data = CCellData {
+            cell_name: if (*value).cell_name.is_null() {
+                CString::new("").unwrap().into_raw()
+            } else {
+                let value_str = CStr::from_ptr((*value).cell_name)
+                    .to_string_lossy()
+                    .to_string();
+                CString::new(value_str)
+                    .unwrap_or_else(|_| CString::new("").unwrap())
+                    .into_raw()
+            },
+            cell_index: (*value).cell_index,
+        };
+
+        // Get current cell_map
+        let cell_map_ref = &mut *cmatch_ref.cell_map;
+
+        // Convert current entries to Vec, add new entry, convert back
+        let mut entries_vec = if cell_map_ref.entries.is_null() || cell_map_ref.len == 0 {
+            Vec::new()
+        } else {
+            Vec::from_raw_parts(cell_map_ref.entries, cell_map_ref.len, cell_map_ref.len)
+        };
+
+        // Create new entry
+        let new_entry = CCellDataMapEntry {
+            key: key_ccell_data,
+            value: value_ccell_data,
+        };
+
+        entries_vec.push(new_entry);
+
+        let new_len = entries_vec.len();
+        let new_entries = Box::into_raw(entries_vec.into_boxed_slice()) as *mut CCellDataMapEntry;
+
+        cell_map_ref.entries = new_entries;
+        cell_map_ref.len = new_len;
+    }
 }
 
 /// Serialize CMatch to JSON C string

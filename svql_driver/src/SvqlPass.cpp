@@ -195,150 +195,67 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	log_push();
 
 	size_t argidx;
-
 	SvqlConfig config = configure(args, design, argidx);
-	auto &solver = *config.solver;
 	std::string pat_filename = config.pat_filename;
 	std::string pat_module_name = config.pat_module_name;
-	bool constports = config.constports;
-	bool nodefaultswaps = config.nodefaultswaps;
-	bool verbose = config.verbose;
 
 	extra_args(args, argidx, design);
 
 	if (pat_filename.empty())
 		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
 
+	this->design = design;
+
+	// Setup the needle design
 	SvqlPass::setup(config);
 
-	// Setting Up Pattern
-	RTLIL::Module *needle = map->module(pat_module_name);
-	std::vector<RTLIL::Wire *> pat_in_ports = std::vector<RTLIL::Wire *>();
-	std::vector<RTLIL::Wire *> pat_out_ports = std::vector<RTLIL::Wire *>();
-	std::vector<RTLIL::Wire *> pat_inout_ports = std::vector<RTLIL::Wire *>();
-	std::vector<Match> matches = std::vector<Match>();
+	// Run the query
+	CMatchList *cmatch_list = run_query(config);
 
-	for (auto wire : needle->wires())
+	if (cmatch_list != nullptr)
 	{
-		if (wire->port_input && !wire->port_output)
+		// Process and display results
+		if (cmatch_list->len > 0)
 		{
-			pat_in_ports.push_back(wire);
-		}
-		if (!wire->port_input && wire->port_output)
-		{
-			pat_out_ports.push_back(wire);
-		}
-		if (wire->port_input && wire->port_output)
-		{
-			pat_inout_ports.push_back(wire);
-		}
-	}
+			log("Found %zu matches.\n", cmatch_list->len);
 
-	// Setting up the graph solver
-	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
-	std::set<RTLIL::IdString> needle_ports;
-
-	log_header(design, "Creating graphs for SubCircuit library.\n");
-
-	// #### Needle Ports
-	std::vector<RTLIL::IdString> ports = needle->ports;
-	for (auto &port : ports)
-	{
-		needle_ports.insert(port);
-	}
-
-	for (auto it = needle->connections().begin(); it != needle->connections().end(); ++it)
-	{
-		log("%s %s", it->first, it->second);
-	}
-
-	// #### Create Needle Graph
-	SubCircuit::Graph mod_graph;
-	std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
-	log("Creating needle graph %s.\n", graph_name.c_str());
-	if (module2graph(mod_graph, needle, constports))
-	{
-		solver.addGraph(graph_name, mod_graph);
-		needle_map[graph_name] = needle;
-		// needle_list.push_back(module);
-	}
-
-	for (auto module : design->modules())
-	{
-		SubCircuit::Graph mod_graph;
-		std::string graph_name = "haystack_" + RTLIL::unescape_id(module->name);
-		log("Creating haystack graph %s.\n", graph_name.c_str());
-		if (module2graph(mod_graph, module, constports, design, -1, nullptr))
-		{
-			solver.addGraph(graph_name, mod_graph);
-			haystack_map[graph_name] = module;
-		}
-	}
-
-	std::vector<SubCircuit::Solver::Result> results;
-	log_header(design, "Running solver from SubCircuit library.\n");
-
-	for (auto &haystack_it : haystack_map)
-	{
-		log("Solving for %s in %s.\n", ("needle_" + RTLIL::unescape_id(needle->name)).c_str(), haystack_it.first.c_str());
-		solver.solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
-	}
-
-	log("Found %d matches.\n", GetSize(results));
-
-	if (results.size() > 0)
-	{
-		for (int i = 0; i < int(results.size()); i++)
-		{
-			Match match;
-			auto &result = results[i];
-
-			for (const auto &it : result.mappings)
+			// Display matches with detailed information
+			for (size_t i = 0; i < cmatch_list->len; i++)
 			{
-				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-				auto *needleCell = static_cast<RTLIL::Cell *>(it.second.needleUserData);
-
-				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
-				std::vector<RTLIL::Wire *> haystack_cell_connections = get_cell_wires(graphCell);
-
-				std::vector<std::pair<RTLIL::Wire *, RTLIL::Wire *>> connections;
-				for (size_t j = 0; j < std::min(needle_cell_connections.size(), haystack_cell_connections.size()); j++)
+				if (cmatch_list->matches[i] != nullptr)
 				{
-					connections.emplace_back(needle_cell_connections[j], haystack_cell_connections[j]);
-				}
+					log("\nMatch #%zu:\n", i);
 
-				match.result = result;
-				match.cell_mapping[needleCell->name] = graphCell->name;
-
-				for (const auto &pair : connections)
-				{
-					if (needle_ports.find(pair.first->name) != needle_ports.end())
+					// Serialize and display the match
+					char *json_str = cmatch_serialize(cmatch_list->matches[i]);
+					if (json_str != nullptr)
 					{
-						log("Needle port %s found in haystack cell %s.\n", pair.first->name.c_str(), graphCell->name.c_str());
-						match.port_mapping[pair.first->name] = pair.second->name;
+						log("Match data: %s\n", json_str);
+						free_json_string(json_str);
 					}
 				}
 			}
-			matches.emplace_back(match);
+		}
+		else
+		{
+			log("No matches found.\n");
 		}
 
-		for (int i = 0; i < int(results.size()); i++)
-		{
-			auto &match = matches[i];
-			log("\nMatch #%d: (%s in %s)\n", i, match.result.needleGraphId.c_str(), match.result.haystackGraphId.c_str());
-			for (const auto &it : match.result.mappings)
-			{
-				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-				CSourceLoc *source_loc = svql_source_loc_parse(graphCell->get_src_attribute().c_str(), '|');
-				char *source_loc_str = svql_source_loc_to_json(source_loc);
-				log("```\n%s\n```", source_loc_str);
-				svql_free_string(source_loc_str);
-				svql_source_loc_free(source_loc);
-			}
-		}
+		// Clean up
+		cmatchlist_free(cmatch_list);
+	}
+	else
+	{
+		log("Query execution failed.\n");
 	}
 
-	delete map;
+	// Clean up needle design
+	if (this->needle_design != nullptr)
+	{
+		delete this->needle_design;
+		this->needle_design = nullptr;
+	}
+
 	log_pop();
 }
 
@@ -474,14 +391,155 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 
 	return config;
 }
-CMatchList *SvqlPass::run_query(std::string pat_filename, std::string pat_module_name)
+
+CMatchList *SvqlPass::run_query(const SvqlConfig &config)
 {
-	// ...
 	if (this->needle_design == nullptr)
 	{
 		log_error("Needle design is not set up. Call setup() before running queries.\n");
 		return nullptr;
 	}
+
+	if (this->design == nullptr)
+	{
+		log_error("Design is not set. Call execute() with a valid design first.\n");
+		return nullptr;
+	}
+
+	// Get the needle module from the design
+	RTLIL::Module *needle = this->needle_design->module(config.pat_module_name);
+	if (needle == nullptr)
+	{
+		log_error("Module %s not found in needle design.\n", config.pat_module_name.c_str());
+		return nullptr;
+	}
+
+	// Setting up the graph solver
+	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
+	std::set<RTLIL::IdString> needle_ports;
+
+	// Get needle ports
+	std::vector<RTLIL::IdString> ports = needle->ports;
+	for (auto &port : ports)
+	{
+		needle_ports.insert(port);
+	}
+
+	// Use the solver from the config (make a copy for this query)
+	auto solver = std::make_unique<SubCircuitReSolver>(*config.solver);
+
+	// Create Needle Graph
+	SubCircuit::Graph mod_graph;
+	std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
+	log("Creating needle graph %s.\n", graph_name.c_str());
+	if (module2graph(mod_graph, needle, config.constports))
+	{
+		solver->addGraph(graph_name, mod_graph);
+		needle_map[graph_name] = needle;
+	}
+
+	// Create haystack graphs from the main design
+	for (auto module : this->design->modules())
+	{
+		SubCircuit::Graph mod_graph;
+		std::string graph_name = "haystack_" + RTLIL::unescape_id(module->name);
+		log("Creating haystack graph %s.\n", graph_name.c_str());
+		if (module2graph(mod_graph, module, config.constports, this->design, -1, nullptr))
+		{
+			solver->addGraph(graph_name, mod_graph);
+			haystack_map[graph_name] = module;
+		}
+	}
+
+	// Run the solver
+	std::vector<SubCircuit::Solver::Result> results;
+	log_header(this->design, "Running solver from SubCircuit library.\n");
+
+	for (auto &haystack_it : haystack_map)
+	{
+		log("Solving for %s in %s.\n", ("needle_" + RTLIL::unescape_id(needle->name)).c_str(), haystack_it.first.c_str());
+		solver->solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
+	}
+
+	log("Found %d matches.\n", GetSize(results));
+
+	// Create CMatchList to return
+	CMatchList *cmatch_list = cmatchlist_new();
+
+	if (results.size() > 0)
+	{
+		for (int i = 0; i < int(results.size()); i++)
+		{
+			auto &result = results[i];
+
+			// Create a new CMatch
+			CMatch *cmatch = cmatch_new();
+
+			for (const auto &it : result.mappings)
+			{
+				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
+				auto *needleCell = static_cast<RTLIL::Cell *>(it.second.needleUserData);
+
+				std::string needle_name = escape_needle_name(needleCell->name.str());
+				std::string haystack_name = escape_needle_name(graphCell->name.str());
+				int needle_id = needleCell->name.index_;
+				int haystack_id = graphCell->name.index_;
+
+				CCellData *needle_cell_data = ccelldata_new(needle_name.c_str(), needle_id);
+				CCellData *haystack_cell_data = ccelldata_new(haystack_name.c_str(), haystack_id);
+
+				// Add cell data to the CMatch
+				cmatch_add_celldata(cmatch, needle_cell_data, haystack_cell_data);
+
+				// Get cell connections
+				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
+				std::vector<RTLIL::Wire *> haystack_cell_connections = get_cell_wires(graphCell);
+
+				// Create port mappings
+				std::vector<std::pair<RTLIL::Wire *, RTLIL::Wire *>> connections;
+				for (size_t j = 0; j < std::min(needle_cell_connections.size(), haystack_cell_connections.size()); j++)
+				{
+					connections.emplace_back(needle_cell_connections[j], haystack_cell_connections[j]);
+				}
+
+				// Log port mappings
+				for (const auto &pair : connections)
+				{
+					if (needle_ports.find(pair.first->name) != needle_ports.end())
+					{
+						// log("Needle port %s mapped to haystack wire %s.\n",
+						// 	pair.first->name.c_str(), pair.second->name.c_str());
+						cmatch_add_port(cmatch, pair.first->name.c_str(), pair.second->name.c_str());
+					}
+				}
+
+				// Log cell mappings
+				// log("Needle cell %s mapped to haystack cell %s.\n",
+				// 	needleCell->name.c_str(), graphCell->name.c_str());
+
+				// Log source location if available
+				// if (config.verbose && graphCell != nullptr)
+				// {
+				// 	CSourceLoc *source_loc = svql_source_loc_parse(graphCell->get_src_attribute().c_str(), '|');
+				// 	if (source_loc != nullptr)
+				// 	{
+				// 		char *source_loc_str = svql_source_loc_to_json(source_loc);
+				// 		if (source_loc_str != nullptr)
+				// 		{
+				// 			log("Source location: %s\n", source_loc_str);
+				// 			svql_free_string(source_loc_str);
+				// 		}
+				// 		svql_source_loc_free(source_loc);
+				// 	}
+				// }
+			}
+
+			// Add the match to the list
+			cmatchlist_add_match(cmatch_list, cmatch);
+		}
+	}
+
+	return cmatch_list;
 }
 
 std::string svql::escape_needle_name(const std::string &name)
