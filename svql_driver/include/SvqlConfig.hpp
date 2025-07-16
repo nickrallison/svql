@@ -16,9 +16,8 @@ namespace svql
     {
         std::unique_ptr<SubCircuitReSolver> solver;
 
-        std::vector<std::string> pat_filenames;
-        std::vector<std::string> regex_filenames;
-        std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes;
+        std::string pat_filename;
+        std::string pat_module_name;
         bool constports;
         bool nodefaultswaps;
         bool verbose;

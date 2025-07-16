@@ -25,6 +25,7 @@ set (SVQL_SRC
     src/RegexMap.cpp
     src/SubCircuitReSolver.cpp
     src/SvqlPass.cpp
+    src/rtlil_backend.cc
 )
 
 add_library (${PROJECT_NAME} SHARED ${SVQL_SRC})
@@ -33,6 +34,8 @@ target_include_directories (${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${yosys_SOURCE_DIR}/
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
 target_compile_options    (${PROJECT_NAME} PRIVATE ${YOSYS_CXXFLAGS_LIST} -D_YOSYS_)

@@ -19,6 +19,9 @@ impl Module for CAdd {
     fn file_path(&self) -> PathBuf {
         unimplemented!()
     }
+    fn module_name(&self) -> String {
+        unimplemented!()
+    }
 }
 
 struct Combined {
@@ -53,6 +56,9 @@ struct And {
 impl Module for And {
     fn file_path(&self) -> PathBuf {
         PathBuf::from("svql_query/verilog/and.v")
+    }
+    fn module_name(&self) -> String {
+        "and_gate".to_string()
     }
 }
 

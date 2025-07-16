@@ -3,11 +3,13 @@ use svql_common::mat::Match;
 
 pub trait Module {
     fn file_path(&self) -> PathBuf;
+    fn module_name(&self) -> String;
     fn query_module<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<Match> {
         // Run yosys and capture the output
-        let file_path: PathBuf = self.file_path();
-        let design_path: PathBuf = design_path.into();
-        let top: String = top.into();
+        let needle_file_path: PathBuf = self.file_path();
+        let haystack_file_path: PathBuf = design_path.into();
+        let needle_module_name: String = self.module_name();
+        let haystack_module_name: String = top.into();
         
         let mut cmd = std::process::Command::new("./yosys/yosys");
         let mut cmd = cmd
@@ -20,7 +22,7 @@ pub trait Module {
             .arg("-p")
             .arg("proc")
             .arg("-p")
-            .arg(format!("svql_driver -pat {} -verbose", file_path.display()));
+            .arg(format!("svql_driver -pat {} {} -verbose", file_path.display()));
         let output = cmd
             .output()
             .expect("Failed to execute yosys command");

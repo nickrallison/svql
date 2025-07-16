@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <regex>
+#include <set>
 
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
@@ -13,6 +14,8 @@
 #include "detail.hpp"
 #include "svql_common.h"
 
+#include "rtlil_backend.h"
+
 using namespace svql;
 using namespace Yosys;
 
@@ -21,13 +24,13 @@ SvqlPass::SvqlPass() : Pass("svql_driver", "find subcircuits and replace them wi
 void SvqlPass::help()
 {
 	log("\n");
-	log("    svql_driver -pat <pat_file> [options] [selection]\n");
+	log("    svql_driver -pat <pat_file> <pat_module_name> [options] [selection]\n");
 	log("\n");
 	log("This pass looks for subcircuits that are isomorphic to any of the modules\n");
 	log("in the given map file.\n");
 	log("map file can be a Verilog source file (*.v) or an RTLIL source file (*.il).\n");
 	log("\n");
-	log("    -pat <pat_file>\n");
+	log("    -pat <pat_file> <pat_module_name>\n");
 	log("        use the modules in this file as reference. This option can be used\n");
 	log("        multiple times.\n");
 	log("\n");
@@ -95,70 +98,83 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	SvqlConfig config = configure(args, design, argidx);
 	auto &solver = *config.solver;
-	std::vector<std::string> pat_filenames = config.pat_filenames;
-	std::vector<std::string> regex_filenames = config.regex_filenames;
-	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes = config.pat_regexes;
+	std::string pat_filename = config.pat_filename;
+	std::string pat_module_name = config.pat_module_name;
 	bool constports = config.constports;
 	bool nodefaultswaps = config.nodefaultswaps;
 	bool verbose = config.verbose;
 
 	extra_args(args, argidx, design);
 
-	if (pat_filenames.empty())
+	if (pat_filename.empty())
 		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
 
 	RTLIL::Design *map = nullptr;
 	map = new RTLIL::Design;
-	for (auto &filename : pat_filenames)
-	{
-		if (filename.compare(0, 1, "%") == 0)
-		{
-			if (!saved_designs.count(filename.substr(1)))
-			{
-				delete map;
-				log_cmd_error("Can't saved design `%s'.\n", filename.c_str() + 1);
-			}
-			for (auto mod : saved_designs.at(filename.substr(1))->modules())
-				if (!map->has(mod->name))
-					map->add(mod->clone());
-		}
-		else
-		{
-			std::ifstream f;
-			rewrite_filename(filename);
-			f.open(filename.c_str());
-			if (f.fail())
-			{
-				delete map;
-				log_cmd_error("Can't open map file `%s'.\n", filename.c_str());
-			}
-			Frontend::frontend_call(map, &f, filename, (filename.size() > 3 && filename.compare(filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
-			f.close();
 
-			if (filename.size() <= 3 || filename.compare(filename.size() - 3, std::string::npos, ".il") != 0)
-			{
-				Pass::call(map, "proc");
-				Pass::call(map, "opt_clean");
-			}
+	if (pat_filename.compare(0, 1, "%") == 0)
+	{
+		if (!saved_designs.count(pat_filename.substr(1)))
+		{
+			delete map;
+			log_cmd_error("Can't saved design `%s'.\n", pat_filename.c_str() + 1);
+		}
+		for (auto mod : saved_designs.at(pat_filename.substr(1))->modules())
+			if (!map->has(mod->name))
+				map->add(mod->clone());
+	}
+	else
+	{
+		std::ifstream f;
+		rewrite_filename(pat_filename);
+		f.open(pat_filename.c_str());
+		if (f.fail())
+		{
+			delete map;
+			log_cmd_error("Can't open map file `%s'.\n", pat_filename.c_str());
+		}
+		Frontend::frontend_call(map, &f, pat_filename, (pat_filename.size() > 3 && pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
+		f.close();
+
+		if (pat_filename.size() <= 3 || pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") != 0)
+		{
+			Pass::call(map, "proc");
+			Pass::call(map, "opt_clean");
 		}
 	}
 
 	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
-	std::vector<RTLIL::Module *> needle_list;
+	RTLIL::Module *needle = map->module(pat_module_name);
+	std::set<RTLIL::IdString> needle_ports;
 
 	log_header(design, "Creating graphs for SubCircuit library.\n");
 
-	for (auto module : map->modules())
+	// #### Needle Ports
+	std::vector<RTLIL::IdString> ports = needle->ports;
+	for (auto &port : ports)
 	{
-		SubCircuit::Graph mod_graph;
-		std::string graph_name = "needle_" + RTLIL::unescape_id(module->name);
-		log("Creating needle graph %s.\n", graph_name.c_str());
-		if (module2graph(mod_graph, module, constports))
-		{
-			solver.addGraph(graph_name, mod_graph);
-			needle_map[graph_name] = module;
-			needle_list.push_back(module);
-		}
+		needle_ports.insert(port);
+	}
+
+	std::ostream f = std::cout;
+
+	for (auto it = needle->connections().begin(); it != needle->connections().end(); ++it)
+	{
+
+		f << stringf("\n");
+		dump_conn(f, indent + "  ", it->first, it->second);
+		first_conn_line = false;
+	}
+
+	// #### Create Needle Graph
+	SubCircuit::Graph mod_graph;
+	std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
+	log("Creating needle graph %s.\n", graph_name.c_str());
+	if (module2graph(mod_graph, needle, constports))
+	{
+		solver.addGraph(graph_name, mod_graph);
+		needle_map[graph_name] = needle;
+		// needle_list.push_back(module);
 	}
 
 	for (auto module : design->modules())
@@ -176,14 +192,12 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::vector<SubCircuit::Solver::Result> results;
 	log_header(design, "Running solver from SubCircuit library.\n");
 
-	std::sort(needle_list.begin(), needle_list.end(), compareSortNeedleList);
+	for (auto &haystack_it : haystack_map)
+	{
+		log("Solving for %s in %s.\n", ("needle_" + RTLIL::unescape_id(needle->name)).c_str(), haystack_it.first.c_str());
+		solver.solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
+	}
 
-	for (auto needle : needle_list)
-		for (auto &haystack_it : haystack_map)
-		{
-			log("Solving for %s in %s.\n", ("needle_" + RTLIL::unescape_id(needle->name)).c_str(), haystack_it.first.c_str());
-			solver.solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
-		}
 	log("Found %d matches.\n", GetSize(results));
 
 	if (results.size() > 0)
@@ -196,17 +210,33 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 			for (const auto &it : result.mappings)
 			{
-				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-				if (c == nullptr)
-					continue;
+				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
+				auto *needleCell = static_cast<RTLIL::Cell *>(it.second.needleUserData);
 
-				log("Found match for %s in s.\n", it.first.c_str());
+				for (const auto &port : needle_ports)
+				{
+					auto cell_wires = get_cell_wires(graphCell);
+					for (auto *wire : cell_wires)
+					{
+						if (wire->name == port)
+						{
+							log("Haystack cell %s has port %s with id %d.\n", graphCell->name.c_str(), port.c_str(), port.index_);
+						}
+					}
+
+					if (needleCell->hasPort(port))
+					{
+						log("Needle cell %s has port %s with id %d.\n", needleCell->name.c_str(), port.c_str(), port.index_);
+					}
+				}
+
+				log("Found match for %s.\n", it.first.c_str());
 			}
 			log("\nMatch #%d: (%s in %s)\n", i, result.needleGraphId.c_str(), result.haystackGraphId.c_str());
 			for (const auto &it : result.mappings)
 			{
-				auto *c = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
-				CSourceLoc *source_loc = svql_source_loc_parse(c->get_src_attribute().c_str(), '|');
+				auto *graphCell = static_cast<RTLIL::Cell *>(it.second.haystackUserData);
+				CSourceLoc *source_loc = svql_source_loc_parse(graphCell->get_src_attribute().c_str(), '|');
 				char *source_loc_str = svql_source_loc_to_json(source_loc);
 				log("```\n%s\n```", source_loc_str);
 				svql_free_string(source_loc_str);
@@ -224,9 +254,8 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 
 	auto solver = std::make_unique<SubCircuitReSolver>();
 
-	std::vector<std::string> pat_filenames;
-	std::vector<std::string> regex_filenames;
-	std::map<std::string, std::map<RTLIL::IdString, std::regex>> pat_regexes;
+	std::string pat_filename;
+	std::string pat_module_name;
 	bool constports = false;
 	bool nodefaultswaps = false;
 	bool verbose = false;
@@ -234,15 +263,10 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 	for (argidx = 1; argidx < args.size(); argidx++)
 	{
 
-		if (args[argidx] == "-pat" && argidx + 1 < args.size())
+		if (args[argidx] == "-pat" && argidx + 2 < args.size())
 		{
-			pat_filenames.push_back(args[++argidx]);
-			continue;
-		}
-
-		if (args[argidx] == "-re" && argidx + 1 < args.size())
-		{
-			regex_filenames.push_back(args[++argidx]);
+			pat_filename = args[++argidx];
+			pat_module_name = RTLIL::escape_id(args[++argidx]);
 			continue;
 		}
 		if (args[argidx] == "-verbose")
@@ -349,12 +373,46 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, RTLIL::Design *des
 
 	SvqlConfig config;
 	config.solver = std::move(solver);
-	config.pat_filenames = pat_filenames;
-	config.regex_filenames = regex_filenames;
-	config.pat_regexes = pat_regexes;
+	config.pat_filename = pat_filename;
+	config.pat_module_name = pat_module_name;
 	config.constports = constports;
 	config.nodefaultswaps = nodefaultswaps;
 	config.verbose = verbose;
 
 	return config;
+}
+
+std::string escape_needle_name(const std::string &name)
+{
+	// if starts with needle_ then remove it
+	if (name.compare(0, 7, "needle_") == 0)
+	{
+		return name.substr(7);
+	}
+
+	// if starts with haystack_ then remove it
+	if (name.compare(0, 8, "haystack_") == 0)
+	{
+		return name.substr(8);
+	}
+	// otherwise return the name as is
+	return name;
+}
+
+std::vector<RTLIL::Wire *> get_cell_wires(RTLIL::Cell *cell)
+{
+	std::set<RTLIL::Wire *> wire_set;
+
+	for (const auto &conn : cell->connections())
+	{
+		for (const RTLIL::SigBit &bit : conn.second)
+		{
+			if (bit.is_wire() && bit.wire != nullptr)
+			{
+				wire_set.insert(bit.wire);
+			}
+		}
+	}
+
+	return std::vector<RTLIL::Wire *>(wire_set.begin(), wire_set.end());
 }
