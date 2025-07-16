@@ -3,6 +3,15 @@ project (svql_driver LANGUAGES CXX)
 
 # ----------------------------------------------------------------------------
 set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Add compatibility flags to avoid GLIBCXX version issues
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
+
+# For better compatibility with older systems
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+endif()
 
 # ----------------------------------------------------------------------------
 set (YOSYS_BIN     "${yosys_SOURCE_DIR}/yosys" CACHE FILEPATH "yosys executable")

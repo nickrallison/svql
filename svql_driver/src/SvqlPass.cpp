@@ -12,7 +12,6 @@
 
 #include "SubCircuitReSolver.hpp"
 #include "GraphConversion.hpp"
-#include "detail.hpp"
 #include "svql_common.h"
 
 using namespace svql;

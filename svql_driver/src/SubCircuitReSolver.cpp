@@ -1,6 +1,5 @@
 #include "SubCircuitReSolver.hpp"
 #include "GraphConversion.hpp"
-#include "detail.hpp"
 
 #include "kernel/rtlil.h"
 #include "kernel/log.h"
