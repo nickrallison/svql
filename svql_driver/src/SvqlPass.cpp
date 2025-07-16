@@ -22,21 +22,19 @@ using namespace Yosys;
 std::vector<RTLIL::Wire *> svql::get_cell_wires(RTLIL::Cell *cell)
 {
 	std::vector<RTLIL::Wire *> wires;
-	
-	// Create a vector of connections and sort them alphabetically by name
+
 	std::vector<std::pair<RTLIL::IdString, RTLIL::SigSpec>> sorted_connections;
 	for (const auto &conn : cell->connections())
 	{
 		sorted_connections.emplace_back(conn.first, conn.second);
 	}
-	
-	// Sort connections alphabetically by connection name
+
 	std::sort(sorted_connections.begin(), sorted_connections.end(),
-		[](const auto &a, const auto &b) {
-			return strcmp(a.first.c_str(), b.first.c_str()) < 0;
-		});
-	
-	// Process connections in alphabetical order
+			  [](const auto &a, const auto &b)
+			  {
+				  return strcmp(a.first.c_str(), b.first.c_str()) < 0;
+			  });
+
 	for (const auto &conn : sorted_connections)
 	{
 		for (const RTLIL::SigBit &bit : conn.second)
