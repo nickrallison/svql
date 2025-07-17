@@ -425,7 +425,7 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 	}
 
 	// Use the solver from the config (make a copy for this query)
-	auto solver = std::make_unique<SubCircuitReSolver>(*config.solver);
+	SubCircuitReSolver *solver = config.solver.get();
 
 	// Create Needle Graph
 	SubCircuit::Graph mod_graph;
@@ -460,7 +460,7 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 		solver->solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
 	}
 
-	log("Found %d matches.\n", GetSize(results));
+	// log("Found %d matches.\n", GetSize(results));
 
 	// Create CMatchList to return
 	CMatchList *cmatch_list = cmatchlist_new();
@@ -511,26 +511,6 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 						cmatch_add_port(cmatch, pair.first->name.c_str(), pair.second->name.c_str());
 					}
 				}
-
-				// Log cell mappings
-				// log("Needle cell %s mapped to haystack cell %s.\n",
-				// 	needleCell->name.c_str(), graphCell->name.c_str());
-
-				// Log source location if available
-				// if (config.verbose && graphCell != nullptr)
-				// {
-				// 	CSourceLoc *source_loc = svql_source_loc_parse(graphCell->get_src_attribute().c_str(), '|');
-				// 	if (source_loc != nullptr)
-				// 	{
-				// 		char *source_loc_str = svql_source_loc_to_json(source_loc);
-				// 		if (source_loc_str != nullptr)
-				// 		{
-				// 			log("Source location: %s\n", source_loc_str);
-				// 			svql_free_string(source_loc_str);
-				// 		}
-				// 		svql_source_loc_free(source_loc);
-				// 	}
-				// }
 			}
 
 			// Add the match to the list

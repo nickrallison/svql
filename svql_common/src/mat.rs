@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -9,10 +8,18 @@ pub struct MatchList {
     pub matches: Vec<Match>,
 }
 
+
+// ##### Prev
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct Match {
+//     pub port_map: HashMap<String, String>,
+//     pub cell_map: HashMap<CellData, CellData>,
+// }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Match {
-    pub port_map: HashMap<String, String>,
-    pub cell_map: HashMap<CellData, CellData>,
+    pub port_map: Vec<(String, String)>,
+    pub cell_map:Vec<(CellData, CellData)>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
@@ -24,17 +31,17 @@ pub struct CellData {
 impl Match {
     pub fn new() -> Self {
         Match {
-            port_map: HashMap::new(),
-            cell_map: HashMap::new(),
+            port_map: Vec::new(),
+            cell_map: Vec::new(),
         }
     }
 
     pub fn add_port(&mut self, key: String, value: String) {
-        self.port_map.insert(key, value);
+        self.port_map.push((key, value));
     }
 
     pub fn add_cell(&mut self, key: CellData, value: CellData) {
-        self.cell_map.insert(key, value);
+        self.cell_map.push((key, value));
     }
 }
 
@@ -42,12 +49,12 @@ impl From<Match> for CMatch {
     fn from(match_data: Match) -> Self {
         let port_entries: Vec<CStringMapEntry> = match_data
             .port_map
-            .iter()
+            .into_iter()
             .map(|(k, v)| {
-                let key = CString::new(k.clone())
+                let key = CString::new(k)
                     .unwrap_or_else(|_| CString::new("").unwrap())
                     .into_raw();
-                let value = CString::new(v.clone())
+                let value = CString::new(v)
                     .unwrap_or_else(|_| CString::new("").unwrap())
                     .into_raw();
                 CStringMapEntry { key, value }
@@ -64,7 +71,6 @@ impl From<Match> for CMatch {
         }));
         std::mem::forget(port_entries);
 
-        // Convert cell_map
         let cell_entries: Vec<CCellDataMapEntry> = match_data
             .cell_map
             .into_iter()
@@ -90,8 +96,8 @@ impl From<Match> for CMatch {
 
 impl From<&CMatch> for Match {
     fn from(cmatch: &CMatch) -> Self {
-        let mut port_map: HashMap<String, String> = HashMap::new();
-        let mut cell_map: HashMap<CellData, CellData> = HashMap::new();
+        let mut port_map: Vec<(String, String)> = Vec::new();
+        let mut cell_map: Vec<(CellData, CellData)> = Vec::new();
 
         // Convert port_map
         if !cmatch.port_map.is_null() {
@@ -111,7 +117,7 @@ impl From<&CMatch> for Match {
                         } else {
                             CStr::from_ptr(entry.value).to_string_lossy().to_string()
                         };
-                        port_map.insert(key, value);
+                        port_map.push((key, value));
                     }
                 }
             }
@@ -127,7 +133,7 @@ impl From<&CMatch> for Match {
                     for entry in entries {
                         let key = (&entry.key).into();
                         let value = (&entry.value).into();
-                        cell_map.insert(key, value);
+                        cell_map.push((key, value));
                     }
                 }
             }
@@ -473,8 +479,22 @@ pub extern "C" fn cmatch_add_celldata(
 /// Serialize CMatch to JSON C string
 #[unsafe(no_mangle)]
 pub extern "C" fn cmatch_serialize(cmatch: *const CMatch) -> *mut c_char {
+
+    // panic!("HERE I AM");
+
     if cmatch.is_null() {
         return ptr::null_mut();
+    }
+
+    let entries = unsafe { (*(*cmatch).port_map).entries };
+    let len = unsafe { (*(*cmatch).port_map).len };
+
+    for i in 0..len {
+        let entry = unsafe { &*entries.add(i) };
+        let key = unsafe { CStr::from_ptr(entry.key) };
+        let value = unsafe { CStr::from_ptr(entry.value) };
+
+        println!("Entry {}: key = {}, value = {}", i, key.to_string_lossy(), value.to_string_lossy());
     }
 
     let cmatch = unsafe { &*cmatch };
@@ -482,9 +502,11 @@ pub extern "C" fn cmatch_serialize(cmatch: *const CMatch) -> *mut c_char {
 
     match serde_json::to_string(&match_data) {
         Ok(json) => CString::new(json)
-            .unwrap_or_else(|_| CString::new("{}").unwrap())
+            .unwrap_or_else(|err| {
+                panic!("Failed to serialize CMatch to JSON: {}", err)
+            })
             .into_raw(),
-        Err(_) => CString::new("{}").unwrap().into_raw(),
+        Err(err) => panic!("Failed to serialize CMatch: {}", err),
     }
 }
 
