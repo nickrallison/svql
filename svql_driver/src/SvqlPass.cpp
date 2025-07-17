@@ -663,3 +663,117 @@ std::string svql::escape_needle_name(const std::string &name)
 	}
 	return name;
 }
+
+SvqlConfig svql::into_svql_runtime_config(const CSvqlRuntimeConfig &ccfg)
+{
+	SvqlConfig config;
+
+	config.pat_module_name = ccfg.pat_module_name ? std::string(ccfg.pat_module_name) : "";
+	config.pat_filename = ccfg.pat_filename ? std::string(ccfg.pat_filename) : "";
+	config.verbose = ccfg.verbose;
+	config.constports = ccfg.const_ports;
+	config.nodefaultswaps = ccfg.nodefaultswaps;
+	config.ignore_parameters = ccfg.ignore_parameters;
+
+	// Convert compat_pairs
+	for (uintptr_t i = 0; i < ccfg.compat_pairs_len; i++)
+	{
+		config.compat_pairs.emplace_back(
+			ccfg.compat_pairs_ptr[i].first ? std::string(ccfg.compat_pairs_ptr[i].first) : "",
+			ccfg.compat_pairs_ptr[i].second ? std::string(ccfg.compat_pairs_ptr[i].second) : "");
+	}
+
+	// Convert swap_ports
+	for (uintptr_t i = 0; i < ccfg.swap_ports_len; i++)
+	{
+		std::set<std::string> ports;
+		for (uintptr_t j = 0; j < ccfg.swap_ports_ptr[i].values_len; j++)
+		{
+			ports.insert(ccfg.swap_ports_ptr[i].values_ptr[j] ? std::string(ccfg.swap_ports_ptr[i].values_ptr[j]) : "");
+		}
+		config.swap_ports.emplace_back(
+			ccfg.swap_ports_ptr[i].key ? std::string(ccfg.swap_ports_ptr[i].key) : "",
+			ports);
+	}
+
+	// Convert perm_ports
+	for (uintptr_t i = 0; i < ccfg.perm_ports_len; i++)
+	{
+		std::vector<std::string> perm_ports_vec;
+		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].first_values_len; j++)
+		{
+			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].first_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].first_values_ptr[j]) : "");
+		}
+		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].second_values_len; j++)
+		{
+			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].second_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].second_values_ptr[j]) : "");
+		}
+		config.perm_ports.emplace_back(
+			ccfg.perm_ports_ptr[i].key ? std::string(ccfg.perm_ports_ptr[i].key) : "",
+			perm_ports_vec);
+	}
+
+	// Convert cell_attr
+	for (uintptr_t i = 0; i < ccfg.cell_attr_len; i++)
+	{
+		config.cell_attr.push_back(ccfg.cell_attr_ptr[i] ? std::string(ccfg.cell_attr_ptr[i]) : "");
+	}
+
+	// Convert wire_attr
+	for (uintptr_t i = 0; i < ccfg.wire_attr_len; i++)
+	{
+		config.wire_attr.push_back(ccfg.wire_attr_ptr[i] ? std::string(ccfg.wire_attr_ptr[i]) : "");
+	}
+
+	// Convert ignore_param
+	for (uintptr_t i = 0; i < ccfg.ignore_param_len; i++)
+	{
+		config.ignore_param.emplace_back(
+			ccfg.ignore_param_ptr[i].first ? std::string(ccfg.ignore_param_ptr[i].first) : "",
+			ccfg.ignore_param_ptr[i].second ? std::string(ccfg.ignore_param_ptr[i].second) : "");
+	}
+
+	return config;
+}
+
+CSvqlRuntimeConfig svql::into_c_svql_runtime_config(const SvqlConfig &config)
+{
+	CSvqlRuntimeConfig runtime_config;
+
+	runtime_config.pat_module_name = config.pat_module_name.c_str();
+	runtime_config.pat_filename = config.pat_filename.c_str();
+	runtime_config.verbose = config.verbose;
+	runtime_config.const_ports = config.constports;
+	runtime_config.nodefaultswaps = config.nodefaultswaps;
+	runtime_config.ignore_parameters = config.ignore_parameters;
+
+	// Convert compat_pairs
+	runtime_config.compat_pairs = config.compat_pairs;
+
+	// Convert swap_ports
+	for (const auto &swap_port : config.swap_ports)
+	{
+		std::vector<std::string> ports_vec(swap_port.second.begin(), swap_port.second.end());
+		runtime_config.swap_ports.emplace_back(swap_port.first, ports_vec);
+	}
+
+	// Convert perm_ports - this is tricky as we need to reconstruct the pair structure
+	for (const auto &perm_port : config.perm_ports)
+	{
+		size_t half_size = perm_port.second.size() / 2;
+		std::vector<std::string> first_half(perm_port.second.begin(), perm_port.second.begin() + half_size);
+		std::vector<std::string> second_half(perm_port.second.begin() + half_size, perm_port.second.end());
+		runtime_config.perm_ports.emplace_back(perm_port.first, std::make_pair(first_half, second_half));
+	}
+
+	// Convert cell_attr
+	runtime_config.cell_attr = config.cell_attr;
+
+	// Convert wire_attr
+	runtime_config.wire_attr = config.wire_attr;
+
+	// Convert ignore_param
+	runtime_config.ignore_param = config.ignore_param;
+
+	return runtime_config;
+}

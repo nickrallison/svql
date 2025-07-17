@@ -3,6 +3,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 
+// use crate::core::string::{CStringMap, CStringMapEntry};
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchList {
     pub matches: Vec<Match>,
@@ -246,20 +248,6 @@ impl From<CMatchList> for MatchList {
 pub struct CMatch {
     pub port_map: *mut CStringMap,
     pub cell_map: *mut CCellDataMap,
-}
-
-/// C FFI representation of a string-to-string map entry
-#[repr(C)]
-pub struct CStringMapEntry {
-    pub key: *mut c_char,
-    pub value: *mut c_char,
-}
-
-/// C FFI representation of a string-to-string map
-#[repr(C)]
-pub struct CStringMap {
-    pub entries: *mut CStringMapEntry,
-    pub len: usize,
 }
 
 /// C FFI representation of a CellData-to-CellData map entry

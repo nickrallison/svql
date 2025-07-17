@@ -35,6 +35,6 @@ namespace svql
     };
 
     SvqlConfig into_svql_runtime_config(const CSvqlRuntimeConfig &ccfg);
-    SvqlRuntimeConfig into_c_svql_runtime_config(const SvqlConfig &config);
+    CSvqlRuntimeConfig into_c_svql_runtime_config(const SvqlConfig &config);
 
 };
