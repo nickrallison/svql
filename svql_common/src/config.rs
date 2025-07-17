@@ -5,7 +5,12 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
+pub struct SvqlRuntimeConfig {
+
+    // new fields
+    pub pat_module_name: String,
+    pub pat_filename: String,
+
     pub verbose: bool,
     pub const_ports: bool,
     pub nodefaultswaps: bool,
@@ -20,7 +25,11 @@ pub struct Config {
 
 // C-compatible representation
 #[repr(C)]
-pub struct CConfig {
+pub struct CSvqlRuntimeConfig {
+
+    pub pat_module_name: *mut c_char,
+    pub pat_filename: *mut c_char,
+
     pub verbose: bool,
     pub const_ports: bool,
     pub nodefaultswaps: bool,
@@ -61,9 +70,14 @@ pub struct CStringVecPair {
     pub second_values_len: usize,
 }
 
-impl Default for Config {
+impl Default for SvqlRuntimeConfig {
     fn default() -> Self {
-        Config {
+        SvqlRuntimeConfig {
+
+            // new fields
+            pat_module_name: String::new(),
+            pat_filename: String::new(),
+
             verbose: false,
             const_ports: false,
             nodefaultswaps: false,
@@ -78,18 +92,18 @@ impl Default for Config {
     }
 }
 
-impl From<Config> for CConfig {
-    fn from(config: Config) -> Self {
+impl From<SvqlRuntimeConfig> for CSvqlRuntimeConfig {
+    fn from(svql_runtime_config: SvqlRuntimeConfig) -> Self {
         // Capture lengths before moving
-        let compat_pairs_len = config.compat_pairs.len();
-        let swap_ports_len = config.swap_ports.len();
-        let perm_ports_len = config.perm_ports.len();
-        let cell_attr_len = config.cell_attr.len();
-        let wire_attr_len = config.wire_attr.len();
-        let ignore_param_len = config.ignore_param.len();
+        let compat_pairs_len = svql_runtime_config.compat_pairs.len();
+        let swap_ports_len = svql_runtime_config.swap_ports.len();
+        let perm_ports_len = svql_runtime_config.perm_ports.len();
+        let cell_attr_len = svql_runtime_config.cell_attr.len();
+        let wire_attr_len = svql_runtime_config.wire_attr.len();
+        let ignore_param_len = svql_runtime_config.ignore_param.len();
 
         // Convert compat_pairs
-        let compat_pairs: Vec<CStringPair> = config
+        let compat_pairs: Vec<CStringPair> = svql_runtime_config
             .compat_pairs
             .into_iter()
             .map(|(first, second)| CStringPair {
@@ -104,7 +118,7 @@ impl From<Config> for CConfig {
         };
 
         // Convert swap_ports
-        let swap_ports: Vec<CStringVec> = config
+        let swap_ports: Vec<CStringVec> = svql_runtime_config
             .swap_ports
             .into_iter()
             .map(|(key, values)| {
@@ -132,7 +146,7 @@ impl From<Config> for CConfig {
         };
 
         // Convert perm_ports
-        let perm_ports: Vec<CStringVecPair> = config
+        let perm_ports: Vec<CStringVecPair> = svql_runtime_config
             .perm_ports
             .into_iter()
             .map(|(key, first_values, second_values)| {
@@ -175,7 +189,7 @@ impl From<Config> for CConfig {
         };
 
         // Convert cell_attr
-        let cell_attr: Vec<*mut c_char> = config
+        let cell_attr: Vec<*mut c_char> = svql_runtime_config
             .cell_attr
             .into_iter()
             .map(|s| CString::new(s).unwrap().into_raw())
@@ -187,7 +201,7 @@ impl From<Config> for CConfig {
         };
 
         // Convert wire_attr
-        let wire_attr: Vec<*mut c_char> = config
+        let wire_attr: Vec<*mut c_char> = svql_runtime_config
             .wire_attr
             .into_iter()
             .map(|s| CString::new(s).unwrap().into_raw())
@@ -199,7 +213,7 @@ impl From<Config> for CConfig {
         };
 
         // Convert ignore_param
-        let ignore_param: Vec<CStringPair> = config
+        let ignore_param: Vec<CStringPair> = svql_runtime_config
             .ignore_param
             .into_iter()
             .map(|(first, second)| CStringPair {
@@ -213,10 +227,10 @@ impl From<Config> for CConfig {
             Box::into_raw(ignore_param.into_boxed_slice()) as *mut CStringPair
         };
 
-        CConfig {
-            verbose: config.verbose,
-            const_ports: config.const_ports,
-            nodefaultswaps: config.nodefaultswaps,
+        CSvqlRuntimeConfig {
+            verbose: svql_runtime_config.verbose,
+            const_ports: svql_runtime_config.const_ports,
+            nodefaultswaps: svql_runtime_config.nodefaultswaps,
             compat_pairs_ptr,
             compat_pairs_len,
             swap_ports_ptr,
@@ -227,21 +241,21 @@ impl From<Config> for CConfig {
             cell_attr_len,
             wire_attr_ptr,
             wire_attr_len,
-            ignore_parameters: config.ignore_parameters,
+            ignore_parameters: svql_runtime_config.ignore_parameters,
             ignore_param_ptr,
             ignore_param_len,
         }
     }
 }
 
-impl From<CConfig> for Config {
-    fn from(c_config: CConfig) -> Self {
+impl From<CSvqlRuntimeConfig> for SvqlRuntimeConfig {
+    fn from(c_svql_runtime_config: CSvqlRuntimeConfig) -> Self {
         unsafe {
             // Convert compat_pairs
-            let compat_pairs = if c_config.compat_pairs_ptr.is_null() {
+            let compat_pairs = if c_svql_runtime_config.compat_pairs_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.compat_pairs_ptr, c_config.compat_pairs_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.compat_pairs_ptr, c_svql_runtime_config.compat_pairs_len);
                 slice
                     .iter()
                     .map(|pair| {
@@ -253,10 +267,10 @@ impl From<CConfig> for Config {
             };
 
             // Convert swap_ports
-            let swap_ports = if c_config.swap_ports_ptr.is_null() {
+            let swap_ports = if c_svql_runtime_config.swap_ports_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.swap_ports_ptr, c_config.swap_ports_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.swap_ports_ptr, c_svql_runtime_config.swap_ports_len);
                 slice
                     .iter()
                     .map(|item| {
@@ -276,10 +290,10 @@ impl From<CConfig> for Config {
             };
 
             // Convert perm_ports
-            let perm_ports = if c_config.perm_ports_ptr.is_null() {
+            let perm_ports = if c_svql_runtime_config.perm_ports_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.perm_ports_ptr, c_config.perm_ports_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.perm_ports_ptr, c_svql_runtime_config.perm_ports_len);
                 slice
                     .iter()
                     .map(|item| {
@@ -308,10 +322,10 @@ impl From<CConfig> for Config {
             };
 
             // Convert cell_attr
-            let cell_attr = if c_config.cell_attr_ptr.is_null() {
+            let cell_attr = if c_svql_runtime_config.cell_attr_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.cell_attr_ptr, c_config.cell_attr_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.cell_attr_ptr, c_svql_runtime_config.cell_attr_len);
                 slice
                     .iter()
                     .map(|ptr| CStr::from_ptr(*ptr).to_string_lossy().into_owned())
@@ -319,10 +333,10 @@ impl From<CConfig> for Config {
             };
 
             // Convert wire_attr
-            let wire_attr = if c_config.wire_attr_ptr.is_null() {
+            let wire_attr = if c_svql_runtime_config.wire_attr_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.wire_attr_ptr, c_config.wire_attr_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.wire_attr_ptr, c_svql_runtime_config.wire_attr_len);
                 slice
                     .iter()
                     .map(|ptr| CStr::from_ptr(*ptr).to_string_lossy().into_owned())
@@ -330,10 +344,10 @@ impl From<CConfig> for Config {
             };
 
             // Convert ignore_param
-            let ignore_param = if c_config.ignore_param_ptr.is_null() {
+            let ignore_param = if c_svql_runtime_config.ignore_param_ptr.is_null() {
                 Vec::new()
             } else {
-                let slice = std::slice::from_raw_parts(c_config.ignore_param_ptr, c_config.ignore_param_len);
+                let slice = std::slice::from_raw_parts(c_svql_runtime_config.ignore_param_ptr, c_svql_runtime_config.ignore_param_len);
                 slice
                     .iter()
                     .map(|pair| {
@@ -344,16 +358,16 @@ impl From<CConfig> for Config {
                     .collect()
             };
 
-            Config {
-                verbose: c_config.verbose,
-                const_ports: c_config.const_ports,
-                nodefaultswaps: c_config.nodefaultswaps,
+            SvqlRuntimeConfig {
+                verbose: c_svql_runtime_config.verbose,
+                const_ports: c_svql_runtime_config.const_ports,
+                nodefaultswaps: c_svql_runtime_config.nodefaultswaps,
                 compat_pairs,
                 swap_ports,
                 perm_ports,
                 cell_attr,
                 wire_attr,
-                ignore_parameters: c_config.ignore_parameters,
+                ignore_parameters: c_svql_runtime_config.ignore_parameters,
                 ignore_param,
             }
         }
@@ -362,14 +376,14 @@ impl From<CConfig> for Config {
 
 // C FFI functions
 #[unsafe(no_mangle)]
-pub extern "C" fn config_to_json(config: *const CConfig) -> *mut c_char {
-    if config.is_null() {
+pub extern "C" fn c_svql_runtime_config_to_json(c_svql_runtime_config: *const CSvqlRuntimeConfig) -> *mut c_char {
+    if c_svql_runtime_config.is_null() {
         return std::ptr::null_mut();
     }
     
     unsafe {
-        let rust_config = Config::from(std::ptr::read(config));
-        match serde_json::to_string(&rust_config) {
+        let rust_svql_runtime_config = SvqlRuntimeConfig::from(std::ptr::read(c_svql_runtime_config));
+        match serde_json::to_string(&rust_svql_runtime_config) {
             Ok(json_string) => {
                 match CString::new(json_string) {
                     Ok(c_string) => c_string.into_raw(),
@@ -382,7 +396,7 @@ pub extern "C" fn config_to_json(config: *const CConfig) -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn config_from_json(json_str: *const c_char) -> *mut CConfig {
+pub extern "C" fn c_svql_runtime_config_from_json(json_str: *const c_char) -> *mut CSvqlRuntimeConfig {
     if json_str.is_null() {
         return std::ptr::null_mut();
     }
@@ -394,10 +408,10 @@ pub extern "C" fn config_from_json(json_str: *const c_char) -> *mut CConfig {
             Err(_) => return std::ptr::null_mut(),
         };
         
-        match serde_json::from_str::<Config>(json_string) {
-            Ok(config) => {
-                let c_config = CConfig::from(config);
-                Box::into_raw(Box::new(c_config))
+        match serde_json::from_str::<SvqlRuntimeConfig>(json_string) {
+            Ok(svql_runtime_config) => {
+                let c_svql_runtime_config = CSvqlRuntimeConfig::from(svql_runtime_config);
+                Box::into_raw(Box::new(c_svql_runtime_config))
             }
             Err(_) => std::ptr::null_mut(),
         }
@@ -405,28 +419,11 @@ pub extern "C" fn config_from_json(json_str: *const c_char) -> *mut CConfig {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn free_config(config: *mut CConfig) {
-    if config.is_null() {
+pub extern "C" fn free_c_svql_runtime_config(c_svql_runtime_config: *mut CSvqlRuntimeConfig) {
+    if c_svql_runtime_config.is_null() {
         return;
     }
-    
-    unsafe {
-        let c_config = Box::from_raw(config);
-        free_c_config_memory(&*c_config);
-    }
-}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn free_json_string(json_str: *mut c_char) {
-    if !json_str.is_null() {
-        unsafe {
-            let _ = CString::from_raw(json_str);
-        }
-    }
-}
-
-unsafe fn free_c_config_memory(config: &CConfig) {
-    // Free compat_pairs
     if !config.compat_pairs_ptr.is_null() {
         let slice = unsafe { std::slice::from_raw_parts(config.compat_pairs_ptr, config.compat_pairs_len) };
         for pair in slice {

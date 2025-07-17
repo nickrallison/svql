@@ -87,9 +87,6 @@ void SvqlPass::help()
 	log("        use the modules in this file as reference. This option can be used\n");
 	log("        multiple times.\n");
 	log("\n");
-	log("    -re <re_file>.json\n");
-	log("        use a regex to match filenames\n");
-	log("\n");
 	log("    -verbose\n");
 	log("        print debug output while analyzing\n");
 	log("\n");
@@ -142,37 +139,37 @@ void SvqlPass::help()
 	log("\n");
 }
 
-std::variant<RTLIL::Design *, std::string> SvqlPass::setup(SvqlConfig &config)
+std::variant<RTLIL::Design *, std::string> SvqlPass::setup(SvqlConfig &config, std::string &pat_filename, std::string &pat_module_name)
 {
 	RTLIL::Design *needle_design = new RTLIL::Design;
 
-	if (config.pat_filename.compare(0, 1, "%") == 0)
+	if (pat_filename.compare(0, 1, "%") == 0)
 	{
-		if (!saved_designs.count(config.pat_filename.substr(1)))
+		if (!saved_designs.count(pat_filename.substr(1)))
 		{
 			delete needle_design;
-			std::string error_msg = "Saved design `" + config.pat_filename.substr(1) + "` not found.";
+			std::string error_msg = "Saved design `" + pat_filename.substr(1) + "` not found.";
 			return error_msg;
 		}
-		for (auto mod : saved_designs.at(config.pat_filename.substr(1))->modules())
+		for (auto mod : saved_designs.at(pat_filename.substr(1))->modules())
 			if (!needle_design->has(mod->name))
 				needle_design->add(mod->clone());
 	}
 	else
 	{
 		std::ifstream f;
-		rewrite_filename(config.pat_filename);
-		f.open(config.pat_filename.c_str());
+		rewrite_filename(pat_filename);
+		f.open(pat_filename.c_str());
 		if (f.fail())
 		{
 			delete needle_design;
-			std::string error_msg = "Can't open map file `" + config.pat_filename + "`.";
+			std::string error_msg = "Can't open map file `" + pat_filename + "`.";
 			return error_msg;
 		}
-		Frontend::frontend_call(needle_design, &f, config.pat_filename, (config.pat_filename.size() > 3 && config.pat_filename.compare(config.pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
+		Frontend::frontend_call(needle_design, &f, pat_filename, (pat_filename.size() > 3 && pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
 		f.close();
 
-		if (config.pat_filename.size() <= 3 || config.pat_filename.compare(config.pat_filename.size() - 3, std::string::npos, ".il") != 0)
+		if (pat_filename.size() <= 3 || pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") != 0)
 		{
 			Pass::call(needle_design, "proc");
 			Pass::call(needle_design, "opt_clean");
@@ -191,15 +188,16 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::string pat_filename = config.pat_filename;
 	std::string pat_module_name = config.pat_module_name;
 
+	// std::string pat_filename = std::string("svql_query/verilog/and.v");
+	// std::string pat_module_name = std::string("and_gate");
+
 	extra_args(args, argidx, design);
 
 	if (pat_filename.empty())
 		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
 
-	// design = design;
-
 	// Setup the needle design
-	std::variant<RTLIL::Design *, std::string> setup_result = SvqlPass::setup(config);
+	std::variant<RTLIL::Design *, std::string> setup_result = SvqlPass::setup(config, pat_filename, pat_module_name);
 	if (std::holds_alternative<std::string>(setup_result))
 	{
 		log_error("Error setting up needle design: %s\n", std::get<std::string>(setup_result).c_str());
@@ -263,11 +261,11 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, size_t &argidx)
 
 	auto solver = std::make_unique<SubCircuitReSolver>();
 
-	std::string pat_filename;
-	std::string pat_module_name;
 	bool constports = false;
 	bool nodefaultswaps = false;
 	bool verbose = false;
+	std::string pat_filename;
+	std::string pat_module_name;
 
 	for (argidx = 1; argidx < args.size(); argidx++)
 	{
@@ -384,6 +382,137 @@ SvqlConfig SvqlPass::configure(std::vector<std::string> args, size_t &argidx)
 	config.solver = std::move(solver);
 	config.pat_filename = pat_filename;
 	config.pat_module_name = pat_module_name;
+	config.constports = constports;
+	config.nodefaultswaps = nodefaultswaps;
+	config.verbose = verbose;
+
+	return config;
+}
+
+SvqlConfig SvqlPass::configure(CConfig &ccfg)
+{
+	auto solver = std::make_unique<SubCircuitReSolver>();
+
+	// Set basic configuration options
+	bool constports = ccfg.const_ports;
+	bool nodefaultswaps = ccfg.nodefaultswaps;
+	bool verbose = ccfg.verbose;
+
+	// Configure solver verbose mode
+	if (verbose)
+	{
+		solver->setVerbose();
+	}
+
+	// Configure ignore parameters
+	if (ccfg.ignore_parameters)
+	{
+		solver->ignoreParameters = true;
+	}
+
+	// Add compatible types
+	for (uintptr_t i = 0; i < ccfg.compat_pairs_len; i++)
+	{
+		std::string needle_type = RTLIL::escape_id(ccfg.compat_pairs_ptr[i].first);
+		std::string haystack_type = RTLIL::escape_id(ccfg.compat_pairs_ptr[i].second);
+		solver->addCompatibleTypes(needle_type, haystack_type);
+	}
+
+	// Add swappable ports
+	for (uintptr_t i = 0; i < ccfg.swap_ports_len; i++)
+	{
+		std::string type = RTLIL::escape_id(ccfg.swap_ports_ptr[i].key);
+		std::set<std::string> ports;
+		for (uintptr_t j = 0; j < ccfg.swap_ports_ptr[i].values_len; j++)
+		{
+			ports.insert(RTLIL::escape_id(ccfg.swap_ports_ptr[i].values_ptr[j]));
+		}
+		solver->addSwappablePorts(type, ports);
+	}
+
+	// Add permutation ports
+	for (uintptr_t i = 0; i < ccfg.perm_ports_len; i++)
+	{
+		std::string type = RTLIL::escape_id(ccfg.perm_ports_ptr[i].key);
+		std::vector<std::string> map_left, map_right;
+
+		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].first_values_len; j++)
+		{
+			map_left.push_back(RTLIL::escape_id(ccfg.perm_ports_ptr[i].first_values_ptr[j]));
+		}
+
+		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].second_values_len; j++)
+		{
+			map_right.push_back(RTLIL::escape_id(ccfg.perm_ports_ptr[i].second_values_ptr[j]));
+		}
+
+		if (map_left.size() != map_right.size())
+		{
+			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+		}
+
+		std::map<std::string, std::string> map;
+		for (size_t j = 0; j < map_left.size(); j++)
+		{
+			map[map_left[j]] = map_right[j];
+		}
+
+		// Validate permutation
+		std::sort(map_left.begin(), map_left.end());
+		std::sort(map_right.begin(), map_right.end());
+		if (map_left != map_right)
+		{
+			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+		}
+
+		solver->addSwappablePortsPermutation(type, map);
+	}
+
+	// Add cell attributes
+	for (uintptr_t i = 0; i < ccfg.cell_attr_len; i++)
+	{
+		solver->cell_attr.insert(RTLIL::escape_id(ccfg.cell_attr_ptr[i]));
+	}
+
+	// Add wire attributes
+	for (uintptr_t i = 0; i < ccfg.wire_attr_len; i++)
+	{
+		solver->wire_attr.insert(RTLIL::escape_id(ccfg.wire_attr_ptr[i]));
+	}
+
+	// Add ignored parameters
+	for (uintptr_t i = 0; i < ccfg.ignore_param_len; i++)
+	{
+		solver->ignoredParams.insert(std::pair<RTLIL::IdString, RTLIL::IdString>(
+			RTLIL::escape_id(ccfg.ignore_param_ptr[i].first),
+			RTLIL::escape_id(ccfg.ignore_param_ptr[i].second)));
+	}
+
+	// Add default swappable ports if not disabled
+	if (!nodefaultswaps)
+	{
+		solver->addSwappablePorts("$and", "\\A", "\\B");
+		solver->addSwappablePorts("$or", "\\A", "\\B");
+		solver->addSwappablePorts("$xor", "\\A", "\\B");
+		solver->addSwappablePorts("$xnor", "\\A", "\\B");
+		solver->addSwappablePorts("$eq", "\\A", "\\B");
+		solver->addSwappablePorts("$ne", "\\A", "\\B");
+		solver->addSwappablePorts("$eqx", "\\A", "\\B");
+		solver->addSwappablePorts("$nex", "\\A", "\\B");
+		solver->addSwappablePorts("$add", "\\A", "\\B");
+		solver->addSwappablePorts("$mul", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_and", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_or", "\\A", "\\B");
+		solver->addSwappablePorts("$_AND_", "\\A", "\\B");
+		solver->addSwappablePorts("$_OR_", "\\A", "\\B");
+		solver->addSwappablePorts("$_XOR_", "\\A", "\\B");
+	}
+
+	// Create and return the SvqlConfig
+	SvqlConfig config;
+	config.solver = std::move(solver);
+	config.pat_filename = "";	 // Not used in this context
+	config.pat_module_name = ""; // Not used in this context
 	config.constports = constports;
 	config.nodefaultswaps = nodefaultswaps;
 	config.verbose = verbose;

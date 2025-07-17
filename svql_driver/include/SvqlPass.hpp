@@ -26,8 +26,9 @@ namespace svql
 		CMatchList *run_query(const SvqlConfig &config, RTLIL::Design *needle_design, RTLIL::Design *design);
 
 		// ####
-		static std::variant<RTLIL::Design *, std::string> setup(SvqlConfig &config);
+		static std::variant<RTLIL::Design *, std::string> setup(SvqlConfig &config, std::string &pat_filename, std::string &pat_module_name);
 		static SvqlConfig configure(std::vector<std::string> args, size_t &argidx);
+		static SvqlConfig configure(CConfig &ccfg);
 
 	} SvqlPass;
 
