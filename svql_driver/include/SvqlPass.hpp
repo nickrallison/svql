@@ -1,5 +1,7 @@
 #pragma once
 
+#include <variant>
+
 #include "kernel/register.h"
 #include "kernel/yosys.h"
 #include "kernel/rtlil.h"
@@ -18,18 +20,14 @@ namespace svql
 		SvqlPass();
 		void help() override;
 		void execute(std::vector<std::string> args, RTLIL::Design *design) override;
-		void setup(SvqlConfig &config);
 		void terminate();
 		void terminate(std::string error_message);
 
-		CMatchList *run_query(const SvqlConfig &config);
+		CMatchList *run_query(const SvqlConfig &config, RTLIL::Design *needle_design, RTLIL::Design *design);
 
 		// ####
-		static SvqlConfig configure(std::vector<std::string> args, RTLIL::Design *design, size_t &argidx);
-
-		// ####
-		RTLIL::Design *design = nullptr;
-		RTLIL::Design *needle_design = nullptr;
+		static std::variant<RTLIL::Design *, std::string> setup(SvqlConfig &config);
+		static SvqlConfig configure(std::vector<std::string> args, size_t &argidx);
 
 	} SvqlPass;
 

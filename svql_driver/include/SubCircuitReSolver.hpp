@@ -32,7 +32,6 @@ namespace svql
                               const std::map<std::string, std::string> &portMap) override;
 
         // helpers ---------------------------------------------------------
-        bool matchesRegex(RTLIL::IdString signal, const std::regex &r) const;
         RTLIL::Const unifiedParam(RTLIL::IdString cell_type, RTLIL::IdString param, RTLIL::Const value);
 
         bool myVerbose = false;
