@@ -5,14 +5,6 @@ project (svql_driver LANGUAGES CXX)
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add compatibility flags to avoid GLIBCXX version issues
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
-
-# For better compatibility with older systems
-if(CMAKE_BUILD_TYPE STREQUAL "Release" OR NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
-endif()
-
 # ----------------------------------------------------------------------------
 set (YOSYS_BIN     "${yosys_SOURCE_DIR}/yosys" CACHE FILEPATH "yosys executable")
 set (YOSYS_CONFIG  "${yosys_SOURCE_DIR}/yosys-config" CACHE FILEPATH "yosys-config executable")
@@ -52,11 +44,13 @@ target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST}
     svql_common
 )
 
+set(ASAN_ENABLED OFF CACHE BOOL "Enable AddressSanitizer")
+
 # AddressSanitizer options - only enable in debug builds to avoid runtime issues
-# if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-#     target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address -fno-omit-frame-pointer)
-#     target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address)
-# endif()
+if(${ASAN_ENABLED})
+    target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=undefined -fsanitize=address)
+endif()
 
 install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION .
