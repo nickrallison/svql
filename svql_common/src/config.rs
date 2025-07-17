@@ -228,6 +228,8 @@ impl From<SvqlRuntimeConfig> for CSvqlRuntimeConfig {
         };
 
         CSvqlRuntimeConfig {
+            pat_module_name: CString::new(svql_runtime_config.pat_module_name).unwrap().into_raw(),
+            pat_filename: CString::new(svql_runtime_config.pat_filename).unwrap().into_raw(),
             verbose: svql_runtime_config.verbose,
             const_ports: svql_runtime_config.const_ports,
             nodefaultswaps: svql_runtime_config.nodefaultswaps,
@@ -359,6 +361,8 @@ impl From<CSvqlRuntimeConfig> for SvqlRuntimeConfig {
             };
 
             SvqlRuntimeConfig {
+                pat_module_name: CStr::from_ptr(c_svql_runtime_config.pat_module_name).to_string_lossy().into_owned(),
+                pat_filename: CStr::from_ptr(c_svql_runtime_config.pat_filename).to_string_lossy().into_owned(),
                 verbose: c_svql_runtime_config.verbose,
                 const_ports: c_svql_runtime_config.const_ports,
                 nodefaultswaps: c_svql_runtime_config.nodefaultswaps,
@@ -424,101 +428,117 @@ pub extern "C" fn free_c_svql_runtime_config(c_svql_runtime_config: *mut CSvqlRu
         return;
     }
 
-    if !config.compat_pairs_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.compat_pairs_ptr, config.compat_pairs_len) };
-        for pair in slice {
-            if !pair.first.is_null() {
-                let _ = unsafe { CString::from_raw(pair.first) };
-            }
-            if !pair.second.is_null() {
-                let _ = unsafe { CString::from_raw(pair.second) };
-            }
+    unsafe {
+        let config = &*c_svql_runtime_config;
+        
+        // Free the new string fields
+        if !config.pat_module_name.is_null() {
+            let _ = CString::from_raw(config.pat_module_name);
         }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.compat_pairs_ptr, config.compat_pairs_len)) };
-    }
+        if !config.pat_filename.is_null() {
+            let _ = CString::from_raw(config.pat_filename);
+        }
 
-    // Free swap_ports
-    if !config.swap_ports_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.swap_ports_ptr, config.swap_ports_len) };
-        for item in slice {
-            if !item.key.is_null() {
-                let _ = unsafe { CString::from_raw(item.key) };
-            }
-            if !item.values_ptr.is_null() {
-                let values_slice = unsafe { std::slice::from_raw_parts(item.values_ptr, item.values_len) };
-                for ptr in values_slice {
-                    if !ptr.is_null() {
-                        let _ = unsafe { CString::from_raw(*ptr) };
-                    }
+        // Free compat_pairs
+        if !config.compat_pairs_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.compat_pairs_ptr, config.compat_pairs_len);
+            for pair in slice {
+                if !pair.first.is_null() {
+                    let _ = CString::from_raw(pair.first);
                 }
-                let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(item.values_ptr, item.values_len)) };
-            }
-        }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.swap_ports_ptr, config.swap_ports_len)) };
-    }
-
-    // Free perm_ports
-    if !config.perm_ports_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.perm_ports_ptr, config.perm_ports_len) };
-        for item in slice {
-            if !item.key.is_null() {
-                let _ = unsafe { CString::from_raw(item.key) };
-            }
-            if !item.first_values_ptr.is_null() {
-                let first_slice = unsafe { std::slice::from_raw_parts(item.first_values_ptr, item.first_values_len) };
-                for ptr in first_slice {
-                    if !ptr.is_null() {
-                        let _ = unsafe { CString::from_raw(*ptr) };
-                    }
+                if !pair.second.is_null() {
+                    let _ = CString::from_raw(pair.second);
                 }
-                let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(item.first_values_ptr, item.first_values_len)) };
             }
-            if !item.second_values_ptr.is_null() {
-                let second_slice = unsafe { std::slice::from_raw_parts(item.second_values_ptr, item.second_values_len) };
-                for ptr in second_slice {
-                    if !ptr.is_null() {
-                        let _ = unsafe { CString::from_raw(*ptr) };
-                    }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.compat_pairs_ptr, config.compat_pairs_len));
+        }
+
+        // Free swap_ports
+        if !config.swap_ports_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.swap_ports_ptr, config.swap_ports_len);
+            for item in slice {
+                if !item.key.is_null() {
+                    let _ = CString::from_raw(item.key);
                 }
-                let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(item.second_values_ptr, item.second_values_len)) };
+                if !item.values_ptr.is_null() {
+                    let values_slice = std::slice::from_raw_parts(item.values_ptr, item.values_len);
+                    for ptr in values_slice {
+                        if !ptr.is_null() {
+                            let _ = CString::from_raw(*ptr);
+                        }
+                    }
+                    let _ = Box::from_raw(std::slice::from_raw_parts_mut(item.values_ptr, item.values_len));
+                }
             }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.swap_ports_ptr, config.swap_ports_len));
         }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.perm_ports_ptr, config.perm_ports_len)) };
-    }
 
-    // Free cell_attr
-    if !config.cell_attr_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.cell_attr_ptr, config.cell_attr_len) };
-        for ptr in slice {
-            if !ptr.is_null() {
-                let _ = unsafe { CString::from_raw(*ptr) };
+        // Free perm_ports
+        if !config.perm_ports_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.perm_ports_ptr, config.perm_ports_len);
+            for item in slice {
+                if !item.key.is_null() {
+                    let _ = CString::from_raw(item.key);
+                }
+                if !item.first_values_ptr.is_null() {
+                    let first_slice = std::slice::from_raw_parts(item.first_values_ptr, item.first_values_len);
+                    for ptr in first_slice {
+                        if !ptr.is_null() {
+                            let _ = CString::from_raw(*ptr);
+                        }
+                    }
+                    let _ = Box::from_raw(std::slice::from_raw_parts_mut(item.first_values_ptr, item.first_values_len));
+                }
+                if !item.second_values_ptr.is_null() {
+                    let second_slice = std::slice::from_raw_parts(item.second_values_ptr, item.second_values_len);
+                    for ptr in second_slice {
+                        if !ptr.is_null() {
+                            let _ = CString::from_raw(*ptr);
+                        }
+                    }
+                    let _ = Box::from_raw(std::slice::from_raw_parts_mut(item.second_values_ptr, item.second_values_len));
+                }
             }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.perm_ports_ptr, config.perm_ports_len));
         }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.cell_attr_ptr, config.cell_attr_len)) };
-    }
 
-    // Free wire_attr
-    if !config.wire_attr_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.wire_attr_ptr, config.wire_attr_len) };
-        for ptr in slice {
-            if !ptr.is_null() {
-                let _ = unsafe { CString::from_raw(*ptr) };
+        // Free cell_attr
+        if !config.cell_attr_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.cell_attr_ptr, config.cell_attr_len);
+            for ptr in slice {
+                if !ptr.is_null() {
+                    let _ = CString::from_raw(*ptr);
+                }
             }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.cell_attr_ptr, config.cell_attr_len));
         }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.wire_attr_ptr, config.wire_attr_len)) } ;
-    }
-    
-    // Free ignore_param
-    if !config.ignore_param_ptr.is_null() {
-        let slice = unsafe { std::slice::from_raw_parts(config.ignore_param_ptr, config.ignore_param_len) };
-        for pair in slice {
-            if !pair.first.is_null() {
-                let _ = unsafe { CString::from_raw(pair.first) };
+
+        // Free wire_attr
+        if !config.wire_attr_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.wire_attr_ptr, config.wire_attr_len);
+            for ptr in slice {
+                if !ptr.is_null() {
+                    let _ = CString::from_raw(*ptr);
+                }
             }
-            if !pair.second.is_null() {
-                let _ = unsafe { CString::from_raw(pair.second) };
-            }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.wire_attr_ptr, config.wire_attr_len));
         }
-        let _ = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(config.ignore_param_ptr, config.ignore_param_len)) };
+        
+        // Free ignore_param
+        if !config.ignore_param_ptr.is_null() {
+            let slice = std::slice::from_raw_parts(config.ignore_param_ptr, config.ignore_param_len);
+            for pair in slice {
+                if !pair.first.is_null() {
+                    let _ = CString::from_raw(pair.first);
+                }
+                if !pair.second.is_null() {
+                    let _ = CString::from_raw(pair.second);
+                }
+            }
+            let _ = Box::from_raw(std::slice::from_raw_parts_mut(config.ignore_param_ptr, config.ignore_param_len));
+        }
+        
+        // Free the main config struct
+        let _ = Box::from_raw(c_svql_runtime_config);
     }
 }
