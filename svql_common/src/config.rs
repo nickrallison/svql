@@ -1,9 +1,10 @@
 
 
 use serde::{Deserialize, Serialize};
-use std::ffi::{CStr, CString};
+// use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use crate::core::list::List;
+use crate::core::string::CrateCString;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SvqlRuntimeConfig {
@@ -22,7 +23,6 @@ pub struct SvqlRuntimeConfig {
     pub ignore_param: Vec<(String, String)>,
 }
 
-type CrateCString = crate::core::string::CString;
 #[repr(C)]
 pub struct CSvqlRuntimeConfig {
 
@@ -33,7 +33,7 @@ pub struct CSvqlRuntimeConfig {
     pub const_ports: bool,
     pub nodefaultswaps: bool,
     pub compat_pairs: List<(CrateCString, CrateCString)>,
-    pub swap_ports: List<CrateCString>,
+    pub swap_ports: List<(CrateCString, List<CrateCString>)>,
     pub perm_ports: List<(CrateCString, List<CrateCString>, List<CrateCString>)>,
     pub cell_attr: List<CrateCString>,
     pub wire_attr: List<CrateCString>,
@@ -44,8 +44,8 @@ pub struct CSvqlRuntimeConfig {
 impl CSvqlRuntimeConfig {
     pub fn new() -> *mut Self {
         let config = CSvqlRuntimeConfig {
-            pat_module_name: CrateCString::new(),
-            pat_filename: CrateCString::new(),
+            pat_module_name: CrateCString::new("").unwrap(),
+            pat_filename: CrateCString::new("").unwrap(),
             verbose: false,
             const_ports: false,
             nodefaultswaps: false,
@@ -96,9 +96,9 @@ impl From<SvqlRuntimeConfig> for CSvqlRuntimeConfig {
             (CrateCString::from(first), CrateCString::from(second))
         }).collect();
 
-        let swap_ports: List<CrateCString> = svql_runtime_config.swap_ports.iter().map(|(key, values)| {
+        let swap_ports: List<(CrateCString, List<CrateCString>)> = svql_runtime_config.swap_ports.iter().map(|(key, values)| {
             let values_list: List<CrateCString> = values.iter().map(|v| CrateCString::from(v)).collect();
-            CrateCString::from(key)
+            (CrateCString::from(key), values_list)
         }).collect();
 
         let perm_ports: List<(CrateCString, List<CrateCString>, List<CrateCString>)> = svql_runtime_config.perm_ports.iter().map(|(key, first_values, second_values)| {
@@ -144,12 +144,12 @@ impl From<CSvqlRuntimeConfig> for SvqlRuntimeConfig {
             (first.into(), second.into())
         }).collect();
 
-        let swap_ports: Vec<(String, Vec<String>)> = c_svql_runtime_config.swap_ports.iter().map(|key| {
-            (key.into(), Vec::new()) // Assuming values are not needed here
+        let swap_ports: Vec<(String, Vec<String>)> = c_svql_runtime_config.swap_ports.iter().map(|(key, values)| {
+            (key.into(), values.iter().map(|v| v.into()).collect())
         }).collect();
 
         let perm_ports: Vec<(String, Vec<String>, Vec<String>)> = c_svql_runtime_config.perm_ports.iter().map(|(key, first_values, second_values)| {
-            (key.into(), first_values.into(), second_values.into())
+            (key.into(), first_values.iter().map(|v| v.into()).collect(), second_values.iter().map(|v| v.into()).collect())
         }).collect();
 
         let cell_attr: Vec<String> = c_svql_runtime_config.cell_attr.iter().map(|attr| attr.into()).collect();
@@ -189,7 +189,7 @@ pub extern "C" fn c_svql_runtime_config_to_json(c_svql_runtime_config: *const CS
         let rust_svql_runtime_config = SvqlRuntimeConfig::from(std::ptr::read(c_svql_runtime_config));
         match serde_json::to_string(&rust_svql_runtime_config) {
             Ok(json_string) => {
-                match CString::new(json_string) {
+                match CrateCString::new(&json_string) {
                     Ok(c_string) => c_string.into_raw(),
                     Err(_) => std::ptr::null_mut(),
                 }

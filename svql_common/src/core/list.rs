@@ -152,7 +152,7 @@ mod tests {
         let list: List<i32> = List::new();
         assert_eq!(list.len(), 0);
         assert!(list.is_empty());
-        assert_eq!(list.as_slice(), &[]);
+        assert_eq!(list.as_slice(), &[0; 0]);
     }
 
     #[test]
@@ -160,6 +160,7 @@ mod tests {
         let list: List<i32> = List::default();
         assert_eq!(list.len(), 0);
         assert!(list.is_empty());
+        assert_eq!(list.as_slice(), &[0; 0]);
     }
 
     #[test]

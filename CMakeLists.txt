@@ -11,8 +11,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
 enable_testing()
 
 add_subdirectory(svql_common)
-add_subdirectory(yosys)
-add_subdirectory(svql_driver)
+# add_subdirectory(yosys)
+# add_subdirectory(svql_driver)
 
-add_subdirectory(svql_pat)
-add_subdirectory(svql_pat_lib)
+# add_subdirectory(svql_pat)
+# add_subdirectory(svql_pat_lib)
