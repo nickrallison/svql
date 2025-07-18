@@ -111,7 +111,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	}
 
 	// Create the CPattern
-	CPattern *pattern = cpattern_new(
+	CPattern *pattern = pattern_new(
 		pattern_file.c_str(),
 		input_ptrs.empty() ? nullptr : input_ptrs.data(),
 		input_ptrs.size(),
@@ -146,7 +146,7 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 }
 
 // from svql_common.h
-// struct CPattern *cpattern_new(const char *file_loc,
+// struct CPattern *pattern_new(const char *file_loc,
 //                               const char *const *in_ports,
 //                               uintptr_t in_ports_len,
 //                               const char *const *out_ports,
