@@ -215,8 +215,13 @@ pub extern "C" fn append_match_to_matchlist(list: &mut CMatchList, match_data: C
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn match_list_clone(list: &CMatchList) -> CMatchList {
-    list.clone()
+pub extern "C" fn match_list_clone(list: *mut CMatchList) -> *mut CMatchList {
+    if list.is_null() {
+        return std::ptr::null_mut();
+    }
+    let c_match_list_ref = unsafe { &*list };
+    let r: CMatchList = c_match_list_ref.clone();
+    Box::into_raw(Box::new(r))
 }
 
 #[unsafe(no_mangle)]
@@ -306,13 +311,14 @@ mod tests {
 
     #[test]
     fn test_ffi_lifecycle() {
-        let c = match_list_new();
-        let c2 = match_list_clone(&c);
-        assert!(match_list_eq(&c, &c2));
-        let _ = match_list_debug_string(&c);
         unsafe {
-            match_list_destroy(Box::into_raw(Box::new(c2)));
-            match_list_destroy(Box::into_raw(Box::new(c)));
+            let c = match_list_new();
+            let c2 = match_list_clone(c);
+            assert!(match_list_eq(&*c, &*c2));
+            let _ = match_list_debug_string(&*c);
+        
+            match_list_destroy(c2);
+            match_list_destroy(c);
         }
     }
 }

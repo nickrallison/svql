@@ -1,8 +1,5 @@
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use std::str::FromStr;
+
 use crate::connection::Connection;
-use svql_common::mat::Match;
 
 #[derive(Clone, Debug)]
 pub struct InPort(String);

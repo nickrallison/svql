@@ -56,8 +56,13 @@ pub extern "C" fn pattern_new() -> *mut CPattern {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn pattern_clone(p: &CPattern) -> CPattern {
-    p.clone()
+pub extern "C" fn pattern_clone(p: *mut CPattern) -> *mut CPattern {
+    if p.is_null() {
+        return std::ptr::null_mut();
+    }
+    let c_pattern_ref = unsafe { &*p };
+    let r: CPattern = c_pattern_ref.clone();
+    Box::into_raw(Box::new(r))
 }
 
 #[unsafe(no_mangle)]
@@ -138,22 +143,14 @@ mod tests {
 
     #[test]
     fn test_ffi_lifecycle() {
-        let c = pattern_new();
-        let c2 = pattern_clone(&c);
-        assert!(pattern_eq(&c, &c2));
-        let _ = pattern_debug_string(&c);
         unsafe {
-            pattern_destroy(Box::into_raw(Box::new(c2)));
-            pattern_destroy(Box::into_raw(Box::new(c)));
+            let c = pattern_new();
+            let c2 = pattern_clone(c);
+            assert!(pattern_eq(&*c, &*c2));
+            let _ = pattern_debug_string(&*c);
+        
+            pattern_destroy(c2);
+            pattern_destroy(c);
         }
-        
-        let vec: Vec<CPattern> = vec![
-            pattern_new(),
-            pattern_new(),
-            pattern_new()
-        ];
-        let list = List::from(vec);
-        drop(list);
-        
     }
 }

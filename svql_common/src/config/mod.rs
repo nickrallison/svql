@@ -215,8 +215,13 @@ pub extern "C" fn svql_runtime_config_default() -> *mut CSvqlRuntimeConfig {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_clone(cfg: &CSvqlRuntimeConfig) -> CSvqlRuntimeConfig {
-    cfg.clone()
+pub extern "C" fn svql_runtime_config_clone(cfg: *mut CSvqlRuntimeConfig) -> *mut CSvqlRuntimeConfig {
+    if cfg.is_null() {
+        return std::ptr::null_mut();
+    }
+    let cfg_ref = unsafe { &*cfg };
+    let cloned_cfg = CSvqlRuntimeConfig::from(&SvqlRuntimeConfig::from(cfg_ref));
+    Box::into_raw(Box::new(cloned_cfg))
 }
 
 #[unsafe(no_mangle)]
@@ -308,12 +313,13 @@ mod tests {
     #[test]
     fn test_ffi_lifecycle() {
         let c = svql_runtime_config_new();
-        let c2 = svql_runtime_config_clone(&c);
-        assert!(svql_runtime_config_eq(&c, &c2));
-        let _ = svql_runtime_config_debug_string(&c);
-        unsafe {
-            svql_runtime_config_destroy(Box::into_raw(Box::new(c2)));
-            svql_runtime_config_destroy(Box::into_raw(Box::new(c)));
+        let c2 = svql_runtime_config_clone(c);
+        unsafe { 
+            assert!(svql_runtime_config_eq(&*c, &*c2));
+            let _ = svql_runtime_config_debug_string(&*c);
+        
+            svql_runtime_config_destroy(c2);
+            svql_runtime_config_destroy(c);
         }
     }
 
@@ -321,7 +327,12 @@ mod tests {
     fn test_default() {
         let c = svql_runtime_config_default();
         let rust = SvqlRuntimeConfig::default();
-        let back = SvqlRuntimeConfig::from(&c);
+        let back = unsafe { SvqlRuntimeConfig::from(&*c) };
+        
         assert_eq!(rust, back);
+        
+        unsafe {
+            svql_runtime_config_destroy(c);
+        }
     }
 }

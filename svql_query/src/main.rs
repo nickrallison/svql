@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use crate::connection::Connection;
 use svql_common::mat::Match;
 use crate::ports::{InPort, OutPort};

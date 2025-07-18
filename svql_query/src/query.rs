@@ -12,17 +12,17 @@ pub trait Module {
         let haystack_module_name: String = top.into();
         
         let mut cmd = std::process::Command::new("./yosys/yosys");
-        let mut cmd = cmd
+        let cmd = cmd
             .arg("-m")
             .arg("build/svql_driver/libsvql_driver.so")
             .arg("-p")
-            .arg(format!("read_verilog {}", design_path.to_string_lossy()))
+            .arg(format!("read_verilog {}", haystack_file_path.to_string_lossy()))
             .arg("-p")
-            .arg(format!("hierarchy -top {}", top))
+            .arg(format!("hierarchy -top {}", haystack_module_name))
             .arg("-p")
             .arg("proc")
             .arg("-p")
-            .arg(format!("svql_driver -pat {} {} -verbose", file_path.display()));
+            .arg(format!("svql_driver -pat {} {} -verbose", needle_file_path.display(), needle_module_name));
         let output = cmd
             .output()
             .expect("Failed to execute yosys command");

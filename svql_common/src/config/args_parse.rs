@@ -29,8 +29,16 @@ pub fn svql_runtime_config_from_args_logic(args: &[String]) -> SvqlRuntimeConfig
     while i < args.len() {
         match args[i].as_str() {
             "-pat" if i + 2 < args.len() => {
-                cfg.pat_filename = args[i + 1].clone();
-                cfg.pat_module_name = args[i + 2].clone();
+                let pat_filename = args[i + 1].clone();
+                let pat_module_name = args[i + 2].clone();
+
+                cfg.pat_filename = pat_filename;
+                
+                if !pat_module_name.starts_with('\\') {
+                    cfg.pat_module_name = format!("\\{}", pat_module_name);
+                } else {
+                    cfg.pat_module_name = pat_module_name;
+                }
                 i += 3;
             }
             "-verbose" => {
