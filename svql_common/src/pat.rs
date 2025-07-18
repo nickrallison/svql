@@ -1,12 +1,11 @@
-use serde::{Deserialize, Serialize};
-use std::{
-    ffi::{CStr, CString},
-    os::raw::c_char,
-    path::PathBuf,
-    ptr, slice,
-};
+// pattern.rs
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+use serde::{Serialize, Deserialize};
+use std::path::{PathBuf};
+use crate::core::string::CrateCString;
+use crate::core::list::List;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pattern {
     pub file_loc: PathBuf,
     pub in_ports: Vec<String>,
@@ -15,202 +14,146 @@ pub struct Pattern {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CPattern {
-    file_loc: *const c_char,
-
-    in_ports: *const *const c_char,
-    in_ports_len: usize,
-
-    out_ports: *const *const c_char,
-    out_ports_len: usize,
-
-    inout_ports: *const *const c_char,
-    inout_ports_len: usize,
+    pub file_loc: CrateCString,
+    pub in_ports: List<CrateCString>,
+    pub out_ports: List<CrateCString>,
+    pub inout_ports: List<CrateCString>,
 }
 
-#[repr(C)]
-struct CPatternBoxed {
-    c_repr: CPattern,
-
-    file_loc_buf: CString,
-
-    in_bufs: Vec<CString>,
-    out_bufs: Vec<CString>,
-    inout_bufs: Vec<CString>,
-
-    in_ptrs: Vec<*const c_char>,
-    out_ptrs: Vec<*const c_char>,
-    inout_ptrs: Vec<*const c_char>,
-}
-
-impl From<Pattern> for CPatternBoxed {
-    fn from(p: Pattern) -> Self {
-        let file_loc_buf = CString::new(p.file_loc.to_string_lossy().into_owned())
-            .expect("Path contained an interior NUL byte");
-
-        fn convert_list(src: Vec<String>) -> (Vec<CString>, Vec<*const c_char>) {
-            let bufs: Vec<CString> = src
-                .into_iter()
-                .map(|s| CString::new(s).expect("String contained NUL"))
-                .collect();
-            let ptrs: Vec<*const c_char> = bufs.iter().map(|c| c.as_ptr()).collect();
-            (bufs, ptrs)
-        }
-
-        let (in_bufs, in_ptrs) = convert_list(p.in_ports);
-        let (out_bufs, out_ptrs) = convert_list(p.out_ports);
-        let (inout_bufs, inout_ptrs) = convert_list(p.inout_ports);
-
-        let c_repr = CPattern {
-            file_loc: file_loc_buf.as_ptr(),
-
-            in_ports: in_ptrs.as_ptr(),
-            in_ports_len: in_ptrs.len(),
-
-            out_ports: out_ptrs.as_ptr(),
-            out_ports_len: out_ptrs.len(),
-
-            inout_ports: inout_ptrs.as_ptr(),
-            inout_ports_len: inout_ptrs.len(),
-        };
-
-        Self {
-            c_repr,
-            file_loc_buf,
-            in_bufs,
-            out_bufs,
-            inout_bufs,
-            in_ptrs,
-            out_ptrs,
-            inout_ptrs,
+impl From<&Pattern> for CPattern {
+    fn from(p: &Pattern) -> Self {
+        CPattern {
+            file_loc: CrateCString::from(p.file_loc.to_string_lossy().as_ref()),
+            in_ports: p.in_ports.iter().map(|s| CrateCString::from(s.as_str())).collect(),
+            out_ports: p.out_ports.iter().map(|s| CrateCString::from(s.as_str())).collect(),
+            inout_ports: p.inout_ports.iter().map(|s| CrateCString::from(s.as_str())).collect(),
         }
     }
 }
 
 impl From<&CPattern> for Pattern {
     fn from(c: &CPattern) -> Self {
+        Pattern {
+            file_loc: PathBuf::from(c.file_loc.as_str()),
+            in_ports: c.in_ports.as_slice().iter().map(|s| s.as_str().to_string()).collect(),
+            out_ports: c.out_ports.as_slice().iter().map(|s| s.as_str().to_string()).collect(),
+            inout_ports: c.inout_ports.as_slice().iter().map(|s| s.as_str().to_string()).collect(),
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pattern_new() -> CPattern {
+    let p = Pattern {
+        file_loc: PathBuf::new(),
+        in_ports: Vec::new(),
+        out_ports: Vec::new(),
+        inout_ports: Vec::new(),
+    };
+    CPattern::from(&p)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pattern_clone(p: &CPattern) -> CPattern {
+    p.clone()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pattern_destroy(p: *mut CPattern) {
+    if !p.is_null() {
+        unsafe { let _ = Box::from_raw(p); };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pattern_eq(a: &CPattern, b: &CPattern) -> bool {
+    a == b
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pattern_debug_string(p: &CPattern) -> CrateCString {
+    let rust_p = Pattern::from(p);
+    let s = format!("{:?}", rust_p);
+    CrateCString::from(s.as_str())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pattern_to_json(p: &CPattern) -> CrateCString {
+    let rust_p = Pattern::from(p);
+    match serde_json::to_string(&rust_p) {
+        Ok(json) => CrateCString::from(json.as_str()),
+        Err(e) => panic!("Failed to serialize to JSON: {}", e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn make_sample_pattern() -> Pattern {
+        Pattern {
+            file_loc: PathBuf::from("/tmp/foo.sv"),
+            in_ports: vec!["a".to_string(), "b".to_string()],
+            out_ports: vec!["c".to_string()],
+            inout_ports: vec!["d".to_string(), "e".to_string()],
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_conversion() {
+        let orig = make_sample_pattern();
+        let c = CPattern::from(&orig);
+        let back = Pattern::from(&c);
+        assert_eq!(orig, back);
+    }
+
+    #[test]
+    fn test_clone_and_eq() {
+        let c1 = CPattern::from(&make_sample_pattern());
+        let c2 = c1.clone();
+        assert_eq!(c1, c2);
+        assert_ne!(&c1 as *const _, &c2 as *const _);
+    }
+
+    #[test]
+    fn test_hash() {
+        let c1 = CPattern::from(&make_sample_pattern());
+        let c2 = c1.clone();
+        let mut set = HashSet::new();
+        set.insert(c1);
+        assert!(set.contains(&c2));
+    }
+
+    #[test]
+    fn test_debug_string() {
+        let c = CPattern::from(&make_sample_pattern());
+        let dbg = pattern_debug_string(&c);
+        let s = dbg.as_str();
+        assert!(s.contains("file_loc"));
+        drop(dbg);
+    }
+
+    #[test]
+    fn test_ffi_lifecycle() {
+        let c = pattern_new();
+        let c2 = pattern_clone(&c);
+        assert!(pattern_eq(&c, &c2));
+        let _ = pattern_debug_string(&c);
         unsafe {
-            let file_loc = PathBuf::from(CStr::from_ptr(c.file_loc).to_string_lossy().into_owned());
-
-            let make_vec = |ptr: *const *const c_char, len: usize| -> Vec<String> {
-                if ptr.is_null() {
-                    Vec::new()
-                } else {
-                    slice::from_raw_parts(ptr, len)
-                        .iter()
-                        .map(|&p| CStr::from_ptr(p).to_string_lossy().into_owned())
-                        .collect()
-                }
-            };
-
-            Self {
-                file_loc,
-                in_ports: make_vec(c.in_ports, c.in_ports_len),
-                out_ports: make_vec(c.out_ports, c.out_ports_len),
-                inout_ports: make_vec(c.inout_ports, c.inout_ports_len),
-            }
+            pattern_destroy(Box::into_raw(Box::new(c2)));
+            pattern_destroy(Box::into_raw(Box::new(c)));
         }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cpattern_new(
-    file_loc: *const c_char,
-
-    in_ports: *const *const c_char,
-    in_ports_len: usize,
-
-    out_ports: *const *const c_char,
-    out_ports_len: usize,
-
-    inout_ports: *const *const c_char,
-    inout_ports_len: usize,
-) -> *mut CPattern {
-    unsafe {
-        if file_loc.is_null() {
-            return ptr::null_mut();
-        }
-
-        let make_vec = |ptr: *const *const c_char, len: usize| -> Vec<String> {
-            if ptr.is_null() || len == 0 {
-                Vec::new()
-            } else {
-                slice::from_raw_parts(ptr, len)
-                    .iter()
-                    .map(|&p| CStr::from_ptr(p).to_string_lossy().into_owned())
-                    .collect()
-            }
-        };
-
-        let pattern = Pattern {
-            file_loc: PathBuf::from(CStr::from_ptr(file_loc).to_string_lossy().into_owned()),
-            in_ports: make_vec(in_ports, in_ports_len),
-            out_ports: make_vec(out_ports, out_ports_len),
-            inout_ports: make_vec(inout_ports, inout_ports_len),
-        };
-
-        let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
-        Box::into_raw(boxed) as *mut CPattern
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cpattern_free(ptr: *mut CPattern) {
-    unsafe {
-        if ptr.is_null() {
-            return;
-        }
-        let _boxed: Box<CPatternBoxed> = Box::from_raw(ptr as *mut CPatternBoxed);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cpattern_to_json(pattern: *const CPattern) -> *mut c_char {
-    unsafe {
-        if pattern.is_null() {
-            return ptr::null_mut();
-        }
-
-        let rust_pattern = Pattern::from(&*pattern);
-        match serde_json::to_string_pretty(&rust_pattern) {
-            Ok(json_string) => match CString::new(json_string) {
-                Ok(c_string) => c_string.into_raw(),
-                Err(_) => ptr::null_mut(),
-            },
-            Err(_) => ptr::null_mut(),
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cpattern_from_json(json_str: *const c_char) -> *mut CPattern {
-    unsafe {
-        if json_str.is_null() {
-            return ptr::null_mut();
-        }
-
-        let json_cstr = CStr::from_ptr(json_str);
-        let json_string = match json_cstr.to_str() {
-            Ok(s) => s,
-            Err(_) => return ptr::null_mut(),
-        };
-
-        let pattern: Pattern = match serde_json::from_str(json_string) {
-            Ok(p) => p,
-            Err(_) => return ptr::null_mut(),
-        };
-
-        let boxed: Box<CPatternBoxed> = Box::new(pattern.into());
-        Box::into_raw(boxed) as *mut CPattern
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cpattern_json_free(json_str: *mut c_char) {
-    unsafe {
-        if json_str.is_null() {
-            return;
-        }
-        let _c_string: CString = CString::from_raw(json_str);
+        
+        let vec: Vec<CPattern> = vec![
+            pattern_new(),
+            pattern_new(),
+            pattern_new()
+        ];
+        let list = List::from(vec);
+        drop(list);
+        
     }
 }
