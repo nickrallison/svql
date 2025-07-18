@@ -258,6 +258,9 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
     use crate::core::string::crate_cstring_destroy;
+    use crate::core::string::crate_cstring_new;
+    use std::ffi::{CString};
+    use std::os::raw::c_char;
 
     fn make_sample() -> MatchList {
         MatchList {
@@ -314,12 +317,38 @@ mod tests {
     #[test]
     fn test_ffi_lifecycle() {
         unsafe {
-            let c = match_list_new();
-            let c2 = match_list_clone(c);
+
+
+            // Create a new CMatchList
+            let celldata1: *mut CCellData = ccelldata_new(CrateCString::from("test"), 42);
+            let celldata2: *mut CCellData = ccelldata_new(CrateCString::from("example"), 84);
+
+            let cstr1: CString = CString::new("port1").unwrap();
+            let cstr2: CString = CString::new("port2").unwrap();
+
+            let str1: *const c_char = cstr1.as_ptr();
+            let str2: *const c_char = cstr2.as_ptr();
+
+            let port_data1: *mut CrateCString = crate_cstring_new(str1);
+            let port_data2: *mut CrateCString = crate_cstring_new(str2);
+
+            let match_data: *mut CMatch = match_new();
+            match_add_celldata(&mut *match_data, (*celldata1).clone(), (*celldata2).clone());
+            match_add_portdata(&mut *match_data, (*port_data1).clone(), (*port_data2).clone());
+
+            let c: *mut CMatchList = match_list_new();
+            append_match_to_matchlist(&mut *c, (*match_data).clone());
+            let c2: *mut CMatchList = match_list_clone(c);
+
             assert!(match_list_eq(&*c, &*c2));
         
             match_list_destroy(c2);
             match_list_destroy(c);
+            match_destroy(match_data);
+            ccelldata_destroy(celldata1);
+            ccelldata_destroy(celldata2);
+            crate_cstring_destroy(port_data1);
+            crate_cstring_destroy(port_data2);
         }
     }
 }

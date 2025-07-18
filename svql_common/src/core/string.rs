@@ -133,18 +133,26 @@ impl From<CrateCString> for String {
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn crate_cstring_new(s: *const c_char) -> CrateCString {
+pub extern "C" fn crate_cstring_new(s: *const c_char) -> *mut CrateCString {
     if s.is_null() {
-        CrateCString::default()
+        Box::into_raw(Box::new(CrateCString::default()))
     } else {
         let cstr = unsafe { CStr::from_ptr(s) };
-        CrateCString::from(cstr)
+        let cstr = CString::new(cstr.to_bytes()).unwrap();
+        Box::into_raw(Box::new(CrateCString {
+            string: cstr.into_raw(),
+        }))
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn crate_cstring_clone(s: &CrateCString) -> CrateCString {
-    s.clone()
+pub extern "C" fn crate_cstring_clone(s: *mut CrateCString) -> *mut CrateCString {
+    if s.is_null() {
+        return ptr::null_mut();
+    }
+    let cstring = unsafe { &*s };
+    let cloned = cstring.clone();
+    Box::into_raw(Box::new(cloned))
 }
 
 #[unsafe(no_mangle)]
@@ -246,15 +254,17 @@ mod tests {
 
     #[test]
     fn test_ffi_functions() {
-        let orig = CString::new("ffi").unwrap();
-        let s = crate_cstring_new(orig.as_ptr());
-        assert_eq!(s.as_str(), "ffi");
-        let len = crate_cstring_len(&s);
-        assert_eq!(len, 3);
-        let s2 = crate_cstring_clone(&s);
-        assert!(crate_cstring_eq(&s, &s2));
-        assert_eq!(crate_cstring_cmp(&s, &s2), 0);
-        crate_cstring_destroy(Box::into_raw(Box::new(s2)));
-        crate_cstring_destroy(Box::into_raw(Box::new(s)));
+        unsafe {
+            let orig = CString::new("ffi").unwrap();
+            let s = crate_cstring_new(orig.as_ptr());
+            assert_eq!((*s).as_str(), "ffi");
+            let len = crate_cstring_len(&*s);
+            assert_eq!(len, 3);
+            let s2 = crate_cstring_clone(s);
+            assert!(crate_cstring_eq(&*s, &*s2));
+            assert_eq!(crate_cstring_cmp(&*s, &*s2), 0);
+            crate_cstring_destroy(s2);
+            crate_cstring_destroy(s);
+        }
     }
 }
