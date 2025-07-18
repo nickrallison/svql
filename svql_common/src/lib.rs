@@ -2,6 +2,7 @@
 pub mod config;
 pub mod core;
 pub mod pat;
+pub mod mat;
 
 use crate::core::list::List;
 use crate::core::string::CrateCString;

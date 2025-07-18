@@ -1,27 +1,17 @@
-use serde::{Deserialize, Serialize};
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::ptr;
-
-// use crate::core::string::{CStringMap, CStringMapEntry};
+use crate::core::list::List;
+use crate::core::string::CrateCString;
+use serde::{Serialize, Deserialize};
+use std::hash::{Hash};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchList {
     pub matches: Vec<Match>,
 }
 
-
-// ##### Prev
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub struct Match {
-//     pub port_map: HashMap<String, String>,
-//     pub cell_map: HashMap<CellData, CellData>,
-// }
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Match {
     pub port_map: Vec<(String, String)>,
-    pub cell_map:Vec<(CellData, CellData)>,
+    pub cell_map: Vec<(CellData, CellData)>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
@@ -30,630 +20,238 @@ pub struct CellData {
     pub cell_index: usize,
 }
 
-impl Match {
-    pub fn new() -> Self {
-        Match {
-            port_map: Vec::new(),
-            cell_map: Vec::new(),
-        }
-    }
+// ========== C-Compatible Structs ==========
 
-    pub fn add_port(&mut self, key: String, value: String) {
-        self.port_map.push((key, value));
-    }
-
-    pub fn add_cell(&mut self, key: CellData, value: CellData) {
-        self.cell_map.push((key, value));
-    }
-}
-
-impl From<Match> for CMatch {
-    fn from(match_data: Match) -> Self {
-        let port_entries: Vec<CStringMapEntry> = match_data
-            .port_map
-            .into_iter()
-            .map(|(k, v)| {
-                let key = CString::new(k)
-                    .unwrap_or_else(|_| CString::new("").unwrap())
-                    .into_raw();
-                let value = CString::new(v)
-                    .unwrap_or_else(|_| CString::new("").unwrap())
-                    .into_raw();
-                CStringMapEntry { key, value }
-            })
-            .collect();
-
-        let port_map = Box::into_raw(Box::new(CStringMap {
-            entries: if port_entries.is_empty() {
-                ptr::null_mut()
-            } else {
-                port_entries.as_ptr() as *mut CStringMapEntry
-            },
-            len: port_entries.len(),
-        }));
-        std::mem::forget(port_entries);
-
-        let cell_entries: Vec<CCellDataMapEntry> = match_data
-            .cell_map
-            .into_iter()
-            .map(|(k, v)| CCellDataMapEntry {
-                key: k.into(),
-                value: v.into(),
-            })
-            .collect();
-
-        let cell_map = Box::into_raw(Box::new(CCellDataMap {
-            entries: if cell_entries.is_empty() {
-                ptr::null_mut()
-            } else {
-                cell_entries.as_ptr() as *mut CCellDataMapEntry
-            },
-            len: cell_entries.len(),
-        }));
-        std::mem::forget(cell_entries);
-
-        CMatch { port_map, cell_map }
-    }
-}
-
-impl From<&CMatch> for Match {
-    fn from(cmatch: &CMatch) -> Self {
-        let mut port_map: Vec<(String, String)> = Vec::new();
-        let mut cell_map: Vec<(CellData, CellData)> = Vec::new();
-
-        // Convert port_map
-        if !cmatch.port_map.is_null() {
-            unsafe {
-                let port_map_ref = &*cmatch.port_map;
-                if !port_map_ref.entries.is_null() {
-                    let entries =
-                        std::slice::from_raw_parts(port_map_ref.entries, port_map_ref.len);
-                    for entry in entries {
-                        let key = if entry.key.is_null() {
-                            String::new()
-                        } else {
-                            CStr::from_ptr(entry.key).to_string_lossy().to_string()
-                        };
-                        let value = if entry.value.is_null() {
-                            String::new()
-                        } else {
-                            CStr::from_ptr(entry.value).to_string_lossy().to_string()
-                        };
-                        port_map.push((key, value));
-                    }
-                }
-            }
-        }
-
-        // Convert cell_map
-        if !cmatch.cell_map.is_null() {
-            unsafe {
-                let cell_map_ref = &*cmatch.cell_map;
-                if !cell_map_ref.entries.is_null() {
-                    let entries =
-                        std::slice::from_raw_parts(cell_map_ref.entries, cell_map_ref.len);
-                    for entry in entries {
-                        let key = (&entry.key).into();
-                        let value = (&entry.value).into();
-                        cell_map.push((key, value));
-                    }
-                }
-            }
-        }
-
-        Match { port_map, cell_map }
-    }
-}
-
-impl From<CMatch> for Match {
-    fn from(cmatch: CMatch) -> Self {
-        let cmatch_ref = &cmatch;
-        Match::from(cmatch_ref)
-    }
-}
-
-/// C FFI equivalent of CellData
 #[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CCellData {
-    pub cell_name: *mut c_char,
+    pub cell_name: CrateCString,
     pub cell_index: usize,
 }
 
-impl From<CellData> for CCellData {
-    fn from(cell_data: CellData) -> Self {
-        let cell_name = CString::new(cell_data.cell_name)
-            .unwrap_or_else(|_| CString::new("").unwrap())
-            .into_raw();
-
-        CCellData {
-            cell_name,
-            cell_index: cell_data.cell_index,
-        }
-    }
-}
-
-impl From<&CCellData> for CellData {
-    fn from(ccell_data: &CCellData) -> Self {
-        let cell_name = if ccell_data.cell_name.is_null() {
-            String::new()
-        } else {
-            unsafe {
-                CStr::from_ptr(ccell_data.cell_name)
-                    .to_string_lossy()
-                    .to_string()
-            }
-        };
-
-        CellData {
-            cell_name,
-            cell_index: ccell_data.cell_index,
-        }
-    }
-}
-
-impl From<CCellData> for CellData {
-    fn from(ccell_data: CCellData) -> Self {
-        let ccell_data_ref = &ccell_data;
-        CellData::from(ccell_data_ref)
-    }
-}
-
-impl From<MatchList> for CMatchList {
-    fn from(match_list: MatchList) -> Self {
-        let len = match_list.matches.len();
-        let match_ptrs: Vec<*mut CMatch> = match_list
-            .matches
-            .into_iter()
-            .map(|m| Box::into_raw(Box::new(CMatch::from(m))))
-            .collect();
-
-        let matches = if match_ptrs.is_empty() {
-            ptr::null_mut()
-        } else {
-            Box::into_raw(match_ptrs.into_boxed_slice()) as *mut *mut CMatch
-        };
-
-        CMatchList { matches, len }
-    }
-}
-
-impl From<&CMatchList> for MatchList {
-    fn from(cmatch_list: &CMatchList) -> Self {
-        let mut matches = Vec::new();
-
-        if !cmatch_list.matches.is_null() && cmatch_list.len > 0 {
-            unsafe {
-                let match_ptrs = std::slice::from_raw_parts(cmatch_list.matches, cmatch_list.len);
-                for &match_ptr in match_ptrs {
-                    if !match_ptr.is_null() {
-                        let cmatch = &*match_ptr;
-                        matches.push(Match::from(cmatch));
-                    }
-                }
-            }
-        }
-
-        MatchList { matches }
-    }
-}
-
-impl From<CMatchList> for MatchList {
-    fn from(cmatch_list: CMatchList) -> Self {
-        let cmatch_list_ref = &cmatch_list;
-        MatchList::from(cmatch_list_ref)
-    }
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CCellDataPair {
+    pub first: CCellData,
+    pub second: CCellData,
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CCellDataPairList {
+    pub items: List<CCellDataPair>,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CStringPair {
+    pub first: CrateCString,
+    pub second: CrateCString,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CStringPairList {
+    pub items: List<CStringPair>,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CMatch {
-    pub port_map: *mut CStringMap,
-    pub cell_map: *mut CCellDataMap,
+    pub port_map: CStringPairList,
+    pub cell_map: CCellDataPairList,
 }
 
-/// C FFI representation of a CellData-to-CellData map entry
 #[repr(C)]
-pub struct CCellDataMapEntry {
-    pub key: CCellData,
-    pub value: CCellData,
-}
-
-/// C FFI representation of a CellData-to-CellData map
-#[repr(C)]
-pub struct CCellDataMap {
-    pub entries: *mut CCellDataMapEntry,
-    pub len: usize,
-}
-
-/// C FFI representation of MatchList
-#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CMatchList {
-    pub matches: *mut *mut CMatch,
-    pub len: usize,
+    pub matches: List<CMatch>,
 }
 
-// C FFI functions for CCellData
-
-/// Create a new CCellData
-#[unsafe(no_mangle)]
-pub extern "C" fn ccelldata_new(cell_name: *const c_char, cell_index: usize) -> *mut CCellData {
-    let cell_name_str = if cell_name.is_null() {
-        String::new()
-    } else {
-        unsafe { CStr::from_ptr(cell_name).to_string_lossy().to_string() }
-    };
-
-    let cell_name_cstring = CString::new(cell_name_str)
-        .unwrap_or_else(|_| CString::new("").unwrap())
-        .into_raw();
-
-    let ccell_data = CCellData {
-        cell_name: cell_name_cstring,
-        cell_index,
-    };
-
-    Box::into_raw(Box::new(ccell_data))
-}
-
-/// Serialize CCellData to JSON C string
-#[unsafe(no_mangle)]
-pub extern "C" fn ccelldata_serialize(ccell_data: *const CCellData) -> *mut c_char {
-    if ccell_data.is_null() {
-        return ptr::null_mut();
-    }
-
-    let ccell_data = unsafe { &*ccell_data };
-    let cell_data: CellData = ccell_data.into();
-
-    match serde_json::to_string(&cell_data) {
-        Ok(json) => CString::new(json)
-            .unwrap_or_else(|_| CString::new("{}").unwrap())
-            .into_raw(),
-        Err(_) => CString::new("{}").unwrap().into_raw(),
-    }
-}
-
-/// Free CCellData memory
-#[unsafe(no_mangle)]
-pub extern "C" fn ccelldata_free(ccell_data: *mut CCellData) {
-    if ccell_data.is_null() {
-        return;
-    }
-
-    unsafe {
-        // Free the cell_name string
-        if !(*ccell_data).cell_name.is_null() {
-            let _ = CString::from_raw((*ccell_data).cell_name);
+// Rust -> C
+impl From<&CellData> for CCellData {
+    fn from(cd: &CellData) -> Self {
+        CCellData {
+            cell_name: CrateCString::from(cd.cell_name.as_str()),
+            cell_index: cd.cell_index,
         }
-        // Free the CCellData struct
-        let _ = Box::from_raw(ccell_data);
     }
 }
-
-// C FFI functions for CMatch
-
-/// Create a new CMatch
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatch_new() -> *mut CMatch {
-    let cmatch = CMatch {
-        port_map: Box::into_raw(Box::new(CStringMap {
-            entries: ptr::null_mut(),
-            len: 0,
-        })),
-        cell_map: Box::into_raw(Box::new(CCellDataMap {
-            entries: ptr::null_mut(),
-            len: 0,
-        })),
-    };
-
-    Box::into_raw(Box::new(cmatch))
-}
-
-/// Add a port to CMatch
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatch_add_port(cmatch: *mut CMatch, key: *const c_char, value: *const c_char) {
-    if cmatch.is_null() || key.is_null() || value.is_null() {
-        return;
-    }
-
-    unsafe {
-        let cmatch_ref = &mut *cmatch;
-
-        // Convert C strings to Rust strings
-        let key_str = CStr::from_ptr(key).to_string_lossy().to_string();
-        let value_str = CStr::from_ptr(value).to_string_lossy().to_string();
-
-        // Get current port_map
-        let port_map_ref = &mut *cmatch_ref.port_map;
-
-        // Convert current entries to Vec, add new entry, convert back
-        let mut entries_vec = if port_map_ref.entries.is_null() || port_map_ref.len == 0 {
-            Vec::new()
-        } else {
-            Vec::from_raw_parts(port_map_ref.entries, port_map_ref.len, port_map_ref.len)
-        };
-
-        // Create new entry
-        let key_cstring = CString::new(key_str)
-            .unwrap_or_else(|_| CString::new("").unwrap())
-            .into_raw();
-        let value_cstring = CString::new(value_str)
-            .unwrap_or_else(|_| CString::new("").unwrap())
-            .into_raw();
-
-        let new_entry = CStringMapEntry {
-            key: key_cstring,
-            value: value_cstring,
-        };
-
-        entries_vec.push(new_entry);
-
-        let new_len = entries_vec.len();
-        let new_entries = Box::into_raw(entries_vec.into_boxed_slice()) as *mut CStringMapEntry;
-
-        port_map_ref.entries = new_entries;
-        port_map_ref.len = new_len;
+impl From<&(CellData, CellData)> for CCellDataPair {
+    fn from(pair: &(CellData, CellData)) -> Self {
+        CCellDataPair {
+            first: CCellData::from(&pair.0),
+            second: CCellData::from(&pair.1),
+        }
     }
 }
-
-/// Add a celldata to CMatch
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatch_add_celldata(
-    cmatch: *mut CMatch,
-    key: *const CCellData,
-    value: *const CCellData,
-) {
-    if cmatch.is_null() || key.is_null() || value.is_null() {
-        return;
+impl From<&(String, String)> for CStringPair {
+    fn from(pair: &(String, String)) -> Self {
+        CStringPair {
+            first: CrateCString::from(pair.0.as_str()),
+            second: CrateCString::from(pair.1.as_str()),
+        }
     }
-
-    unsafe {
-        let cmatch_ref = &mut *cmatch;
-
-        // Convert CCellData to owned CCellData for storage
-        let key_ccell_data = CCellData {
-            cell_name: if (*key).cell_name.is_null() {
-                CString::new("").unwrap().into_raw()
-            } else {
-                let key_str = CStr::from_ptr((*key).cell_name)
-                    .to_string_lossy()
-                    .to_string();
-                CString::new(key_str)
-                    .unwrap_or_else(|_| CString::new("").unwrap())
-                    .into_raw()
+}
+impl From<&Match> for CMatch {
+    fn from(m: &Match) -> Self {
+        CMatch {
+            port_map: CStringPairList {
+                items: m.port_map.iter().map(CStringPair::from).collect(),
             },
-            cell_index: (*key).cell_index,
-        };
-
-        let value_ccell_data = CCellData {
-            cell_name: if (*value).cell_name.is_null() {
-                CString::new("").unwrap().into_raw()
-            } else {
-                let value_str = CStr::from_ptr((*value).cell_name)
-                    .to_string_lossy()
-                    .to_string();
-                CString::new(value_str)
-                    .unwrap_or_else(|_| CString::new("").unwrap())
-                    .into_raw()
+            cell_map: CCellDataPairList {
+                items: m.cell_map.iter().map(CCellDataPair::from).collect(),
             },
-            cell_index: (*value).cell_index,
-        };
-
-        // Get current cell_map
-        let cell_map_ref = &mut *cmatch_ref.cell_map;
-
-        // Convert current entries to Vec, add new entry, convert back
-        let mut entries_vec = if cell_map_ref.entries.is_null() || cell_map_ref.len == 0 {
-            Vec::new()
-        } else {
-            Vec::from_raw_parts(cell_map_ref.entries, cell_map_ref.len, cell_map_ref.len)
-        };
-
-        // Create new entry
-        let new_entry = CCellDataMapEntry {
-            key: key_ccell_data,
-            value: value_ccell_data,
-        };
-
-        entries_vec.push(new_entry);
-
-        let new_len = entries_vec.len();
-        let new_entries = Box::into_raw(entries_vec.into_boxed_slice()) as *mut CCellDataMapEntry;
-
-        cell_map_ref.entries = new_entries;
-        cell_map_ref.len = new_len;
-    }
-}
-
-/// Serialize CMatch to JSON C string
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatch_serialize(cmatch: *const CMatch) -> *mut c_char {
-
-    // panic!("HERE I AM");
-
-    if cmatch.is_null() {
-        return ptr::null_mut();
-    }
-
-    let entries = unsafe { (*(*cmatch).port_map).entries };
-    let len = unsafe { (*(*cmatch).port_map).len };
-
-    for i in 0..len {
-        let entry = unsafe { &*entries.add(i) };
-        let key = unsafe { CStr::from_ptr(entry.key) };
-        let value = unsafe { CStr::from_ptr(entry.value) };
-
-        println!("Entry {}: key = {}, value = {}", i, key.to_string_lossy(), value.to_string_lossy());
-    }
-
-    let cmatch = unsafe { &*cmatch };
-    let match_data = Match::from(cmatch);
-
-    match serde_json::to_string(&match_data) {
-        Ok(json) => CString::new(json)
-            .unwrap_or_else(|err| {
-                panic!("Failed to serialize CMatch to JSON: {}", err)
-            })
-            .into_raw(),
-        Err(err) => panic!("Failed to serialize CMatch: {}", err),
-    }
-}
-
-/// Free CMatch memory
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatch_free(cmatch: *mut CMatch) {
-    if cmatch.is_null() {
-        return;
-    }
-
-    unsafe {
-        let cmatch_ref = &*cmatch;
-
-        // Free port_map
-        if !cmatch_ref.port_map.is_null() {
-            let port_map_ref = &*cmatch_ref.port_map;
-            if !port_map_ref.entries.is_null() {
-                let entries =
-                    std::slice::from_raw_parts_mut(port_map_ref.entries, port_map_ref.len);
-                for entry in entries {
-                    if !entry.key.is_null() {
-                        let _ = CString::from_raw(entry.key);
-                    }
-                    if !entry.value.is_null() {
-                        let _ = CString::from_raw(entry.value);
-                    }
-                }
-                let _ =
-                    Vec::from_raw_parts(port_map_ref.entries, port_map_ref.len, port_map_ref.len);
-            }
-            let _ = Box::from_raw(cmatch_ref.port_map);
         }
-
-        // Free cell_map
-        if !cmatch_ref.cell_map.is_null() {
-            let cell_map_ref = &*cmatch_ref.cell_map;
-            if !cell_map_ref.entries.is_null() {
-                let entries =
-                    std::slice::from_raw_parts_mut(cell_map_ref.entries, cell_map_ref.len);
-                for entry in entries {
-                    // Free the CCellData entries
-                    if !entry.key.cell_name.is_null() {
-                        let _ = CString::from_raw(entry.key.cell_name);
-                    }
-                    if !entry.value.cell_name.is_null() {
-                        let _ = CString::from_raw(entry.value.cell_name);
-                    }
-                }
-                let _ =
-                    Vec::from_raw_parts(cell_map_ref.entries, cell_map_ref.len, cell_map_ref.len);
-            }
-            let _ = Box::from_raw(cmatch_ref.cell_map);
+    }
+}
+impl From<&MatchList> for CMatchList {
+    fn from(ml: &MatchList) -> Self {
+        CMatchList {
+            matches: ml.matches.iter().map(CMatch::from).collect(),
         }
-
-        // Free the CMatch struct
-        let _ = Box::from_raw(cmatch);
     }
 }
 
-/// Free a JSON C string returned by serialize functions
+// C -> Rust
+impl From<&CCellData> for CellData {
+    fn from(c: &CCellData) -> Self {
+        CellData {
+            cell_name: c.cell_name.as_str().to_string(),
+            cell_index: c.cell_index,
+        }
+    }
+}
+impl From<&CCellDataPair> for (CellData, CellData) {
+    fn from(pair: &CCellDataPair) -> Self {
+        (CellData::from(&pair.first), CellData::from(&pair.second))
+    }
+}
+impl From<&CStringPair> for (String, String) {
+    fn from(pair: &CStringPair) -> Self {
+        (pair.first.as_str().to_string(), pair.second.as_str().to_string())
+    }
+}
+impl From<&CMatch> for Match {
+    fn from(c: &CMatch) -> Self {
+        Match {
+            port_map: c.port_map.items.as_slice().iter().map(|p| p.into()).collect(),
+            cell_map: c.cell_map.items.as_slice().iter().map(|p| p.into()).collect(),
+        }
+    }
+}
+impl From<&CMatchList> for MatchList {
+    fn from(c: &CMatchList) -> Self {
+        MatchList {
+            matches: c.matches.as_slice().iter().map(|m| m.into()).collect(),
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
-pub extern "C" fn free_json_string(json_str: *mut c_char) {
-    if !json_str.is_null() {
+pub extern "C" fn match_list_new() -> CMatchList {
+    CMatchList { matches: List::new() }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_list_clone(list: &CMatchList) -> CMatchList {
+    list.clone()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn match_list_destroy(list: *mut CMatchList) {
+    if !list.is_null() {
+        unsafe { let _ = Box::from_raw(list); };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_list_eq(a: &CMatchList, b: &CMatchList) -> bool {
+    a == b
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_list_debug_string(list: &CMatchList) -> CrateCString {
+    let rust = MatchList::from(list);
+    let s = format!("{:?}", rust);
+    CrateCString::from(s.as_str())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_list_to_json(list: &CMatchList) -> CrateCString {
+    let rust = MatchList::from(list);
+    match serde_json::to_string(&rust) {
+        Ok(json) => CrateCString::from(json.as_str()),
+        Err(e) => panic!("Failed to serialize to JSON: {}", e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn make_sample() -> MatchList {
+        MatchList {
+            matches: vec![
+                Match {
+                    port_map: vec![("a".to_string(), "b".to_string())],
+                    cell_map: vec![
+                        (
+                            CellData { cell_name: "foo".to_string(), cell_index: 1 },
+                            CellData { cell_name: "bar".to_string(), cell_index: 2 }
+                        )
+                    ],
+                }
+            ]
+        }
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        let orig = make_sample();
+        let c = CMatchList::from(&orig);
+        let back = MatchList::from(&c);
+        assert_eq!(orig.matches.len(), back.matches.len());
+        assert_eq!(orig.matches[0].port_map, back.matches[0].port_map);
+        assert_eq!(orig.matches[0].cell_map, back.matches[0].cell_map);
+    }
+
+    #[test]
+    fn test_clone_and_eq() {
+        let c1 = CMatchList::from(&make_sample());
+        let c2 = c1.clone();
+        assert_eq!(c1, c2);
+        assert_ne!(&c1 as *const _, &c2 as *const _);
+    }
+
+    #[test]
+    fn test_hash() {
+        let c1 = CMatchList::from(&make_sample());
+        let c2 = c1.clone();
+        let mut set = HashSet::new();
+        set.insert(c1);
+        assert!(set.contains(&c2));
+    }
+
+    #[test]
+    fn test_debug_string() {
+        let c = CMatchList::from(&make_sample());
+        let dbg = match_list_debug_string(&c);
+        let s = dbg.as_str();
+        assert!(s.contains("cell_name"));
+        drop(dbg);
+    }
+
+    #[test]
+    fn test_ffi_lifecycle() {
+        let c = match_list_new();
+        let c2 = match_list_clone(&c);
+        assert!(match_list_eq(&c, &c2));
+        let _ = match_list_debug_string(&c);
         unsafe {
-            let _ = CString::from_raw(json_str);
+            match_list_destroy(Box::into_raw(Box::new(c2)));
+            match_list_destroy(Box::into_raw(Box::new(c)));
         }
-    }
-}
-
-// C FFI functions for CMatchList
-
-/// Create a new CMatchList
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatchlist_new() -> *mut CMatchList {
-    let cmatch_list = CMatchList {
-        matches: ptr::null_mut(),
-        len: 0,
-    };
-
-    Box::into_raw(Box::new(cmatch_list))
-}
-
-/// Add a CMatch to a CMatchList
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatchlist_add_match(cmatch_list: *mut CMatchList, cmatch: *mut CMatch) {
-    if cmatch_list.is_null() || cmatch.is_null() {
-        return;
-    }
-
-    unsafe {
-        let cmatch_list_ref = &mut *cmatch_list;
-
-        // Convert current array to Vec, add new match, convert back
-        let mut matches_vec = if cmatch_list_ref.matches.is_null() || cmatch_list_ref.len == 0 {
-            Vec::new()
-        } else {
-            Vec::from_raw_parts(
-                cmatch_list_ref.matches,
-                cmatch_list_ref.len,
-                cmatch_list_ref.len,
-            )
-        };
-
-        matches_vec.push(cmatch);
-
-        let new_len = matches_vec.len();
-        let new_matches = Box::into_raw(matches_vec.into_boxed_slice()) as *mut *mut CMatch;
-
-        cmatch_list_ref.matches = new_matches;
-        cmatch_list_ref.len = new_len;
-    }
-}
-
-/// Serialize CMatchList to JSON C string
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatchlist_serialize(cmatch_list: *const CMatchList) -> *mut c_char {
-    if cmatch_list.is_null() {
-        return ptr::null_mut();
-    }
-
-    let cmatch_list = unsafe { &*cmatch_list };
-    let match_list = MatchList::from(cmatch_list);
-
-    match serde_json::to_string(&match_list) {
-        Ok(json) => CString::new(json)
-            .unwrap_or_else(|_| CString::new("{}").unwrap())
-            .into_raw(),
-        Err(_) => CString::new("{}").unwrap().into_raw(),
-    }
-}
-
-/// Free CMatchList memory
-#[unsafe(no_mangle)]
-pub extern "C" fn cmatchlist_free(cmatch_list: *mut CMatchList) {
-    if cmatch_list.is_null() {
-        return;
-    }
-
-    unsafe {
-        let cmatch_list_ref = &*cmatch_list;
-
-        // Free all CMatch entries
-        if !cmatch_list_ref.matches.is_null() && cmatch_list_ref.len > 0 {
-            let match_ptrs =
-                std::slice::from_raw_parts_mut(cmatch_list_ref.matches, cmatch_list_ref.len);
-            for &mut match_ptr in match_ptrs {
-                if !match_ptr.is_null() {
-                    cmatch_free(match_ptr);
-                }
-            }
-            // Free the array of pointers
-            let _ = Vec::from_raw_parts(
-                cmatch_list_ref.matches,
-                cmatch_list_ref.len,
-                cmatch_list_ref.len,
-            );
-        }
-
-        // Free the CMatchList struct
-        let _ = Box::from_raw(cmatch_list);
     }
 }
