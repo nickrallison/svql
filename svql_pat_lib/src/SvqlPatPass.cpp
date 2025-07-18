@@ -7,7 +7,7 @@
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
 
-// #include "svql_common.h"
+#include "svql_common.h"
 
 using namespace Yosys;
 
@@ -33,7 +33,6 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::string pattern_file = "";
 	std::string module_name = "";
 
-
 	size_t argidx;
 	for (argidx = 1; argidx < args.size(); argidx++)
 	{
@@ -55,18 +54,21 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	extra_args(args, argidx, design);
 
-	if (module_name.empty()) {
+	if (module_name.empty())
+	{
 		log("SVQL_PAT_ERROR: No module name specified. Use -module <module_name>\n");
 		log_error("No module name specified. Use -module <module_name>\n");
 	}
 
-	if (module_name[0] != '\\') {
+	if (module_name[0] != '\\')
+	{
 		module_name = "\\" + module_name; // Ensure module name starts with a backslash
 	}
 
 	// Find the module in the design
 	RTLIL::Module *module = design->module(RTLIL::IdString(module_name));
-	if (!module) {
+	if (!module)
+	{
 		log("SVQL_PAT_ERROR: Module '%s' not found in design\n", module_name.c_str());
 		log_error("Module '%s' not found in design\n", module_name.c_str());
 	}
@@ -77,79 +79,70 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::vector<std::string> inout_ports;
 
 	// Iterate through module ports to categorize them
-	for (auto &port_name : module->ports) {
+	for (auto &port_name : module->ports)
+	{
 		RTLIL::Wire *wire = module->wire(port_name);
-		if (!wire) continue;
+		if (!wire)
+			continue;
 
 		std::string port_str = port_name.str();
-		
-		if (wire->port_input && wire->port_output) {
+
+		if (wire->port_input && wire->port_output)
+		{
 			// Inout port
 			inout_ports.push_back(port_str);
-		} else if (wire->port_input) {
+		}
+		else if (wire->port_input)
+		{
 			// Input port
 			input_ports.push_back(port_str);
-		} else if (wire->port_output) {
+		}
+		else if (wire->port_output)
+		{
 			// Output port
 			output_ports.push_back(port_str);
 		}
 	}
 
-	// Convert std::vector<std::string> to const char* arrays for C interface
-	std::vector<const char*> input_ptrs;
-	std::vector<const char*> output_ptrs;
-	std::vector<const char*> inout_ptrs;
+	List<CrateCString> input_ptrs;
+	List<CrateCString> output_ptrs;
+	List<CrateCString> inout_ptrs;
 
-	for (const auto& port : input_ports) {
-		input_ptrs.push_back(port.c_str());
+	for (const auto &port : input_ports)
+	{
+		string_list_append(&input_ptrs, crate_cstring_new(port.c_str()));
 	}
-	for (const auto& port : output_ports) {
-		output_ptrs.push_back(port.c_str());
+	for (const auto &port : output_ports)
+	{
+		string_list_append(&output_ptrs, crate_cstring_new(port.c_str()));
 	}
-	for (const auto& port : inout_ports) {
-		inout_ptrs.push_back(port.c_str());
+	for (const auto &port : inout_ports)
+	{
+		string_list_append(&inout_ptrs, crate_cstring_new(port.c_str()));
 	}
 
-	// Create the CPattern
-	CPattern *pattern = pattern_new(
-		pattern_file.c_str(),
-		input_ptrs.empty() ? nullptr : input_ptrs.data(),
-		input_ptrs.size(),
-		output_ptrs.empty() ? nullptr : output_ptrs.data(),
-		output_ptrs.size(),
-		inout_ptrs.empty() ? nullptr : inout_ptrs.data(),
-		inout_ptrs.size()
-	);
-
-	if (!pattern) {
-		log("SVQL_PAT_ERROR: Failed to create pattern\n");
-		log_error("Failed to create pattern\n");
-	}
+	CPattern *pattern = pattern_new();
+	pattern->file_loc = crate_cstring_new(pattern_file.c_str());
+	pattern->in_ports = input_ptrs;
+	pattern->out_ports = output_ptrs;
+	pattern->inout_ports = inout_ptrs;
 
 	log("Created pattern for module '%s' with %zu input(s), %zu output(s), and %zu inout(s) ports\n",
 		module_name.c_str(), input_ports.size(), output_ports.size(), inout_ports.size());
 
-	// Serialize pattern to JSON and log it
-	char *json_str = cpattern_to_json(pattern);
-	if (json_str) {
-		log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
-		cpattern_json_free(json_str);
-	} else {
-		log("SVQL_PAT_ERROR: Failed to serialize pattern to JSON\n");
-	}
-
-	// TODO: Further processing will be added later
-	// For now, just clean up the pattern
-	cpattern_free(pattern);
+	CrateCString json_str = pattern_to_json(pattern);
+	log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
+	crate_cstring_destroy(&json_str);
+	// if (json_str)
+	// {
+	// 	log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
+	// 	crate_cstring_destroy(json_str);
+	// }
+	// else
+	// {
+	// 	log("SVQL_PAT_ERROR: Failed to serialize pattern to JSON\n");
+	// }
+	pattern_destroy(pattern);
 
 	log_pop();
 }
-
-// from svql_common.h
-// struct CPattern *pattern_new(const char *file_loc,
-//                               const char *const *in_ports,
-//                               uintptr_t in_ports_len,
-//                               const char *const *out_ports,
-//                               uintptr_t out_ports_len,
-//                               const char *const *inout_ports,
-//                               uintptr_t inout_ports_len);

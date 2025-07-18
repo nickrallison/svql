@@ -23,12 +23,11 @@ namespace svql
 		void terminate();
 		void terminate(std::string error_message);
 
-		CMatchList *run_query(const SvqlConfig &config, RTLIL::Design *needle_design, RTLIL::Design *design);
-
-		// ####
-		static std::variant<RTLIL::Design *, std::string> setup(SvqlConfig &config, std::string &pat_filename, std::string &pat_module_name);
-		static SvqlConfig configure(std::vector<std::string> args, size_t &argidx);
-		static SvqlConfig configure(CSvqlRuntimeConfig &ccfg);
+        // ####
+        static CSvqlRuntimeConfig parse_args_to_config(const std::vector<std::string>& args);
+        static std::unique_ptr<SubCircuitReSolver> create_solver(const CSvqlRuntimeConfig& cfg);
+        static RTLIL::Design* setup_needle_design(const CSvqlRuntimeConfig& cfg, std::string& error_msg);
+        static CMatchList* run_solver(SubCircuitReSolver* solver, const CSvqlRuntimeConfig& cfg, RTLIL::Design* needle, RTLIL::Design* haystack);
 	} SvqlPass;
 
 	void print_wire(RTLIL::Wire *wire);

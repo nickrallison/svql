@@ -1,3 +1,5 @@
+pub mod args_parse;
+
 use serde::{Deserialize, Serialize};
 use crate::core::list::List;
 use crate::core::string::CrateCString;
@@ -203,12 +205,12 @@ impl From<&CSvqlRuntimeConfig> for SvqlRuntimeConfig {
 // ==================== FFI Functions ====================
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_new() -> CSvqlRuntimeConfig {
-    CSvqlRuntimeConfig::from(&SvqlRuntimeConfig::default())
+pub extern "C" fn svql_runtime_config_new() -> *mut CSvqlRuntimeConfig {
+    Box::into_raw(Box::new(CSvqlRuntimeConfig::from(&SvqlRuntimeConfig::default())))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_default() -> CSvqlRuntimeConfig {
+pub extern "C" fn svql_runtime_config_default() -> *mut CSvqlRuntimeConfig {
     svql_runtime_config_new()
 }
 

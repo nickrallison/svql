@@ -15,9 +15,9 @@ pub extern "C" fn print_string(s: &CrateCString) {
 
 pub type StringList = List<CrateCString>;
 
+
+
 #[unsafe(no_mangle)]
-pub extern "C" fn print_string_list(list: &StringList) {
-    for item in list.iter() {
-        println!("{}", item.as_str());
-    }
+pub extern "C" fn string_list_append(list: &mut List<CrateCString>, item: CrateCString) {
+    list.append(item);
 }

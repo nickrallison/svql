@@ -45,14 +45,14 @@ impl From<&CPattern> for Pattern {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn pattern_new() -> CPattern {
+pub extern "C" fn pattern_new() -> *mut CPattern {
     let p = Pattern {
         file_loc: PathBuf::new(),
         in_ports: Vec::new(),
         out_ports: Vec::new(),
         inout_ports: Vec::new(),
     };
-    CPattern::from(&p)
+    Box::into_raw(Box::new(CPattern::from(&p)))
 }
 
 #[unsafe(no_mangle)]

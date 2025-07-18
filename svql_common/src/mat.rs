@@ -148,9 +148,70 @@ impl From<&CMatchList> for MatchList {
     }
 }
 
+impl Default for CMatch {
+    fn default() -> Self {
+        CMatch {
+            port_map: CStringPairList { items: List::new() },
+            cell_map: CCellDataPairList { items: List::new() },
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
-pub extern "C" fn match_list_new() -> CMatchList {
-    CMatchList { matches: List::new() }
+pub extern "C" fn ccelldata_new(string: CrateCString, index: usize) -> *mut CCellData {
+    Box::into_raw(Box::new(CCellData {
+        cell_name: string,
+        cell_index: index,
+    }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ccelldata_destroy(ccelldata: *mut CCellData) {
+    if !ccelldata.is_null() {
+        unsafe { let _ = Box::from_raw(ccelldata); };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_add_celldata(cmatch: &mut CMatch, cell_data_1: CCellData, cell_data_2: CCellData)  {
+    let cell_pair = CCellDataPair {
+        first: cell_data_1,
+        second: cell_data_2,
+    };
+    
+    cmatch.cell_map.items.append(cell_pair);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_add_portdata(cmatch: &mut CMatch, port_data_1: CrateCString, port_data_2: CrateCString)  {
+    let port_pair = CStringPair {
+        first: port_data_1,
+        second: port_data_2,
+    };
+    
+    cmatch.port_map.items.append(port_pair);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_new() -> *mut CMatch {
+    Box::into_raw(Box::new(CMatch::default()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_destroy(cmatch: *mut CMatch) {
+    if !cmatch.is_null() {
+        unsafe { let _ = Box::from_raw(cmatch); };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn match_list_new() -> *mut CMatchList {
+    Box::into_raw(Box::new(CMatchList { matches: List::new() }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn append_match_to_matchlist(list: &mut CMatchList, match_data: CMatch) {
+    list.matches.append(match_data);
 }
 
 #[unsafe(no_mangle)]

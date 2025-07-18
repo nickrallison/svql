@@ -139,17 +139,177 @@ void SvqlPass::help()
 	log("\n");
 }
 
-std::variant<RTLIL::Design *, std::string> SvqlPass::setup(SvqlConfig &config, std::string &pat_filename, std::string &pat_module_name)
+void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
+{
+	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
+	log_push();
+
+	std::string error_msg;
+
+	// 1. Parse args to config (Rust FFI)
+	CSvqlRuntimeConfig cfg = parse_args_to_config(args);
+
+	// 2. Create solver
+	auto solver = create_solver(cfg);
+
+	// 3. Setup needle design
+	RTLIL::Design *needle_design = setup_needle_design(cfg, error_msg);
+	if (!needle_design)
+	{
+		log_error("Error setting up needle design: %s\n", error_msg.c_str());
+		return;
+	}
+
+	// 4. Run solver
+	CMatchList *cmatch_list = run_solver(solver.get(), cfg, needle_design, design);
+
+	// 5. Print results (as before)
+	if (cmatch_list != nullptr)
+	{
+		CrateCString json_str = match_list_to_json(cmatch_list);
+		log("SVQL_MATCHES: %s\n", json_str.string);
+		crate_cstring_destroy(&json_str);
+		match_list_destroy(cmatch_list); // Rust FFI cleanup
+	}
+
+	// 6. Clean up
+	delete needle_design;
+	log_pop();
+}
+
+CSvqlRuntimeConfig SvqlPass::parse_args_to_config(const std::vector<std::string> &args)
+{
+	std::vector<const char *> argv;
+	for (const auto &s : args)
+		argv.push_back(s.c_str());
+	// Call the Rust FFI function
+	return svql_runtime_config_from_args((int)argv.size(), argv.data());
+}
+
+std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(const CSvqlRuntimeConfig &cfg)
+{
+	auto solver = std::make_unique<SubCircuitReSolver>();
+
+	// Use the config to set up the solver (as in your old configure(CConfig&))
+	if (cfg.verbose)
+		solver->setVerbose();
+	if (cfg.ignore_parameters)
+		solver->ignoreParameters = true;
+
+	// compat_pairs
+	for (size_t i = 0; i < cfg.compat_pairs.items.len; ++i)
+	{
+		const auto &pair = cfg.compat_pairs.items.ptr[i];
+		solver->addCompatibleTypes(pair.item1.string, pair.item2.string);
+	}
+
+	// swap_ports
+	for (size_t i = 0; i < cfg.swap_ports.items.len; ++i)
+	{
+		const auto &swap = cfg.swap_ports.items.ptr[i];
+		std::set<std::string> ports;
+		for (size_t j = 0; j < swap.ports.items.len; ++j)
+		{
+			ports.insert(swap.ports.items.ptr[j].string);
+		}
+		solver->addSwappablePorts(swap.name.string, ports);
+	}
+
+	// perm_ports
+	for (size_t i = 0; i < cfg.perm_ports.items.len; ++i)
+	{
+		const auto &perm = cfg.perm_ports.items.ptr[i];
+		std::vector<std::string> left, right;
+		for (size_t j = 0; j < perm.ports.items.len; ++j)
+		{
+			left.push_back(perm.ports.items.ptr[j].string);
+		}
+		for (size_t j = 0; j < perm.wires.items.len; ++j)
+		{
+			right.push_back(perm.wires.items.ptr[j].string);
+		}
+		if (left.size() != right.size())
+		{
+			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+		}
+		std::map<std::string, std::string> map;
+		for (size_t j = 0; j < left.size(); ++j)
+		{
+			map[left[j]] = right[j];
+		}
+		std::vector<std::string> left_sorted = left, right_sorted = right;
+		std::sort(left_sorted.begin(), left_sorted.end());
+		std::sort(right_sorted.begin(), right_sorted.end());
+		if (left_sorted != right_sorted)
+		{
+			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+		}
+		solver->addSwappablePortsPermutation(perm.name.string, map);
+	}
+
+	// cell_attr
+	for (size_t i = 0; i < cfg.cell_attr.items.len; ++i)
+	{
+		solver->cell_attr.insert(cfg.cell_attr.items.ptr[i].string);
+	}
+
+	// wire_attr
+	for (size_t i = 0; i < cfg.wire_attr.items.len; ++i)
+	{
+		solver->wire_attr.insert(cfg.wire_attr.items.ptr[i].string);
+	}
+
+	// ignore_param
+	for (size_t i = 0; i < cfg.ignore_param.items.len; ++i)
+	{
+		const auto &ip = cfg.ignore_param.items.ptr[i];
+		solver->ignoredParams.insert(std::make_pair(ip.name.string, ip.value.string));
+	}
+
+	// Default swappable ports
+	if (!cfg.nodefaultswaps)
+	{
+		solver->addSwappablePorts("$and", "\\A", "\\B");
+		solver->addSwappablePorts("$or", "\\A", "\\B");
+		solver->addSwappablePorts("$xor", "\\A", "\\B");
+		solver->addSwappablePorts("$xnor", "\\A", "\\B");
+		solver->addSwappablePorts("$eq", "\\A", "\\B");
+		solver->addSwappablePorts("$ne", "\\A", "\\B");
+		solver->addSwappablePorts("$eqx", "\\A", "\\B");
+		solver->addSwappablePorts("$nex", "\\A", "\\B");
+		solver->addSwappablePorts("$add", "\\A", "\\B");
+		solver->addSwappablePorts("$mul", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_and", "\\A", "\\B");
+		solver->addSwappablePorts("$logic_or", "\\A", "\\B");
+		solver->addSwappablePorts("$_AND_", "\\A", "\\B");
+		solver->addSwappablePorts("$_OR_", "\\A", "\\B");
+		solver->addSwappablePorts("$_XOR_", "\\A", "\\B");
+	}
+
+	return solver;
+}
+
+RTLIL::Design *SvqlPass::setup_needle_design(const CSvqlRuntimeConfig &cfg, std::string &error_msg)
 {
 	RTLIL::Design *needle_design = new RTLIL::Design;
+	std::string pat_filename = cfg.pat_filename.string;
+	std::string pat_module_name = cfg.pat_module_name.string;
+
+	if (pat_filename.empty())
+	{
+		error_msg = "Missing pattern filename.";
+		delete needle_design;
+		return nullptr;
+	}
 
 	if (pat_filename.compare(0, 1, "%") == 0)
 	{
+
 		if (!saved_designs.count(pat_filename.substr(1)))
 		{
+			error_msg = "Saved design `" + pat_filename.substr(1) + "` not found.";
 			delete needle_design;
-			std::string error_msg = "Saved design `" + pat_filename.substr(1) + "` not found.";
-			return error_msg;
+			return nullptr;
 		}
 		for (auto mod : saved_designs.at(pat_filename.substr(1))->modules())
 			if (!needle_design->has(mod->name))
@@ -162,9 +322,9 @@ std::variant<RTLIL::Design *, std::string> SvqlPass::setup(SvqlConfig &config, s
 		f.open(pat_filename.c_str());
 		if (f.fail())
 		{
+			error_msg = "Can't open map file `" + pat_filename + "`.";
 			delete needle_design;
-			std::string error_msg = "Can't open map file `" + pat_filename + "`.";
-			return error_msg;
+			return nullptr;
 		}
 		Frontend::frontend_call(needle_design, &f, pat_filename, (pat_filename.size() > 3 && pat_filename.compare(pat_filename.size() - 3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
 		f.close();
@@ -178,349 +338,7 @@ std::variant<RTLIL::Design *, std::string> SvqlPass::setup(SvqlConfig &config, s
 	return needle_design;
 }
 
-void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
-{
-	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
-	log_push();
-
-	size_t argidx;
-	SvqlConfig config = configure(args, argidx);
-	std::string pat_filename = config.pat_filename;
-	std::string pat_module_name = config.pat_module_name;
-
-	// std::string pat_filename = std::string("svql_query/verilog/and.v");
-	// std::string pat_module_name = std::string("and_gate");
-
-	extra_args(args, argidx, design);
-
-	if (pat_filename.empty())
-		log_cmd_error("Missing option -pat <verilog_or_rtlil_file>.\n");
-
-	// Setup the needle design
-	std::variant<RTLIL::Design *, std::string> setup_result = SvqlPass::setup(config, pat_filename, pat_module_name);
-	if (std::holds_alternative<std::string>(setup_result))
-	{
-		log_error("Error setting up needle design: %s\n", std::get<std::string>(setup_result).c_str());
-		return;
-	}
-
-	RTLIL::Design *needle_design = std::get<RTLIL::Design *>(setup_result);
-
-	// Run the query
-	CMatchList *cmatch_list = run_query(config, needle_design, design);
-
-	if (cmatch_list != nullptr)
-	{
-		// Process and display results
-		if (cmatch_list->len > 0)
-		{
-			log("Found %zu matches.\n", cmatch_list->len);
-
-			// Display matches with detailed information
-			for (size_t i = 0; i < cmatch_list->len; i++)
-			{
-				if (cmatch_list->matches[i] != nullptr)
-				{
-					log("\nMatch #%zu:\n", i);
-
-					// Serialize and display the match
-					char *json_str = cmatch_serialize(cmatch_list->matches[i]);
-					if (json_str != nullptr)
-					{
-						log("Match data: %s\n", json_str);
-						free_json_string(json_str);
-					}
-				}
-			}
-		}
-		else
-		{
-			log("No matches found.\n");
-		}
-
-		// Clean up
-		cmatchlist_free(cmatch_list);
-	}
-	else
-	{
-		log("Query execution failed.\n");
-	}
-
-	// Clean up needle design
-	if (needle_design != nullptr)
-	{
-		delete needle_design;
-		needle_design = nullptr;
-	}
-
-	log_pop();
-}
-
-SvqlConfig SvqlPass::configure(std::vector<std::string> args, size_t &argidx)
-{
-
-	auto solver = std::make_unique<SubCircuitReSolver>();
-
-	bool constports = false;
-	bool nodefaultswaps = false;
-	bool verbose = false;
-	std::string pat_filename;
-	std::string pat_module_name;
-
-	for (argidx = 1; argidx < args.size(); argidx++)
-	{
-
-		if (args[argidx] == "-pat" && argidx + 2 < args.size())
-		{
-			pat_filename = args[++argidx];
-			pat_module_name = RTLIL::escape_id(args[++argidx]);
-			continue;
-		}
-		if (args[argidx] == "-verbose")
-		{
-			solver->setVerbose();
-			continue;
-		}
-		if (args[argidx] == "-constports")
-		{
-			constports = true;
-			continue;
-		}
-		if (args[argidx] == "-nodefaultswaps")
-		{
-			nodefaultswaps = true;
-			continue;
-		}
-		if (args[argidx] == "-compat" && argidx + 2 < args.size())
-		{
-			std::string needle_type = RTLIL::escape_id(args[++argidx]);
-			std::string haystack_type = RTLIL::escape_id(args[++argidx]);
-			solver->addCompatibleTypes(needle_type, haystack_type);
-			continue;
-		}
-		if (args[argidx] == "-swap" && argidx + 2 < args.size())
-		{
-			std::string type = RTLIL::escape_id(args[++argidx]);
-			std::set<std::string> ports;
-			std::string ports_str = args[++argidx], p;
-			while (!(p = next_token(ports_str, ",\t\r\n ")).empty())
-				ports.insert(RTLIL::escape_id(p));
-			solver->addSwappablePorts(type, ports);
-			continue;
-		}
-		if (args[argidx] == "-perm" && argidx + 3 < args.size())
-		{
-			std::string type = RTLIL::escape_id(args[++argidx]);
-			std::vector<std::string> map_left, map_right;
-			std::string left_str = args[++argidx];
-			std::string right_str = args[++argidx], p;
-			while (!(p = next_token(left_str, ",\t\r\n ")).empty())
-				map_left.push_back(RTLIL::escape_id(p));
-			while (!(p = next_token(right_str, ",\t\r\n ")).empty())
-				map_right.push_back(RTLIL::escape_id(p));
-			if (map_left.size() != map_right.size())
-				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-			std::map<std::string, std::string> map;
-			for (size_t i = 0; i < map_left.size(); i++)
-				map[map_left[i]] = map_right[i];
-			std::sort(map_left.begin(), map_left.end());
-			std::sort(map_right.begin(), map_right.end());
-			if (map_left != map_right)
-				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-			solver->addSwappablePortsPermutation(type, map);
-			continue;
-		}
-		if (args[argidx] == "-cell_attr" && argidx + 1 < args.size())
-		{
-			solver->cell_attr.insert(RTLIL::escape_id(args[++argidx]));
-			continue;
-		}
-		if (args[argidx] == "-wire_attr" && argidx + 1 < args.size())
-		{
-			solver->wire_attr.insert(RTLIL::escape_id(args[++argidx]));
-			continue;
-		}
-		if (args[argidx] == "-ignore_parameters")
-		{
-			solver->ignoreParameters = true;
-			continue;
-		}
-		if (args[argidx] == "-ignore_param" && argidx + 2 < args.size())
-		{
-			solver->ignoredParams.insert(std::pair<RTLIL::IdString, RTLIL::IdString>(RTLIL::escape_id(args[argidx + 1]), RTLIL::escape_id(args[argidx + 2])));
-			argidx += 2;
-			continue;
-		}
-		break;
-	}
-
-	if (!nodefaultswaps)
-	{
-		solver->addSwappablePorts("$and", "\\A", "\\B");
-		solver->addSwappablePorts("$or", "\\A", "\\B");
-		solver->addSwappablePorts("$xor", "\\A", "\\B");
-		solver->addSwappablePorts("$xnor", "\\A", "\\B");
-		solver->addSwappablePorts("$eq", "\\A", "\\B");
-		solver->addSwappablePorts("$ne", "\\A", "\\B");
-		solver->addSwappablePorts("$eqx", "\\A", "\\B");
-		solver->addSwappablePorts("$nex", "\\A", "\\B");
-		solver->addSwappablePorts("$add", "\\A", "\\B");
-		solver->addSwappablePorts("$mul", "\\A", "\\B");
-		solver->addSwappablePorts("$logic_and", "\\A", "\\B");
-		solver->addSwappablePorts("$logic_or", "\\A", "\\B");
-		solver->addSwappablePorts("$_AND_", "\\A", "\\B");
-		solver->addSwappablePorts("$_OR_", "\\A", "\\B");
-		solver->addSwappablePorts("$_XOR_", "\\A", "\\B");
-	}
-
-	if (verbose)
-	{
-		solver->setVerbose();
-	}
-
-	SvqlConfig config;
-	config.solver = std::move(solver);
-	config.pat_filename = pat_filename;
-	config.pat_module_name = pat_module_name;
-	config.constports = constports;
-	config.nodefaultswaps = nodefaultswaps;
-	config.verbose = verbose;
-
-	return config;
-}
-
-SvqlConfig SvqlPass::configure(CConfig &ccfg)
-{
-	auto solver = std::make_unique<SubCircuitReSolver>();
-
-	// Set basic configuration options
-	bool constports = ccfg.const_ports;
-	bool nodefaultswaps = ccfg.nodefaultswaps;
-	bool verbose = ccfg.verbose;
-
-	// Configure solver verbose mode
-	if (verbose)
-	{
-		solver->setVerbose();
-	}
-
-	// Configure ignore parameters
-	if (ccfg.ignore_parameters)
-	{
-		solver->ignoreParameters = true;
-	}
-
-	// Add compatible types
-	for (uintptr_t i = 0; i < ccfg.compat_pairs_len; i++)
-	{
-		std::string needle_type = RTLIL::escape_id(ccfg.compat_pairs_ptr[i].first);
-		std::string haystack_type = RTLIL::escape_id(ccfg.compat_pairs_ptr[i].second);
-		solver->addCompatibleTypes(needle_type, haystack_type);
-	}
-
-	// Add swappable ports
-	for (uintptr_t i = 0; i < ccfg.swap_ports_len; i++)
-	{
-		std::string type = RTLIL::escape_id(ccfg.swap_ports_ptr[i].key);
-		std::set<std::string> ports;
-		for (uintptr_t j = 0; j < ccfg.swap_ports_ptr[i].values_len; j++)
-		{
-			ports.insert(RTLIL::escape_id(ccfg.swap_ports_ptr[i].values_ptr[j]));
-		}
-		solver->addSwappablePorts(type, ports);
-	}
-
-	// Add permutation ports
-	for (uintptr_t i = 0; i < ccfg.perm_ports_len; i++)
-	{
-		std::string type = RTLIL::escape_id(ccfg.perm_ports_ptr[i].key);
-		std::vector<std::string> map_left, map_right;
-
-		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].first_values_len; j++)
-		{
-			map_left.push_back(RTLIL::escape_id(ccfg.perm_ports_ptr[i].first_values_ptr[j]));
-		}
-
-		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].second_values_len; j++)
-		{
-			map_right.push_back(RTLIL::escape_id(ccfg.perm_ports_ptr[i].second_values_ptr[j]));
-		}
-
-		if (map_left.size() != map_right.size())
-		{
-			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-		}
-
-		std::map<std::string, std::string> map;
-		for (size_t j = 0; j < map_left.size(); j++)
-		{
-			map[map_left[j]] = map_right[j];
-		}
-
-		// Validate permutation
-		std::sort(map_left.begin(), map_left.end());
-		std::sort(map_right.begin(), map_right.end());
-		if (map_left != map_right)
-		{
-			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
-		}
-
-		solver->addSwappablePortsPermutation(type, map);
-	}
-
-	// Add cell attributes
-	for (uintptr_t i = 0; i < ccfg.cell_attr_len; i++)
-	{
-		solver->cell_attr.insert(RTLIL::escape_id(ccfg.cell_attr_ptr[i]));
-	}
-
-	// Add wire attributes
-	for (uintptr_t i = 0; i < ccfg.wire_attr_len; i++)
-	{
-		solver->wire_attr.insert(RTLIL::escape_id(ccfg.wire_attr_ptr[i]));
-	}
-
-	// Add ignored parameters
-	for (uintptr_t i = 0; i < ccfg.ignore_param_len; i++)
-	{
-		solver->ignoredParams.insert(std::pair<RTLIL::IdString, RTLIL::IdString>(
-			RTLIL::escape_id(ccfg.ignore_param_ptr[i].first),
-			RTLIL::escape_id(ccfg.ignore_param_ptr[i].second)));
-	}
-
-	// Add default swappable ports if not disabled
-	if (!nodefaultswaps)
-	{
-		solver->addSwappablePorts("$and", "\\A", "\\B");
-		solver->addSwappablePorts("$or", "\\A", "\\B");
-		solver->addSwappablePorts("$xor", "\\A", "\\B");
-		solver->addSwappablePorts("$xnor", "\\A", "\\B");
-		solver->addSwappablePorts("$eq", "\\A", "\\B");
-		solver->addSwappablePorts("$ne", "\\A", "\\B");
-		solver->addSwappablePorts("$eqx", "\\A", "\\B");
-		solver->addSwappablePorts("$nex", "\\A", "\\B");
-		solver->addSwappablePorts("$add", "\\A", "\\B");
-		solver->addSwappablePorts("$mul", "\\A", "\\B");
-		solver->addSwappablePorts("$logic_and", "\\A", "\\B");
-		solver->addSwappablePorts("$logic_or", "\\A", "\\B");
-		solver->addSwappablePorts("$_AND_", "\\A", "\\B");
-		solver->addSwappablePorts("$_OR_", "\\A", "\\B");
-		solver->addSwappablePorts("$_XOR_", "\\A", "\\B");
-	}
-
-	// Create and return the SvqlConfig
-	SvqlConfig config;
-	config.solver = std::move(solver);
-	config.pat_filename = "";	 // Not used in this context
-	config.pat_module_name = ""; // Not used in this context
-	config.constports = constports;
-	config.nodefaultswaps = nodefaultswaps;
-	config.verbose = verbose;
-
-	return config;
-}
-
-CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_design, RTLIL::Design *design)
+CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeConfig &cfg, RTLIL::Design *needle_design, RTLIL::Design *design)
 {
 	if (needle_design == nullptr)
 	{
@@ -535,10 +353,11 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 	}
 
 	// Get the needle module from the design
-	RTLIL::Module *needle = needle_design->module(config.pat_module_name);
+	std::string pat_module_name = cfg.pat_module_name.string;
+	RTLIL::Module *needle = needle_design->module(pat_module_name);
 	if (needle == nullptr)
 	{
-		log_error("Module %s not found in needle design.\n", config.pat_module_name.c_str());
+		log_error("Module %s not found in needle design.\n", pat_module_name.c_str());
 		return nullptr;
 	}
 
@@ -553,14 +372,11 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 		needle_ports.insert(port);
 	}
 
-	// Use the solver from the config (make a copy for this query)
-	SubCircuitReSolver *solver = config.solver.get();
-
 	// Create Needle Graph
 	SubCircuit::Graph mod_graph;
 	std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
 	log("Creating needle graph %s.\n", graph_name.c_str());
-	if (module2graph(mod_graph, needle, config.constports))
+	if (module2graph(mod_graph, needle, cfg.const_ports))
 	{
 		solver->addGraph(graph_name, mod_graph);
 		needle_map[graph_name] = needle;
@@ -572,7 +388,7 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 		SubCircuit::Graph mod_graph;
 		std::string graph_name = "haystack_" + RTLIL::unescape_id(module->name);
 		log("Creating haystack graph %s.\n", graph_name.c_str());
-		if (module2graph(mod_graph, module, config.constports, design, -1, nullptr))
+		if (module2graph(mod_graph, module, cfg.const_ports, design, -1, nullptr))
 		{
 			solver->addGraph(graph_name, mod_graph);
 			haystack_map[graph_name] = module;
@@ -592,7 +408,7 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 	// log("Found %d matches.\n", GetSize(results));
 
 	// Create CMatchList to return
-	CMatchList *cmatch_list = cmatchlist_new();
+	CMatchList *cmatch_list = match_list_new();
 
 	if (results.size() > 0)
 	{
@@ -601,7 +417,7 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 			auto &result = results[i];
 
 			// Create a new CMatch
-			CMatch *cmatch = cmatch_new();
+			CMatch *cmatch = match_new();
 
 			for (const auto &it : result.mappings)
 			{
@@ -613,11 +429,15 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 				int needle_id = needleCell->name.index_;
 				int haystack_id = graphCell->name.index_;
 
-				CCellData *needle_cell_data = ccelldata_new(needle_name.c_str(), needle_id);
-				CCellData *haystack_cell_data = ccelldata_new(haystack_name.c_str(), haystack_id);
+				CCellData *needle_cell_data = ccelldata_new(crate_cstring_new(needle_name.c_str()), needle_id);
+				CCellData *haystack_cell_data = ccelldata_new(crate_cstring_new(haystack_name.c_str()), haystack_id);
 
 				// Add cell data to the CMatch
-				cmatch_add_celldata(cmatch, needle_cell_data, haystack_cell_data);
+				match_add_celldata(cmatch, *needle_cell_data, *haystack_cell_data);
+
+				// Clean up cell data
+				ccelldata_destroy(needle_cell_data);
+				ccelldata_destroy(haystack_cell_data);
 
 				// Get cell connections
 				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
@@ -637,13 +457,15 @@ CMatchList *SvqlPass::run_query(const SvqlConfig &config, RTLIL::Design *needle_
 					{
 						// log("Needle port %s mapped to haystack wire %s.\n",
 						// 	pair.first->name.c_str(), pair.second->name.c_str());
-						cmatch_add_port(cmatch, pair.first->name.c_str(), pair.second->name.c_str());
+						match_add_portdata(cmatch, crate_cstring_new(pair.first->name.c_str()), crate_cstring_new(pair.second->name.c_str()));
 					}
 				}
 			}
 
 			// Add the match to the list
-			cmatchlist_add_match(cmatch_list, cmatch);
+			append_match_to_matchlist(cmatch_list, *cmatch);
+			// Clean up CMatch
+			match_destroy(cmatch);
 		}
 	}
 
@@ -664,116 +486,116 @@ std::string svql::escape_needle_name(const std::string &name)
 	return name;
 }
 
-SvqlConfig svql::into_svql_runtime_config(const CSvqlRuntimeConfig &ccfg)
-{
-	SvqlConfig config;
+// SvqlConfig svql::into_svql_runtime_config(const CSvqlRuntimeConfig &ccfg)
+// {
+// 	SvqlConfig config;
 
-	config.pat_module_name = ccfg.pat_module_name ? std::string(ccfg.pat_module_name) : "";
-	config.pat_filename = ccfg.pat_filename ? std::string(ccfg.pat_filename) : "";
-	config.verbose = ccfg.verbose;
-	config.constports = ccfg.const_ports;
-	config.nodefaultswaps = ccfg.nodefaultswaps;
-	config.ignore_parameters = ccfg.ignore_parameters;
+// 	config.pat_module_name = ccfg.pat_module_name ? std::string(ccfg.pat_module_name) : "";
+// 	config.pat_filename = ccfg.pat_filename ? std::string(ccfg.pat_filename) : "";
+// 	config.verbose = ccfg.verbose;
+// 	config.constports = ccfg.const_ports;
+// 	config.nodefaultswaps = ccfg.nodefaultswaps;
+// 	config.ignore_parameters = ccfg.ignore_parameters;
 
-	// Convert compat_pairs
-	for (uintptr_t i = 0; i < ccfg.compat_pairs_len; i++)
-	{
-		config.compat_pairs.emplace_back(
-			ccfg.compat_pairs_ptr[i].first ? std::string(ccfg.compat_pairs_ptr[i].first) : "",
-			ccfg.compat_pairs_ptr[i].second ? std::string(ccfg.compat_pairs_ptr[i].second) : "");
-	}
+// 	// Convert compat_pairs
+// 	for (uintptr_t i = 0; i < ccfg.compat_pairs_len; i++)
+// 	{
+// 		config.compat_pairs.emplace_back(
+// 			ccfg.compat_pairs_ptr[i].first ? std::string(ccfg.compat_pairs_ptr[i].first) : "",
+// 			ccfg.compat_pairs_ptr[i].second ? std::string(ccfg.compat_pairs_ptr[i].second) : "");
+// 	}
 
-	// Convert swap_ports
-	for (uintptr_t i = 0; i < ccfg.swap_ports_len; i++)
-	{
-		std::set<std::string> ports;
-		for (uintptr_t j = 0; j < ccfg.swap_ports_ptr[i].values_len; j++)
-		{
-			ports.insert(ccfg.swap_ports_ptr[i].values_ptr[j] ? std::string(ccfg.swap_ports_ptr[i].values_ptr[j]) : "");
-		}
-		config.swap_ports.emplace_back(
-			ccfg.swap_ports_ptr[i].key ? std::string(ccfg.swap_ports_ptr[i].key) : "",
-			ports);
-	}
+// 	// Convert swap_ports
+// 	for (uintptr_t i = 0; i < ccfg.swap_ports_len; i++)
+// 	{
+// 		std::set<std::string> ports;
+// 		for (uintptr_t j = 0; j < ccfg.swap_ports_ptr[i].values_len; j++)
+// 		{
+// 			ports.insert(ccfg.swap_ports_ptr[i].values_ptr[j] ? std::string(ccfg.swap_ports_ptr[i].values_ptr[j]) : "");
+// 		}
+// 		config.swap_ports.emplace_back(
+// 			ccfg.swap_ports_ptr[i].key ? std::string(ccfg.swap_ports_ptr[i].key) : "",
+// 			ports);
+// 	}
 
-	// Convert perm_ports
-	for (uintptr_t i = 0; i < ccfg.perm_ports_len; i++)
-	{
-		std::vector<std::string> perm_ports_vec;
-		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].first_values_len; j++)
-		{
-			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].first_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].first_values_ptr[j]) : "");
-		}
-		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].second_values_len; j++)
-		{
-			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].second_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].second_values_ptr[j]) : "");
-		}
-		config.perm_ports.emplace_back(
-			ccfg.perm_ports_ptr[i].key ? std::string(ccfg.perm_ports_ptr[i].key) : "",
-			perm_ports_vec);
-	}
+// 	// Convert perm_ports
+// 	for (uintptr_t i = 0; i < ccfg.perm_ports_len; i++)
+// 	{
+// 		std::vector<std::string> perm_ports_vec;
+// 		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].first_values_len; j++)
+// 		{
+// 			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].first_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].first_values_ptr[j]) : "");
+// 		}
+// 		for (uintptr_t j = 0; j < ccfg.perm_ports_ptr[i].second_values_len; j++)
+// 		{
+// 			perm_ports_vec.push_back(ccfg.perm_ports_ptr[i].second_values_ptr[j] ? std::string(ccfg.perm_ports_ptr[i].second_values_ptr[j]) : "");
+// 		}
+// 		config.perm_ports.emplace_back(
+// 			ccfg.perm_ports_ptr[i].key ? std::string(ccfg.perm_ports_ptr[i].key) : "",
+// 			perm_ports_vec);
+// 	}
 
-	// Convert cell_attr
-	for (uintptr_t i = 0; i < ccfg.cell_attr_len; i++)
-	{
-		config.cell_attr.push_back(ccfg.cell_attr_ptr[i] ? std::string(ccfg.cell_attr_ptr[i]) : "");
-	}
+// 	// Convert cell_attr
+// 	for (uintptr_t i = 0; i < ccfg.cell_attr_len; i++)
+// 	{
+// 		config.cell_attr.push_back(ccfg.cell_attr_ptr[i] ? std::string(ccfg.cell_attr_ptr[i]) : "");
+// 	}
 
-	// Convert wire_attr
-	for (uintptr_t i = 0; i < ccfg.wire_attr_len; i++)
-	{
-		config.wire_attr.push_back(ccfg.wire_attr_ptr[i] ? std::string(ccfg.wire_attr_ptr[i]) : "");
-	}
+// 	// Convert wire_attr
+// 	for (uintptr_t i = 0; i < ccfg.wire_attr_len; i++)
+// 	{
+// 		config.wire_attr.push_back(ccfg.wire_attr_ptr[i] ? std::string(ccfg.wire_attr_ptr[i]) : "");
+// 	}
 
-	// Convert ignore_param
-	for (uintptr_t i = 0; i < ccfg.ignore_param_len; i++)
-	{
-		config.ignore_param.emplace_back(
-			ccfg.ignore_param_ptr[i].first ? std::string(ccfg.ignore_param_ptr[i].first) : "",
-			ccfg.ignore_param_ptr[i].second ? std::string(ccfg.ignore_param_ptr[i].second) : "");
-	}
+// 	// Convert ignore_param
+// 	for (uintptr_t i = 0; i < ccfg.ignore_param_len; i++)
+// 	{
+// 		config.ignore_param.emplace_back(
+// 			ccfg.ignore_param_ptr[i].first ? std::string(ccfg.ignore_param_ptr[i].first) : "",
+// 			ccfg.ignore_param_ptr[i].second ? std::string(ccfg.ignore_param_ptr[i].second) : "");
+// 	}
 
-	return config;
-}
+// 	return config;
+// }
 
-CSvqlRuntimeConfig svql::into_c_svql_runtime_config(const SvqlConfig &config)
-{
-	CSvqlRuntimeConfig runtime_config;
+// CSvqlRuntimeConfig svql::into_c_svql_runtime_config(const SvqlConfig &config)
+// {
+// 	CSvqlRuntimeConfig runtime_config;
 
-	runtime_config.pat_module_name = config.pat_module_name.c_str();
-	runtime_config.pat_filename = config.pat_filename.c_str();
-	runtime_config.verbose = config.verbose;
-	runtime_config.const_ports = config.constports;
-	runtime_config.nodefaultswaps = config.nodefaultswaps;
-	runtime_config.ignore_parameters = config.ignore_parameters;
+// 	runtime_config.pat_module_name = config.pat_module_name.c_str();
+// 	runtime_config.pat_filename = config.pat_filename.c_str();
+// 	runtime_config.verbose = config.verbose;
+// 	runtime_config.const_ports = config.constports;
+// 	runtime_config.nodefaultswaps = config.nodefaultswaps;
+// 	runtime_config.ignore_parameters = config.ignore_parameters;
 
-	// Convert compat_pairs
-	runtime_config.compat_pairs = config.compat_pairs;
+// 	// Convert compat_pairs
+// 	runtime_config.compat_pairs = config.compat_pairs;
 
-	// Convert swap_ports
-	for (const auto &swap_port : config.swap_ports)
-	{
-		std::vector<std::string> ports_vec(swap_port.second.begin(), swap_port.second.end());
-		runtime_config.swap_ports.emplace_back(swap_port.first, ports_vec);
-	}
+// 	// Convert swap_ports
+// 	for (const auto &swap_port : config.swap_ports)
+// 	{
+// 		std::vector<std::string> ports_vec(swap_port.second.begin(), swap_port.second.end());
+// 		runtime_config.swap_ports.emplace_back(swap_port.first, ports_vec);
+// 	}
 
-	// Convert perm_ports - this is tricky as we need to reconstruct the pair structure
-	for (const auto &perm_port : config.perm_ports)
-	{
-		size_t half_size = perm_port.second.size() / 2;
-		std::vector<std::string> first_half(perm_port.second.begin(), perm_port.second.begin() + half_size);
-		std::vector<std::string> second_half(perm_port.second.begin() + half_size, perm_port.second.end());
-		runtime_config.perm_ports.emplace_back(perm_port.first, std::make_pair(first_half, second_half));
-	}
+// 	// Convert perm_ports - this is tricky as we need to reconstruct the pair structure
+// 	for (const auto &perm_port : config.perm_ports)
+// 	{
+// 		size_t half_size = perm_port.second.size() / 2;
+// 		std::vector<std::string> first_half(perm_port.second.begin(), perm_port.second.begin() + half_size);
+// 		std::vector<std::string> second_half(perm_port.second.begin() + half_size, perm_port.second.end());
+// 		runtime_config.perm_ports.emplace_back(perm_port.first, std::make_pair(first_half, second_half));
+// 	}
 
-	// Convert cell_attr
-	runtime_config.cell_attr = config.cell_attr;
+// 	// Convert cell_attr
+// 	runtime_config.cell_attr = config.cell_attr;
 
-	// Convert wire_attr
-	runtime_config.wire_attr = config.wire_attr;
+// 	// Convert wire_attr
+// 	runtime_config.wire_attr = config.wire_attr;
 
-	// Convert ignore_param
-	runtime_config.ignore_param = config.ignore_param;
+// 	// Convert ignore_param
+// 	runtime_config.ignore_param = config.ignore_param;
 
-	return runtime_config;
-}
+// 	return runtime_config;
+// }
