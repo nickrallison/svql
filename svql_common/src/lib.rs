@@ -2,15 +2,11 @@
 // pub mod mat;
 // pub mod pat;
 // pub mod source;
-// pub mod config;
+pub mod config;
+pub mod core;
 
 use crate::core::list::List;
 use crate::core::string::CrateCString;
-
-pub mod core;
-
-// pub use core::string::CrateCString;
-// pub use config::*;
 
 
 #[unsafe(no_mangle)]
