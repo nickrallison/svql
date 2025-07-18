@@ -237,17 +237,18 @@ pub extern "C" fn match_list_eq(a: &CMatchList, b: &CMatchList) -> bool {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn match_list_debug_string(list: &CMatchList) -> CrateCString {
+pub extern "C" fn match_list_debug_string(list: &CMatchList) -> *mut CrateCString {
     let rust = MatchList::from(list);
     let s = format!("{:?}", rust);
-    CrateCString::from(s.as_str())
+    
+    Box::into_raw(Box::new(CrateCString::from(s.as_str())))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn match_list_to_json(list: &CMatchList) -> CrateCString {
+pub extern "C" fn match_list_to_json(list: &CMatchList) -> *mut CrateCString {
     let rust = MatchList::from(list);
     match serde_json::to_string(&rust) {
-        Ok(json) => CrateCString::from(json.as_str()),
+        Ok(json) => Box::into_raw(Box::new(CrateCString::from(json.as_str()))),
         Err(e) => panic!("Failed to serialize to JSON: {}", e),
     }
 }
@@ -256,6 +257,7 @@ pub extern "C" fn match_list_to_json(list: &CMatchList) -> CrateCString {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use crate::core::string::crate_cstring_destroy;
 
     fn make_sample() -> MatchList {
         MatchList {
@@ -303,10 +305,10 @@ mod tests {
     #[test]
     fn test_debug_string() {
         let c = CMatchList::from(&make_sample());
-        let dbg = match_list_debug_string(&c);
-        let s = dbg.as_str();
+        let dbg: *mut CrateCString = match_list_debug_string(&c);
+        let s = unsafe { (&*dbg).as_str() };
         assert!(s.contains("cell_name"));
-        drop(dbg);
+        crate_cstring_destroy(dbg);
     }
 
     #[test]
@@ -315,7 +317,6 @@ mod tests {
             let c = match_list_new();
             let c2 = match_list_clone(c);
             assert!(match_list_eq(&*c, &*c2));
-            let _ = match_list_debug_string(&*c);
         
             match_list_destroy(c2);
             match_list_destroy(c);

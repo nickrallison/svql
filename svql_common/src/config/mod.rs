@@ -237,17 +237,17 @@ pub extern "C" fn svql_runtime_config_eq(a: &CSvqlRuntimeConfig, b: &CSvqlRuntim
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_debug_string(cfg: &CSvqlRuntimeConfig) -> CrateCString {
+pub extern "C" fn svql_runtime_config_debug_string(cfg: &CSvqlRuntimeConfig) -> *mut CrateCString {
     let rust_cfg = SvqlRuntimeConfig::from(cfg);
     let s = format!("{:?}", rust_cfg);
-    CrateCString::from(s.as_str())
+    Box::into_raw(Box::new(CrateCString::from(s.as_str())))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_to_json(cfg: &CSvqlRuntimeConfig) -> CrateCString {
+pub extern "C" fn svql_runtime_config_to_json(cfg: &CSvqlRuntimeConfig) -> *mut CrateCString {
     let rust_cfg = SvqlRuntimeConfig::from(cfg);
     match serde_json::to_string(&rust_cfg) {
-        Ok(json) => CrateCString::from(json.as_str()),
+        Ok(json) => Box::into_raw(Box::new(CrateCString::from(json.as_str()))),
         Err(e) => panic!("Failed to serialize to JSON: {}", e),
     }
 }
@@ -258,6 +258,7 @@ pub extern "C" fn svql_runtime_config_to_json(cfg: &CSvqlRuntimeConfig) -> Crate
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use crate::core::string::crate_cstring_destroy;
 
     fn make_sample_config() -> SvqlRuntimeConfig {
         SvqlRuntimeConfig {
@@ -305,9 +306,9 @@ mod tests {
     fn test_debug_string() {
         let c = CSvqlRuntimeConfig::from(&make_sample_config());
         let dbg = svql_runtime_config_debug_string(&c);
-        let s = dbg.as_str();
+        let s = unsafe { (&*dbg).as_str() };
         assert!(s.contains("pat_module_name"));
-        drop(dbg);
+        crate_cstring_destroy(dbg);
     }
 
     #[test]
@@ -316,7 +317,6 @@ mod tests {
         let c2 = svql_runtime_config_clone(c);
         unsafe { 
             assert!(svql_runtime_config_eq(&*c, &*c2));
-            let _ = svql_runtime_config_debug_string(&*c);
         
             svql_runtime_config_destroy(c2);
             svql_runtime_config_destroy(c);

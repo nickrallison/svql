@@ -109,8 +109,8 @@ pub fn svql_runtime_config_from_args_logic(args: &[String]) -> SvqlRuntimeConfig
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn svql_runtime_config_from_args(argc: i32, argv: *const *const c_char) -> CSvqlRuntimeConfig {
+pub extern "C" fn svql_runtime_config_from_args(argc: i32, argv: *const *const c_char) -> *mut CSvqlRuntimeConfig {
     let args = argv_to_vec(argc, argv);
     let rust_cfg = svql_runtime_config_from_args_logic(&args);
-    CSvqlRuntimeConfig::from(&rust_cfg)
+    Box::into_raw(Box::new(CSvqlRuntimeConfig::from(&rust_cfg)))
 }
