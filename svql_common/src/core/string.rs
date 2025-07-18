@@ -127,6 +127,11 @@ impl From<CrateCString> for CString {
         }
     }
 }
+impl From<CrateCString> for String {
+    fn from(s: CrateCString) -> Self {
+        s.as_str().to_string()
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn crate_cstring_new(s: *const c_char) -> CrateCString {
     if s.is_null() {
