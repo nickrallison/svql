@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(svql LANGUAGES CXX C)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Set C++ standard and compatibility flags globally
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
