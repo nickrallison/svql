@@ -24,6 +24,9 @@ namespace svql
 		void terminate();
 		void terminate(std::string error_message);
 
+		void execute_cmd(std::vector<std::string> args, RTLIL::Design *design);
+		void execute_net(std::vector<std::string> args, RTLIL::Design *design);
+
 		// ####
 		static std::optional<SvqlRuntimeConfig> parse_args_to_config(size_t &argsidx, const std::vector<std::string> &args, std::string &error_msg);
 		static std::unique_ptr<SubCircuitReSolver> create_solver(const SvqlRuntimeConfig &cfg);

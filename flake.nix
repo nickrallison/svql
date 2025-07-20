@@ -18,6 +18,7 @@
             cmake
             ninja
             pkg-config
+            asio
 
             ## Rust
             cargo 

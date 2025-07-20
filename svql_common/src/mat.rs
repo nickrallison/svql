@@ -35,9 +35,14 @@ mod ffi {
 
     extern "Rust" {
         fn matchlist_into_json_string(cfg: &QueryMatchList) -> String;
+        fn matchlist_from_json_string(json: &str) -> QueryMatchList;
     }
 }
 
 fn matchlist_into_json_string(cfg: &QueryMatchList) -> String {
     serde_json::to_string(cfg).expect("Failed to serialize QueryMatchList to JSON")
+}
+
+fn matchlist_from_json_string(json: &str) -> QueryMatchList {
+    serde_json::from_str(json).expect("Failed to deserialize JSON to QueryMatchList")
 }

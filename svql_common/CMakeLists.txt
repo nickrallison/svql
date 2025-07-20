@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.20)
 
 project(svql_common NONE)
 
-find_program(CARGO_EXECUTABLE cargo REQUIRED)
+find_program(
+        CARGO_EXECUTABLE
+        NAMES cargo
+        HINTS "$ENV{HOME}/.cargo/bin"
+        REQUIRED
+)
 
 #### CMake Cache Variables ####
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

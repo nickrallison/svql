@@ -78,7 +78,9 @@ SvqlPass::SvqlPass() : Pass("svql_driver", "find subcircuits and replace them wi
 void SvqlPass::help()
 {
 	log("\n");
-	log("    svql_driver -pat <pat_file> <pat_module_name> [options] [selection]\n");
+	log("    svql_driver -cmd [-pat <pat_file> <pat_module_name> [options] [selection]]\n");
+	log("    or\n");
+	log("    svql_driver -net [port]\n");
 	log("\n");
 	log("This pass looks for subcircuits that are isomorphic to any of the modules\n");
 	log("in the given map file.\n");
@@ -142,8 +144,116 @@ void SvqlPass::help()
 
 void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 {
-	log_header(design, "Executing SVQL DRIVER pass (find matching subcircuits).\n");
+	log_header(design, "Executing SVQL DRIVER pass.\n");
 	log_push();
+
+	std::string error_msg;
+
+	// 1. Parse args to config (Rust FFI)
+	size_t argsidx = 1;
+
+	std::string mode = args[1];
+	if (mode == "-cmd")
+	{
+		log("Running in command mode.\n");
+		execute_cmd(args, design);
+	}
+	else if (mode == "-net")
+	{
+		log("Running in network mode.\n");
+		execute_net(args, design);
+	}
+	else
+	{
+		log_error("Invalid mode '%s'. Use '-cmd' or '-net'.\n", mode.c_str());
+		return;
+	}
+
+	// std::optional<SvqlRuntimeConfig> cfg = parse_args_to_config(argsidx, args, error_msg);
+	// if (!cfg)
+	// {
+	// 	log_error("Error parsing arguments: %s\n", error_msg.c_str());
+	// 	return;
+	// }
+	// extra_args(args, argsidx, design);
+	// SvqlRuntimeConfig &cfg_ref = *cfg;
+
+	// // 2. Create solver
+	// auto solver = create_solver(cfg_ref);
+
+	// // 3. Setup needle design
+	// RTLIL::Design *needle_design = setup_needle_design(cfg_ref, error_msg);
+	// if (!needle_design)
+	// {
+	// 	log_error("Error setting up needle design: %s\n", error_msg.c_str());
+	// 	return;
+	// }
+
+	// // 4. Run solver
+	// std::optional<QueryMatchList> match_list = run_solver(solver.get(), cfg_ref, needle_design, design, error_msg);
+	// if (!match_list)
+	// {
+	// 	log_error("Error running solver: %s\n", error_msg.c_str());
+	// 	return;
+	// }
+	// QueryMatchList &match_list_ref = match_list.value();
+
+	// // 5. Print results (as before)
+	// rust::String json_str = matchlist_into_json_string(match_list_ref);
+	// log("SVQL_MATCHES: %s\n", json_str.c_str());
+
+	// // 6. Clean up
+	// delete needle_design;
+	log_pop();
+}
+
+void SvqlPass::execute_cmd(std::vector<std::string> args, RTLIL::Design *design)
+{
+
+	std::string error_msg;
+
+	// 1. Parse args to config (Rust FFI)
+	size_t argsidx = 1;
+	args.erase(args.begin());
+	std::optional<SvqlRuntimeConfig> cfg = parse_args_to_config(argsidx, args, error_msg);
+	if (!cfg)
+	{
+		log_error("Error parsing arguments: %s\n", error_msg.c_str());
+		return;
+	}
+	extra_args(args, argsidx, design);
+	SvqlRuntimeConfig &cfg_ref = *cfg;
+
+	// 2. Create solver
+	auto solver = create_solver(cfg_ref);
+
+	// 3. Setup needle design
+	RTLIL::Design *needle_design = setup_needle_design(cfg_ref, error_msg);
+	if (!needle_design)
+	{
+		log_error("Error setting up needle design: %s\n", error_msg.c_str());
+		return;
+	}
+
+	// 4. Run solver
+	std::optional<QueryMatchList> match_list = run_solver(solver.get(), cfg_ref, needle_design, design, error_msg);
+	if (!match_list)
+	{
+		log_error("Error running solver: %s\n", error_msg.c_str());
+		return;
+	}
+	QueryMatchList &match_list_ref = match_list.value();
+
+	// 5. Print results (as before)
+	rust::String json_str = matchlist_into_json_string(match_list_ref);
+	log("SVQL_MATCHES: %s\n", json_str.c_str());
+
+	// 6. Clean up
+	delete needle_design;
+}
+
+void SvqlPass::execute_net(std::vector<std::string> args, RTLIL::Design *design)
+{
 
 	std::string error_msg;
 
@@ -184,10 +294,9 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	// 6. Clean up
 	delete needle_design;
-	log_pop();
 }
 
-std::optional<SvqlRuntimeConfig> parse_args_to_config(size_t &argsidx, const std::vector<std::string> &args, std::string &error_msg)
+std::optional<SvqlRuntimeConfig> SvqlPass::parse_args_to_config(size_t &argsidx, const std::vector<std::string> &args, std::string &error_msg)
 {
 
 	SvqlRuntimeConfig cfg = SvqlRuntimeConfig();

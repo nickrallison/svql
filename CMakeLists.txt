@@ -19,6 +19,7 @@ if(ENABLE_LTO)
   endif()
 endif()
 
+
 enable_testing()
 
 add_subdirectory(svql_common)

@@ -48,6 +48,7 @@ mod ffi {
 
     extern "Rust" {
         fn svql_runtime_config_into_json_string(cfg: &SvqlRuntimeConfig) -> String;
+        fn svql_runtime_config_from_json_string(json: &str) -> SvqlRuntimeConfig;
     }
 }
 
@@ -58,6 +59,10 @@ fn new_svql_runtime_config() -> SvqlRuntimeConfig {
 
 fn svql_runtime_config_into_json_string(cfg: &SvqlRuntimeConfig) -> String {
     serde_json::to_string(cfg).expect("Failed to serialize SvqlRuntimeConfig to JSON")
+}
+
+fn svql_runtime_config_from_json_string(json: &str) -> SvqlRuntimeConfig {
+    serde_json::from_str(json).expect("Failed to deserialize JSON to SvqlRuntimeConfig")
 }
 
 impl CompatPair {
