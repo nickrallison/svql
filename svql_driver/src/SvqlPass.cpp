@@ -1,6 +1,6 @@
 #include "SvqlPass.hpp"
 
-#include <variant>
+#include <optional>
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -13,7 +13,8 @@
 
 #include "SubCircuitReSolver.hpp"
 #include "GraphConversion.hpp"
-#include "svql_common.h"
+#include "svql_common_config.h"
+#include "svql_common_mat.h"
 
 using namespace svql;
 using namespace Yosys;
@@ -147,13 +148,21 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	std::string error_msg;
 
 	// 1. Parse args to config (Rust FFI)
-	CSvqlRuntimeConfig *cfg = parse_args_to_config(args);
+	size_t argsidx = 1;
+	std::optional<SvqlRuntimeConfig> cfg = parse_args_to_config(argsidx, args, error_msg);
+	if (!cfg)
+	{
+		log_error("Error parsing arguments: %s\n", error_msg.c_str());
+		return;
+	}
+	extra_args(args, argsidx, design);
+	SvqlRuntimeConfig &cfg_ref = *cfg;
 
 	// 2. Create solver
-	auto solver = create_solver(cfg);
+	auto solver = create_solver(cfg_ref);
 
 	// 3. Setup needle design
-	RTLIL::Design *needle_design = setup_needle_design(cfg, error_msg);
+	RTLIL::Design *needle_design = setup_needle_design(cfg_ref, error_msg);
 	if (!needle_design)
 	{
 		log_error("Error setting up needle design: %s\n", error_msg.c_str());
@@ -161,69 +170,178 @@ void SvqlPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	}
 
 	// 4. Run solver
-	CMatchList *cmatch_list = run_solver(solver.get(), cfg, needle_design, design);
+	std::optional<QueryMatchList> match_list = run_solver(solver.get(), cfg_ref, needle_design, design, error_msg);
+	if (!match_list)
+	{
+		log_error("Error running solver: %s\n", error_msg.c_str());
+		return;
+	}
+	QueryMatchList &match_list_ref = match_list.value();
 
 	// 5. Print results (as before)
-	if (cmatch_list != nullptr)
-	{
-		CrateCString json_str = match_list_to_json(cmatch_list);
-		log("SVQL_MATCHES: %s\n", json_str.string);
-		// Dont need to free string since its dropped at the end of the function
-		// crate_cstring_destroy(&json_str);
-		match_list_destroy(cmatch_list); // Rust FFI cleanup
-	}
+	rust::String json_str = matchlist_into_json_string(match_list_ref);
+	log("SVQL_MATCHES: %s\n", json_str.c_str());
 
 	// 6. Clean up
-	svql_runtime_config_destroy(cfg);
 	delete needle_design;
 	log_pop();
 }
 
-CSvqlRuntimeConfig *SvqlPass::parse_args_to_config(const std::vector<std::string> &args)
+std::optional<SvqlRuntimeConfig> parse_args_to_config(size_t &argsidx, const std::vector<std::string> &args, std::string &error_msg)
 {
-	std::vector<const char *> argv;
-	for (const auto &s : args)
-		argv.push_back(s.c_str());
-	return svql_runtime_config_from_args((int)argv.size(), argv.data());
+
+	SvqlRuntimeConfig cfg = SvqlRuntimeConfig();
+
+	for (argsidx = 1; argsidx < args.size(); argsidx++)
+	{
+		if (args[argsidx] == "-pat" && argsidx + 2 < args.size())
+		{
+			cfg.pat_module_name = args[++argsidx];
+			cfg.pat_filename = args[++argsidx];
+			continue;
+		}
+		if (args[argsidx] == "-verbose")
+		{
+			cfg.verbose = true;
+			continue;
+		}
+		if (args[argsidx] == "-constports")
+		{
+			cfg.const_ports = true;
+			continue;
+		}
+		if (args[argsidx] == "-nodefaultswaps")
+		{
+			cfg.nodefaultswaps = true;
+			continue;
+		}
+		if (args[argsidx] == "-compat" && argsidx + 2 < args.size())
+		{
+			std::string needle_type = RTLIL::escape_id(args[++argsidx]);
+			std::string haystack_type = RTLIL::escape_id(args[++argsidx]);
+
+			CompatPair compat_pair;
+			compat_pair.needle = needle_type;
+			compat_pair.haystack = haystack_type;
+
+			cfg.compat_pairs.emplace_back(compat_pair);
+			continue;
+		}
+		if (args[argsidx] == "-swap" && argsidx + 2 < args.size())
+		{
+			std::string type = RTLIL::escape_id(args[++argsidx]);
+			std::set<std::string> ports;
+			std::string ports_str = args[++argsidx], p;
+			while (!(p = next_token(ports_str, ",\t\r\n ")).empty())
+				ports.insert(RTLIL::escape_id(p));
+
+			SwapPort swap_port;
+			swap_port.type_name = type;
+			for (const auto &port : ports)
+			{
+				swap_port.ports.emplace_back(port);
+			}
+			cfg.swap_ports.emplace_back(swap_port);
+			continue;
+		}
+		if (args[argsidx] == "-perm" && argsidx + 3 < args.size())
+		{
+			std::string type = RTLIL::escape_id(args[++argsidx]);
+			std::vector<std::string> map_left, map_right;
+			std::string left_str = args[++argsidx];
+			std::string right_str = args[++argsidx], p;
+			while (!(p = next_token(left_str, ",\t\r\n ")).empty())
+				map_left.push_back(RTLIL::escape_id(p));
+			while (!(p = next_token(right_str, ",\t\r\n ")).empty())
+				map_right.push_back(RTLIL::escape_id(p));
+			if (map_left.size() != map_right.size())
+				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+			std::map<std::string, std::string> map;
+			for (size_t i = 0; i < map_left.size(); i++)
+				map[map_left[i]] = map_right[i];
+			std::sort(map_left.begin(), map_left.end());
+			std::sort(map_right.begin(), map_right.end());
+			if (map_left != map_right)
+				log_cmd_error("Arguments to -perm are not a valid permutation!\n");
+
+			PermPort perm_port;
+			perm_port.type_name = type;
+			for (const auto &port : map_left)
+				perm_port.left.emplace_back(port);
+			for (const auto &wire : map_right)
+				perm_port.right.emplace_back(wire);
+
+			cfg.perm_ports.emplace_back(perm_port);
+			continue;
+		}
+		if (args[argsidx] == "-cell_attr" && argsidx + 1 < args.size())
+		{
+			cfg.cell_attr.emplace_back(RTLIL::escape_id(args[++argsidx]));
+			continue;
+		}
+		if (args[argsidx] == "-wire_attr" && argsidx + 1 < args.size())
+		{
+			cfg.wire_attr.emplace_back(RTLIL::escape_id(args[++argsidx]));
+			continue;
+		}
+		if (args[argsidx] == "-ignore_parameters")
+		{
+			cfg.ignore_params = true;
+			continue;
+		}
+		if (args[argsidx] == "-ignore_param" && argsidx + 2 < args.size())
+		{
+			IgnoreParam ignore_param;
+			ignore_param.param_name = RTLIL::escape_id(args[++argsidx]);
+			ignore_param.param_value = RTLIL::escape_id(args[++argsidx]);
+			cfg.ignored_parameters.emplace_back(ignore_param);
+			continue;
+		}
+
+		error_msg = "Unknown argument: " + args[argsidx];
+		return std::nullopt;
+	}
+
+	return cfg;
 }
 
-std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(const CSvqlRuntimeConfig *cfg)
+std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(const SvqlRuntimeConfig &cfg)
 {
 	auto solver = std::make_unique<SubCircuitReSolver>();
 
-	if (cfg->verbose)
+	if (cfg.verbose)
 		solver->setVerbose();
-	if (cfg->ignore_parameters)
+	if (cfg.ignore_params)
 		solver->ignoreParameters = true;
 
-	for (size_t i = 0; i < cfg->compat_pairs.items.len; ++i)
+	for (size_t i = 0; i < cfg.compat_pairs.size(); ++i)
 	{
-		const auto &pair = cfg->compat_pairs.items.ptr[i];
-		solver->addCompatibleTypes(pair.item1.string, pair.item2.string);
+		const auto &pair = cfg.compat_pairs[i];
+		solver->addCompatibleTypes(pair.needle.operator std::string(), pair.haystack.operator std::string());
 	}
 
-	for (size_t i = 0; i < cfg->swap_ports.items.len; ++i)
+	for (size_t i = 0; i < cfg.swap_ports.size(); ++i)
 	{
-		const auto &swap = cfg->swap_ports.items.ptr[i];
+		const auto &swap = cfg.swap_ports[i];
 		std::set<std::string> ports;
-		for (size_t j = 0; j < swap.ports.items.len; ++j)
+		for (size_t j = 0; j < swap.ports.size(); ++j)
 		{
-			ports.insert(swap.ports.items.ptr[j].string);
+			ports.insert(swap.ports[j].operator std::string());
 		}
-		solver->addSwappablePorts(swap.name.string, ports);
+		solver->addSwappablePorts(swap.type_name.operator std::string(), ports);
 	}
 
-	for (size_t i = 0; i < cfg->perm_ports.items.len; ++i)
+	for (size_t i = 0; i < cfg.perm_ports.size(); ++i)
 	{
-		const auto &perm = cfg->perm_ports.items.ptr[i];
+		const auto &perm = cfg.perm_ports[i];
 		std::vector<std::string> left, right;
-		for (size_t j = 0; j < perm.ports.items.len; ++j)
+		for (size_t j = 0; j < perm.left.size(); ++j)
 		{
-			left.push_back(perm.ports.items.ptr[j].string);
+			left.push_back(perm.left[j].operator std::string());
 		}
-		for (size_t j = 0; j < perm.wires.items.len; ++j)
+		for (size_t j = 0; j < perm.right.size(); ++j)
 		{
-			right.push_back(perm.wires.items.ptr[j].string);
+			right.push_back(perm.right[j].operator std::string());
 		}
 		if (left.size() != right.size())
 		{
@@ -241,26 +359,26 @@ std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(const CSvqlRuntimeCo
 		{
 			log_cmd_error("Arguments to -perm are not a valid permutation!\n");
 		}
-		solver->addSwappablePortsPermutation(perm.name.string, map);
+		solver->addSwappablePortsPermutation(perm.type_name.operator std::string(), map);
 	}
 
-	for (size_t i = 0; i < cfg->cell_attr.items.len; ++i)
+	for (size_t i = 0; i < cfg.cell_attr.size(); ++i)
 	{
-		solver->cell_attr.insert(cfg->cell_attr.items.ptr[i].string);
+		solver->cell_attr.insert(cfg.cell_attr[i].operator std::string());
 	}
 
-	for (size_t i = 0; i < cfg->wire_attr.items.len; ++i)
+	for (size_t i = 0; i < cfg.wire_attr.size(); ++i)
 	{
-		solver->wire_attr.insert(cfg->wire_attr.items.ptr[i].string);
+		solver->wire_attr.insert(cfg.wire_attr[i].operator std::string());
 	}
 
-	for (size_t i = 0; i < cfg->ignore_param.items.len; ++i)
+	for (size_t i = 0; i < cfg.ignored_parameters.size(); ++i)
 	{
-		const auto &ip = cfg->ignore_param.items.ptr[i];
-		solver->ignoredParams.insert(std::make_pair(ip.name.string, ip.value.string));
+		const auto &ip = cfg.ignored_parameters[i];
+		solver->ignoredParams.insert(std::make_pair(ip.param_name.operator std::string(), ip.param_value.operator std::string()));
 	}
 
-	if (!cfg->nodefaultswaps)
+	if (!cfg.nodefaultswaps)
 	{
 		solver->addSwappablePorts("$and", "\\A", "\\B");
 		solver->addSwappablePorts("$or", "\\A", "\\B");
@@ -282,11 +400,11 @@ std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(const CSvqlRuntimeCo
 	return solver;
 }
 
-RTLIL::Design *SvqlPass::setup_needle_design(const CSvqlRuntimeConfig *cfg, std::string &error_msg)
+RTLIL::Design *SvqlPass::setup_needle_design(const SvqlRuntimeConfig &cfg, std::string &error_msg)
 {
 	RTLIL::Design *needle_design = new RTLIL::Design;
-	std::string pat_filename = cfg->pat_filename.string;
-	std::string pat_module_name = cfg->pat_module_name.string;
+	std::string pat_filename = cfg.pat_filename.operator std::string();
+	std::string pat_module_name = cfg.pat_module_name.operator std::string();
 
 	if (pat_filename.empty())
 	{
@@ -331,26 +449,26 @@ RTLIL::Design *SvqlPass::setup_needle_design(const CSvqlRuntimeConfig *cfg, std:
 	return needle_design;
 }
 
-CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeConfig *cfg, RTLIL::Design *needle_design, RTLIL::Design *design)
+std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitReSolver *solver, const SvqlRuntimeConfig &cfg, RTLIL::Design *needle_design, RTLIL::Design *design, std::string &error_msg)
 {
 	if (needle_design == nullptr)
 	{
-		log_error("Needle design is not set up. Call setup() before running queries.\n");
-		return nullptr;
+		error_msg = "Needle design is not set up. Call setup() before running queries.";
+		return std::nullopt;
 	}
 
 	if (design == nullptr)
 	{
-		log_error("Design is not set. Call execute() with a valid design first.\n");
-		return nullptr;
+		error_msg = "Design is not set. Call execute() with a valid design first.";
+		return std::nullopt;
 	}
 
-	std::string pat_module_name = cfg->pat_module_name.string;
+	std::string pat_module_name = cfg.pat_module_name.operator std::string();
 	RTLIL::Module *needle = needle_design->module(pat_module_name);
 	if (needle == nullptr)
 	{
-		log_error("Module %s not found in needle design.\n", pat_module_name.c_str());
-		return nullptr;
+		error_msg = "Module " + pat_module_name + " not found in needle design.";
+		return std::nullopt;
 	}
 
 	std::map<std::string, RTLIL::Module *> needle_map, haystack_map;
@@ -365,7 +483,7 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 	SubCircuit::Graph mod_graph;
 	std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
 	log("Creating needle graph %s.\n", graph_name.c_str());
-	if (module2graph(mod_graph, needle, cfg->const_ports))
+	if (module2graph(mod_graph, needle, cfg.const_ports))
 	{
 		solver->addGraph(graph_name, mod_graph);
 		needle_map[graph_name] = needle;
@@ -376,7 +494,7 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 		SubCircuit::Graph mod_graph;
 		std::string graph_name = "haystack_" + RTLIL::unescape_id(module->name);
 		log("Creating haystack graph %s.\n", graph_name.c_str());
-		if (module2graph(mod_graph, module, cfg->const_ports, design, -1, nullptr))
+		if (module2graph(mod_graph, module, cfg.const_ports, design, -1, nullptr))
 		{
 			solver->addGraph(graph_name, mod_graph);
 			haystack_map[graph_name] = module;
@@ -392,7 +510,7 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 		solver->solve(results, "needle_" + RTLIL::unescape_id(needle->name), haystack_it.first, false);
 	}
 
-	CMatchList *cmatch_list = match_list_new();
+	QueryMatchList matchlist = QueryMatchList();
 
 	if (results.size() > 0)
 	{
@@ -400,7 +518,7 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 		{
 			auto &result = results[i];
 
-			CMatch *cmatch = match_new();
+			QueryMatch match = QueryMatch();
 
 			for (const auto &it : result.mappings)
 			{
@@ -412,10 +530,19 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 				int needle_id = needleCell->name.index_;
 				int haystack_id = graphCell->name.index_;
 
-				CCellData *needle_cell_data = ccelldata_new(crate_cstring_new(needle_name.c_str()), needle_id);
-				CCellData *haystack_cell_data = ccelldata_new(crate_cstring_new(haystack_name.c_str()), haystack_id);
+				CellData needle_cell_data = CellData();
+				needle_cell_data.cell_name = needle_name;
+				needle_cell_data.cell_index = needle_id;
 
-				match_add_celldata(cmatch, *needle_cell_data, *haystack_cell_data);
+				CellData haystack_cell_data = CellData();
+				haystack_cell_data.cell_name = haystack_name;
+				haystack_cell_data.cell_index = haystack_id;
+
+				CellPair cell_pair = CellPair();
+				cell_pair.needle = needle_cell_data;
+				cell_pair.haystack = haystack_cell_data;
+
+				match.cell_map.emplace_back(cell_pair);
 
 				std::vector<RTLIL::Wire *> needle_cell_connections = get_cell_wires(needleCell);
 				std::vector<RTLIL::Wire *> haystack_cell_connections = get_cell_wires(graphCell);
@@ -430,16 +557,20 @@ CMatchList *SvqlPass::run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeC
 				{
 					if (needle_ports.find(pair.first->name) != needle_ports.end())
 					{
-						match_add_portdata(cmatch, crate_cstring_new(pair.first->name.c_str()), crate_cstring_new(pair.second->name.c_str()));
+
+						StringPair port_pair = StringPair();
+						port_pair.needle = pair.first->name.str();
+						port_pair.haystack = pair.second->name.str();
+						match.port_map.emplace_back(port_pair);
 					}
 				}
 			}
 
-			append_match_to_matchlist(cmatch_list, *cmatch);
+			matchlist.matches.emplace_back(match);
 		}
 	}
 
-	return cmatch_list;
+	return matchlist;
 }
 
 std::string svql::escape_needle_name(const std::string &name)

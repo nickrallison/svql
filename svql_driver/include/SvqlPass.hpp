@@ -1,6 +1,6 @@
 #pragma once
 
-#include <variant>
+#include <optional>
 
 #include "kernel/register.h"
 #include "kernel/yosys.h"
@@ -8,7 +8,8 @@
 
 #include "SubCircuitReSolver.hpp"
 
-#include "svql_common.h"
+#include "svql_common_config.h"
+#include "svql_common_mat.h"
 
 using namespace Yosys;
 
@@ -24,10 +25,10 @@ namespace svql
 		void terminate(std::string error_message);
 
 		// ####
-		static CSvqlRuntimeConfig *parse_args_to_config(const std::vector<std::string> &args);
-		static std::unique_ptr<SubCircuitReSolver> create_solver(const CSvqlRuntimeConfig *cfg);
-		static RTLIL::Design *setup_needle_design(const CSvqlRuntimeConfig *cfg, std::string &error_msg);
-		static CMatchList *run_solver(SubCircuitReSolver *solver, const CSvqlRuntimeConfig *cfg, RTLIL::Design *needle, RTLIL::Design *haystack);
+		static std::optional<SvqlRuntimeConfig> parse_args_to_config(size_t &argsidx, const std::vector<std::string> &args, std::string &error_msg);
+		static std::unique_ptr<SubCircuitReSolver> create_solver(const SvqlRuntimeConfig &cfg);
+		static RTLIL::Design *setup_needle_design(const SvqlRuntimeConfig &cfg, std::string &error_msg);
+		static std::optional<QueryMatchList> run_solver(SubCircuitReSolver *solver, const SvqlRuntimeConfig &cfg, RTLIL::Design *needle, RTLIL::Design *haystack, std::string &error_msg);
 	} SvqlPass;
 
 	void print_wire(RTLIL::Wire *wire);

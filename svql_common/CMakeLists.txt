@@ -2,40 +2,68 @@ cmake_minimum_required(VERSION 3.20)
 
 project(svql_common NONE)
 
-include(ExternalProject)
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-find_program(CARGO_EXECUTABLE     cargo     REQUIRED)
-find_program(CBINDGEN_EXECUTABLE  cbindgen  REQUIRED)
+#### CMake Cache Variables ####
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD ${CARGO_EXECUTABLE} build)
+    set(TARGET_DIR "debug")
+else ()
+    set(CARGO_CMD ${CARGO_EXECUTABLE} build --release)
+    set(TARGET_DIR "release")
+endif ()
 
-set(SVQL_COMMON_TARGET_DIR  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_target)
-set(SVQL_COMMON_HEADER_DIR  ${CMAKE_CURRENT_BINARY_DIR}/include)
-file(MAKE_DIRECTORY          ${SVQL_COMMON_HEADER_DIR})
+if (DEFINED ENV{CARGO_BUILD_TARGET})
+    set(TARGET_DIR "$ENV{CARGO_BUILD_TARGET}/${TARGET_DIR}")
+endif()
 
-ExternalProject_Add(
-    ${PROJECT_NAME}_build
-    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND
-        ${CMAKE_COMMAND} -E env
-            CARGO_TARGET_DIR=${SVQL_COMMON_TARGET_DIR}
-            ${CARGO_EXECUTABLE} build --release --lib
-        COMMAND
-            ${CBINDGEN_EXECUTABLE}
-                --config ${CMAKE_CURRENT_SOURCE_DIR}/cbindgen.toml
-                --output ${SVQL_COMMON_HEADER_DIR}/svql_common.h
-                ${CMAKE_CURRENT_SOURCE_DIR}
-    BUILD_BYPRODUCTS
-        ${SVQL_COMMON_TARGET_DIR}/release/lib${PROJECT_NAME}.a
-        ${SVQL_COMMON_HEADER_DIR}/svql_common.h
-    INSTALL_COMMAND ""
+if(ENABLE_LTO)
+    set(RUST_FLAGS_LIST "-C linker=clang")
+    string (REPLACE ";" " " RUST_FLAGS "${RUST_FLAGS_LIST}")
+endif()
+
+
+#### CMake Setup Custom Outputs ####
+set(GEN_SRCDIR ${CMAKE_CURRENT_BINARY_DIR}/build/svql_common)
+file(MAKE_DIRECTORY "${GEN_SRCDIR}")
+set(SVQL_COMMON_CONFIG_CXX "${GEN_SRCDIR}/svql_common_config.cpp")
+set(SVQL_COMMON_CONFIG_H   "${GEN_SRCDIR}/svql_common_config.h")
+set(SVQL_COMMON_MAT_CXX "${GEN_SRCDIR}/svql_common_mat.cpp")
+set(SVQL_COMMON_MAT_H   "${GEN_SRCDIR}/svql_common_mat.h")
+set(SVQL_COMMON_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libsvql_common.a")
+
+add_custom_command(
+    OUTPUT ${SVQL_COMMON_CONFIG_CXX} ${SVQL_COMMON_CONFIG_H} ${SVQL_COMMON_LIB} ${SVQL_COMMON_MAT_CXX} ${SVQL_COMMON_MAT_H}
+    COMMAND ${CMAKE_COMMAND} -E env
+            CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            RUSTFLAGS=${RUST_FLAGS}
+            ${CARGO_CMD}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.cc ${SVQL_COMMON_CONFIG_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.h  ${SVQL_COMMON_CONFIG_H}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/mat.rs.cc ${SVQL_COMMON_MAT_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/mat.rs.h  ${SVQL_COMMON_MAT_H}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Building Rust+generating CXX bridge"
+    VERBATIM
+)
+add_custom_target(${PROJECT_NAME}_gen
+    DEPENDS
+        ${SVQL_COMMON_CONFIG_CXX}
+        ${SVQL_COMMON_CONFIG_H}
+        ${SVQL_COMMON_MAT_CXX}
+        ${SVQL_COMMON_MAT_H}
 )
 
-add_library(${PROJECT_NAME} STATIC IMPORTED GLOBAL)
-set_target_properties(
-    ${PROJECT_NAME}
-    PROPERTIES
-        IMPORTED_LOCATION             ${SVQL_COMMON_TARGET_DIR}/release/lib${PROJECT_NAME}.a
-        INTERFACE_INCLUDE_DIRECTORIES ${SVQL_COMMON_HEADER_DIR}
+#### C++ Library Setup ####
+add_library(${PROJECT_NAME} STATIC
+    ${SVQL_COMMON_CONFIG_CXX}
+    ${SVQL_COMMON_MAT_CXX}
 )
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${GEN_SRCDIR})
+target_link_libraries(${PROJECT_NAME} pthread dl ${SVQL_COMMON_LIB})
 
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_build)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gen)
+
+add_test(NAME svql_common_test 
+    COMMAND ${CARGO_EXECUTABLE} test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

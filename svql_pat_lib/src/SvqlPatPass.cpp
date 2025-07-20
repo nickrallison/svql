@@ -110,19 +110,54 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 	for (const auto &port : input_ports)
 	{
-		string_list_append(&input_ptrs, crate_cstring_new(port.c_str()));
+		CrateCString *port_cstr = crate_cstring_new(port.c_str());
+		if (port_cstr == nullptr)
+		{
+			log("SVQL_PAT_ERROR: Failed to create CrateCString for input port '%s'\n", port.c_str());
+			log_error("Failed to create CrateCString for input port '%s'\n", port.c_str());
+		}
+		else
+		{
+			string_list_append(&input_ptrs, *port_cstr);
+			crate_cstring_destroy(port_cstr);
+		}
 	}
 	for (const auto &port : output_ports)
 	{
-		string_list_append(&output_ptrs, crate_cstring_new(port.c_str()));
+		CrateCString *port_cstr = crate_cstring_new(port.c_str());
+		if (port_cstr == nullptr)
+		{
+			log("SVQL_PAT_ERROR: Failed to create CrateCString for output port '%s'\n", port.c_str());
+			log_error("Failed to create CrateCString for output port '%s'\n", port.c_str());
+		}
+		else
+		{
+			string_list_append(&output_ptrs, *port_cstr);
+			crate_cstring_destroy(port_cstr);
+		}
 	}
 	for (const auto &port : inout_ports)
 	{
-		string_list_append(&inout_ptrs, crate_cstring_new(port.c_str()));
+		CrateCString *port_cstr = crate_cstring_new(port.c_str());
+		if (port_cstr == nullptr)
+		{
+			log("SVQL_PAT_ERROR: Failed to create CrateCString for inout port '%s'\n", port.c_str());
+			log_error("Failed to create CrateCString for inout port '%s'\n", port.c_str());
+		}
+		else
+		{
+			string_list_append(&inout_ptrs, *port_cstr);
+			crate_cstring_destroy(port_cstr);
+		}
 	}
 
 	CPattern *pattern = pattern_new();
-	pattern->file_loc = crate_cstring_new(pattern_file.c_str());
+
+	CrateCString *module_name_cstr = crate_cstring_new(module_name.c_str());
+
+	pattern->file_loc = *module_name_cstr; // Use the module name as the file location
+	crate_cstring_destroy(module_name_cstr);
+
 	pattern->in_ports = input_ptrs;
 	pattern->out_ports = output_ptrs;
 	pattern->inout_ports = inout_ptrs;

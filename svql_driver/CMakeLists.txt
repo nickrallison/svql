@@ -33,6 +33,7 @@ target_include_directories (${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${yosys_SOURCE_DIR}/
+        ${svql_common_BINARY_DIR}/
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
@@ -43,6 +44,8 @@ target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST}
     yosys
     svql_common
 )
+
+add_dependencies(${PROJECT_NAME} svql_common)
 
 set(ASAN_ENABLED OFF CACHE BOOL "Enable AddressSanitizer")
 
