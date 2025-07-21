@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::mat::ffi::{QueryMatchList, CellData};
 use thiserror::Error;
+use std::fmt::Display;
 
 lazy_static! {
-    static ref NAMED_IDSTRING_RE:   Regex = Regex::new(r"^\\\\(\S*)$").unwrap();
+    static ref NAMED_IDSTRING_RE:   Regex = Regex::new(r"^\\(\S*)$").unwrap();
     static ref UNNAMED_IDSTRING_RE: Regex = Regex::new(r"^\$([^\$]*)\$([^:]*):([^\$]*)\$(.*)$").unwrap();
 }
 
@@ -64,6 +65,17 @@ pub enum IdString {
     }
 }
 
+impl Display for IdString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IdString::Named(name) => write!(f, "\\{}", name),
+            IdString::Unnamed { gate_name, file_path, line, id } => {
+                write!(f, "${}${}:{}${}", gate_name, file_path, line, id)
+            }
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum IdStringError {
     #[error("{0}")]
@@ -91,10 +103,29 @@ pub struct SanitizedCellData {
     pub cell_index: usize,
 }
 
+impl Display for SanitizedCellData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}[{}]", self.cell_name, self.cell_index)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SanitizedQueryMatch {
     pub port_map: HashMap<IdString, IdString>,
     pub cell_map: HashMap<SanitizedCellData, SanitizedCellData>,
+}
+
+impl Display for SanitizedQueryMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let port_map: Vec<String> = self.port_map.iter()
+            .map(|(k, v)| format!("{} -> {}", k, v))
+            .collect();
+        let cell_map: Vec<String> = self.cell_map.iter()
+            .map(|(k, v)| format!("{} -> {}", k, v))
+            .collect();
+        write!(f, "Port Map: [{}], \nCell Map: [{}]",
+               port_map.join(", "), cell_map.join(", "))
+    }
 }
 
 // into iter

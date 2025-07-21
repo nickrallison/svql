@@ -72,7 +72,7 @@ struct CombinedAnd {
 
 impl CombinedAnd {
     fn connect(mut self) -> Self {
-        connect!(self, &self.and1.a, &self.and2.y);
+        connect!(self, &self.and2.a, &self.and1.y);
         self
     }
 }
@@ -85,7 +85,29 @@ impl Query for CombinedAnd {
     fn query_net<A: ToSocketAddrs>(&self, addr: A) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
         let and_results = self.and1.query_net(&addr)?;
         let and2_results = self.and2.query_net(&addr)?;
-        todo!();
+
+        todo!()
+        
+        // trim all results to only include matches where the connection is valid
+        // let mut results = Vec::new();
+        // for match1 in and_results {
+        //     // filter for results in match2 that match the connection criteria
+        //     // i.e. the output of and1 is connected to the input of and2
+        //     let match1_y_id_str = match1.port_map.get("\\a");
+        //     let match1_y = match1.port_map.get("\\y"); 
+
+        //     for match2 in &and2_results {
+        //         // connections only specify connectivity, not the actual names
+
+        //         if match1.port_map.contains_key(&self.and1.y.idstring) && 
+        //            match2.port_map.contains_key(&self.and2.y.idstring) {
+        //             let mut combined_match = match1.clone();
+        //             combined_match.port_map.extend(match2.port_map.clone());
+        //             results.push(combined_match);
+        //         }
+        //     }
+        // }
+        // Ok(results)
     }
 
 }
@@ -96,9 +118,33 @@ fn main() {
         b: InPort::new("and.b"),
         y: OutPort::new("and.y"),
     };
+
+    let res = and.query_net("127.0.0.1:9999");
+    if res.is_err() {
+        eprintln!("Error querying net: {:?}", res.err());
+        return;
+    }
+    let res = res.unwrap();
+    for match_item in &res {
+        println!("{}", match_item);
+    }
+    // let pretty = serde_json::to_string_pretty(&res).unwrap();
+    // println!("{}", pretty);
+
+
+    let and2 = And {
+        a: InPort::new("and2.a"),
+        b: InPort::new("and2.b"),
+        y: OutPort::new("and2.y"),
+    };
+    let combined = CombinedAnd {
+        connections: Vec::new(),
+        and1: and,
+        and2: and2,
+    }.connect();
     
     // loopback addr:9999
-    let res = and.query_net("127.0.0.1:9999");
+    let res = combined.query_net("127.0.0.1:9999");
     if res.is_err() {
         eprintln!("Error querying net: {:?}", res.err());
         return;
