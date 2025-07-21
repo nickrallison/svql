@@ -1,11 +1,12 @@
 #include "SvqlPass.hpp"
 
 #include <algorithm>
+#include <boost/asio.hpp>
 #include <cstring>
 #include <fstream>
 #include <optional>
-#include <regex>
 #include <set>
+#include <thread>
 
 #include "GraphConversion.hpp"
 #include "SubCircuitReSolver.hpp"
@@ -217,8 +218,76 @@ void SvqlPass::execute_cmd(std::vector<std::string> args,
 
 void SvqlPass::execute_net(std::vector<std::string> args,
                            RTLIL::Design *design) {
-    log_error("Network mode is not implemented yet.\n");
-    return;
+    std::string error_msg;
+    size_t argsidx;
+    auto port_opt = parse_args_net(argsidx, args, error_msg);
+    uint16_t port = port_opt.value_or(8080);
+
+    using boost::asio::ip::tcp;
+    try {
+        boost::asio::io_context io;
+        tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), port));
+        log("SVQL DRIVER server listening on port %d.\n", port);
+
+        while (true) {
+            tcp::socket socket(io);
+            acceptor.accept(socket);
+
+            std::thread([socket = std::move(socket), design, this]() mutable {
+                try {
+                    boost::asio::streambuf buf;
+                    boost::asio::read_until(socket, buf, '\n');
+                    std::istream is(&buf);
+                    std::string req_json;
+                    std::getline(is, req_json);
+
+                    if (req_json.empty()) return;
+
+                    rust::String req_rs(req_json);
+                    SvqlRuntimeConfig cfg =
+                        svql_runtime_config_from_json_string(req_rs);
+
+                    auto solver = create_solver(cfg);
+
+                    std::string err;
+                    RTLIL::Design *needle_design =
+                        setup_needle_design(cfg, err);
+                    if (!needle_design) {
+                        std::string resp = "ERR: " + err + "\n";
+                        boost::asio::write(socket, boost::asio::buffer(resp));
+                        return;
+                    }
+
+                    auto res = run_solver(solver.get(), cfg, needle_design,
+                                          design, err);
+                    if (!res) {
+                        std::string resp = "ERR: " + err + "\n";
+                        boost::asio::write(socket, boost::asio::buffer(resp));
+                        delete needle_design;
+                        return;
+                    }
+
+                    rust::String resp_rs =
+                        matchlist_into_json_string(res.value());
+                    std::string resp = resp_rs.operator std::string() + "\n";
+                    boost::asio::write(socket, boost::asio::buffer(resp));
+
+                    delete needle_design;
+                    socket.shutdown(tcp::socket::shutdown_both);
+                    socket.close();
+                } catch (const std::exception &e) {
+                    try {
+                        std::string resp =
+                            std::string("ERR: ") + e.what() + "\n";
+                        boost::asio::write(socket, boost::asio::buffer(resp));
+                    } catch (...) {
+                    }
+                }
+            }).detach();
+        }
+    } catch (const std::exception &e) {
+        log_error("Network mode failed: %s\n", e.what());
+    }
 }
 
 std::optional<SvqlRuntimeConfig> SvqlPass::parse_args_to_config(
