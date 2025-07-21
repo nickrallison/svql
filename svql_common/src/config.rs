@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::ffi::{CompatPair, IgnoreParam, PermPort, SvqlRuntimeConfig, SwapPort};
 
 #[cxx::bridge]
-mod ffi {
+pub mod ffi {
 
     #[derive(Debug, Default, Clone, Serialize, Deserialize)]
     pub struct SvqlRuntimeConfig {
@@ -53,15 +53,15 @@ mod ffi {
 }
 
 // Free functions for cxx bridge
-fn new_svql_runtime_config() -> SvqlRuntimeConfig {
+pub fn new_svql_runtime_config() -> SvqlRuntimeConfig {
     SvqlRuntimeConfig::default()
 }
 
-fn svql_runtime_config_into_json_string(cfg: &SvqlRuntimeConfig) -> String {
+pub fn svql_runtime_config_into_json_string(cfg: &SvqlRuntimeConfig) -> String {
     serde_json::to_string(cfg).expect("Failed to serialize SvqlRuntimeConfig to JSON")
 }
 
-fn svql_runtime_config_from_json_string(json: &str) -> SvqlRuntimeConfig {
+pub fn svql_runtime_config_from_json_string(json: &str) -> SvqlRuntimeConfig {
     serde_json::from_str(json).expect("Failed to deserialize JSON to SvqlRuntimeConfig")
 }
 

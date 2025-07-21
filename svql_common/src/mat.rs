@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::mat::ffi::{QueryMatchList};
 
 #[cxx::bridge]
-mod ffi {
+pub mod ffi {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct QueryMatchList {
@@ -39,10 +39,10 @@ mod ffi {
     }
 }
 
-fn matchlist_into_json_string(cfg: &QueryMatchList) -> String {
+pub fn matchlist_into_json_string(cfg: &QueryMatchList) -> String {
     serde_json::to_string(cfg).expect("Failed to serialize QueryMatchList to JSON")
 }
 
-fn matchlist_from_json_string(json: &str) -> QueryMatchList {
+pub fn matchlist_from_json_string(json: &str) -> QueryMatchList {
     serde_json::from_str(json).expect("Failed to deserialize JSON to QueryMatchList")
 }

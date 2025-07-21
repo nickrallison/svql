@@ -11,6 +11,7 @@
 #include "GraphConversion.hpp"
 #include "SubCircuitReSolver.hpp"
 #include "kernel/log.h"
+#include "kernel/rtlil.h"
 #include "kernel/sigtools.h"
 #include "libs/subcircuit/subcircuit.h"
 #include "svql_common_config.h"
@@ -409,7 +410,7 @@ std::optional<uint16_t> SvqlPass::parse_args_net(
     bool port_found = false;
 
     for (argsidx = 2; argsidx < args.size(); argsidx++) {
-        if (args[argsidx] == "-port" && argsidx + 2 < args.size()) {
+        if (args[argsidx] == "-port" && argsidx + 1 < args.size()) {
             std::string port_str = args[++argsidx];
             if (port_str.empty()) {
                 error_msg = "Missing port argument after -port.";
@@ -587,7 +588,7 @@ std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitReSolver *solver,
     }
 
     std::string pat_module_name = cfg.pat_module_name.operator std::string();
-    RTLIL::Module *needle = needle_design->module(pat_module_name);
+    RTLIL::Module *needle = needle_design->module(RTLIL::escape_id(pat_module_name));
     if (needle == nullptr) {
         error_msg =
             "Module " + pat_module_name + " not found in needle design.";

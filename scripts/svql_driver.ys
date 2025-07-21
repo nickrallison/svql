@@ -1,4 +1,5 @@
 read_verilog examples/cwe1234/locked_register_pat.v
 hierarchy -top locked_register_example
 proc
-svql_driver -cmd -pat svql_query/verilog/and.v and_gate -verbose
+# svql_driver -cmd -pat svql_query/verilog/and.v and_gate -verbose
+svql_driver -net -port 9999
