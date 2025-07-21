@@ -4,22 +4,30 @@ use std::net::{TcpStream, ToSocketAddrs};
 // use anyhow::{anyhow, Context, Result};
 
 use svql_common::config::ffi::SvqlRuntimeConfig;
+use svql_common::mat::SanitizedQueryMatch;
 use svql_common::mat::ffi::QueryMatchList;
 use svql_common::mat::matchlist_from_json_string;
 use svql_common::config::svql_runtime_config_into_json_string;
 
-#[derive(Debug)]
+use thiserror::Error;
+
+#[derive(Debug, Error)]
 pub enum SvqlQueryError {
+    #[error("Connection error: {0}")]
     ConnectionError(String),
+    #[error("Response error: {0}")]
     ResponseError(String),
+    #[error("Parse error: {0}")]
     ParseError(String),
+    #[error("Query match conversion error: {0}")]
+    IdStringError(#[from] svql_common::mat::IdStringError),
 }
 
 
 pub fn run_svql_query<A: ToSocketAddrs>(
     addr: A,
     cfg: &SvqlRuntimeConfig,
-) -> Result<QueryMatchList, SvqlQueryError> {
+) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
     // 1. serialise the request
     let json_cfg = svql_runtime_config_into_json_string(cfg);
     let mut stream = TcpStream::connect(addr)
@@ -50,7 +58,9 @@ pub fn run_svql_query<A: ToSocketAddrs>(
     }
 
     // 5. parse JSON to QueryMatchList
-    let match_list =
+    let match_list: QueryMatchList =
         matchlist_from_json_string(response.trim());
+
+    let match_list: Vec<SanitizedQueryMatch> = match_list.try_into()?;
     Ok(match_list)
 }

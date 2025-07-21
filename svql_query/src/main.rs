@@ -1,7 +1,10 @@
 use std::path::PathBuf;
+use std::net::ToSocketAddrs;
 use crate::connection::Connection;
 use crate::ports::{InPort, OutPort};
 use crate::query::{Module, Query};
+use crate::net::{SvqlQueryError};
+use svql_common::mat::{SanitizedQueryMatch, IdStringError};
 
 mod query;
 mod ports;
@@ -61,6 +64,32 @@ impl Module for And {
     }
 }
 
+struct CombinedAnd {
+    connections: Vec<Connection>,
+    and1: And,
+    and2: And,
+}
+
+impl CombinedAnd {
+    fn connect(mut self) -> Self {
+        connect!(self, &self.and1.a, &self.and2.y);
+        self
+    }
+}
+
+impl Query for CombinedAnd {
+    fn query<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<SanitizedQueryMatch> {
+        todo!()
+    }
+
+    fn query_net<A: ToSocketAddrs>(&self, addr: A) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
+        let and_results = self.and1.query_net(&addr)?;
+        let and2_results = self.and2.query_net(&addr)?;
+        todo!();
+    }
+
+}
+
 fn main() {
     let and = And {
         a: InPort::new("and.a"),
@@ -70,5 +99,11 @@ fn main() {
     
     // loopback addr:9999
     let res = and.query_net("127.0.0.1:9999");
-    println!("{:?}", res);
+    if res.is_err() {
+        eprintln!("Error querying net: {:?}", res.err());
+        return;
+    }
+    let res = res.unwrap();
+    let pretty = serde_json::to_string_pretty(&res).unwrap();
+    println!("{}", pretty);
 }
