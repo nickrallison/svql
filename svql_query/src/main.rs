@@ -4,7 +4,7 @@ use crate::connection::Connection;
 use crate::ports::{InPort, OutPort};
 use crate::query::{Module, Query};
 use crate::net::{SvqlQueryError};
-use svql_common::mat::{SanitizedQueryMatch, IdStringError};
+use svql_common::mat::{SanitizedQueryMatch, IdStringError, IdString};
 
 mod query;
 mod ports;
@@ -78,48 +78,105 @@ impl CombinedAnd {
 }
 
 impl Query for CombinedAnd {
-    fn query<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<SanitizedQueryMatch> {
+    fn query<P: Into<PathBuf>, S: Into<String>>(
+        &self,
+        design_path: P,
+        top: S,
+    ) -> Vec<SanitizedQueryMatch> {
         todo!()
     }
 
-    fn query_net<A: ToSocketAddrs>(&self, addr: A) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
-        let and_results = self.and1.query_net(&addr)?;
+    fn query_net<A: ToSocketAddrs>(
+        &self,
+        addr: A,
+    ) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
+        // 1. run both sub-queries
+        let and1_results = self.and1.query_net(&addr)?;
         let and2_results = self.and2.query_net(&addr)?;
 
-        todo!()
-        
-        // trim all results to only include matches where the connection is valid
-        // let mut results = Vec::new();
-        // for match1 in and_results {
-        //     // filter for results in match2 that match the connection criteria
-        //     // i.e. the output of and1 is connected to the input of and2
-        //     let match1_y_id_str = match1.port_map.get("\\a");
-        //     let match1_y = match1.port_map.get("\\y"); 
+        // 2. port names we care about (hard-coded for the two-AND example)
+        let key_and1_y = IdString::Named("y".to_owned());
+        let key_and2_a = IdString::Named("a".to_owned());
 
-        //     for match2 in &and2_results {
-        //         // connections only specify connectivity, not the actual names
+        let mut merged = Vec::<SanitizedQueryMatch>::new();
 
-        //         if match1.port_map.contains_key(&self.and1.y.idstring) && 
-        //            match2.port_map.contains_key(&self.and2.y.idstring) {
-        //             let mut combined_match = match1.clone();
-        //             combined_match.port_map.extend(match2.port_map.clone());
-        //             results.push(combined_match);
-        //         }
-        //     }
-        // }
-        // Ok(results)
+        // 3. brute-force pairwise merge whenever the connectivity matches
+        for m1 in &and1_results {
+            let Some(hay_of_y) = m1.port_map.get(&key_and1_y) else { continue };
+
+            for m2 in &and2_results {
+                let Some(hay_of_a) = m2.port_map.get(&key_and2_a) else { continue };
+
+                // and1.y ───► same signal ◄─── and2.a   ?
+                if hay_of_y == hay_of_a {
+                    // build the union; keep first-seen value on duplicates
+                    let mut port_map: HashMap<IdString, IdString> = m1.port_map.clone();
+                    for (k, v) in &m2.port_map {
+                        port_map.entry(k.clone()).or_insert(v.clone());
+                    }
+
+                    let mut cell_map = m1.cell_map.clone();
+                    for (k, v) in &m2.cell_map {
+                        cell_map.entry(k.clone()).or_insert(v.clone());
+                    }
+
+                    merged.push(SanitizedQueryMatch { port_map, cell_map });
+                }
+            }
+        }
+
+        Ok(merged)
+    }
+}
+
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+// Helper ────────────────────────────────────────────────────────────────────────
+fn try_merge_matches(
+    m1: &SanitizedQueryMatch,
+    m2: &SanitizedQueryMatch,
+) -> Option<SanitizedQueryMatch> {
+    // merge port maps – abort if the same key maps to different hay-stack ids
+    let mut port_map: HashMap<IdString, IdString> = m1.port_map.clone();
+    for (k, v) in &m2.port_map {
+        match port_map.entry(k.clone()) {
+            Entry::Vacant(e) => {
+                e.insert(v.clone());
+            }
+            Entry::Occupied(e) => {
+                if e.get() != v {
+                    return None; // conflict
+                }
+            }
+        }
     }
 
+    // merge cell maps – same policy as above
+    let mut cell_map = m1.cell_map.clone();
+    for (k, v) in &m2.cell_map {
+        match cell_map.entry(k.clone()) {
+            Entry::Vacant(e) => {
+                e.insert(v.clone());
+            }
+            Entry::Occupied(e) => {
+                if e.get() != v {
+                    return None; // conflict
+                }
+            }
+        }
+    }
+
+    Some(SanitizedQueryMatch { port_map, cell_map })
 }
 
 fn main() {
-    let and = And {
-        a: InPort::new("and.a"),
-        b: InPort::new("and.b"),
-        y: OutPort::new("and.y"),
+    let and1 = And {
+        a: InPort::new("and1.a"),
+        b: InPort::new("and1.b"),
+        y: OutPort::new("and1.y"),
     };
 
-    let res = and.query_net("127.0.0.1:9999");
+    let res = and1.query_net("127.0.0.1:9999");
     if res.is_err() {
         eprintln!("Error querying net: {:?}", res.err());
         return;
@@ -139,17 +196,17 @@ fn main() {
     };
     let combined = CombinedAnd {
         connections: Vec::new(),
-        and1: and,
+        and1: and1,
         and2: and2,
     }.connect();
     
-    // loopback addr:9999
     let res = combined.query_net("127.0.0.1:9999");
     if res.is_err() {
         eprintln!("Error querying net: {:?}", res.err());
         return;
     }
     let res = res.unwrap();
-    let pretty = serde_json::to_string_pretty(&res).unwrap();
-    println!("{}", pretty);
+    for match_item in &res {
+        println!("{}", match_item);
+    }
 }
