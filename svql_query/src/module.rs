@@ -20,7 +20,7 @@ pub trait RtlModuleTrait {
 }
 
 pub trait RtlModuleResultTrait: Sized {
-    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Result<Self, QueryError>;
+    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
 }
 
 #[derive(Debug, Clone)]
@@ -61,22 +61,14 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<Result<RtlModuleResult<ModuleType::Result>, QueryError>>, DriverError> {
+    ) -> Result<Vec<RtlModuleResult<ModuleType::Result>>, DriverError> {
         let cfg = self.config();
         let matches = driver.query(&cfg)?;
-        let mut out = Vec::new();
-
-        for m in matches {
-            match m {
-                Ok(m) => match RtlModuleResult::<ModuleType::Result>::from_match(m) {
-                    Ok(r) => out.push(Ok(r)),
-                    Err(e) => out.push(Err(e)),
-                },
-                Err(e) => out.push(Err(QueryError::DriverConversionError(e))),
-            }
-        }
-
-        Ok(out)
+        Ok(matches
+            .into_iter()
+            // RtlModuleResult<ModuleType::Result>
+            .map(|m| RtlModuleResult::from_match(m))
+            .collect())
     }
 }
 
@@ -94,12 +86,12 @@ where
     fn new(cells: Vec<SanitizedCellData>, module: ModuleResultType) -> Self {
         RtlModuleResult { cells, module }
     }
-    fn from_match(m: SanitizedQueryMatch) -> Result<Self, QueryError> {
-        let module = ModuleResultType::from_portmap(m.port_map)?;
-        Ok(Self {
+    fn from_match(m: SanitizedQueryMatch) -> Self {
+        let module = ModuleResultType::from_portmap(m.port_map);
+        Self {
             cells: m.cell_map.into_values().collect(),
             module,
-        })
+        }
     }
 }
 
@@ -108,13 +100,6 @@ where
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.
     type Result: Debug + RtlQueryResultTrait;
-
-    /// Execute the query with the driver.  Implementors usually call
-    /// `driver.query(..)` internally and translate the matches.
-    fn run_query(
-        &self,
-        driver: &Driver,
-    ) -> Result<Vec<Result<RtlQueryResult<Self::Result>, QueryError>>, DriverError>;
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
@@ -152,9 +137,8 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<Result<RtlQueryResult<QueryType::Result>, QueryError>>, DriverError> {
-        // Simply delegate to the concrete query implementation.
-        self.query.run_query(driver)
+    ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
+        todo!("Implement RtlQuery::query method");
     }
 }
 
@@ -193,4 +177,17 @@ fn instance(inst: &str, parent: Option<&str>) -> String {
     } else {
         inst.to_string()
     }
+}
+
+pub fn split_driver_results<Ok, Err>(res: Vec<Result<Ok, Err>>) -> (Vec<Ok>, Vec<Err>) {
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+
+    for r in res {
+        match r {
+            Ok(m) => oks.push(m),
+            Err(e) => errs.push(e),
+        }
+    }
+    (oks, errs)
 }

@@ -1,4 +1,4 @@
-use crate::module::{lookup, QueryError, RtlModuleResultTrait, RtlModuleTrait};
+use crate::module::{lookup, RtlModuleResultTrait, RtlModuleTrait};
 use crate::ports::{InPort, OutPort};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -47,11 +47,11 @@ impl AndResult {
 }
 
 impl RtlModuleResultTrait for AndResult {
-    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Result<AndResult, QueryError> {
-        Ok(AndResult {
-            a: lookup(&port_map, "a")?,
-            b: lookup(&port_map, "b")?,
-            y: lookup(&port_map, "y")?,
-        })
+    fn from_portmap(port_map: HashMap<IdString, IdString>) -> AndResult {
+        AndResult {
+            a: lookup(&port_map, "a").expect("Port 'a' not found"),
+            b: lookup(&port_map, "b").expect("Port 'b' not found"),
+            y: lookup(&port_map, "y").expect("Port 'y' not found"),
+        }
     }
 }

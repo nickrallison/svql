@@ -1,10 +1,8 @@
 use crate::examples::and::{And, AndResult};
-use crate::module::{RtlModule, RtlQueryResult, RtlQueryResultTrait, RtlQueryTrait};
+use crate::module::{RtlModule, RtlQueryResultTrait, RtlQueryTrait};
 use std::collections::HashSet;
 
 use crate::connect;
-use crate::driver::{Driver, DriverError};
-use crate::module::QueryError;
 use crate::ports::{Connection, InPort, OutPort};
 use std::fmt::Debug;
 
@@ -27,13 +25,6 @@ impl TripleAnd {
 
 impl RtlQueryTrait for TripleAnd {
     type Result = TripleAndResult;
-
-    fn run_query(
-        &self,
-        driver: &Driver,
-    ) -> Result<Vec<Result<RtlQueryResult<Self::Result>, QueryError>>, DriverError> {
-        todo!()
-    }
 
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>> {
         let mut connections = HashSet::new();

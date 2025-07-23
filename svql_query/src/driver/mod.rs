@@ -15,10 +15,7 @@ impl Driver {
         Driver::Net(NetDriver::new(addr))
     }
 
-    pub fn query(
-        &self,
-        cfg: &SvqlRuntimeConfig,
-    ) -> Result<Vec<Result<SanitizedQueryMatch, DriverConversionError>>, DriverError> {
+    pub fn query(&self, cfg: &SvqlRuntimeConfig) -> Result<Vec<SanitizedQueryMatch>, DriverError> {
         match self {
             Driver::Net(driver) => driver.query(cfg).map_err(DriverError::NetError),
         }
