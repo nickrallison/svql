@@ -1,61 +1,28 @@
-use std::{net::ToSocketAddrs, path::PathBuf};
-use std::collections::HashSet;
+use std::{path::PathBuf};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ports::{InPort, OutPort, Connection},
-    query::{Module, run_svql_query_leaf},
+    ports::{Connection},
+    query::{run_svql_query_leaf},
 };
 
 use svql_common::{
-    mat::{IdString, SanitizedQueryMatch, SanitizedCellData},
+    mat::{IdString, SanitizedQueryMatch},
 };
 
-#[derive(Debug)]
-struct And<In, Out, Inst, Id> {
-    inst: Inst,
-    connections: HashSet<Connection<In, Out>>,
-    // 
-    a: In,
-    b: In,
-    y: Out,
-    id: Id,
+
+use lazy_static::lazy_static;
+
+use crate::{
+    net::{SvqlQueryError},
+};
+use crate::ports::{InPort, OutPort};
+use crate::query::{connections_satisfied, try_merge_matches};
+
+lazy_static! {
+    static ref EMPTY_CONNECTIONS: HashSet<Connection<InPort, OutPort>> = HashSet::new();
 }
 
-impl Module for And<InPort, OutPort, String, ()> {
-    type Result = And<IdString, IdString, (), HashSet<SanitizedCellData>>;
-
-    fn file_path(&self)   -> PathBuf { "svql_query/verilog/and.v".into() }
-    fn module_name(&self) -> String  { "and_gate".into() }
-    fn instance_name(&self) -> &str  { &self.inst }
-
-    fn query_net(
-        &self,
-        addr: &str,
-    ) -> Result<Vec<Self::Result>, SvqlQueryError> {
-        // identical to today’s implementation
-        let res: Vec<SanitizedQueryMatch> = run_svql_query_leaf(addr, self.file_path(), self.module_name())?;
-        let results: Vec<Self::Result> = res.into_iter()
-            .map(|m| {
-                // And<IdString, IdString, (), HashSet<SanitizedCellData>>
-
-                And {
-                    inst: self.instance_name().to_string(),
-                    a: m.port_map.get(&IdString::Named("a".into()))
-                        .cloned()
-                        .unwrap_or_else(|| IdString::Named("a".into())),
-                    b: m.port_map.get(&IdString::Named("b".into()))
-                        .cloned()
-                        .unwrap_or_else(|| IdString::Named("b".into())),
-                    y: m.port_map.get(&IdString::Named("y".into()))
-                        .cloned()
-                        .unwrap_or_else(|| IdString::Named("y".into())),
-                    id: m.id,
-                }
-            })
-            .collect();
-        
-    }
-}
 
 pub trait Module {
     type Result;
@@ -65,7 +32,7 @@ pub trait Module {
     fn instance_name(&self) -> &str;
 
     fn submodules(&self)  -> Vec<&dyn Module> { Vec::new() }
-    fn connections(&self) -> &HashSet<Connection> { &EMPTY_CONNECTIONS }
+    fn connections(&self) -> &HashSet<Connection<InPort, OutPort>> { &EMPTY_CONNECTIONS }
 
     // public façade – starts recursion with empty prefix
     fn query_net(&self, addr: &str)
