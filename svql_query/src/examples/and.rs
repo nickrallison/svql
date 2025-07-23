@@ -21,7 +21,9 @@ impl And {
     }
 }
 
-impl RtlModuleTrait<And> for And {
+impl RtlModuleTrait for And {
+    type Result = AndResult;
+
     fn file_path(&self) -> PathBuf {
         "svql_query/verilog/and.v".into()
     }
@@ -44,7 +46,7 @@ impl AndResult {
     }
 }
 
-impl RtlModuleResultTrait<AndResult> for AndResult {
+impl RtlModuleResultTrait for AndResult {
     fn from_portmap(port_map: HashMap<IdString, IdString>) -> Result<AndResult, QueryError> {
         Ok(AndResult {
             a: lookup(&port_map, "a")?,

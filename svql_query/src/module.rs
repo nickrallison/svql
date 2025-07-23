@@ -12,6 +12,17 @@ lazy_static! {
     static ref EMPTY_CONNECTIONS: HashSet<Connection<InPort, OutPort>> = HashSet::new();
 }
 
+pub trait RtlModuleTrait {
+    type Result: Debug + RtlModuleResultTrait;
+
+    fn file_path(&self) -> PathBuf;
+    fn module_name(&self) -> &'static str;
+}
+
+pub trait RtlModuleResultTrait: Sized {
+    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Result<Self, QueryError>;
+}
+
 #[derive(Debug, Clone)]
 pub struct RtlModule<ModuleType> {
     pub inst: String,
@@ -21,7 +32,7 @@ pub struct RtlModule<ModuleType> {
 
 impl<ModuleType> RtlModule<ModuleType>
 where
-    ModuleType: RtlModuleTrait<ModuleType>,
+    ModuleType: RtlModuleTrait,
 {
     pub fn new(inst: String, module: ModuleType) -> Self {
         RtlModule {
@@ -32,11 +43,7 @@ where
     }
 
     fn instance(&self, parent: Option<&str>) -> String {
-        if let Some(p) = parent {
-            format!("{}.{}", p, self.inst)
-        } else {
-            self.inst.clone()
-        }
+        instance(&self.inst, parent)
     }
 
     pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
@@ -51,38 +58,26 @@ where
         cfg
     }
 
-    pub fn query<ModuleResultType>(
+    pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<Result<RtlModuleResult<ModuleResultType>, QueryError>>, DriverError>
-    where
-        ModuleResultType: Debug,
-        ModuleResultType: RtlModuleResultTrait<ModuleResultType>,
-    {
+    ) -> Result<Vec<Result<RtlModuleResult<ModuleType::Result>, QueryError>>, DriverError> {
         let cfg = self.config();
-        let mut matches = driver.query(&cfg)?;
-        let mut results = Vec::new();
+        let matches = driver.query(&cfg)?;
+        let mut out = Vec::new();
+
         for m in matches {
             match m {
-                Ok(m) => {
-                    let match_ = RtlModuleResult::from_match(m);
-                    if let Ok(result) = match_ {
-                        results.push(Ok(result));
-                    } else {
-                        let err = match_.expect_err("Match Error");
-                        results.push(Err(err));
-                    }
-                }
-                Err(e) => results.push(Err(QueryError::DriverConversionError(e))),
+                Ok(m) => match RtlModuleResult::<ModuleType::Result>::from_match(m) {
+                    Ok(r) => out.push(Ok(r)),
+                    Err(e) => out.push(Err(e)),
+                },
+                Err(e) => out.push(Err(QueryError::DriverConversionError(e))),
             }
         }
-        Ok(results)
-    }
-}
 
-pub trait RtlModuleTrait<ModuleType> {
-    fn file_path(&self) -> PathBuf;
-    fn module_name(&self) -> &'static str;
+        Ok(out)
+    }
 }
 
 #[derive(Debug)]
@@ -94,28 +89,38 @@ pub struct RtlModuleResult<ModuleResultType> {
 
 impl<ModuleResultType> RtlModuleResult<ModuleResultType>
 where
-    ModuleResultType: RtlModuleResultTrait<ModuleResultType>,
+    ModuleResultType: RtlModuleResultTrait,
 {
     fn new(cells: Vec<SanitizedCellData>, module: ModuleResultType) -> Self {
         RtlModuleResult { cells, module }
     }
-    fn from_match(m: SanitizedQueryMatch) -> Result<RtlModuleResult<ModuleResultType>, QueryError> {
-        let cell_map = m.cell_map;
-        let port_map = m.port_map;
-        let module_result = ModuleResultType::from_portmap(port_map)?;
-        let cells = cell_map.into_values().collect();
-        Ok(RtlModuleResult {
-            cells,
-            module: module_result,
+    fn from_match(m: SanitizedQueryMatch) -> Result<Self, QueryError> {
+        let module = ModuleResultType::from_portmap(m.port_map)?;
+        Ok(Self {
+            cells: m.cell_map.into_values().collect(),
+            module,
         })
     }
 }
 
-pub trait RtlModuleResultTrait<ModuleResultType> {
-    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Result<ModuleResultType, QueryError>;
+// ###################
+
+pub trait RtlQueryTrait {
+    /// Type produced for every successful match of this query.
+    type Result: Debug + RtlQueryResultTrait;
+
+    /// Execute the query with the driver.  Implementors usually call
+    /// `driver.query(..)` internally and translate the matches.
+    fn run_query(
+        &self,
+        driver: &Driver,
+    ) -> Result<Vec<Result<RtlQueryResult<Self::Result>, QueryError>>, DriverError>;
+
+    /// The set of extra connections the query wants to impose.
+    fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
 }
 
-// ###################
+pub trait RtlQueryResultTrait {}
 
 #[derive(Debug, Clone)]
 pub struct RtlQuery<QueryType> {
@@ -126,7 +131,7 @@ pub struct RtlQuery<QueryType> {
 
 impl<QueryType> RtlQuery<QueryType>
 where
-    QueryType: RtlQueryTrait<QueryType>,
+    QueryType: RtlQueryTrait,
 {
     pub fn new(inst: String, query: QueryType) -> Self {
         RtlQuery {
@@ -137,38 +142,20 @@ where
     }
 
     fn instance(&self, parent: Option<&str>) -> String {
-        if let Some(p) = parent {
-            format!("{}.{}", p, self.inst)
-        } else {
-            self.inst.clone()
-        }
+        instance(&self.inst, parent)
     }
 
     pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
         self.connections.insert(conn);
     }
 
-    pub fn query<QueryResultType>(
+    pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<Result<RtlQueryResult<QueryResultType>, QueryError>>, DriverError>
-    where
-        QueryResultType: Debug,
-        QueryResultType: RtlQueryResultTrait<QueryResultType>,
-    {
+    ) -> Result<Vec<Result<RtlQueryResult<QueryType::Result>, QueryError>>, DriverError> {
+        // Simply delegate to the concrete query implementation.
         self.query.run_query(driver)
     }
-}
-
-pub trait RtlQueryTrait<QueryType> {
-    fn run_query<QueryResultType>(
-        &self,
-        driver: &Driver,
-    ) -> Result<Vec<Result<RtlQueryResult<QueryResultType>, QueryError>>, DriverError>
-    where
-        QueryResultType: Debug,
-        QueryResultType: RtlQueryResultTrait<QueryResultType>;
-    fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
 }
 
 #[derive(Debug)]
@@ -179,14 +166,12 @@ pub struct RtlQueryResult<QueryResultType> {
 
 impl<QueryResultType> RtlQueryResult<QueryResultType>
 where
-    QueryResultType: RtlQueryResultTrait<QueryResultType>,
+    QueryResultType: RtlQueryResultTrait,
 {
     fn new(cells: Vec<SanitizedCellData>, query: QueryResultType) -> Self {
         RtlQueryResult { cells, query }
     }
 }
-
-pub trait RtlQueryResultTrait<QueryResultType> {}
 
 #[derive(Debug, Clone, Error)]
 pub enum QueryError {
@@ -200,4 +185,12 @@ pub fn lookup(m: &HashMap<IdString, IdString>, pin: &str) -> Result<IdString, Qu
     m.get(&IdString::Named(pin.into()))
         .cloned()
         .ok_or_else(|| QueryError::MissingPort(m.clone(), pin.to_string()))
+}
+
+fn instance(inst: &str, parent: Option<&str>) -> String {
+    if let Some(p) = parent {
+        format!("{}.{}", p, inst)
+    } else {
+        inst.to_string()
+    }
 }
