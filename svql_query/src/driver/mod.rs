@@ -25,7 +25,7 @@ impl Driver {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum DriverConversionError {
     #[error("Query match conversion error: {0}")]
     IdStringError(#[from] svql_common::mat::IdStringError),

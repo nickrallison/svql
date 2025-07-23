@@ -188,7 +188,7 @@ where
 
 pub trait RtlQueryResultTrait<QueryResultType> {}
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum QueryError {
     #[error("Cannot convert Query Match PortMap: {0:#?}, due to missing port `{1}`")]
     MissingPort(HashMap<IdString, IdString>, String),

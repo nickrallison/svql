@@ -1,14 +1,15 @@
+use crate::mat::ffi::{CellData, QueryMatchList};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::mat::ffi::{QueryMatchList, CellData};
-use thiserror::Error;
 use std::fmt::Display;
+use thiserror::Error;
 
 lazy_static! {
-    static ref NAMED_IDSTRING_RE:   Regex = Regex::new(r"^\\(\S*)$").unwrap();
-    static ref UNNAMED_IDSTRING_RE: Regex = Regex::new(r"^\$([^\$]*)\$([^:]*):([^\$]*)\$(.*)$").unwrap();
+    static ref NAMED_IDSTRING_RE: Regex = Regex::new(r"^\\(\S*)$").unwrap();
+    static ref UNNAMED_IDSTRING_RE: Regex =
+        Regex::new(r"^\$([^\$]*)\$([^:]*):([^\$]*)\$(.*)$").unwrap();
 }
 
 #[cxx::bridge]
@@ -49,7 +50,6 @@ pub mod ffi {
     }
 }
 
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum IdString {
     // "\\[name]"
@@ -62,21 +62,26 @@ pub enum IdString {
         file_path: String,
         line: String,
         id: String,
-    }
+    },
 }
 
 impl Display for IdString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IdString::Named(name) => write!(f, "\\{}", name),
-            IdString::Unnamed { gate_name, file_path, line, id } => {
+            IdString::Unnamed {
+                gate_name,
+                file_path,
+                line,
+                id,
+            } => {
                 write!(f, "${}${}:{}${}", gate_name, file_path, line, id)
             }
         }
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum IdStringError {
     #[error("{0}")]
     InvalidFormat(String),
@@ -117,14 +122,22 @@ pub struct SanitizedQueryMatch {
 
 impl Display for SanitizedQueryMatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let port_map: Vec<String> = self.port_map.iter()
+        let port_map: Vec<String> = self
+            .port_map
+            .iter()
             .map(|(k, v)| format!("{} -> {}", k, v))
             .collect();
-        let cell_map: Vec<String> = self.cell_map.iter()
+        let cell_map: Vec<String> = self
+            .cell_map
+            .iter()
             .map(|(k, v)| format!("{} -> {}", k, v))
             .collect();
-        write!(f, "Port Map: [{}], \nCell Map: [{}]",
-               port_map.join(", "), cell_map.join(", "))
+        write!(
+            f,
+            "Port Map: [{}], \nCell Map: [{}]",
+            port_map.join(", "),
+            cell_map.join(", ")
+        )
     }
 }
 
@@ -132,7 +145,11 @@ impl Display for SanitizedQueryMatch {
 impl TryInto<Vec<SanitizedQueryMatch>> for ffi::QueryMatchList {
     type Error = IdStringError;
     fn try_into(self) -> Result<Vec<SanitizedQueryMatch>, Self::Error> {
-        let matches = self.matches.into_iter().map(|m| m.try_into()).collect::<Result<Vec<_>, _>>()?;
+        let matches = self
+            .matches
+            .into_iter()
+            .map(|m| m.try_into())
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(matches)
     }
 }
@@ -140,7 +157,9 @@ impl TryInto<Vec<SanitizedQueryMatch>> for ffi::QueryMatchList {
 impl TryInto<SanitizedQueryMatch> for ffi::QueryMatch {
     type Error = IdStringError;
     fn try_into(self) -> Result<SanitizedQueryMatch, Self::Error> {
-        let port_map = self.port_map.into_iter()
+        let port_map = self
+            .port_map
+            .into_iter()
             .map(|pair| {
                 let needle: IdString = pair.needle.try_into()?;
                 let haystack: IdString = pair.haystack.try_into()?;
@@ -148,7 +167,9 @@ impl TryInto<SanitizedQueryMatch> for ffi::QueryMatch {
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
 
-        let cell_map = self.cell_map.into_iter()
+        let cell_map = self
+            .cell_map
+            .into_iter()
             .map(|pair| {
                 let needle: SanitizedCellData = pair.needle.try_into()?;
                 let haystack: SanitizedCellData = pair.haystack.try_into()?;
@@ -156,10 +177,7 @@ impl TryInto<SanitizedQueryMatch> for ffi::QueryMatch {
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
 
-        Ok(SanitizedQueryMatch {
-            port_map,
-            cell_map,
-        })
+        Ok(SanitizedQueryMatch { port_map, cell_map })
     }
 }
 

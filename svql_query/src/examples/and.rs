@@ -31,7 +31,7 @@ impl RtlModuleTrait<And> for And {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AndResult {
     pub a: IdString,
     pub b: IdString,
