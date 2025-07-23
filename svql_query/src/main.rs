@@ -1,212 +1,170 @@
-use std::path::PathBuf;
-use std::net::ToSocketAddrs;
-use crate::connection::Connection;
-use crate::ports::{InPort, OutPort};
-use crate::query::{Module, Query};
-use crate::net::{SvqlQueryError};
-use svql_common::mat::{SanitizedQueryMatch, IdStringError, IdString};
+use std::{net::ToSocketAddrs, path::PathBuf};
+use std::collections::HashSet;
+
+use crate::{
+    connection::Connection,
+    ports::{InPort, OutPort},
+    query::Module,
+};
 
 mod query;
 mod ports;
 mod connection;
 mod net;
 
-// struct AndGate {
-//     in1: InPort,
-//     in2: InPort,
-//     out: OutPort,
-// }
-
-// impl Module for AndGate {
-//     fn file_path(&self) -> PathBuf {
-//         "svql_query/verilog/and.v".into()
-//     }
-//     fn module_name(&self) -> String {
-//         "and_gate".to_string()
-//     }
-// }
-
-// struct Combined {
-    
-//     connections: Vec<Connection>,
-//     // modules: Vec<Box<dyn Module>>,
-//     cadd1: CAdd,
-//     cadd2: CAdd,
-// }
-
-// impl Combined {
-//     fn connect(mut self) -> Self {
-//         connect!(self, &self.cadd1.in1, &self.cadd2.out);
-//         connect!(self, &self.cadd2.c, &self.cadd1.in2);
-//         self
-//     }
-// }
-
-// impl Query for Combined {
-//     fn query<P: Into<PathBuf>, S: Into<String>>(&self, design_path: P, top: S) -> Vec<Match> {
-//         // Implement the query logic here
-//         vec![]
-//     }
-// }
-
+#[derive(Debug)]
 struct And {
+    inst: String,
     a: InPort,
     b: InPort,
     y: OutPort,
 }
-
-impl Module for And {
-    fn file_path(&self) -> PathBuf {
-        PathBuf::from("svql_query/verilog/and.v")
+impl And {
+    fn new(inst: &str) -> Self {
+        And {
+            inst: inst.into(),
+            a: InPort::new(format!("{inst}.a")),
+            b: InPort::new(format!("{inst}.b")),
+            y: OutPort::new(format!("{inst}.y")),
+        }
     }
-    fn module_name(&self) -> String {
-        "and_gate".to_string()
+
+    fn from_module_path(
+        mut self,
+        module_path: &str
+    ) -> Self {
+        And {
+            inst: self.inst.clone(),
+            a: InPort::new(format!("{module_path}.{}.a", self.inst.clone())),
+            b: InPort::new(format!("{module_path}.{}.b", self.inst.clone())),
+            y: OutPort::new(format!("{module_path}.{}.y", self.inst.clone())),
+        }
     }
 }
+impl Module for And {
+    fn file_path(&self)   -> PathBuf { "svql_query/verilog/and.v".into() }
+    fn module_name(&self) -> String  { "and_gate".into() }
+    fn instance_name(&self) -> &str  { &self.inst }
+}
 
-struct CombinedAnd {
-    connections: Vec<Connection>,
+// ── composite ───────────────────────────────────────
+#[derive(Debug)]
+struct SubCombinedAnd {
+    inst: String,
+    connections: HashSet<Connection>,
     and1: And,
     and2: And,
 }
-
-impl CombinedAnd {
+impl SubCombinedAnd {
+    fn new(inst: &str, and1: And, and2: And) -> Self {
+        
+        SubCombinedAnd {
+            inst: inst.into(),
+            connections: HashSet::new(),
+            and1: and1.from_module_path(
+                inst,
+            ),
+            and2: and2.from_module_path(
+                inst,
+            ),
+        }
+    }
     fn connect(mut self) -> Self {
         connect!(self, &self.and2.a, &self.and1.y);
         self
     }
-}
 
-impl Query for CombinedAnd {
-    fn query<P: Into<PathBuf>, S: Into<String>>(
-        &self,
-        design_path: P,
-        top: S,
-    ) -> Vec<SanitizedQueryMatch> {
-        todo!()
-    }
+    fn from_module_path(mut self, module_path: &str) -> Self {
+        // build "<module_path>.<self.inst>"
+        let prefix = if module_path.is_empty() {
+            self.inst.clone()
+        } else {
+            format!("{module_path}.{}", self.inst)
+        };
 
-    fn query_net<A: ToSocketAddrs>(
-        &self,
-        addr: A,
-    ) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
-        // 1. run both sub-queries
-        let and1_results = self.and1.query_net(&addr)?;
-        let and2_results = self.and2.query_net(&addr)?;
+        // rename the leaf modules
+        self.and1 = self.and1.from_module_path(&prefix);
+        self.and2 = self.and2.from_module_path(&prefix);
 
-        // 2. port names we care about (hard-coded for the two-AND example)
-        let key_and1_y = IdString::Named("y".to_owned());
-        let key_and2_a = IdString::Named("a".to_owned());
+        // the old connections still point to the old names – drop them
+        self.connections.clear();
 
-        let mut merged = Vec::<SanitizedQueryMatch>::new();
-
-        // 3. brute-force pairwise merge whenever the connectivity matches
-        for m1 in &and1_results {
-            let Some(hay_of_y) = m1.port_map.get(&key_and1_y) else { continue };
-
-            for m2 in &and2_results {
-                let Some(hay_of_a) = m2.port_map.get(&key_and2_a) else { continue };
-
-                // and1.y ───► same signal ◄─── and2.a   ?
-                if hay_of_y == hay_of_a {
-                    // build the union; keep first-seen value on duplicates
-                    let mut port_map: HashMap<IdString, IdString> = m1.port_map.clone();
-                    for (k, v) in &m2.port_map {
-                        port_map.entry(k.clone()).or_insert(v.clone());
-                    }
-
-                    let mut cell_map = m1.cell_map.clone();
-                    for (k, v) in &m2.cell_map {
-                        cell_map.entry(k.clone()).or_insert(v.clone());
-                    }
-
-                    merged.push(SanitizedQueryMatch { port_map, cell_map });
-                }
-            }
-        }
-
-        Ok(merged)
+        // and recreate them with the new names
+        self = self.connect();
+        self
     }
 }
+impl Module for SubCombinedAnd {
+    // dummy leaf info – unused because this is a composite
+    fn file_path(&self)   -> PathBuf { PathBuf::new() }
+    fn module_name(&self) -> String  { "SubCombinedAnd".into() }
+    fn instance_name(&self) -> &str  { "SubCombinedAnd" }
 
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-// Helper ────────────────────────────────────────────────────────────────────────
-fn try_merge_matches(
-    m1: &SanitizedQueryMatch,
-    m2: &SanitizedQueryMatch,
-) -> Option<SanitizedQueryMatch> {
-    // merge port maps – abort if the same key maps to different hay-stack ids
-    let mut port_map: HashMap<IdString, IdString> = m1.port_map.clone();
-    for (k, v) in &m2.port_map {
-        match port_map.entry(k.clone()) {
-            Entry::Vacant(e) => {
-                e.insert(v.clone());
-            }
-            Entry::Occupied(e) => {
-                if e.get() != v {
-                    return None; // conflict
-                }
-            }
+    fn submodules(&self) -> Vec<&dyn Module> {
+        vec![&self.and1, &self.and2]
+    }
+    fn connections(&self) -> &HashSet<Connection> { &self.connections }
+}
+
+// ── composite ───────────────────────────────────────
+#[derive(Debug)]
+struct CombinedAnd {
+    inst: String,
+    connections: HashSet<Connection>,
+    and: And,
+    sub_combined_and: SubCombinedAnd,
+}
+impl CombinedAnd {
+    fn new(inst: &str, and: And, sub_combined_and: SubCombinedAnd) -> Self {
+        CombinedAnd {
+            inst: inst.into(),
+            connections: HashSet::new(),
+            and: and.from_module_path(
+                inst,
+            ),
+            sub_combined_and: sub_combined_and.from_module_path(
+                inst,
+            ),
         }
     }
-
-    // merge cell maps – same policy as above
-    let mut cell_map = m1.cell_map.clone();
-    for (k, v) in &m2.cell_map {
-        match cell_map.entry(k.clone()) {
-            Entry::Vacant(e) => {
-                e.insert(v.clone());
-            }
-            Entry::Occupied(e) => {
-                if e.get() != v {
-                    return None; // conflict
-                }
-            }
-        }
+    fn connect(mut self) -> Self {
+        self.sub_combined_and = self.sub_combined_and
+            .connect();
+        connect!(self, &self.sub_combined_and.and2.y, &self.and.a);
+        self
     }
+}
+impl Module for CombinedAnd {
+    // dummy leaf info – unused because this is a composite
+    fn file_path(&self)   -> PathBuf { PathBuf::new() }
+    fn module_name(&self) -> String  { "CombinedAnd".into() }
+    fn instance_name(&self) -> &str  { "CombinedAnd" }
 
-    Some(SanitizedQueryMatch { port_map, cell_map })
+    fn submodules(&self) -> Vec<&dyn Module> {
+        vec![&self.and, &self.sub_combined_and]
+    }
+    fn connections(&self) -> &HashSet<Connection> { &self.connections }
 }
 
 fn main() {
-    let and1 = And {
-        a: InPort::new("and1.a"),
-        b: InPort::new("and1.b"),
-        y: OutPort::new("and1.y"),
-    };
+    let and1 = And::new("and1");
 
-    let res = and1.query_net("127.0.0.1:9999");
-    if res.is_err() {
-        eprintln!("Error querying net: {:?}", res.err());
-        return;
-    }
-    let res = res.unwrap();
-    for match_item in &res {
-        println!("{}", match_item);
-    }
-    // let pretty = serde_json::to_string_pretty(&res).unwrap();
-    // println!("{}", pretty);
+    // object-safe call
+    let res = and1.query_net("127.0.0.1:9999").unwrap();
+    for m in &res { println!("{}", m); }
+    println!("---");
 
+    let and2 = And::new("and2");
+    let and3 = And::new("and");
 
-    let and2 = And {
-        a: InPort::new("and2.a"),
-        b: InPort::new("and2.b"),
-        y: OutPort::new("and2.y"),
-    };
-    let combined = CombinedAnd {
-        connections: Vec::new(),
-        and1: and1,
-        and2: and2,
-    }.connect();
-    
-    let res = combined.query_net("127.0.0.1:9999");
-    if res.is_err() {
-        eprintln!("Error querying net: {:?}", res.err());
-        return;
-    }
-    let res = res.unwrap();
-    for match_item in &res {
-        println!("{}", match_item);
-    }
+    let mut sub_combined = SubCombinedAnd::new("SubCombinedAnd", and1, and2);
+    let mut combined = CombinedAnd::new("CombinedAnd", and3, sub_combined).connect();
+
+    println!("CombinedAnd: {:#?}", combined);
+
+    let res2 = combined.query_net("127.0.0.1:9999").unwrap();
+
+    println!("---");
+    println!("CombinedAnd query result:");
+    for m in &res2 { println!("{}", m); }
 }

@@ -1,10 +1,9 @@
 use crate::ports::{InPort, OutPort};
 
-#[derive(Clone, Debug)]
-
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Connection {
-    in_port: InPort,
-    out_port: OutPort,
+    pub in_port: InPort,
+    pub out_port: OutPort,
 }
 
 impl Connection {
@@ -17,7 +16,7 @@ impl Connection {
 macro_rules! connect {
     ( $module:expr, $wire1:expr , $wire2:expr ) => {
         {
-            $module.connections.push($wire1.connect_to($wire2));
+            $module.connections.insert($wire1.connect_to($wire2));
         }
     };
 }

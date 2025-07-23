@@ -13,5 +13,5 @@ output y
 
 
 // assign y = ((a & b) & c) & ((d & e) & f);
-assign y = ((a & b) & c);
+assign y = (((a & b) & c) & d);
 endmodule
