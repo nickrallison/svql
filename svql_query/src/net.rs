@@ -28,7 +28,7 @@ pub enum SvqlQueryError {
 pub fn run_svql_query<A: ToSocketAddrs>(
     addr: A,
     cfg: &SvqlRuntimeConfig,
-) -> Result<HashSet<SanitizedQueryMatch>, SvqlQueryError> {
+) -> Result<Vec<SanitizedQueryMatch>, SvqlQueryError> {
     // 1. serialise the request
     let json_cfg = svql_runtime_config_into_json_string(cfg);
     let mut stream = TcpStream::connect(addr)
@@ -62,6 +62,6 @@ pub fn run_svql_query<A: ToSocketAddrs>(
     let match_list: QueryMatchList =
         matchlist_from_json_string(response.trim());
 
-    let match_list: HashSet<SanitizedQueryMatch> = match_list.try_into()?;
+    let match_list: Vec<SanitizedQueryMatch> = match_list.try_into()?;
     Ok(match_list)
 }
