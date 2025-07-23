@@ -20,3 +20,24 @@ impl OutPort {
         Connection::new(in_port.clone(), self.clone())
     }
 }
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Connection<In, Out> {
+    pub in_port: In,
+    pub out_port: Out,
+}
+
+impl<In, Out> Connection<In, Out> {
+    pub fn new(in_port: In, out_port: Out) -> Connection {
+        Connection { in_port, out_port }
+    }
+}
+
+#[macro_export]
+macro_rules! connect {
+    ( $module:expr, $wire1:expr , $wire2:expr ) => {
+        {
+            $module.connections.insert($wire1.connect_to($wire2));
+        }
+    };
+}
