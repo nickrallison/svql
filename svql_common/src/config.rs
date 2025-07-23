@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
+// allow unused imports for serde
+#![allow(unused_imports)]
 use crate::config::ffi::{CompatPair, IgnoreParam, PermPort, SvqlRuntimeConfig, SwapPort};
+use serde::{Deserialize, Serialize};
 
 #[cxx::bridge]
 pub mod ffi {
@@ -79,12 +81,19 @@ impl SwapPort {
 
 impl PermPort {
     pub fn new(type_name: String, left: Vec<String>, right: Vec<String>) -> Self {
-        PermPort { type_name, left, right }
+        PermPort {
+            type_name,
+            left,
+            right,
+        }
     }
 }
 
 impl IgnoreParam {
     pub fn new(param_name: String, param_value: String) -> Self {
-        IgnoreParam { param_name, param_value }
+        IgnoreParam {
+            param_name,
+            param_value,
+        }
     }
 }

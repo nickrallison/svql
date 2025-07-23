@@ -1,32 +1,47 @@
-// and.rs
 use crate::examples::and::{And, AndResult};
-use crate::ports::{Connection, InPort, OutPort};
+use crate::module::{RtlModule, RtlQueryResult, RtlQueryResultTrait, RtlQueryTrait};
 use std::collections::HashSet;
-use svql_common::mat::SanitizedCellData;
 
-#[derive(Debug)]
+use crate::connect;
+use crate::driver::{Driver, DriverError};
+use crate::module::QueryError;
+use crate::ports::{Connection, InPort, OutPort};
+use std::fmt::Debug;
+
+#[derive(Debug, Clone)]
 pub struct TripleAnd {
-    pub and1: And,
-    pub and2: And,
-    pub and3: And,
-
-    pub inst: String,
-    pub connections: HashSet<Connection<InPort, OutPort>>,
+    pub and1: RtlModule<And>,
+    pub and2: RtlModule<And>,
+    pub and3: RtlModule<And>,
 }
 
 impl TripleAnd {
-    pub fn new(inst: String) -> Self {
+    pub fn new() -> Self {
         TripleAnd {
-            and1: And::new("and1".into()),
-            and2: And::new("and2".into()),
-            and3: And::new("and3".into()),
-            inst,
-            connections: HashSet::new(),
+            and1: RtlModule::new("and1".into(), And::new()),
+            and2: RtlModule::new("and2".into(), And::new()),
+            and3: RtlModule::new("and3".into(), And::new()),
         }
     }
+}
 
-    pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
-        self.connections.insert(conn);
+impl RtlQueryTrait<TripleAnd> for TripleAnd {
+    fn run_query<QueryResultType>(
+        &self,
+        driver: &Driver,
+    ) -> Result<Vec<Result<RtlQueryResult<QueryResultType>, QueryError>>, DriverError>
+    where
+        QueryResultType: Debug,
+        QueryResultType: RtlQueryResultTrait<QueryResultType>,
+    {
+        todo!()
+    }
+
+    fn connect(&self) -> HashSet<Connection<InPort, OutPort>> {
+        let mut connections = HashSet::new();
+        connect!(&mut connections, &self.and1.module.y, &self.and2.module.a);
+        connect!(&mut connections, &self.and2.module.y, &self.and3.module.a);
+        connections
     }
 }
 
@@ -35,7 +50,12 @@ pub struct TripleAndResult {
     pub and1: AndResult,
     pub and2: AndResult,
     pub and3: AndResult,
-
-    pub inst: String,
-    pub cells: Vec<SanitizedCellData>,
 }
+
+impl TripleAndResult {
+    pub fn new(and1: AndResult, and2: AndResult, and3: AndResult) -> Self {
+        TripleAndResult { and1, and2, and3 }
+    }
+}
+
+impl RtlQueryResultTrait<TripleAndResult> for TripleAndResult {}
