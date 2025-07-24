@@ -1,3 +1,4 @@
+use crate::module::inst_path;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -25,6 +26,9 @@ impl InPort {
         full_path.push(self.inst.clone());
         self.full_path = full_path;
     }
+    pub fn inst_path(&self) -> String {
+        inst_path(&self.full_path)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -51,6 +55,10 @@ impl OutPort {
         let mut full_path = parent_path.clone();
         full_path.push(self.inst.clone());
         self.full_path = full_path;
+    }
+
+    pub fn inst_path(&self) -> String {
+        inst_path(&self.full_path)
     }
 }
 

@@ -62,6 +62,10 @@ where
         self.module.init_full_path(full_path);
     }
 
+    pub fn inst_path(&self) -> String {
+        inst_path(&self.full_path)
+    }
+
     pub fn query(
         &self,
         driver: &Driver,
@@ -99,10 +103,10 @@ pub fn lookup(m: &HashMap<IdString, IdString>, pin: &str) -> Result<IdString, Qu
         .ok_or_else(|| QueryError::MissingPort(m.clone(), pin.to_string()))
 }
 
-pub(crate) fn instance(inst: &str, parent: Option<&str>) -> String {
-    if let Some(p) = parent {
-        format!("{}.{}", p, inst)
-    } else {
-        inst.to_string()
-    }
+pub fn inst_path(full_path: &Vec<Arc<String>>) -> String {
+    full_path
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>()
+        .join(".")
 }

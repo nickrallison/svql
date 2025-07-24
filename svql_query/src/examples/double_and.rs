@@ -115,24 +115,31 @@ impl RtlQueryResultTrait for DoubleAndResult {
 }
 
 #[cfg(test)]
-mod tests {
+mod double_and_tests {
     use super::*;
     use crate::driver::mock::MockDriver;
     use crate::driver::Driver;
     use crate::query::RtlQuery;
 
     #[test]
-    fn test_double_and() {
+    fn test_port_path() {
         let double_and: RtlQuery<DoubleAnd> =
             RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
 
-        let inst = double_and.inst.clone();
-        let inst_path = double_and.full_path.clone();
+        let double_and1_a = double_and.query.and1.module.a.clone();
+
+        assert_eq!(double_and1_a.inst_path(), "double_and.and1.a".to_string());
+    }
+
+    #[test]
+    fn test_matches_len() {
+        let double_and: RtlQuery<DoubleAnd> =
+            RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
 
         let driver = Driver::Mock(MockDriver);
 
-        let matches = double_and.query.query(&driver, inst, inst_path).unwrap();
-        println!("DoubleAnd matches len: {:?}", matches.len());
+        let matches = double_and.query(&driver).unwrap();
+        let matches_len = println!("DoubleAnd matches len: {:?}", matches.len());
         assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
     }
 }

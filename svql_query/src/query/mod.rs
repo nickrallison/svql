@@ -1,4 +1,5 @@
 use crate::driver::{Driver, DriverError};
+use crate::module::inst_path;
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
 use crate::query::traits::RtlQueryTrait;
@@ -34,8 +35,8 @@ where
         query
     }
 
-    fn instance(&self, parent: Option<&str>) -> String {
-        crate::module::instance(&self.inst, parent)
+    pub fn inst_path(&self) -> String {
+        inst_path(&self.full_path)
     }
 
     pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
