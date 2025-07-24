@@ -1,9 +1,14 @@
 use crate::examples::and::{And, AndResult};
-use crate::module::{Queryable, RtlModule, RtlQueryResultTrait, RtlQueryTrait};
-use std::collections::HashSet;
+use crate::module::{
+    RtlModule, RtlModuleResult, RtlModuleTrait, RtlQueryQueryIterator, RtlQueryResultTrait,
+    RtlQueryTrait,
+};
+use std::collections::{HashMap, HashSet};
 
 use crate::connect;
+use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
+use itertools::iproduct;
 use std::fmt::Debug;
 use svql_common::mat::{IdString, SanitizedQueryMatch};
 
@@ -39,28 +44,30 @@ impl RtlQueryTrait for DoubleAnd {
         connections
     }
 
-    fn sub_modules(&self) -> Vec<&dyn Queryable> {
-        vec![&self.and1, &self.and2]
-    }
+    fn query(&self, driver: &Driver) -> Result<RtlQueryQueryIterator<Self::Result>, DriverError> {
+        let cartesian_product = iproduct!(self.and1.query(driver), self.and2.query(driver));
 
-    fn sub_queries(&self) -> Vec<&dyn Queryable> {
-        vec![]
+        todo!();
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DoubleAndResult {
-    pub and1: RtlModule<AndResult>,
-    pub and2: RtlModule<AndResult>,
+    pub and1: Option<RtlModule<AndResult>>,
+    pub and2: Option<RtlModule<AndResult>>,
 }
 
 impl DoubleAndResult {
-    pub fn new(and1: RtlModule<AndResult>, and2: RtlModule<AndResult>) -> Self {
+    pub fn new(and1: Option<RtlModule<AndResult>>, and2: Option<RtlModule<AndResult>>) -> Self {
         DoubleAndResult { and1, and2 }
     }
 }
 
-impl RtlQueryResultTrait for DoubleAndResult {}
+impl RtlQueryResultTrait for DoubleAndResult {
+    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self {
+        todo!()
+    }
+}
 
 #[cfg(test)]
 mod tests {

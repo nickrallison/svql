@@ -1,5 +1,5 @@
 use crate::examples::and::{And, AndResult};
-use crate::module::{Queryable, RtlModule, RtlQueryResultTrait, RtlQueryTrait};
+use crate::module::{RtlModule, RtlQueryResultTrait, RtlQueryTrait};
 use std::collections::HashSet;
 
 use crate::ports::{Connection, InPort, OutPort};

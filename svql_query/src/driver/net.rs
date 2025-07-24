@@ -9,6 +9,8 @@ use svql_common::mat::SanitizedQueryMatch;
 
 use thiserror::Error;
 
+use super::DriverIterator;
+
 pub struct NetDriver {
     addr: String,
 }
@@ -18,10 +20,7 @@ impl NetDriver {
         NetDriver { addr }
     }
 
-    pub fn query(
-        &self,
-        cfg: &SvqlRuntimeConfig,
-    ) -> Result<Vec<SanitizedQueryMatch>, SvqlDriverNetError> {
+    pub fn query(&self, cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
         run_svql_query_net(&self.addr, cfg)
     }
 }
@@ -42,7 +41,7 @@ pub enum SvqlDriverNetError {
 pub fn run_svql_query_net<A: ToSocketAddrs>(
     addr: A,
     cfg: &SvqlRuntimeConfig,
-) -> Result<Vec<SanitizedQueryMatch>, SvqlDriverNetError> {
+) -> Result<DriverIterator, SvqlDriverNetError> {
     // 1. serialise the request
     let json_cfg = svql_runtime_config_into_json_string(cfg);
     let mut stream =
@@ -78,6 +77,7 @@ pub fn run_svql_query_net<A: ToSocketAddrs>(
     // 5. parse JSON to QueryMatchList
     let match_list: QueryMatchList = matchlist_from_json_string(response.trim());
 
+    // return an iterator
     let matches: Vec<SanitizedQueryMatch> = match_list
         .matches
         .into_iter()
@@ -86,5 +86,6 @@ pub fn run_svql_query_net<A: ToSocketAddrs>(
                 .expect("QueryMatch::try_into SanitizedQueryMatch Failed")
         })
         .collect();
-    Ok(matches)
+
+    Ok(DriverIterator::new(matches))
 }

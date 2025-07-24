@@ -1,7 +1,8 @@
+use crate::driver::net::SvqlDriverNetError;
+use crate::driver::DriverIterator;
+use std::collections::HashMap;
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::mat::{IdString, SanitizedCellData, SanitizedQueryMatch};
-use std::collections::HashMap;
-use crate::driver::net::SvqlDriverNetError;
 
 pub struct MockDriver;
 
@@ -10,17 +11,17 @@ impl MockDriver {
         MockDriver
     }
 
-    pub fn query(
-        &self,
-        _cfg: &SvqlRuntimeConfig,
-    ) -> Result<Vec<SanitizedQueryMatch>, SvqlDriverNetError> {
+    pub fn query(&self, _cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
         // Return the three matches from the provided output
         let matches = vec![
             // Match 0
             SanitizedQueryMatch {
                 port_map: {
                     let mut map = HashMap::new();
-                    map.insert(IdString::Named("b".to_string()), IdString::Named("d".to_string()));
+                    map.insert(
+                        IdString::Named("b".to_string()),
+                        IdString::Named("d".to_string()),
+                    );
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
@@ -79,7 +80,10 @@ impl MockDriver {
                             id: "1_Y".to_string(),
                         },
                     );
-                    map.insert(IdString::Named("b".to_string()), IdString::Named("c".to_string()));
+                    map.insert(
+                        IdString::Named("b".to_string()),
+                        IdString::Named("c".to_string()),
+                    );
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
@@ -129,8 +133,14 @@ impl MockDriver {
                             id: "1_Y".to_string(),
                         },
                     );
-                    map.insert(IdString::Named("a".to_string()), IdString::Named("a".to_string()));
-                    map.insert(IdString::Named("b".to_string()), IdString::Named("b".to_string()));
+                    map.insert(
+                        IdString::Named("a".to_string()),
+                        IdString::Named("a".to_string()),
+                    );
+                    map.insert(
+                        IdString::Named("b".to_string()),
+                        IdString::Named("b".to_string()),
+                    );
                     map
                 },
                 cell_map: {
@@ -159,7 +169,7 @@ impl MockDriver {
                 },
             },
         ];
-        
-        Ok(matches)
+
+        Ok(DriverIterator::new(matches))
     }
 }

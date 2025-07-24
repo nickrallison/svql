@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverConversionError, DriverError};
+use crate::driver::{Driver, DriverConversionError, DriverError, DriverIterator};
 use crate::ports::{Connection, InPort, OutPort};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
@@ -12,6 +12,31 @@ lazy_static! {
     static ref EMPTY_CONNECTIONS: HashSet<Connection<InPort, OutPort>> = HashSet::new();
 }
 
+#[derive(Debug, Clone)]
+pub struct RtlModuleQueryIterator<T> {
+    matches: std::iter::Map<DriverIterator, fn(SanitizedQueryMatch) -> RtlModuleResult<T>>,
+}
+
+impl<T> Iterator for RtlModuleQueryIterator<T> {
+    type Item = RtlModuleResult<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.matches.next()
+    }
+}
+
+pub struct RtlQueryQueryIterator<T> {
+    matches: std::iter::Map<DriverIterator, fn(SanitizedQueryMatch) -> RtlQueryResult<T>>,
+}
+
+impl<T> Iterator for RtlQueryQueryIterator<T> {
+    type Item = RtlQueryResult<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.matches.next()
+    }
+}
+
 pub trait RtlModuleTrait {
     type Result: Debug + RtlModuleResultTrait;
 
@@ -19,7 +44,7 @@ pub trait RtlModuleTrait {
     fn module_name(&self) -> &'static str;
 }
 
-pub trait RtlModuleResultTrait: Sized {
+pub trait RtlModuleResultTrait {
     fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
 }
 
@@ -61,14 +86,14 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<RtlModuleResult<ModuleType::Result>>, DriverError> {
+    ) -> Result<RtlModuleQueryIterator<ModuleType::Result>, DriverError> {
         let cfg = self.config();
         let matches = driver.query(&cfg)?;
-        Ok(matches
-            .into_iter()
-            // RtlModuleResult<ModuleType::Result>
-            .map(|m| RtlModuleResult::from_match(m))
-            .collect())
+        let iter = matches.into_iter().map(
+            RtlModuleResult::from_match
+                as fn(SanitizedQueryMatch) -> RtlModuleResult<ModuleType::Result>,
+        );
+        Ok(RtlModuleQueryIterator { matches: iter })
     }
 }
 
@@ -95,35 +120,18 @@ where
     }
 }
 
-// ###################
-
-// Define a trait for queryable components (both modules and queries)
-pub trait Queryable {
-    fn query(&self, driver: &Driver) -> Result<Vec<SanitizedQueryMatch>, DriverError>;
-}
-
-impl<M: RtlModuleTrait> Queryable for RtlModule<M> {
-    fn query(&self, driver: &Driver) -> Result<Vec<SanitizedQueryMatch>, DriverError> {
-        let cfg = self.config();
-        driver.query(&cfg)
-    }
-}
-
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.
     type Result: Debug + RtlQueryResultTrait;
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-
-    /// Get submodules that are part of this query
-    fn sub_modules(&self) -> Vec<&dyn Queryable>;
-
-    /// Get subqueries that are part of this query
-    fn sub_queries(&self) -> Vec<&dyn Queryable>;
+    fn query(&self, driver: &Driver) -> Result<RtlQueryQueryIterator<Self::Result>, DriverError>;
 }
 
-pub trait RtlQueryResultTrait {}
+pub trait RtlQueryResultTrait {
+    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
+}
 
 #[derive(Debug, Clone)]
 pub struct RtlQuery<QueryType> {
@@ -152,16 +160,23 @@ where
         self.connections.insert(conn);
     }
 
+    pub(crate) fn config(&self) -> SvqlRuntimeConfig {
+        let mut cfg = SvqlRuntimeConfig::default();
+        // For queries, we'll need to define how to get the file path and module name
+        // This might need to be added to RtlQueryTrait or handled differently
+        cfg.verbose = true;
+        cfg
+    }
+
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
-        let mut cartesian_product_of_sub_results: Vec<RtlQueryResult<QueryType::Result>> = vec![];
-        todo!(
-            "need to fill results as the cartesian product of all submodules and subqueries into its result type"
-        );
-
-        todo!("filter cartesian product results by the connections imposed by the query");
+    ) -> Result<RtlQueryQueryIterator<QueryType::Result>, DriverError> {
+        let cfg = self.config();
+        let matches = driver.query(&cfg)?;
+        Ok(RtlQueryQueryIterator {
+            matches: matches.map(RtlQueryResult::from_match),
+        })
     }
 }
 
@@ -177,6 +192,14 @@ where
 {
     fn new(cells: Vec<SanitizedCellData>, query: QueryResultType) -> Self {
         RtlQueryResult { cells, query }
+    }
+
+    fn from_match(m: SanitizedQueryMatch) -> RtlQueryResult<QueryResultType> {
+        let query = QueryResultType::from_portmap(m.port_map);
+        Self {
+            cells: m.cell_map.into_values().collect(),
+            query,
+        }
     }
 }
 
