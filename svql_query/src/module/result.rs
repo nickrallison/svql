@@ -1,7 +1,7 @@
 use crate::module::traits::RtlModuleResultTrait;
 use svql_common::mat::{SanitizedCellData, SanitizedQueryMatch};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RtlModuleResult<ModuleResultType> {
     // pub inst: String,
     pub cells: Vec<SanitizedCellData>,

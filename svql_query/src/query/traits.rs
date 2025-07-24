@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
-use crate::query::query_iterator::RtlQueryQueryIterator;
+use crate::query::result::RtlQueryResult;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use svql_common::mat::IdString;
@@ -11,7 +11,10 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-    fn query(&self, driver: &Driver) -> Result<RtlQueryQueryIterator<Self::Result>, DriverError>;
+    fn query(
+        &self,
+        driver: &Driver,
+    ) -> Result<Box<dyn Iterator<Item = RtlQueryResult<Self::Result>> + '_>, DriverError>;
 }
 
 pub trait RtlQueryResultTrait {

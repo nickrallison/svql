@@ -1,9 +1,10 @@
+use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
+use crate::query::result::RtlQueryResult;
 use crate::query::traits::RtlQueryTrait;
 use std::collections::HashSet;
 use svql_common::config::ffi::SvqlRuntimeConfig;
 
-pub mod query_iterator;
 pub mod result;
 pub mod traits;
 
@@ -40,5 +41,12 @@ where
         // This might need to be added to RtlQueryTrait or handled differently
         cfg.verbose = true;
         cfg
+    }
+
+    pub fn query(
+        &self,
+        driver: &Driver,
+    ) -> Result<Box<dyn Iterator<Item = RtlQueryResult<QueryType::Result>> + '_>, DriverError> {
+        self.query.query(driver)
     }
 }

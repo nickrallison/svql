@@ -1,9 +1,7 @@
-pub mod query_iterator;
 pub mod result;
 pub mod traits;
 
 use crate::driver::{Driver, DriverConversionError, DriverError};
-use crate::module::query_iterator::RtlModuleQueryIterator;
 use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
@@ -11,7 +9,7 @@ use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use svql_common::mat::{IdString, SanitizedQueryMatch};
+use svql_common::mat::IdString;
 use thiserror::Error;
 
 lazy_static! {
@@ -56,14 +54,11 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<RtlModuleQueryIterator<ModuleType::Result>, DriverError> {
+    ) -> Result<impl Iterator<Item = RtlModuleResult<ModuleType::Result>>, DriverError> {
         let cfg = self.config();
         let matches = driver.query(&cfg)?;
-        let iter = matches.into_iter().map(
-            RtlModuleResult::from_match
-                as fn(SanitizedQueryMatch) -> RtlModuleResult<ModuleType::Result>,
-        );
-        Ok(RtlModuleQueryIterator { matches: iter })
+        let iter = matches.into_iter().map(RtlModuleResult::from_match);
+        Ok(iter)
     }
 }
 
