@@ -101,5 +101,6 @@ mod tests {
         let driver = Driver::Mock(MockDriver);
 
         let matches = double_and.query.query(&driver).unwrap();
+        assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
     }
 }

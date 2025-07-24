@@ -13,13 +13,19 @@ pub struct RtlQuery<QueryType> {
     pub inst: String,
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub query: QueryType,
+    // #####
+    // pub parent: Option<Arc<RefCell<RtlQuery<QueryType>>>>,
 }
 
 impl<QueryType> RtlQuery<QueryType>
 where
     QueryType: RtlQueryTrait,
 {
-    pub fn new(inst: String, query: QueryType) -> Self {
+    pub fn new(
+        inst: String,
+        query: QueryType,
+        // parent: Option<Arc<RefCell<RtlQuery<QueryType>>>>,
+    ) -> Self {
         RtlQuery {
             inst,
             connections: QueryType::connect(&query),

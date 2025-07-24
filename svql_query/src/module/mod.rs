@@ -21,6 +21,7 @@ pub struct RtlModule<ModuleType> {
     pub inst: String,
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub module: ModuleType,
+    // #####
 }
 
 impl<ModuleType> RtlModule<ModuleType>
