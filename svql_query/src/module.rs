@@ -154,9 +154,14 @@ where
 
     pub fn query(
         &self,
-        _driver: &Driver,
+        driver: &Driver,
     ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
-        todo!("Implement RtlQuery::query method");
+        let mut cartesian_product_of_sub_results: Vec<RtlQueryResult<QueryType::Result>> = vec![];
+        todo!(
+            "need to fill results as the cartesian product of all submodules and subqueries into its result type"
+        );
+
+        todo!("filter cartesian product results by the connections imposed by the query");
     }
 }
 

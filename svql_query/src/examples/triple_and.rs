@@ -69,15 +69,4 @@ impl TripleAndResult {
     }
 }
 
-impl RtlQueryResultTrait for TripleAndResult {
-    // fn from_matches(_matches: Vec<SanitizedQueryMatch>) -> Self {
-    //     // In a real implementation, you would extract the appropriate data from the matches
-    //     // For now, we'll create placeholder instances with named IdStrings
-    //     let placeholder_id = IdString::Named("placeholder".to_string());
-    //     TripleAndResult {
-    //         and1: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id.clone()),
-    //         and2: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id.clone()),
-    //         and3: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id),
-    //     }
-    // }
-}
+impl RtlQueryResultTrait for TripleAndResult {}
