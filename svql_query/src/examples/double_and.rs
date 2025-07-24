@@ -1,13 +1,12 @@
 use crate::examples::and::{And, AndResult};
-use crate::module::{
-    RtlModule, RtlModuleResult, RtlModuleTrait, RtlQueryQueryIterator, RtlQueryResultTrait,
-    RtlQueryTrait,
-};
+use crate::module::RtlModule;
 use std::collections::{HashMap, HashSet};
 
 use crate::connect;
 use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
+use crate::query::query_iterator::RtlQueryQueryIterator;
+use crate::query::traits::{RtlQueryResultTrait, RtlQueryTrait};
 use itertools::iproduct;
 use std::fmt::Debug;
 use svql_common::mat::{IdString, SanitizedQueryMatch};
@@ -45,9 +44,13 @@ impl RtlQueryTrait for DoubleAnd {
     }
 
     fn query(&self, driver: &Driver) -> Result<RtlQueryQueryIterator<Self::Result>, DriverError> {
-        let cartesian_product = iproduct!(self.and1.query(driver), self.and2.query(driver));
+        let cartesian_product = iproduct!(self.and1.query(driver)?, self.and2.query(driver)?);
 
-        todo!();
+        let mapped_results = cartesian_product.map(|(and1_result, and2_result)| {
+            DoubleAndResult::new(Some(and1_result), Some(and2_result))
+        });
+
+        Ok(RtlQueryQueryIterator::new(Box::new(mapped_results)))
     }
 }
 
@@ -74,7 +77,7 @@ mod tests {
     use super::*;
     use crate::driver::mock::MockDriver;
     use crate::driver::Driver;
-    use crate::module::RtlQuery;
+    use crate::query::RtlQuery;
 
     #[test]
     fn test_double_and() {

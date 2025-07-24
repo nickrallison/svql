@@ -1,4 +1,5 @@
-use crate::module::{lookup, RtlModuleResultTrait, RtlModuleTrait};
+use crate::module::lookup;
+use crate::module::traits::{RtlModuleResultTrait, RtlModuleTrait};
 use crate::ports::{InPort, OutPort};
 use std::collections::HashMap;
 use std::path::PathBuf;
