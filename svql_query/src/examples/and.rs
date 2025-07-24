@@ -25,7 +25,6 @@ impl And {
 
 impl RtlModuleTrait for And {
     type Result = AndResult;
-    // type ModuleIter = ();
 
     fn file_path(&self) -> PathBuf {
         "svql_query/verilog/and.v".into()
@@ -41,6 +40,11 @@ impl RtlModuleTrait for And {
 
     fn set_instance(&mut self, inst: Arc<String>) {
         todo!()
+    }
+    fn init_full_path(&mut self, full_path: Vec<Arc<String>>) {
+        self.a.init_full_path(full_path.clone());
+        self.b.init_full_path(full_path.clone());
+        self.y.init_full_path(full_path);
     }
 }
 

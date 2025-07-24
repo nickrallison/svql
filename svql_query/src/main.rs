@@ -1,6 +1,10 @@
+use crate::driver::mock::MockDriver;
 use crate::driver::Driver;
 use crate::examples::and::And;
+use crate::examples::double_and::DoubleAnd;
 use crate::module::RtlModule;
+use crate::query::traits::RtlQueryTrait;
+use crate::query::RtlQuery;
 use log::LevelFilter;
 use svql_common::mat::SanitizedQueryMatch;
 
@@ -34,19 +38,19 @@ fn main() {
     let driver = Driver::new_mock();
 
     // Directly query the driver for AND gate matches
-    let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());
-    let cfg = and.config();
-
-    match driver.query(&cfg) {
-        Ok(matches) => {
-            log::trace!("Direct AND query returned {} matches", matches.len());
-            for (i, m) in matches.iter().enumerate() {
-                print_match_details(m, &format!("Direct AND match {}", i));
-                println!("serialized match: {:#?}", m);
-            }
-        }
-        Err(e) => {
-            log::trace!("Direct AND query failed with error: {:?}", e);
-        }
-    }
+    // let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());
+    // let cfg = and.config();
+    //
+    // match driver.query(&cfg) {
+    //     Ok(matches) => {
+    //         log::trace!("Direct AND query returned {} matches", matches.len());
+    //         for (i, m) in matches.iter().enumerate() {
+    //             print_match_details(m, &format!("Direct AND match {}", i));
+    //             println!("serialized match: {:#?}", m);
+    //         }
+    //     }
+    //     Err(e) => {
+    //         log::trace!("Direct AND query failed with error: {:?}", e);
+    //     }
+    // }
 }

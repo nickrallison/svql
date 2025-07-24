@@ -24,12 +24,14 @@ where
     QueryType: RtlQueryTrait + Debug,
 {
     pub fn new(query: QueryType, inst: String) -> Self {
-        RtlQuery {
+        let mut query = RtlQuery {
             inst: Arc::new(inst),
             full_path: vec![],
             connections: QueryType::connect(&query),
             query,
-        }
+        };
+        query.init_full_path(vec![]);
+        query
     }
 
     fn instance(&self, parent: Option<&str>) -> String {
@@ -46,6 +48,15 @@ where
         // This might need to be added to RtlQueryTrait or handled differently
         cfg.verbose = true;
         cfg
+    }
+
+    pub(crate) fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+        let mut full_path = parent_path.clone();
+        full_path.push(self.inst.clone());
+        self.full_path = full_path.clone();
+
+        // Initialize full path for module's ports
+        self.query.init_full_path(full_path);
     }
 
     pub fn query(

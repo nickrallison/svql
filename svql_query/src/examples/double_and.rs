@@ -59,6 +59,12 @@ impl RtlQueryTrait for DoubleAnd {
         connections
     }
 
+    fn init_full_path(&mut self, full_path: Vec<Arc<String>>) {
+        // Initialize full path for both AND gates
+        self.and1.init_full_path(full_path.clone());
+        self.and2.init_full_path(full_path.clone());
+    }
+
     fn query(
         &self,
         driver: &Driver,
@@ -126,7 +132,7 @@ mod tests {
         let driver = Driver::Mock(MockDriver);
 
         let matches = double_and.query.query(&driver, inst, inst_path).unwrap();
-        log::debug!("DoubleAnd matches: {:?}", matches);
-        // assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
+        println!("DoubleAnd matches len: {:?}", matches.len());
+        assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
     }
 }

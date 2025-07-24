@@ -9,13 +9,21 @@ pub struct InPort {
 impl InPort {
     pub fn new<S: Into<String>>(s: S) -> InPort {
         let inst = Arc::new(s.into());
-        InPort {
+        let mut in_port = InPort {
             inst,
             full_path: vec![],
-        }
+        };
+        in_port.init_full_path(vec![]);
+        in_port
     }
     pub fn connect_to(&self, out_port: &OutPort) -> Connection<InPort, OutPort> {
         Connection::new(self.clone(), out_port.clone())
+    }
+
+    pub fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+        let mut full_path = parent_path.clone();
+        full_path.push(self.inst.clone());
+        self.full_path = full_path;
     }
 }
 
@@ -28,13 +36,21 @@ pub struct OutPort {
 impl OutPort {
     pub fn new<S: Into<String>>(s: S) -> OutPort {
         let inst = Arc::new(s.into());
-        OutPort {
+        let mut out_port = OutPort {
             inst,
             full_path: vec![],
-        }
+        };
+        out_port.init_full_path(vec![]);
+        out_port
     }
     pub fn connect_to(&self, in_port: &InPort) -> Connection<InPort, OutPort> {
         Connection::new(in_port.clone(), self.clone())
+    }
+
+    pub fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+        let mut full_path = parent_path.clone();
+        full_path.push(self.inst.clone());
+        self.full_path = full_path;
     }
 }
 

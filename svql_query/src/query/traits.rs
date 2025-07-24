@@ -11,6 +11,7 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
+    fn init_full_path(&mut self, full_path: Vec<Arc<String>>);
     fn query(
         &self,
         driver: &Driver,

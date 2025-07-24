@@ -31,12 +31,14 @@ where
     ModuleType: RtlModuleTrait,
 {
     pub fn new(module: ModuleType, inst: String) -> Self {
-        RtlModule {
+        let mut module = RtlModule {
             inst: Arc::new(inst),
             full_path: vec![],
             connections: EMPTY_CONNECTIONS.clone(),
             module,
-        }
+        };
+        module.init_full_path(vec![]);
+        module
     }
 
     // pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
@@ -49,6 +51,15 @@ where
         cfg.pat_module_name = self.module.module_name().to_string();
         cfg.verbose = true;
         cfg
+    }
+
+    pub(crate) fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+        let mut full_path = parent_path.clone();
+        full_path.push(self.inst.clone());
+        self.full_path = full_path.clone();
+
+        // Initialize full path for module's ports
+        self.module.init_full_path(full_path);
     }
 
     pub fn query(

@@ -11,6 +11,7 @@ pub trait RtlModuleTrait {
     fn module_name(&self) -> &'static str;
     fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
     fn set_instance(&mut self, inst: Arc<String>);
+    fn init_full_path(&mut self, full_path: Vec<Arc<String>>);
 }
 
 pub trait RtlModuleResultTrait {
