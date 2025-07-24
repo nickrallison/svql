@@ -1,9 +1,18 @@
+use std::sync::Arc;
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct InPort(pub String);
+pub struct InPort {
+    pub inst: Arc<String>,
+    pub full_path: Vec<Arc<String>>,
+}
 
 impl InPort {
     pub fn new<S: Into<String>>(s: S) -> InPort {
-        InPort(s.into())
+        let inst = Arc::new(s.into());
+        InPort {
+            inst,
+            full_path: vec![],
+        }
     }
     pub fn connect_to(&self, out_port: &OutPort) -> Connection<InPort, OutPort> {
         Connection::new(self.clone(), out_port.clone())
@@ -11,11 +20,18 @@ impl InPort {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct OutPort(pub String);
+pub struct OutPort {
+    pub inst: Arc<String>,
+    pub full_path: Vec<Arc<String>>,
+}
 
 impl OutPort {
     pub fn new<S: Into<String>>(s: S) -> OutPort {
-        OutPort(s.into())
+        let inst = Arc::new(s.into());
+        OutPort {
+            inst,
+            full_path: vec![],
+        }
     }
     pub fn connect_to(&self, in_port: &InPort) -> Connection<InPort, OutPort> {
         Connection::new(in_port.clone(), self.clone())

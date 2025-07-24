@@ -3,6 +3,7 @@ use crate::module::traits::{RtlModuleResultTrait, RtlModuleTrait};
 use crate::ports::{Connection, InPort, OutPort};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use svql_common::mat::IdString;
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,10 @@ impl RtlModuleTrait for And {
     fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
         todo!()
     }
+
+    fn set_instance(&mut self, inst: Arc<String>) {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -59,5 +64,23 @@ impl RtlModuleResultTrait for AndResult {
             b: lookup(&port_map, "b").expect("Port 'b' not found"),
             y: lookup(&port_map, "y").expect("Port 'y' not found"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::examples::and::And;
+    use crate::module::RtlModule;
+
+    #[test]
+    fn test_and_port_hierarchy() {
+        let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());
+
+        // and.connections
+
+        // let driver = Driver::Mock(MockDriver);
+        //
+        // let matches = double_and.query.query(&driver, inst, inst_path).unwrap();
+        // assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
     }
 }

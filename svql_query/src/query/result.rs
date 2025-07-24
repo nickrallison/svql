@@ -1,8 +1,11 @@
 use crate::query::traits::RtlQueryResultTrait;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct RtlQueryResult<QueryResultType> {
-    // pub cells: Vec<SanitizedCellData>,
+    pub inst: Arc<String>,
+    pub full_path: Vec<Arc<String>>,
+    // ################
     pub query: QueryResultType,
 }
 
@@ -10,7 +13,13 @@ impl<QueryResultType> RtlQueryResult<QueryResultType>
 where
     QueryResultType: RtlQueryResultTrait,
 {
-    pub fn new(query: QueryResultType) -> Self {
-        RtlQueryResult { query }
+    pub fn new(query: QueryResultType, inst: Arc<String>, parent_path: Vec<Arc<String>>) -> Self {
+        let mut full_path = parent_path;
+        full_path.push(inst.clone());
+        RtlQueryResult {
+            inst,
+            full_path,
+            query,
+        }
     }
 }

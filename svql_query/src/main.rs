@@ -34,7 +34,7 @@ fn main() {
     let driver = Driver::new_mock();
 
     // Directly query the driver for AND gate matches
-    let and: RtlModule<And> = RtlModule::new("and_gate".to_string(), And::new(), None);
+    let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());
     let cfg = and.config();
 
     match driver.query(&cfg) {

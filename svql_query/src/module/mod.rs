@@ -5,10 +5,10 @@ use crate::driver::{Driver, DriverConversionError, DriverError};
 use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
-use crate::query::traits::RtlBoxedQueryTrait;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::sync::Arc;
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::mat::IdString;
 use thiserror::Error;
@@ -18,38 +18,30 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone)]
-pub struct RtlModule<'a, ModuleType> {
-    pub inst: String,
+pub struct RtlModule<ModuleType> {
+    pub inst: Arc<String>,
+    pub full_path: Vec<Arc<String>>,
+    // ################
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub module: ModuleType,
-    // #####
-    pub parent: Option<&'a dyn RtlBoxedQueryTrait>,
 }
 
-impl<'a, ModuleType> RtlModule<'a, ModuleType>
+impl<ModuleType> RtlModule<ModuleType>
 where
     ModuleType: RtlModuleTrait,
 {
-    pub fn new(
-        inst: String,
-        module: ModuleType,
-        parent: Option<&'a dyn RtlBoxedQueryTrait>,
-    ) -> Self {
+    pub fn new(module: ModuleType, inst: String) -> Self {
         RtlModule {
-            inst,
+            inst: Arc::new(inst),
+            full_path: vec![],
             connections: EMPTY_CONNECTIONS.clone(),
             module,
-            parent,
         }
     }
 
-    pub fn instance(&self, parent: Option<&str>) -> String {
-        instance(&self.inst, parent)
-    }
-
-    pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
-        self.connections.insert(conn);
-    }
+    // pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
+    //     self.connections.insert(conn);
+    // }
 
     pub(crate) fn config(&self) -> SvqlRuntimeConfig {
         let mut cfg = SvqlRuntimeConfig::default();
@@ -65,15 +57,20 @@ where
     ) -> Result<Vec<RtlModuleResult<ModuleType::Result>>, DriverError> {
         let cfg = self.config();
         let matches = driver.query(&cfg)?;
+
+        let inst = self.inst.clone();
+        let full_path = self.full_path.clone();
+
         let iter = matches
             .into_iter()
             .map(RtlModuleResult::from_match)
+            .map(|mut result| {
+                result.inst = inst.clone();
+                result.full_path = full_path.clone();
+                result
+            })
             .collect();
         Ok(iter)
-    }
-
-    pub(crate) fn set_parent(&mut self, parent: Option<&'a dyn RtlBoxedQueryTrait>) {
-        self.parent = parent;
     }
 }
 

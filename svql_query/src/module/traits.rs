@@ -2,6 +2,7 @@ use crate::ports::{Connection, InPort, OutPort};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::sync::Arc;
 use svql_common::mat::IdString;
 
 pub trait RtlModuleTrait {
@@ -9,6 +10,7 @@ pub trait RtlModuleTrait {
     fn file_path(&self) -> PathBuf;
     fn module_name(&self) -> &'static str;
     fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
+    fn set_instance(&mut self, inst: Arc<String>);
 }
 
 pub trait RtlModuleResultTrait {
