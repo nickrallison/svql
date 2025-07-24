@@ -54,10 +54,13 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<impl Iterator<Item = RtlModuleResult<ModuleType::Result>>, DriverError> {
+    ) -> Result<Vec<RtlModuleResult<ModuleType::Result>>, DriverError> {
         let cfg = self.config();
         let matches = driver.query(&cfg)?;
-        let iter = matches.into_iter().map(RtlModuleResult::from_match);
+        let iter = matches
+            .into_iter()
+            .map(RtlModuleResult::from_match)
+            .collect();
         Ok(iter)
     }
 }

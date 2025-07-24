@@ -46,7 +46,7 @@ where
     pub fn query(
         &self,
         driver: &Driver,
-    ) -> Result<Box<dyn Iterator<Item = RtlQueryResult<QueryType::Result>> + '_>, DriverError> {
+    ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
         self.query.query(driver)
     }
 }

@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::connect;
 use crate::driver::{Driver, DriverError};
+use crate::module::result::RtlModuleResult;
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
 use crate::query::traits::{RtlQueryResultTrait, RtlQueryTrait};
@@ -43,43 +44,38 @@ impl RtlQueryTrait for DoubleAnd {
         connections
     }
 
-    fn query(
-        &self,
-        driver: &Driver,
-    ) -> Result<Box<dyn Iterator<Item = RtlQueryResult<Self::Result>> + '_>, DriverError> {
+    fn query(&self, driver: &Driver) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
         // // Get the query iterators for both AND gates
-        // let mut and1_results = self.and1.query(driver)?;
-        // let mut and2_results = self.and2.query(driver)?;
+        let and1_results = self.and1.query(driver)?;
+        let and2_results = self.and2.query(driver)?;
         //
         // // Create a cartesian product of the results
-        // let cartesian_product = iproduct!(and1_results, and2_results);
+        let cartesian_product = iproduct!(and1_results, and2_results);
         //
         // // Map the cartesian product to DoubleAndResult instances
-        // let matches = cartesian_product.map(|(and1_result, and2_result)| {
-        //     RtlQueryResult::new(
-        //         [and1_result.cells.clone(), and2_result.cells.clone()].concat(),
-        //         DoubleAndResult {
-        //             and1: Some(RtlModule::new("and1".to_string(), and1_result.module)),
-        //             and2: Some(RtlModule::new("and2".to_string(), and2_result.module)),
-        //         }
-        //     )
-        // });
-        //
-        // // Convert the iterator to RtlQueryQueryIterator
-        // Ok(RtlQueryQueryIterator { matches })
+        let matches = cartesian_product.map(|(and1_result, and2_result)| {
+            let double_and_result = DoubleAndResult::new(and1_result, and2_result);
+            RtlQueryResult::new(double_and_result)
+        });
+        let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
+            .filter(|match_result| {
+                // Check if the match is valid based on the connections
+                match_result.query.valid_connections(&self.connect())
+            })
+            .collect();
 
-        todo!();
+        Ok(filtered_matches)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DoubleAndResult {
-    pub and1: RtlModule<AndResult>,
-    pub and2: RtlModule<AndResult>,
+    pub and1: RtlModuleResult<AndResult>,
+    pub and2: RtlModuleResult<AndResult>,
 }
 
 impl DoubleAndResult {
-    pub fn new(and1: RtlModule<AndResult>, and2: RtlModule<AndResult>) -> Self {
+    pub fn new(and1: RtlModuleResult<AndResult>, and2: RtlModuleResult<AndResult>) -> Self {
         DoubleAndResult { and1, and2 }
     }
 }

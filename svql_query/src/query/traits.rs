@@ -11,12 +11,14 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-    fn query(
-        &self,
-        driver: &Driver,
-    ) -> Result<Box<dyn Iterator<Item = RtlQueryResult<Self::Result>> + '_>, DriverError>;
+    fn query(&self, driver: &Driver) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError>;
 }
 
 pub trait RtlQueryResultTrait {
     fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
+    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
+        // Default implementation can be overridden if needed
+        todo!();
+        true
+    }
 }

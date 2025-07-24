@@ -24,6 +24,7 @@ impl And {
 
 impl RtlModuleTrait for And {
     type Result = AndResult;
+    // type ModuleIter = ();
 
     fn file_path(&self) -> PathBuf {
         "svql_query/verilog/and.v".into()
