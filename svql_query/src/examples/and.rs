@@ -1,7 +1,7 @@
 use crate::module::lookup;
 use crate::module::traits::{RtlModuleResultTrait, RtlModuleTrait};
-use crate::ports::{InPort, OutPort};
-use std::collections::HashMap;
+use crate::ports::{Connection, InPort, OutPort};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use svql_common::mat::IdString;
 
@@ -32,6 +32,10 @@ impl RtlModuleTrait for And {
 
     fn module_name(&self) -> &'static str {
         "and_gate"
+    }
+
+    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
+        todo!()
     }
 }
 

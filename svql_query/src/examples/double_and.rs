@@ -1,5 +1,6 @@
 use crate::examples::and::{And, AndResult};
 use crate::module::RtlModule;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use crate::connect;
@@ -7,27 +8,29 @@ use crate::driver::{Driver, DriverError};
 use crate::module::result::RtlModuleResult;
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
-use crate::query::traits::{RtlQueryResultTrait, RtlQueryTrait};
+use crate::query::traits::{RtlBoxedQueryTrait, RtlQueryResultTrait, RtlQueryTrait};
 use itertools::iproduct;
 use std::fmt::Debug;
-use svql_common::mat::{IdString, SanitizedQueryMatch};
+use std::sync::Arc;
+use svql_common::mat::IdString;
 
 #[derive(Debug, Clone)]
-pub struct DoubleAnd {
-    pub and1: RtlModule<And>,
-    pub and2: RtlModule<And>,
+pub struct DoubleAnd<'a> {
+    pub and1: RtlModule<'a, And>,
+    pub and2: RtlModule<'a, And>,
 }
 
-impl DoubleAnd {
+impl<'a> DoubleAnd<'a> {
     pub fn new() -> Self {
-        DoubleAnd {
-            and1: RtlModule::new("and1".into(), And::new()),
-            and2: RtlModule::new("and2".into(), And::new()),
-        }
+        todo!();
+        // DoubleAnd {
+        //     and1: RtlModule::new("and1".into(), And::new()),
+        //     and2: RtlModule::new("and2".into(), And::new()),
+        // }
     }
 }
 
-impl RtlQueryTrait for DoubleAnd {
+impl<'a> RtlQueryTrait<'a> for DoubleAnd<'a> {
     type Result = DoubleAndResult;
 
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>> {
@@ -66,6 +69,12 @@ impl RtlQueryTrait for DoubleAnd {
 
         Ok(filtered_matches)
     }
+
+    fn set_parent(&mut self, parent: Option<&'a dyn RtlBoxedQueryTrait>) {
+        // Set the parent for both AND modules
+        self.and1.set_parent(parent);
+        self.and2.set_parent(parent);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -81,9 +90,9 @@ impl DoubleAndResult {
 }
 
 impl RtlQueryResultTrait for DoubleAndResult {
-    fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self {
-        todo!()
-    }
+    // fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self {
+    //     todo!()
+    // }
 }
 
 #[cfg(test)]
@@ -96,7 +105,7 @@ mod tests {
     #[test]
     fn test_double_and() {
         let double_and: RtlQuery<DoubleAnd> =
-            RtlQuery::new("double_and".to_string(), DoubleAnd::new());
+            RtlQuery::new("double_and".to_string(), DoubleAnd::new(), None);
 
         let driver = Driver::Mock(MockDriver);
 

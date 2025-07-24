@@ -8,9 +8,7 @@ pub trait RtlModuleTrait {
     type Result: Debug + RtlModuleResultTrait;
     fn file_path(&self) -> PathBuf;
     fn module_name(&self) -> &'static str;
-    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
-        todo!()
-    }
+    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
 }
 
 pub trait RtlModuleResultTrait {

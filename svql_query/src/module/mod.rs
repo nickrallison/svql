@@ -5,6 +5,7 @@ use crate::driver::{Driver, DriverConversionError, DriverError};
 use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
+use crate::query::traits::RtlBoxedQueryTrait;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -17,22 +18,28 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone)]
-pub struct RtlModule<ModuleType> {
+pub struct RtlModule<'a, ModuleType> {
     pub inst: String,
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub module: ModuleType,
     // #####
+    pub parent: Option<&'a dyn RtlBoxedQueryTrait>,
 }
 
-impl<ModuleType> RtlModule<ModuleType>
+impl<'a, ModuleType> RtlModule<'a, ModuleType>
 where
     ModuleType: RtlModuleTrait,
 {
-    pub fn new(inst: String, module: ModuleType) -> Self {
+    pub fn new(
+        inst: String,
+        module: ModuleType,
+        parent: Option<&'a dyn RtlBoxedQueryTrait>,
+    ) -> Self {
         RtlModule {
             inst,
             connections: EMPTY_CONNECTIONS.clone(),
             module,
+            parent,
         }
     }
 
@@ -63,6 +70,10 @@ where
             .map(RtlModuleResult::from_match)
             .collect();
         Ok(iter)
+    }
+
+    pub(crate) fn set_parent(&mut self, parent: Option<&'a dyn RtlBoxedQueryTrait>) {
+        self.parent = parent;
     }
 }
 
