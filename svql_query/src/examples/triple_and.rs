@@ -1,10 +1,10 @@
 use crate::examples::and::{And, AndResult};
-use crate::module::{RtlModule, RtlQueryResultTrait, RtlQueryTrait};
+use crate::module::{Queryable, RtlModule, RtlQueryResultTrait, RtlQueryTrait};
 use std::collections::HashSet;
 
-use crate::connect;
 use crate::ports::{Connection, InPort, OutPort};
 use std::fmt::Debug;
+use svql_common::mat::{IdString, SanitizedQueryMatch};
 
 #[derive(Debug, Clone)]
 pub struct TripleAnd {
@@ -28,9 +28,31 @@ impl RtlQueryTrait for TripleAnd {
 
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>> {
         let mut connections = HashSet::new();
-        connect!(&mut connections, &self.and1.module.y, &self.and2.module.a);
-        connect!(&mut connections, &self.and2.module.y, &self.and3.module.a);
+        // Try using hierarchical names for the ports
+        connections.insert(Connection::new(
+            InPort::new("and2.a"),
+            OutPort::new("and1.y"),
+        ));
+        connections.insert(Connection::new(
+            InPort::new("and3.a"),
+            OutPort::new("and2.y"),
+        ));
+
+        // Print connections for debugging
+        log::trace!("TripleAnd connections:");
+        for conn in &connections {
+            log::trace!("  {} -> {}", conn.out_port.0, conn.in_port.0);
+        }
+
         connections
+    }
+
+    fn sub_modules(&self) -> Vec<&dyn Queryable> {
+        vec![&self.and1, &self.and2, &self.and3]
+    }
+
+    fn sub_queries(&self) -> Vec<&dyn Queryable> {
+        vec![]
     }
 }
 
@@ -47,4 +69,15 @@ impl TripleAndResult {
     }
 }
 
-impl RtlQueryResultTrait for TripleAndResult {}
+impl RtlQueryResultTrait for TripleAndResult {
+    // fn from_matches(_matches: Vec<SanitizedQueryMatch>) -> Self {
+    //     // In a real implementation, you would extract the appropriate data from the matches
+    //     // For now, we'll create placeholder instances with named IdStrings
+    //     let placeholder_id = IdString::Named("placeholder".to_string());
+    //     TripleAndResult {
+    //         and1: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id.clone()),
+    //         and2: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id.clone()),
+    //         and3: AndResult::new(placeholder_id.clone(), placeholder_id.clone(), placeholder_id),
+    //     }
+    // }
+}

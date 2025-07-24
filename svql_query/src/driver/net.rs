@@ -38,6 +38,7 @@ pub enum SvqlDriverNetError {
     IdStringError(#[from] svql_common::mat::IdStringError),
 }
 
+// Make the function public for use in mock driver
 pub fn run_svql_query_net<A: ToSocketAddrs>(
     addr: A,
     cfg: &SvqlRuntimeConfig,
@@ -47,7 +48,7 @@ pub fn run_svql_query_net<A: ToSocketAddrs>(
     let mut stream =
         TcpStream::connect(addr).map_err(|e| SvqlDriverNetError::ConnectionError(e.to_string()))?;
 
-    // 2. send it (driver expects '\n' terminated line)
+    // 2. send it (driver expects newline terminated line)
     stream
         .write_all(format!("{}\n", json_cfg).as_bytes())
         .map_err(|e| SvqlDriverNetError::ConnectionError(e.to_string()))?;

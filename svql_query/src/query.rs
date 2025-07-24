@@ -30,6 +30,7 @@ pub fn try_merge_matches(
             }
             Entry::Occupied(e) => {
                 if e.get() != v {
+                    trace!("Port maps conflict on key {:?}: {:?} != {:?}", k, e.get(), v);
                     return None;
                 }
             }
@@ -44,6 +45,7 @@ pub fn try_merge_matches(
             }
             Entry::Occupied(e) => {
                 if e.get() != v {
+                    trace!("Cell maps conflict on key {:?}: {:?} != {:?}", k, e.get(), v);
                     return None;
                 }
             }
@@ -61,24 +63,36 @@ pub fn connections_satisfied(
     conns: &HashSet<Connection<InPort, OutPort>>,
 ) -> bool {
     trace!("connections_satisfied()");
+    trace!("match port_map: {:#?}", m.port_map);
+    
     for c in conns {
-        trace!("needs  {} == {}", c.in_port.0, c.out_port.0);
+        trace!("checking connection: {} == {}", c.in_port.0, c.out_port.0);
     }
 
-    conns.iter().all(|c| {
+    let result = conns.iter().all(|c| {
         let k_lhs = IdString::Named(c.in_port.0.clone());
         let k_rhs = IdString::Named(c.out_port.0.clone());
 
+        let lhs_value = m.port_map.get(&k_lhs);
+        let rhs_value = m.port_map.get(&k_rhs);
+        
+        trace!("Looking for keys: {:?} and {:?}", k_lhs, k_rhs);
+        trace!("Values found: {:?} and {:?}", lhs_value, rhs_value);
+
         let res = matches!(
-            (m.port_map.get(&k_lhs), m.port_map.get(&k_rhs)),
+            (lhs_value, rhs_value),
             (Some(x), Some(y)) if x == y
         );
+        
         trace!(
             "{:?} == {:?}  → {}",
-            m.port_map.get(&k_lhs),
-            m.port_map.get(&k_rhs),
+            lhs_value,
+            rhs_value,
             res
         );
         res
-    })
+    });
+    
+    trace!("connections_satisfied result: {}", result);
+    result
 }

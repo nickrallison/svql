@@ -50,7 +50,7 @@ where
         self.connections.insert(conn);
     }
 
-    fn config(&self) -> SvqlRuntimeConfig {
+    pub(crate) fn config(&self) -> SvqlRuntimeConfig {
         let mut cfg = SvqlRuntimeConfig::default();
         cfg.pat_filename = self.module.file_path().to_string_lossy().into_owned();
         cfg.pat_module_name = self.module.module_name().to_string();
@@ -97,12 +97,30 @@ where
 
 // ###################
 
+// Define a trait for queryable components (both modules and queries)
+pub trait Queryable {
+    fn query(&self, driver: &Driver) -> Result<Vec<SanitizedQueryMatch>, DriverError>;
+}
+
+impl<M: RtlModuleTrait> Queryable for RtlModule<M> {
+    fn query(&self, driver: &Driver) -> Result<Vec<SanitizedQueryMatch>, DriverError> {
+        let cfg = self.config();
+        driver.query(&cfg)
+    }
+}
+
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.
     type Result: Debug + RtlQueryResultTrait;
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
+
+    /// Get submodules that are part of this query
+    fn sub_modules(&self) -> Vec<&dyn Queryable>;
+
+    /// Get subqueries that are part of this query
+    fn sub_queries(&self) -> Vec<&dyn Queryable>;
 }
 
 pub trait RtlQueryResultTrait {}
@@ -121,7 +139,7 @@ where
     pub fn new(inst: String, query: QueryType) -> Self {
         RtlQuery {
             inst,
-            connections: EMPTY_CONNECTIONS.clone(),
+            connections: QueryType::connect(&query),
             query,
         }
     }
@@ -136,7 +154,7 @@ where
 
     pub fn query(
         &self,
-        driver: &Driver,
+        _driver: &Driver,
     ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
         todo!("Implement RtlQuery::query method");
     }
