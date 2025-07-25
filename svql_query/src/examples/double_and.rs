@@ -109,9 +109,9 @@ impl DoubleAndResult {
 }
 
 impl RtlQueryResultTrait for DoubleAndResult {
-    // fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self {
-    //     todo!()
-    // }
+    fn validate_connection(&self, connections: &Connection<InPort, OutPort>) -> bool {
+        todo!()
+    }
 }
 
 #[cfg(test)]

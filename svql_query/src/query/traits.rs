@@ -21,10 +21,13 @@ pub trait RtlQueryTrait {
 }
 
 pub trait RtlQueryResultTrait {
-    // fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
-    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
-        // Default implementation can be overridden if needed
-        // todo!();
+    fn validate_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
+        for conn in connections {
+            if !self.validate_connection(conn) {
+                return false;
+            }
+        }
         true
     }
+    fn validate_connection(&self, connections: &Connection<InPort, OutPort>) -> bool;
 }

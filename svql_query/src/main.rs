@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use crate::driver::mock::MockDriver;
 use crate::driver::Driver;
 use crate::examples::and::And;
@@ -35,7 +36,12 @@ fn main() {
     log::trace!("Starting svql_query");
 
     // Use mock driver for testing
-    let driver = Driver::new_mock();
+    let double_and: RtlQuery<DoubleAnd> = RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
+
+    let driver = Driver::Mock(MockDriver);
+
+    let matches = double_and.query(&driver).unwrap();
+    assert_eq!(matches.len(), 2, "Expected 2 matches for DoubleAnd query");
 
     // Directly query the driver for AND gate matches
     // let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());

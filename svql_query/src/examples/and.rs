@@ -34,10 +34,12 @@ impl RtlModuleTrait for And {
         "and_gate"
     }
 
+    #[allow(unused_variables)]
     fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
         todo!()
     }
 
+    #[allow(unused_variables)]
     fn set_instance(&mut self, inst: Arc<String>) {
         todo!()
     }
@@ -68,23 +70,5 @@ impl RtlModuleResultTrait for AndResult {
             b: lookup(&port_map, "b").expect("Port 'b' not found"),
             y: lookup(&port_map, "y").expect("Port 'y' not found"),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::examples::and::And;
-    use crate::module::RtlModule;
-
-    #[test]
-    fn test_and_port_hierarchy() {
-        let and: RtlModule<And> = RtlModule::new(And::new(), "and_gate".to_string());
-
-        // and.connections
-
-        // let driver = Driver::Mock(MockDriver);
-        //
-        // let matches = double_and.query.query(&driver, inst, inst_path).unwrap();
-        // assert!(matches.len() == 2, "Expected 2 matches for DoubleAnd query");
     }
 }
