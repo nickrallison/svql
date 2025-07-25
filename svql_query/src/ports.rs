@@ -18,6 +18,7 @@ impl InPort {
         in_port.init_full_path(vec![].into());
         in_port
     }
+    #[allow(dead_code)]
     pub fn connect_to(&self, out_port: &OutPort) -> Connection<InPort, OutPort> {
         Connection::new(self.clone(), out_port.clone())
     }
@@ -27,6 +28,7 @@ impl InPort {
         full_path.push_back(self.inst.clone());
         self.full_path = full_path;
     }
+    #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
         inst_path(&self.full_path)
     }
@@ -48,6 +50,7 @@ impl OutPort {
         out_port.init_full_path(vec![].into());
         out_port
     }
+    #[allow(dead_code)]
     pub fn connect_to(&self, in_port: &InPort) -> Connection<InPort, OutPort> {
         Connection::new(in_port.clone(), self.clone())
     }
@@ -58,6 +61,7 @@ impl OutPort {
         self.full_path = full_path;
     }
 
+    #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
         inst_path(&self.full_path)
     }

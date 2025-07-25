@@ -1,13 +1,14 @@
 use crate::module::traits::RtlModuleResultTrait;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use svql_common::mat::{SanitizedCellData, SanitizedQueryMatch};
+use svql_common::matches::{SanitizedCellData, SanitizedQueryMatch};
 
 #[derive(Debug, Clone)]
 pub struct RtlModuleResult<ModuleResultType> {
     pub inst: Arc<String>,
     pub full_path: VecDeque<Arc<String>>,
     // ################
+    #[allow(dead_code)]
     pub cells: Vec<SanitizedCellData>,
     pub module: ModuleResultType,
 }

@@ -1,12 +1,10 @@
 use crate::driver::{Driver, DriverError};
 use crate::module::inst_path;
-use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
 use crate::query::traits::RtlQueryTrait;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::Arc;
-use svql_common::config::ffi::SvqlRuntimeConfig;
 
 pub mod result;
 pub mod traits;
@@ -16,7 +14,7 @@ pub struct RtlQuery<QueryType> {
     pub inst: Arc<String>,
     pub full_path: VecDeque<Arc<String>>,
     // ################
-    pub connections: HashSet<Connection<InPort, OutPort>>,
+    // pub connections: HashSet<Connection<InPort, OutPort>>,
     pub query: QueryType,
 }
 
@@ -28,28 +26,21 @@ where
         let mut query = RtlQuery {
             inst: Arc::new(inst),
             full_path: vec![].into(),
-            connections: QueryType::connect(&query),
+            // connections: QueryType::connect(&query),
             query,
         };
         query.init_full_path(vec![].into());
         query
     }
 
+    #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
         inst_path(&self.full_path)
     }
 
-    pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
-        self.connections.insert(conn);
-    }
-
-    pub(crate) fn config(&self) -> SvqlRuntimeConfig {
-        let mut cfg = SvqlRuntimeConfig::default();
-        // For queries, we'll need to define how to get the file path and module name
-        // This might need to be added to RtlQueryTrait or handled differently
-        cfg.verbose = true;
-        cfg
-    }
+    // pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
+    //     self.connections.insert(conn);
+    // }
 
     pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
         let mut full_path = parent_path.clone();

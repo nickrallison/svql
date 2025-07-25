@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-svql_common = { path = "../svql_common" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
+
+svql_common.workspace = true
+svql_query_proc_macro.workspace = true
+
+# ---------------------
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 lazy_static.workspace = true
-log = "0.4.27"
-env_logger = "0.11.5"
-itertools = "0.14.0"
+log.workspace = true
+env_logger.workspace = true
+itertools.workspace = true

@@ -1,10 +1,10 @@
 use crate::module::lookup;
 use crate::module::traits::{RtlModuleResultTrait, RtlModuleTrait};
-use crate::ports::{Connection, InPort, OutPort};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::ports::{InPort, OutPort};
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
-use svql_common::mat::IdString;
+use svql_common::matches::IdString;
 
 #[derive(Debug, Clone)]
 pub struct And {
@@ -34,15 +34,15 @@ impl RtlModuleTrait for And {
         "and_gate"
     }
 
-    #[allow(unused_variables)]
-    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
-        todo!()
-    }
-
-    #[allow(unused_variables)]
-    fn set_instance(&mut self, inst: Arc<String>) {
-        todo!()
-    }
+    // #[allow(unused_variables)]
+    // fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
+    //     todo!()
+    // }
+    //
+    // #[allow(unused_variables)]
+    // fn set_instance(&mut self, inst: Arc<String>) {
+    //     todo!()
+    // }
     fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>) {
         self.a.init_full_path(full_path.clone());
         self.b.init_full_path(full_path.clone());
@@ -58,6 +58,7 @@ pub struct AndResult {
 }
 
 impl AndResult {
+    #[allow(dead_code)]
     pub fn new(a: IdString, b: IdString, y: IdString) -> Self {
         AndResult { a, b, y }
     }

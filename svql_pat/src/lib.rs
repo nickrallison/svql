@@ -1,4 +1,3 @@
-
 // svql_pat/src/lib.rs
 
 //! # SVQL Pattern Extraction Library
@@ -57,35 +56,35 @@
 //! - The `svql_pat_lib.so` plugin must be built and available
 //! - Input Verilog files must be syntactically correct
 
+use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use regex::Regex;
+use svql_common::pattern::ffi::Pattern;
 use thiserror::Error;
-use svql_common::pat::Pattern;
 
 #[derive(Error, Debug)]
 pub enum SvqlPatError {
     #[error("File not found: {path}")]
     FileNotFound { path: PathBuf },
-    
+
     #[error("Module '{module}' not found in file '{file}'")]
     ModuleNotFound { module: String, file: PathBuf },
-    
+
     #[error("Verilog syntax error in file '{file}': {details}")]
     SyntaxError { file: PathBuf, details: String },
-    
+
     #[error("Failed to execute yosys: {details}")]
     YosysExecutionError { details: String },
-    
+
     #[error("Failed to parse yosys output: {details}")]
     ParseError { details: String },
-    
+
     #[error("JSON parsing error: {details}")]
     JsonError { details: String },
-    
+
     #[error("Pattern creation failed: {details}")]
     PatternCreationError { details: String },
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -93,13 +92,13 @@ pub enum SvqlPatError {
 pub type Result<T> = std::result::Result<T, SvqlPatError>;
 
 /// Extract pattern information from a Verilog file using yosys
-/// 
+///
 /// # Arguments
 /// * `verilog_file` - Path to the Verilog file
 /// * `module_name` - Name of the module to extract pattern from
 /// * `yosys_bin_path` - Optional path to yosys binary (defaults to finding it in the workspace)
 /// * `plugin_lib_path` - Optional path to the svql_pat_lib plugin (defaults to finding it in build dir)
-/// 
+///
 /// # Returns
 /// A Result containing the Pattern or an error
 pub fn extract_pattern<P: AsRef<Path>>(
@@ -109,30 +108,31 @@ pub fn extract_pattern<P: AsRef<Path>>(
     plugin_lib_path: Option<P>,
 ) -> Result<Pattern> {
     let verilog_path = verilog_file.as_ref();
-    
+
     // Check if file exists
     if !verilog_path.exists() {
         return Err(SvqlPatError::FileNotFound {
             path: verilog_path.to_path_buf(),
         });
     }
-    
+
     // Determine paths to yosys and plugin
     let yosys_bin = if let Some(path) = yosys_bin_path {
         path.as_ref().to_path_buf()
     } else {
         find_yosys_binary()?
     };
-    
+
     let plugin_lib = if let Some(path) = plugin_lib_path {
         path.as_ref().to_path_buf()
     } else {
         find_plugin_library()?
     };
-    
+
     // Build yosys command
     let mut cmd = Command::new(&yosys_bin);
-    cmd.arg("-m").arg(&plugin_lib)
+    cmd.arg("-m")
+        .arg(&plugin_lib)
         .arg(verilog_path)
         .arg("-p")
         .arg(format!(
@@ -141,15 +141,17 @@ pub fn extract_pattern<P: AsRef<Path>>(
             module_name,
             verilog_path.display()
         ));
-    
+
     // Execute yosys
-    let output = cmd.output().map_err(|e| SvqlPatError::YosysExecutionError {
-        details: format!("Failed to run yosys: {}", e),
-    })?;
-    
+    let output = cmd
+        .output()
+        .map_err(|e| SvqlPatError::YosysExecutionError {
+            details: format!("Failed to run yosys: {}", e),
+        })?;
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     // Check for errors in the output
     if !output.status.success() {
         // Check if it's a module not found error from yosys hierarchy command
@@ -159,13 +161,16 @@ pub fn extract_pattern<P: AsRef<Path>>(
                 file: verilog_path.to_path_buf(),
             });
         }
-        
+
         return Err(SvqlPatError::YosysExecutionError {
-            details: format!("Yosys exited with code {}: {}", 
-                output.status.code().unwrap_or(-1), stderr),
+            details: format!(
+                "Yosys exited with code {}: {}",
+                output.status.code().unwrap_or(-1),
+                stderr
+            ),
         });
     }
-    
+
     // Parse the output for specific errors
     parse_yosys_output(&stdout, &stderr, verilog_path, module_name)
 }
@@ -201,7 +206,7 @@ fn parse_yosys_output(
             });
         }
     }
-    
+
     // Check for Verilog syntax errors in stderr
     if stderr.contains("syntax error") || stderr.contains("Parse error") {
         return Err(SvqlPatError::SyntaxError {
@@ -209,16 +214,18 @@ fn parse_yosys_output(
             details: extract_syntax_error_details(stderr),
         });
     }
-    
+
     // Look for JSON pattern between markers
-    let json_regex = Regex::new(r"(?s)SVQL_PAT_JSON_BEGIN\n(.*?)\nSVQL_PAT_JSON_END")
-        .map_err(|e| SvqlPatError::ParseError {
-            details: format!("Failed to create regex: {}", e),
+    let json_regex =
+        Regex::new(r"(?s)SVQL_PAT_JSON_BEGIN\n(.*?)\nSVQL_PAT_JSON_END").map_err(|e| {
+            SvqlPatError::ParseError {
+                details: format!("Failed to create regex: {}", e),
+            }
         })?;
-    
+
     if let Some(captures) = json_regex.captures(stdout) {
         let json_str = captures.get(1).unwrap().as_str();
-        
+
         // Parse JSON to Pattern
         serde_json::from_str::<Pattern>(json_str).map_err(|e| SvqlPatError::JsonError {
             details: format!("Failed to parse JSON: {}", e),
@@ -236,13 +243,11 @@ fn extract_syntax_error_details(stderr: &str) -> String {
     let syntax_lines: Vec<&str> = stderr
         .lines()
         .filter(|line| {
-            line.contains("syntax error") || 
-            line.contains("Parse error") ||
-            line.contains("ERROR:")
+            line.contains("syntax error") || line.contains("Parse error") || line.contains("ERROR:")
         })
         .take(3) // Take first few error lines
         .collect();
-    
+
     if syntax_lines.is_empty() {
         "Unknown syntax error".to_string()
     } else {
@@ -259,14 +264,14 @@ fn find_yosys_binary() -> Result<PathBuf> {
         "../yosys/yosys",
         "build/yosys/yosys",
     ];
-    
+
     for path in &possible_paths {
         let candidate = PathBuf::from(path);
         if candidate.exists() {
             return Ok(candidate);
         }
     }
-    
+
     // Try system PATH
     if let Ok(output) = Command::new("which").arg("yosys").output() {
         if output.status.success() {
@@ -275,7 +280,7 @@ fn find_yosys_binary() -> Result<PathBuf> {
             return Ok(PathBuf::from(path_str));
         }
     }
-    
+
     Err(SvqlPatError::YosysExecutionError {
         details: "Could not find yosys binary".to_string(),
     })
@@ -289,14 +294,14 @@ fn find_plugin_library() -> Result<PathBuf> {
         "../build/svql_pat_lib/libsvql_pat_lib.so",
         "svql_pat_lib/libsvql_pat_lib.so",
     ];
-    
+
     for path in &possible_paths {
         let candidate = PathBuf::from(path);
         if candidate.exists() {
             return Ok(candidate);
         }
     }
-    
+
     Err(SvqlPatError::YosysExecutionError {
         details: "Could not find svql_pat_lib plugin library".to_string(),
     })
@@ -308,21 +313,22 @@ pub fn extract_pattern_default<P: AsRef<Path>>(
     module_name: &str,
 ) -> Result<Pattern> {
     let verilog_path = verilog_file.as_ref();
-    
+
     // Check if file exists
     if !verilog_path.exists() {
         return Err(SvqlPatError::FileNotFound {
             path: verilog_path.to_path_buf(),
         });
     }
-    
+
     // Determine paths to yosys and plugin
     let yosys_bin = find_yosys_binary()?;
     let plugin_lib = find_plugin_library()?;
-    
+
     // Build yosys command
     let mut cmd = Command::new(&yosys_bin);
-    cmd.arg("-m").arg(&plugin_lib)
+    cmd.arg("-m")
+        .arg(&plugin_lib)
         .arg(verilog_path)
         .arg("-p")
         .arg(format!(
@@ -331,15 +337,17 @@ pub fn extract_pattern_default<P: AsRef<Path>>(
             module_name,
             verilog_path.display()
         ));
-    
+
     // Execute yosys
-    let output = cmd.output().map_err(|e| SvqlPatError::YosysExecutionError {
-        details: format!("Failed to run yosys: {}", e),
-    })?;
-    
+    let output = cmd
+        .output()
+        .map_err(|e| SvqlPatError::YosysExecutionError {
+            details: format!("Failed to run yosys: {}", e),
+        })?;
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     // Check for errors in the output
     if !output.status.success() {
         // Check if it's a module not found error from yosys hierarchy command
@@ -349,13 +357,16 @@ pub fn extract_pattern_default<P: AsRef<Path>>(
                 file: verilog_path.to_path_buf(),
             });
         }
-        
+
         return Err(SvqlPatError::YosysExecutionError {
-            details: format!("Yosys exited with code {}: {}", 
-                output.status.code().unwrap_or(-1), stderr),
+            details: format!(
+                "Yosys exited with code {}: {}",
+                output.status.code().unwrap_or(-1),
+                stderr
+            ),
         });
     }
-    
+
     // Parse the output for specific errors
     parse_yosys_output(&stdout, &stderr, verilog_path, module_name)
 }
@@ -371,7 +382,7 @@ mod tests {
             path: PathBuf::from("test.v"),
         };
     }
-    
+
     #[test]
     fn test_parse_syntax_error() {
         let stderr = "ERROR: Syntax error in line 5\nParse error: unexpected token";

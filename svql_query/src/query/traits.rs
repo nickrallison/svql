@@ -4,7 +4,7 @@ use crate::query::result::RtlQueryResult;
 use std::collections::{HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
-use svql_common::mat::IdString;
+use svql_common::matches::IdString;
 
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.

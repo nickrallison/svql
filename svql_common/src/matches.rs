@@ -1,4 +1,4 @@
-use crate::mat::ffi::{CellData, QueryMatchList};
+use crate::matches::ffi::{CellData, QueryMatchList};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};

@@ -28,5 +28,5 @@ add_subdirectory(svql_common)
 add_subdirectory(yosys)
 add_subdirectory(svql_driver)
 
-# add_subdirectory(svql_pat)
-# add_subdirectory(svql_pat_lib)
+add_subdirectory(svql_pat)
+add_subdirectory(svql_pat_lib)

@@ -1,16 +1,15 @@
-use crate::ports::{Connection, InPort, OutPort};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
-use svql_common::mat::IdString;
+use svql_common::matches::IdString;
 
 pub trait RtlModuleTrait {
     type Result: Debug + RtlModuleResultTrait;
     fn file_path(&self) -> PathBuf;
     fn module_name(&self) -> &'static str;
-    fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
-    fn set_instance(&mut self, inst: Arc<String>);
+    // fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
+    // fn set_instance(&mut self, inst: Arc<String>);
     fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>);
 }
 

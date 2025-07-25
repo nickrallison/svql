@@ -1,14 +1,24 @@
 [workspace]
+members = [
+    "svql_common",
+    "svql_pat",
+    "svql_query",
+    "svql_query_proc_macro",
+]
 resolver = "3"
-members = [ 
-    "svql_common" , 
-    #"svql_pat", 
-    "svql_query" ]
 
 [workspace.dependencies]
-cbindgen = "0.29"
+svql_common = { path = "svql_common" }
+svql_pat = { path = "svql_pat" }
+svql_query = { path = "svql_query" }
+svql_query_proc_macro = { path = "svql_query_proc_macro" }
+# ---------------------
+
 lazy_static = "1.5.0"
 regex = "1.11.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+log = "0.4.27"
+env_logger = "0.11.5"
+itertools = "0.14.0"

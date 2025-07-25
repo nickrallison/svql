@@ -12,7 +12,7 @@ use crate::query::traits::{RtlQueryResultTrait, RtlQueryTrait};
 use itertools::iproduct;
 use std::fmt::Debug;
 use std::sync::Arc;
-use svql_common::mat::IdString;
+use svql_common::matches::IdString;
 
 #[derive(Debug, Clone)]
 pub struct DoubleAnd {

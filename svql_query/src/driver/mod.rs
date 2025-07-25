@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 use crate::driver::mock::MockDriver;
 use crate::driver::net::{NetDriver, SvqlDriverNetError};
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use svql_common::mat::SanitizedQueryMatch;
+use svql_common::matches::SanitizedQueryMatch;
 
 use thiserror::Error;
 
@@ -30,17 +32,17 @@ impl DriverIterator {
         DriverIterator { matches }
     }
 
-    pub fn len(&self) -> usize {
-        self.matches.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.matches.is_empty()
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<SanitizedQueryMatch> {
-        self.matches.iter()
-    }
+    // pub fn len(&self) -> usize {
+    //     self.matches.len()
+    // }
+    //
+    // pub fn is_empty(&self) -> bool {
+    //     self.matches.is_empty()
+    // }
+    //
+    // pub fn iter(&self) -> std::slice::Iter<SanitizedQueryMatch> {
+    //     self.matches.iter()
+    // }
 }
 
 pub enum Driver {
@@ -68,7 +70,7 @@ impl Driver {
 #[derive(Debug, Clone, Error)]
 pub enum DriverConversionError {
     #[error("Query match conversion error: {0}")]
-    IdStringError(#[from] svql_common::mat::IdStringError),
+    IdStringError(#[from] svql_common::matches::IdStringError),
 }
 
 #[derive(Debug, Error)]

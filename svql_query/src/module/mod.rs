@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use svql_common::mat::IdString;
+use svql_common::matches::IdString;
 use thiserror::Error;
 
 lazy_static! {
@@ -22,7 +22,7 @@ pub struct RtlModule<ModuleType> {
     pub inst: Arc<String>,
     pub full_path: VecDeque<Arc<String>>,
     // ################
-    pub connections: HashSet<Connection<InPort, OutPort>>,
+    // pub connections: HashSet<Connection<InPort, OutPort>>,
     pub module: ModuleType,
 }
 
@@ -34,7 +34,7 @@ where
         let mut module = RtlModule {
             inst: Arc::new(inst),
             full_path: vec![].into(),
-            connections: EMPTY_CONNECTIONS.clone(),
+            // connections: EMPTY_CONNECTIONS.clone(),
             module,
         };
         module.init_full_path(vec![].into());
@@ -62,6 +62,7 @@ where
         self.module.init_full_path(full_path);
     }
 
+    #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
         inst_path(&self.full_path)
     }

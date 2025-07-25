@@ -1,5 +1,3 @@
-
 pub mod config;
-pub mod pat;
-pub mod mat;
-
+pub mod matches;
+pub mod pattern;

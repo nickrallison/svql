@@ -2,7 +2,7 @@ use crate::driver::net::SvqlDriverNetError;
 use crate::driver::DriverIterator;
 use std::collections::HashMap;
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use svql_common::mat::{IdString, SanitizedCellData, SanitizedQueryMatch};
+use svql_common::matches::{IdString, SanitizedCellData, SanitizedQueryMatch};
 
 pub struct MockDriver;
 
