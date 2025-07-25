@@ -16,22 +16,6 @@ impl<ModuleResultType> RtlModuleResult<ModuleResultType>
 where
     ModuleResultType: RtlModuleResultTrait,
 {
-    fn new(
-        inst: String,
-        parent_path: VecDeque<Arc<String>>,
-        cells: Vec<SanitizedCellData>,
-        module: ModuleResultType,
-    ) -> Self {
-        let inst = Arc::new(inst);
-        let mut full_path = parent_path;
-        full_path.push_back(inst.clone());
-        RtlModuleResult {
-            inst,
-            full_path,
-            cells,
-            module,
-        }
-    }
     pub(crate) fn from_match(m: SanitizedQueryMatch) -> Self {
         let module = ModuleResultType::from_portmap(m.port_map);
         Self {

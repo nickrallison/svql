@@ -65,11 +65,7 @@ where
         driver: &Driver,
     ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
         let inst = self.inst.clone();
-        let parent_path = self.full_path.clone();
-
-        let mut full_path = parent_path.clone();
-        full_path.push_back(inst.clone());
-
+        let full_path = self.full_path.clone();
         self.query.query(driver, inst, full_path)
     }
 }

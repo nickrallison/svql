@@ -29,22 +29,23 @@ fn print_match_details(m: &SanitizedQueryMatch, name: &str) {
 
 fn main() {
     // Initialize logger
-    env_logger::Builder::new()
-        .filter_level(LevelFilter::Trace)
-        .init();
+    // env_logger::Builder::new()
+    //     .filter_level(LevelFilter::Trace)
+    //     .init();
 
     log::trace!("Starting svql_query");
 
     // Directly query the driver for AND gate matches
     let double_and: RtlQuery<DoubleAnd> = RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
 
-    let driver = Driver::new_net("localhost:9999".to_string());
+    // let driver = Driver::new_net("localhost:9999".to_string());
+    let driver = Driver::new_mock();
 
     match double_and.query(&driver) {
         Ok(matches) => {
             log::trace!("Direct AND query returned {} matches", matches.len());
             for (i, m) in matches.iter().enumerate() {
-                println!("match:\n{:#?}", m);
+                println!("-----\n{:#?}", m);
             }
         }
         Err(e) => {

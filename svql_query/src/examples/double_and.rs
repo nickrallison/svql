@@ -73,20 +73,20 @@ impl RtlQueryTrait for DoubleAnd {
         inst: Arc<String>,
         full_path: VecDeque<Arc<String>>,
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
-        // // Get the query iterators for both AND gates
+        // Get the query iterators for both AND gates
 
         let and1_results = self.and1.query(driver)?;
         let and2_results = self.and2.query(driver)?;
-        //
-        // // Create a cartesian product of the results
+
+        // Create a cartesian product of the results
         let cartesian_product = iproduct!(and1_results, and2_results);
-        //
-        // // Map the cartesian product to DoubleAndResult instances
+
+        // Map the cartesian product to DoubleAndResult instances
         let matches = cartesian_product.map(|(and1_result, and2_result)| {
             let double_and_result = DoubleAndResult::new(and1_result, and2_result);
-
             RtlQueryResult::new(double_and_result, inst.clone(), full_path.clone())
         });
+
         let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
             .filter(|match_result| {
                 // Check if the match is valid based on the connections

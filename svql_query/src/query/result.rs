@@ -17,10 +17,8 @@ where
     pub fn new(
         query: QueryResultType,
         inst: Arc<String>,
-        parent_path: VecDeque<Arc<String>>,
+        full_path: VecDeque<Arc<String>>,
     ) -> Self {
-        let mut full_path = parent_path;
-        full_path.push_back(inst.clone());
         RtlQueryResult {
             inst,
             full_path,
