@@ -29,9 +29,9 @@ fn print_match_details(m: &SanitizedQueryMatch, name: &str) {
 
 fn main() {
     // Initialize logger
-    // env_logger::Builder::new()
-    //     .filter_level(LevelFilter::Trace)
-    //     .init();
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Trace)
+        .init();
 
     log::trace!("Starting svql_query");
 

@@ -1,7 +1,6 @@
 use crate::examples::and::{And, AndResult};
 use crate::module::RtlModule;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use crate::connect;
 use crate::driver::{Driver, DriverError};
@@ -37,27 +36,6 @@ impl RtlQueryTrait for DoubleAnd {
         let mut connections = HashSet::new();
         // Try using hierarchical names for the ports
         connect!(connections, &self.and1.module.y, &self.and2.module.a);
-
-        // Print connections for debugging
-        log::trace!("DoubleAnd connections:");
-        for conn in &connections {
-            let out_port_path: String = conn
-                .out_port
-                .full_path
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join(".");
-            let in_port_path: String = conn
-                .in_port
-                .full_path
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join(".");
-            log::trace!("  {} -> {}", out_port_path, in_port_path);
-        }
-
         connections
     }
 
