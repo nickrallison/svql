@@ -1,10 +1,11 @@
 use crate::module::inst_path;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct InPort {
     pub inst: Arc<String>,
-    pub full_path: Vec<Arc<String>>,
+    pub full_path: VecDeque<Arc<String>>,
 }
 
 impl InPort {
@@ -12,18 +13,18 @@ impl InPort {
         let inst = Arc::new(s.into());
         let mut in_port = InPort {
             inst,
-            full_path: vec![],
+            full_path: vec![].into(),
         };
-        in_port.init_full_path(vec![]);
+        in_port.init_full_path(vec![].into());
         in_port
     }
     pub fn connect_to(&self, out_port: &OutPort) -> Connection<InPort, OutPort> {
         Connection::new(self.clone(), out_port.clone())
     }
 
-    pub fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+    pub fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
         let mut full_path = parent_path.clone();
-        full_path.push(self.inst.clone());
+        full_path.push_back(self.inst.clone());
         self.full_path = full_path;
     }
     pub fn inst_path(&self) -> String {
@@ -34,7 +35,7 @@ impl InPort {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct OutPort {
     pub inst: Arc<String>,
-    pub full_path: Vec<Arc<String>>,
+    pub full_path: VecDeque<Arc<String>>,
 }
 
 impl OutPort {
@@ -42,18 +43,18 @@ impl OutPort {
         let inst = Arc::new(s.into());
         let mut out_port = OutPort {
             inst,
-            full_path: vec![],
+            full_path: vec![].into(),
         };
-        out_port.init_full_path(vec![]);
+        out_port.init_full_path(vec![].into());
         out_port
     }
     pub fn connect_to(&self, in_port: &InPort) -> Connection<InPort, OutPort> {
         Connection::new(in_port.clone(), self.clone())
     }
 
-    pub fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+    pub fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
         let mut full_path = parent_path.clone();
-        full_path.push(self.inst.clone());
+        full_path.push_back(self.inst.clone());
         self.full_path = full_path;
     }
 

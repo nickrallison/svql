@@ -3,7 +3,7 @@ use crate::module::inst_path;
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
 use crate::query::traits::RtlQueryTrait;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
 use svql_common::config::ffi::SvqlRuntimeConfig;
@@ -14,7 +14,7 @@ pub mod traits;
 #[derive(Debug, Clone)]
 pub struct RtlQuery<QueryType> {
     pub inst: Arc<String>,
-    pub full_path: Vec<Arc<String>>,
+    pub full_path: VecDeque<Arc<String>>,
     // ################
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub query: QueryType,
@@ -27,11 +27,11 @@ where
     pub fn new(query: QueryType, inst: String) -> Self {
         let mut query = RtlQuery {
             inst: Arc::new(inst),
-            full_path: vec![],
+            full_path: vec![].into(),
             connections: QueryType::connect(&query),
             query,
         };
-        query.init_full_path(vec![]);
+        query.init_full_path(vec![].into());
         query
     }
 
@@ -51,9 +51,9 @@ where
         cfg
     }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
         let mut full_path = parent_path.clone();
-        full_path.push(self.inst.clone());
+        full_path.push_back(self.inst.clone());
         self.full_path = full_path.clone();
 
         // Initialize full path for module's ports
@@ -68,7 +68,7 @@ where
         let parent_path = self.full_path.clone();
 
         let mut full_path = parent_path.clone();
-        full_path.push(inst.clone());
+        full_path.push_back(inst.clone());
 
         self.query.query(driver, inst, full_path)
     }

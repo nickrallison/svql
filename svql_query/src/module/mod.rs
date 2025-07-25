@@ -6,7 +6,7 @@ use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
 use lazy_static::lazy_static;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
 use svql_common::config::ffi::SvqlRuntimeConfig;
@@ -20,7 +20,7 @@ lazy_static! {
 #[derive(Debug, Clone)]
 pub struct RtlModule<ModuleType> {
     pub inst: Arc<String>,
-    pub full_path: Vec<Arc<String>>,
+    pub full_path: VecDeque<Arc<String>>,
     // ################
     pub connections: HashSet<Connection<InPort, OutPort>>,
     pub module: ModuleType,
@@ -33,11 +33,11 @@ where
     pub fn new(module: ModuleType, inst: String) -> Self {
         let mut module = RtlModule {
             inst: Arc::new(inst),
-            full_path: vec![],
+            full_path: vec![].into(),
             connections: EMPTY_CONNECTIONS.clone(),
             module,
         };
-        module.init_full_path(vec![]);
+        module.init_full_path(vec![].into());
         module
     }
 
@@ -53,9 +53,9 @@ where
         cfg
     }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: Vec<Arc<String>>) {
+    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
         let mut full_path = parent_path.clone();
-        full_path.push(self.inst.clone());
+        full_path.push_back(self.inst.clone());
         self.full_path = full_path.clone();
 
         // Initialize full path for module's ports
@@ -103,7 +103,7 @@ pub fn lookup(m: &HashMap<IdString, IdString>, pin: &str) -> Result<IdString, Qu
         .ok_or_else(|| QueryError::MissingPort(m.clone(), pin.to_string()))
 }
 
-pub fn inst_path(full_path: &Vec<Arc<String>>) -> String {
+pub fn inst_path(full_path: &VecDeque<Arc<String>>) -> String {
     full_path
         .iter()
         .map(|s| s.to_string())

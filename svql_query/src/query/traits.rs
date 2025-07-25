@@ -1,9 +1,10 @@
 use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
+use svql_common::mat::IdString;
 
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.
@@ -11,12 +12,12 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-    fn init_full_path(&mut self, full_path: Vec<Arc<String>>);
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>);
     fn query(
         &self,
         driver: &Driver,
         inst: Arc<String>,
-        full_path: Vec<Arc<String>>,
+        full_path: VecDeque<Arc<String>>,
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError>;
 }
 
@@ -30,4 +31,5 @@ pub trait RtlQueryResultTrait {
         true
     }
     fn validate_connection(&self, connections: &Connection<InPort, OutPort>) -> bool;
+    fn find_port(&self, port_name: VecDeque<Arc<String>>) -> Option<&IdString>;
 }

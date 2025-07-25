@@ -1,11 +1,12 @@
 use crate::module::traits::RtlModuleResultTrait;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use svql_common::mat::{SanitizedCellData, SanitizedQueryMatch};
 
 #[derive(Debug, Clone)]
 pub struct RtlModuleResult<ModuleResultType> {
     pub inst: Arc<String>,
-    pub full_path: Vec<Arc<String>>,
+    pub full_path: VecDeque<Arc<String>>,
     // ################
     pub cells: Vec<SanitizedCellData>,
     pub module: ModuleResultType,
@@ -17,13 +18,13 @@ where
 {
     fn new(
         inst: String,
-        parent_path: Vec<Arc<String>>,
+        parent_path: VecDeque<Arc<String>>,
         cells: Vec<SanitizedCellData>,
         module: ModuleResultType,
     ) -> Self {
         let inst = Arc::new(inst);
         let mut full_path = parent_path;
-        full_path.push(inst.clone());
+        full_path.push_back(inst.clone());
         RtlModuleResult {
             inst,
             full_path,
@@ -35,7 +36,7 @@ where
         let module = ModuleResultType::from_portmap(m.port_map);
         Self {
             inst: Arc::new("".to_string()),
-            full_path: vec![],
+            full_path: vec![].into(),
             cells: m.cell_map.into_values().collect(),
             module,
         }

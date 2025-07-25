@@ -1,5 +1,5 @@
 use crate::ports::{Connection, InPort, OutPort};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,9 +11,10 @@ pub trait RtlModuleTrait {
     fn module_name(&self) -> &'static str;
     fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
     fn set_instance(&mut self, inst: Arc<String>);
-    fn init_full_path(&mut self, full_path: Vec<Arc<String>>);
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>);
 }
 
 pub trait RtlModuleResultTrait {
     fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
+    fn find_port(&self, port_name: VecDeque<Arc<String>>) -> Option<&IdString>;
 }

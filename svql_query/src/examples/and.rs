@@ -1,7 +1,7 @@
 use crate::module::lookup;
 use crate::module::traits::{RtlModuleResultTrait, RtlModuleTrait};
 use crate::ports::{Connection, InPort, OutPort};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use svql_common::mat::IdString;
@@ -43,7 +43,7 @@ impl RtlModuleTrait for And {
     fn set_instance(&mut self, inst: Arc<String>) {
         todo!()
     }
-    fn init_full_path(&mut self, full_path: Vec<Arc<String>>) {
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>) {
         self.a.init_full_path(full_path.clone());
         self.b.init_full_path(full_path.clone());
         self.y.init_full_path(full_path);
@@ -69,6 +69,21 @@ impl RtlModuleResultTrait for AndResult {
             a: lookup(&port_map, "a").expect("Port 'a' not found"),
             b: lookup(&port_map, "b").expect("Port 'b' not found"),
             y: lookup(&port_map, "y").expect("Port 'y' not found"),
+        }
+    }
+
+    fn find_port(&self, port_name: VecDeque<Arc<String>>) -> Option<&IdString> {
+        if port_name.len() != 2 {
+            return None;
+        }
+        if port_name[1] == Arc::new("a".to_string()) {
+            Some(&self.a)
+        } else if port_name[1] == Arc::new("b".to_string()) {
+            Some(&self.b)
+        } else if port_name[1] == Arc::new("y".to_string()) {
+            Some(&self.y)
+        } else {
+            None
         }
     }
 }
