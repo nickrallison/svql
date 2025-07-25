@@ -15,7 +15,7 @@
 #include "kernel/sigtools.h"
 #include "libs/subcircuit/subcircuit.h"
 #include "svql_common_config.h"
-#include "svql_common_mat.h"
+#include "svql_common_matches.h"
 
 using namespace svql;
 using namespace Yosys;

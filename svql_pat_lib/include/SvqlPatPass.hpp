@@ -4,8 +4,6 @@
 #include "kernel/yosys.h"
 #include "kernel/rtlil.h"
 
-#include "svql_common.h"
-
 using namespace Yosys;
 
 struct SvqlPatPass : public Pass

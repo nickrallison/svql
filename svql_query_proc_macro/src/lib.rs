@@ -7,7 +7,7 @@ use crate::module::codegen;
 use crate::module::lower;
 use crate::module::parse;
 
-#[proc_macro_derive(Module)]
+#[proc_macro_derive(Module, attributes(pattern_file, module_name, yosys, svql_pat_lib))]
 #[proc_macro_error]
 pub fn module(ts: TokenStream) -> TokenStream {
     let ast = parse::parse(ts.clone().into());

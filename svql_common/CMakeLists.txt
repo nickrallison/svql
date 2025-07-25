@@ -33,36 +33,47 @@ set(GEN_SRCDIR ${CMAKE_CURRENT_BINARY_DIR}/build/svql_common)
 file(MAKE_DIRECTORY "${GEN_SRCDIR}")
 set(SVQL_COMMON_CONFIG_CXX "${GEN_SRCDIR}/svql_common_config.cpp")
 set(SVQL_COMMON_CONFIG_H   "${GEN_SRCDIR}/svql_common_config.h")
-set(SVQL_COMMON_MAT_CXX "${GEN_SRCDIR}/svql_common_mat.cpp")
-set(SVQL_COMMON_MAT_H   "${GEN_SRCDIR}/svql_common_mat.h")
+
+set(SVQL_COMMON_MATCHES_CXX "${GEN_SRCDIR}/svql_common_matches.cpp")
+set(SVQL_COMMON_MATCHES_H   "${GEN_SRCDIR}/svql_common_matches.h")
+
+set(SVQL_COMMON_PATTERN_CXX "${GEN_SRCDIR}/svql_common_pattern.cpp")
+set(SVQL_COMMON_PATTERN_H   "${GEN_SRCDIR}/svql_common_pattern.h")
+
 set(SVQL_COMMON_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libsvql_common.a")
 
 add_custom_command(
-    OUTPUT ${SVQL_COMMON_CONFIG_CXX} ${SVQL_COMMON_CONFIG_H} ${SVQL_COMMON_LIB} ${SVQL_COMMON_MAT_CXX} ${SVQL_COMMON_MAT_H}
+    OUTPUT ${SVQL_COMMON_LIB} ${SVQL_COMMON_CONFIG_CXX} ${SVQL_COMMON_CONFIG_H} ${SVQL_COMMON_MATCHES_CXX} ${SVQL_COMMON_MATCHES_H} ${SVQL_COMMON_PATTERN_CXX} ${SVQL_COMMON_PATTERN_H}
     COMMAND ${CMAKE_COMMAND} -E env
             CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
             RUSTFLAGS=${RUST_FLAGS}
             ${CARGO_CMD}
     COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.cc ${SVQL_COMMON_CONFIG_CXX}
     COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.h  ${SVQL_COMMON_CONFIG_H}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/mat.rs.cc ${SVQL_COMMON_MAT_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/mat.rs.h  ${SVQL_COMMON_MAT_H}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/matches.rs.cc ${SVQL_COMMON_MATCHES_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/matches.rs.h  ${SVQL_COMMON_MATCHES_H}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/pattern.rs.cc ${SVQL_COMMON_PATTERN_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/pattern.rs.h  ${SVQL_COMMON_PATTERN_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building Rust+generating CXX bridge"
     VERBATIM
 )
 add_custom_target(${PROJECT_NAME}_gen
     DEPENDS
+        ${SVQL_COMMON_LIB}
         ${SVQL_COMMON_CONFIG_CXX}
         ${SVQL_COMMON_CONFIG_H}
-        ${SVQL_COMMON_MAT_CXX}
-        ${SVQL_COMMON_MAT_H}
+        ${SVQL_COMMON_MATCHES_CXX}
+        ${SVQL_COMMON_MATCHES_H}
+        ${SVQL_COMMON_PATTERN_CXX}
+        ${SVQL_COMMON_PATTERN_H}
 )
 
 #### C++ Library Setup ####
 add_library(${PROJECT_NAME} STATIC
     ${SVQL_COMMON_CONFIG_CXX}
-    ${SVQL_COMMON_MAT_CXX}
+    ${SVQL_COMMON_MATCHES_CXX}
+    ${SVQL_COMMON_PATTERN_CXX}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${GEN_SRCDIR})
 target_link_libraries(${PROJECT_NAME} pthread dl ${SVQL_COMMON_LIB})

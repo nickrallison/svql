@@ -7,7 +7,7 @@
 #include "kernel/rtlil.h"
 #include "kernel/yosys.h"
 #include "svql_common_config.h"
-#include "svql_common_mat.h"
+#include "svql_common_matches.h"
 
 using namespace Yosys;
 

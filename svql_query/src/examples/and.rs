@@ -5,6 +5,13 @@ use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use svql_common::matches::IdString;
+use svql_query_proc_macro::Module;
+
+#[derive(Module)]
+#[pattern_file = "svql_query/verilog/and.sv"]
+#[svql_pat_lib = "./build/"]
+#[yosys = "./yosys/yosys"]
+pub struct NewAnd;
 
 #[derive(Debug, Clone)]
 pub struct And {
@@ -33,16 +40,6 @@ impl RtlModuleTrait for And {
     fn module_name(&self) -> &'static str {
         "and_gate"
     }
-
-    // #[allow(unused_variables)]
-    // fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
-    //     todo!()
-    // }
-    //
-    // #[allow(unused_variables)]
-    // fn set_instance(&mut self, inst: Arc<String>) {
-    //     todo!()
-    // }
     fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>) {
         self.a.init_full_path(full_path.clone());
         self.b.init_full_path(full_path.clone());

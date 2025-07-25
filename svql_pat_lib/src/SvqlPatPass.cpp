@@ -7,7 +7,7 @@
 #include "kernel/log.h"
 #include "kernel/sigtools.h"
 
-#include "svql_common.h"
+#include "svql_common_pattern.h"
 
 using namespace Yosys;
 
@@ -74,9 +74,8 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 	}
 
 	// Collect port names by type
-	std::vector<std::string> input_ports;
-	std::vector<std::string> output_ports;
-	std::vector<std::string> inout_ports;
+	Pattern pattern = Pattern();
+	pattern.file_loc = pattern_file;
 
 	// Iterate through module ports to categorize them
 	for (auto &port_name : module->ports)
@@ -87,97 +86,24 @@ void SvqlPatPass::execute(std::vector<std::string> args, RTLIL::Design *design)
 
 		std::string port_str = port_name.str();
 
-		if (wire->port_input && wire->port_output)
-		{
-			// Inout port
-			inout_ports.push_back(port_str);
-		}
-		else if (wire->port_input)
+		if (wire->port_input)
 		{
 			// Input port
-			input_ports.push_back(port_str);
+			pattern.in_ports.emplace_back(port_str);
 		}
 		else if (wire->port_output)
 		{
 			// Output port
-			output_ports.push_back(port_str);
+			pattern.out_ports.emplace_back(port_str);
 		}
+		else if (wire->port_input && wire->port_output)
+          		{
+          			// Inout port
+          			pattern.inout_ports.emplace_back(port_str);
+          		}
 	}
 
-	List<CrateCString> input_ptrs;
-	List<CrateCString> output_ptrs;
-	List<CrateCString> inout_ptrs;
-
-	for (const auto &port : input_ports)
-	{
-		CrateCString *port_cstr = crate_cstring_new(port.c_str());
-		if (port_cstr == nullptr)
-		{
-			log("SVQL_PAT_ERROR: Failed to create CrateCString for input port '%s'\n", port.c_str());
-			log_error("Failed to create CrateCString for input port '%s'\n", port.c_str());
-		}
-		else
-		{
-			string_list_append(&input_ptrs, *port_cstr);
-			crate_cstring_destroy(port_cstr);
-		}
-	}
-	for (const auto &port : output_ports)
-	{
-		CrateCString *port_cstr = crate_cstring_new(port.c_str());
-		if (port_cstr == nullptr)
-		{
-			log("SVQL_PAT_ERROR: Failed to create CrateCString for output port '%s'\n", port.c_str());
-			log_error("Failed to create CrateCString for output port '%s'\n", port.c_str());
-		}
-		else
-		{
-			string_list_append(&output_ptrs, *port_cstr);
-			crate_cstring_destroy(port_cstr);
-		}
-	}
-	for (const auto &port : inout_ports)
-	{
-		CrateCString *port_cstr = crate_cstring_new(port.c_str());
-		if (port_cstr == nullptr)
-		{
-			log("SVQL_PAT_ERROR: Failed to create CrateCString for inout port '%s'\n", port.c_str());
-			log_error("Failed to create CrateCString for inout port '%s'\n", port.c_str());
-		}
-		else
-		{
-			string_list_append(&inout_ptrs, *port_cstr);
-			crate_cstring_destroy(port_cstr);
-		}
-	}
-
-	CPattern *pattern = pattern_new();
-
-	CrateCString *module_name_cstr = crate_cstring_new(module_name.c_str());
-
-	pattern->file_loc = *module_name_cstr; // Use the module name as the file location
-	crate_cstring_destroy(module_name_cstr);
-
-	pattern->in_ports = input_ptrs;
-	pattern->out_ports = output_ptrs;
-	pattern->inout_ports = inout_ptrs;
-
-	log("Created pattern for module '%s' with %zu input(s), %zu output(s), and %zu inout(s) ports\n",
-		module_name.c_str(), input_ports.size(), output_ports.size(), inout_ports.size());
-
-	CrateCString json_str = pattern_to_json(pattern);
-	log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
-	crate_cstring_destroy(&json_str);
-	// if (json_str)
-	// {
-	// 	log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str);
-	// 	crate_cstring_destroy(json_str);
-	// }
-	// else
-	// {
-	// 	log("SVQL_PAT_ERROR: Failed to serialize pattern to JSON\n");
-	// }
-	pattern_destroy(pattern);
-
+	rust::String json_str = pattern_into_json_string(pattern);
+	log("SVQL_PAT_JSON_BEGIN\n%s\nSVQL_PAT_JSON_END\n", json_str.c_str());
 	log_pop();
 }
