@@ -18,7 +18,7 @@ pub fn analyze(ast: Ast) -> Model {
     let plugin_library_path = std::path::PathBuf::from(&ast.svql_pat_plugin_path);
     let pattern = extract_pattern(
         file_path,
-        ast.module_name.clone(),
+        &ast.module_name,
         Some(yosys_path),
         Some(plugin_library_path),
     )

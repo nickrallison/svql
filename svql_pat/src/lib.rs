@@ -390,4 +390,19 @@ mod tests {
         assert!(details.contains("Syntax error"));
         assert!(details.contains("Parse error"));
     }
+
+    #[test]
+    fn test_extract_pattern() {
+        let workspace_root: PathBuf =
+            PathBuf::from(std::env::var("CARGO_WORKSPACE_DIR").expect("workspace root not set"));
+        let relative_path = PathBuf::from("svql_query/verilog/and.v");
+        let verilog_file = workspace_root.join(relative_path);
+        let module_name = "and_gate";
+        let yosys_bin_path = Some(workspace_root.join(PathBuf::from("yosys/yosys")));
+        let plugin_lib_path =
+            Some(workspace_root.join(PathBuf::from("build/svql_pat_lib/libsvql_pat_lib.so")));
+        let result = extract_pattern(verilog_file, module_name, yosys_bin_path, plugin_lib_path);
+        assert!(result.is_ok(), "Expected successful pattern extraction");
+        panic!("{:#?}", result.unwrap());
+    }
 }

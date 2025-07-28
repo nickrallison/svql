@@ -29,12 +29,9 @@ pub struct Ir {
 /// Turn a Verilog port name into a *valid* Rust identifier.
 fn sanitize(name: &str) -> Ident {
     let mut s = String::with_capacity(name.len());
-    for c in name.chars() {
-        s.push(if c.is_ascii_alphanumeric() || c == '_' {
-            c
-        } else {
-            '_'
-        });
+
+    for c in name.chars().filter(|c| *c != '\\') {
+        s.push(if c.is_ascii_alphanumeric() { c } else { '_' });
     }
     if s.chars().next().unwrap().is_ascii_digit() {
         s.insert(0, '_');
@@ -74,5 +71,17 @@ pub fn lower(model: Model) -> Ir {
         file_path: model.file_path,
         module_name: model.module_name,
         ports,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize() {
+        assert_eq!(sanitize("\\valid_name"), format_ident!("valid_name"));
+        assert_eq!(sanitize("invalid-name"), format_ident!("invalid_name"));
+        assert_eq!(sanitize("123invalid"), format_ident!("_123invalid"));
     }
 }

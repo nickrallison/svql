@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use crate::driver::mock::MockDriver;
 use crate::driver::Driver;
-use crate::examples::and::And;
-use crate::examples::double_and::DoubleAnd;
+// use crate::examples::and::And;
+// use crate::examples::double_and::DoubleAnd;
 use crate::module::RtlModule;
 use crate::query::traits::RtlQueryTrait;
 use crate::query::RtlQuery;
@@ -23,21 +23,21 @@ fn main() {
 
     log::trace!("Starting svql_query");
 
-    // Directly query the driver for AND gate matches
-    let double_and: RtlQuery<DoubleAnd> = RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
-
-    // let driver = Driver::new_net("localhost:9999".to_string());
-    let driver = Driver::new_mock();
-
-    match double_and.query(&driver) {
-        Ok(matches) => {
-            log::trace!("Direct AND query returned {} matches", matches.len());
-            for m in matches.iter() {
-                println!("-----\n{:#?}", m);
-            }
-        }
-        Err(e) => {
-            log::trace!("Direct AND query failed with error: {:?}", e);
-        }
-    }
+    // // Directly query the driver for AND gate matches
+    // let double_and: RtlQuery<DoubleAnd> = RtlQuery::new(DoubleAnd::new(), "double_and".to_string());
+    //
+    // // let driver = Driver::new_net("localhost:9999".to_string());
+    // let driver = Driver::new_mock();
+    //
+    // match double_and.query(&driver) {
+    //     Ok(matches) => {
+    //         log::trace!("Direct AND query returned {} matches", matches.len());
+    //         for m in matches.iter() {
+    //             println!("-----\n{:#?}", m);
+    //         }
+    //     }
+    //     Err(e) => {
+    //         log::trace!("Direct AND query failed with error: {:?}", e);
+    //     }
+    // }
 }

@@ -96,9 +96,8 @@ pub fn parse(attr: TokenStream, item: TokenStream) -> Ast {
 }
 
 fn prepend_relative_path(file_path: &str, prefix: &str) -> String {
-    // after you extract `let mut file_path = s.value();` from the LitStr…
-    if !std::path::Path::new(&file_path).is_absolute() {
-        let abs = std::path::Path::new(&prefix).join(file_path);
+    if !std::path::Path::new(file_path).is_absolute() {
+        let abs = std::path::Path::new(prefix).join(file_path);
         abs.canonicalize()
             .unwrap_or(abs)
             .to_string_lossy()
