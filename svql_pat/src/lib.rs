@@ -146,7 +146,7 @@ pub fn extract_pattern<P: AsRef<Path>>(
     let output = cmd
         .output()
         .map_err(|e| SvqlPatError::YosysExecutionError {
-            details: format!("Failed to run yosys: {}", e),
+            details: format!("Failed to run yosys: {e}"),
         })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -219,7 +219,7 @@ fn parse_yosys_output(
     let json_regex =
         Regex::new(r"(?s)SVQL_PAT_JSON_BEGIN\n(.*?)\nSVQL_PAT_JSON_END").map_err(|e| {
             SvqlPatError::ParseError {
-                details: format!("Failed to create regex: {}", e),
+                details: format!("Failed to create regex: {e}"),
             }
         })?;
 
@@ -228,7 +228,7 @@ fn parse_yosys_output(
 
         // Parse JSON to Pattern
         serde_json::from_str::<Pattern>(json_str).map_err(|e| SvqlPatError::JsonError {
-            details: format!("Failed to parse JSON: {}", e),
+            details: format!("Failed to parse JSON: {e}"),
         })
     } else {
         Err(SvqlPatError::ParseError {
@@ -342,7 +342,7 @@ pub fn extract_pattern_default<P: AsRef<Path>>(
     let output = cmd
         .output()
         .map_err(|e| SvqlPatError::YosysExecutionError {
-            details: format!("Failed to run yosys: {}", e),
+            details: format!("Failed to run yosys: {e}"),
         })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);

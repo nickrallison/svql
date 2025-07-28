@@ -13,13 +13,16 @@ pub struct Model {
 }
 
 pub fn analyze(ast: Ast) -> Model {
+    let file_path = std::path::PathBuf::from(&ast.file_path);
+    let yosys_path = std::path::PathBuf::from(&ast.yosys);
+    let plugin_library_path = std::path::PathBuf::from(&ast.svql_pat_plugin_path);
     let pattern = extract_pattern(
-        &ast.file_path,
-        &ast.module_name,
-        Some(&ast.yosys),
-        Some(&ast.svql_pat_plugin_path),
+        file_path,
+        ast.module_name.clone(),
+        Some(yosys_path),
+        Some(plugin_library_path),
     )
-    .unwrap_or_else(|e| abort!(ast.iface_ident, "extract_pattern failed: {}", e));
+    .unwrap_or_else(|e| abort!(ast.iface_ident, "svql-query: extract_pattern failed: {}", e));
 
     Model {
         vis: ast.vis,

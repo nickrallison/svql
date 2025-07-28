@@ -15,7 +15,7 @@ fn main() {
             println!("  Inout ports: {:?}", pattern.inout_ports);
         },
         Err(e) => {
-            println!("Error extracting pattern: {}", e);
+            println!("Error extracting pattern: {e}");
             std::process::exit(1);
         }
     }
@@ -28,10 +28,10 @@ fn main() {
             std::process::exit(1);
         },
         Err(SvqlPatError::FileNotFound { path }) => {
-            println!("Correctly detected non-existent file: {:?}", path);
+            println!("Correctly detected non-existent file: {path:?}");
         },
         Err(e) => {
-            println!("Unexpected error: {}", e);
+            println!("Unexpected error: {e}");
             std::process::exit(1);
         }
     }
@@ -44,10 +44,10 @@ fn main() {
             std::process::exit(1);
         },
         Err(SvqlPatError::ModuleNotFound { module, file }) => {
-            println!("Correctly detected non-existent module '{}' in file {:?}", module, file);
+            println!("Correctly detected non-existent module '{module}' in file {file:?}");
         },
         Err(e) => {
-            println!("Unexpected error: {}", e);
+            println!("Unexpected error: {e}");
             std::process::exit(1);
         }
     }

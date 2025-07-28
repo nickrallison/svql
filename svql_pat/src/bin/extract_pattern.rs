@@ -12,7 +12,7 @@ fn main() {
             "Example: {} examples/cwe1234/variant1.v locked_register_example",
             args[0]
         );
-        println!("args: {:?}", args);
+        println!("args: {args:?}");
         std::process::exit(1);
     }
 
@@ -20,8 +20,7 @@ fn main() {
     let module_name = &args[2];
 
     println!(
-        "Extracting pattern from file '{}' for module '{}'...",
-        verilog_file, module_name
+        "Extracting pattern from file '{verilog_file}' for module '{module_name}'..."
     );
 
     match extract_pattern_default(verilog_file, module_name) {
@@ -30,16 +29,16 @@ fn main() {
             println!("   📁 File: {:?}", pattern.file_loc);
             println!("   📥 Input ports ({}):", pattern.in_ports.len());
             for port in &pattern.in_ports {
-                println!("      - {}", port);
+                println!("      - {port}");
             }
             println!("   📤 Output ports ({}):", pattern.out_ports.len());
             for port in &pattern.out_ports {
-                println!("      - {}", port);
+                println!("      - {port}");
             }
             if !pattern.inout_ports.is_empty() {
                 println!("   🔄 Inout ports ({}):", pattern.inout_ports.len());
                 for port in &pattern.inout_ports {
-                    println!("      - {}", port);
+                    println!("      - {port}");
                 }
             }
 
@@ -47,15 +46,15 @@ fn main() {
             match serde_json::to_string_pretty(&pattern) {
                 Ok(json) => {
                     println!("\n📋 JSON representation:");
-                    println!("{}", json);
+                    println!("{json}");
                 }
                 Err(e) => {
-                    eprintln!("⚠️  Warning: Failed to serialize to JSON: {}", e);
+                    eprintln!("⚠️  Warning: Failed to serialize to JSON: {e}");
                 }
             }
         }
         Err(e) => {
-            eprintln!("\n❌ Error: {}", e);
+            eprintln!("\n❌ Error: {e}");
 
             // Provide specific help based on error type
             match e {

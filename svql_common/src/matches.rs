@@ -68,14 +68,14 @@ pub enum IdString {
 impl Display for IdString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IdString::Named(name) => write!(f, "\\{}", name),
+            IdString::Named(name) => write!(f, "\\{name}"),
             IdString::Unnamed {
                 gate_name,
                 file_path,
                 line,
                 id,
             } => {
-                write!(f, "${}${}:{}${}", gate_name, file_path, line, id)
+                write!(f, "${gate_name}${file_path}:{line}${id}")
             }
         }
     }
@@ -125,12 +125,12 @@ impl Display for SanitizedQueryMatch {
         let port_map: Vec<String> = self
             .port_map
             .iter()
-            .map(|(k, v)| format!("{} -> {}", k, v))
+            .map(|(k, v)| format!("{k} -> {v}"))
             .collect();
         let cell_map: Vec<String> = self
             .cell_map
             .iter()
-            .map(|(k, v)| format!("{} -> {}", k, v))
+            .map(|(k, v)| format!("{k} -> {v}"))
             .collect();
         write!(
             f,

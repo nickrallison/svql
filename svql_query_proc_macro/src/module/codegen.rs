@@ -53,6 +53,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     // --------------------------- assemble -------------------------------
     quote! {
         // ================= interface ====================================
+        #[derive(Debug, Clone, PartialEq, Eq)]
         #vis struct #iface_ident {
             #(#in_fields ,)*
             #(#out_fields ,)*
@@ -76,6 +77,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         }
 
         // ================= result =======================================
+        #[derive(Debug, Clone, PartialEq, Eq)]
         #vis struct #result_ident {
             #(#result_fields ,)*
         }
@@ -94,7 +96,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 port_name: std::collections::VecDeque<std::sync::Arc<String>>
             ) -> Option<&svql_common::matches::IdString> {
                 if port_name.len() != 2 { return None; }
-                match port_name[1].as_ref() {
+                match port_name[1].as_str() {
                     #(#find_arms ,)*
                     _ => None,
                 }
