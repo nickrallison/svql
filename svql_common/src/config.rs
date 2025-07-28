@@ -1,4 +1,3 @@
-// allow unused imports for serde
 #![allow(unused_imports)]
 use crate::config::ffi::{CompatPair, IgnoreParam, PermPort, SvqlRuntimeConfig, SwapPort};
 use serde::{Deserialize, Serialize};
