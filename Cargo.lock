@@ -519,6 +519,8 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "svql_common",
+ "svql_pat",
  "syn 1.0.109",
  "trybuild",
 ]

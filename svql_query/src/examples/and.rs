@@ -7,10 +7,13 @@ use std::sync::Arc;
 use svql_common::matches::IdString;
 use svql_query_proc_macro::Module;
 
-#[derive(Module)]
-#[pattern_file = "svql_query/verilog/and.sv"]
-#[svql_pat_lib = "./build/"]
-#[yosys = "./yosys/yosys"]
+#[derive(Debug, Clone)]
+#[module(
+    file = "svql_query/verilog/and.v",
+    module = "and_gate",
+    yosys = "./yosys/yosys",
+    svql_pat_plugin_path = "./build/svql_pat_lib/libsvql_pat_lib.so"
+)]
 pub struct NewAnd;
 
 #[derive(Debug, Clone)]

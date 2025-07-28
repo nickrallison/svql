@@ -7,12 +7,15 @@ use crate::module::codegen;
 use crate::module::lower;
 use crate::module::parse;
 
-#[proc_macro_derive(Module, attributes(pattern_file, module_name, yosys, svql_pat_lib))]
+/// Attribute style macro:
+/// #[module(file = "...", module = "...", yosys = "...", svql_pat_plugin_path = "...")]  pub struct MyIfc;
+#[proc_macro_attribute]
 #[proc_macro_error]
-pub fn module(ts: TokenStream) -> TokenStream {
-    let ast = parse::parse(ts.clone().into());
+pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let ast   = parse::parse(attr.into(), item.into());
     let model = analyze::analyze(ast);
-    let ir = lower::lower(model);
-    let _ = codegen::codegen(ir);
-    TokenStream::new()
+    let ir    = lower::lower(model);
+    let ts    = codegen::codegen(ir);
+    ts.into()
 }
+
