@@ -8,7 +8,7 @@ use svql_common::matches::IdString;
 use svql_query_proc_macro::module;
 
 #[module(
-    file = "svql_query/verilog/and.v",
+    file = "examples/patterns/basic/and/verilog/and.v",
     module = "and_gate",
     yosys = "./yosys/yosys",
     svql_pat_plugin_path = "./build/svql_pat_lib/libsvql_pat_lib.so"
