@@ -401,8 +401,19 @@ mod tests {
         let yosys_bin_path = Some(workspace_root.join(PathBuf::from("yosys/yosys")));
         let plugin_lib_path =
             Some(workspace_root.join(PathBuf::from("build/svql_pat_lib/libsvql_pat_lib.so")));
-        let result = extract_pattern(verilog_file, module_name, yosys_bin_path, plugin_lib_path);
+        let result = extract_pattern(
+            verilog_file.clone(),
+            module_name,
+            yosys_bin_path,
+            plugin_lib_path,
+        );
         assert!(result.is_ok(), "Expected successful pattern extraction");
-        panic!("{:#?}", result.unwrap());
+        let expected: Pattern = Pattern {
+            file_loc: verilog_file.to_string_lossy().to_string(),
+            in_ports: vec!["\\a".to_string(), "\\b".to_string()],
+            out_ports: vec!["\\y".to_string()],
+            inout_ports: vec![],
+        };
+        assert_eq!(result.unwrap(), expected)
     }
 }
