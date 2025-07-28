@@ -21,6 +21,22 @@ if(ENABLE_LTO)
   endif()
 endif()
 
+set(SVQL_CARGO_TARGET_DIR  ${CMAKE_BINARY_DIR}/cargo_target)
+set(SVQL_PAT_LIB "${SVQL_CARGO_TARGET_DIR}/release/libsvql_pat.a")
+
+ExternalProject_Add(
+    rust_build
+    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND
+        ${CMAKE_COMMAND} -E env
+            CARGO_TARGET_DIR=${SVQL_COMMON_TARGET_DIR}
+            ${CARGO_EXECUTABLE} build --release --lib
+    BUILD_BYPRODUCTS
+        ${SVQL_COMMON_TARGET_DIR}/release/lib${PROJECT_NAME}.a
+    INSTALL_COMMAND ""
+)
+
 
 enable_testing()
 
@@ -28,5 +44,4 @@ add_subdirectory(svql_common)
 add_subdirectory(yosys)
 add_subdirectory(svql_driver)
 
-add_subdirectory(svql_pat)
 add_subdirectory(svql_pat_lib)

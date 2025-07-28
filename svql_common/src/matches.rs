@@ -54,9 +54,9 @@ pub mod ffi {
 pub enum IdString {
     // "\\[name]"
     Named(String),
-    // $and$svql_query/verilog/many_ands.v:14$2_Y
-    // $and$svql_query/verilog/and.v:9$11
-    // $and$svql_query/verilog/many_ands.v:14$2
+    // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y
+    // $and$examples/patterns/basic/and/verilog/and.v:9$11
+    // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2
     Unnamed {
         gate_name: String,
         file_path: String,
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_parse_unnamed_idstring() {
-        let unnamed_id = "$and$svql_query/verilog/many_ands.v:14$2_Y";
+        let unnamed_id = "$and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y";
         let result = parse_idstring(unnamed_id).unwrap();
         match result {
             IdString::Unnamed {
@@ -233,7 +233,7 @@ mod tests {
                 id,
             } => {
                 assert_eq!(gate_name, "and");
-                assert_eq!(file_path, "svql_query/verilog/many_ands.v");
+                assert_eq!(file_path, "examples/patterns/basic/and/verilog/many_ands.v");
                 assert_eq!(line, "14");
                 assert_eq!(id, "2_Y");
             }
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_parse_unnamed_idstring_simple() {
-        let unnamed_id = "$and$svql_query/verilog/and.v:9$11";
+        let unnamed_id = "$and$examples/patterns/basic/and/verilog/and.v:9$11";
         let result = parse_idstring(unnamed_id).unwrap();
         match result {
             IdString::Unnamed {
@@ -253,7 +253,7 @@ mod tests {
                 id,
             } => {
                 assert_eq!(gate_name, "and");
-                assert_eq!(file_path, "svql_query/verilog/and.v");
+                assert_eq!(file_path, "examples/patterns/basic/and/verilog/and.v");
                 assert_eq!(line, "9");
                 assert_eq!(id, "11");
             }

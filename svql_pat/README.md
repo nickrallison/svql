@@ -99,64 +99,81 @@ match extract_pattern_default("file.v", "module") {
 }
 ```
 
-## CLI Tool
-
-The library includes a command-line tool for quick pattern extraction:
-
-```bash
-# Build the project
-cmake -B build && cmake --build build --parallel 4
-
-# Run the CLI tool
-cargo run --package svql_pat --bin extract_pattern examples/cwe1234/variant1.v locked_register_example
-```
-
-Example output:
-```
-✅ Successfully extracted pattern:
-   📁 File: "examples/cwe1234/variant1.v"
-   📥 Input ports (7):
-      - \data_in
-      - \clk
-      - \resetn
-      - \write
-      - \lock
-      - \scan_mode
-      - \debug_unlocked
-   📤 Output ports (1):
-      - \data_out
-
-📋 JSON representation:
-{
-  "file_loc": "examples/cwe1234/variant1.v",
-  "in_ports": [
-    "\\data_in",
-    "\\clk",
-    "\\resetn",
-    "\\write",
-    "\\lock",
-    "\\scan_mode",
-    "\\debug_unlocked"
-  ],
-  "out_ports": [
-    "\\data_out"
-  ],
-  "inout_ports": []
-}
-```
-
 ## Testing
 
-Run the test suite:
+Run the test suite to verify the library functionality:
 
 ```bash
 cargo test --package svql_pat
 ```
 
-Or run the integration test:
+The test suite includes:
+- Integration tests demonstrating basic usage
+- Error handling tests for various failure modes
+- Advanced usage tests with custom paths
+- JSON serialization tests
 
-```bash
-cargo run --package svql_pat --bin test_svql_pat
+## Usage Examples
+
+### Example 1: Extract and Display Pattern Information
+
+```rust
+use svql_pat::extract_pattern_default;
+
+fn main() {
+    match extract_pattern_default("examples/cwe1234/variant1.v", "locked_register_example") {
+        Ok(pattern) => {
+            println!("Successfully extracted pattern:");
+            println!("  File: {:?}", pattern.file_loc);
+            println!("  Input ports ({}): {:?}", pattern.in_ports.len(), pattern.in_ports);
+            println!("  Output ports ({}): {:?}", pattern.out_ports.len(), pattern.out_ports);
+            if !pattern.inout_ports.is_empty() {
+                println!("  Inout ports ({}): {:?}", pattern.inout_ports.len(), pattern.inout_ports);
+            }
+        }
+        Err(e) => eprintln!("Error: {}", e),
+    }
+}
+```
+
+### Example 2: JSON Export
+
+```rust
+use svql_pat::extract_pattern_default;
+
+fn export_pattern_to_json(verilog_file: &str, module_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let pattern = extract_pattern_default(verilog_file, module_name)?;
+    let json = serde_json::to_string_pretty(&pattern)?;
+    Ok(json)
+}
+```
+
+### Example 3: Batch Processing
+
+```rust
+use svql_pat::{extract_pattern_default, SvqlPatError};
+
+fn process_multiple_modules(files_and_modules: &[(&str, &str)]) {
+    for (file, module) in files_and_modules {
+        match extract_pattern_default(file, module) {
+            Ok(pattern) => {
+                println!("✓ {} -> {} ports total", 
+                    module, 
+                    pattern.in_ports.len() + pattern.out_ports.len() + pattern.inout_ports.len()
+                );
+            }
+            Err(SvqlPatError::FileNotFound { .. }) => {
+                eprintln!("✗ File not found: {}", file);
+            }
+            Err(SvqlPatError::ModuleNotFound { .. }) => {
+                eprintln!("✗ Module '{}' not found in {}", module, file);
+            }
+            Err(e) => {
+                eprintln!("✗ Error processing {}: {}", file, e);
+            }
+        }
+    }
+}
 ```
 
 ## Architecture
@@ -196,8 +213,8 @@ The `Pattern` struct (from `svql_common`) contains:
 ## Contributing
 
 1. Ensure all tests pass: `cargo test`
-2. Run the example: `cargo run --package svql_pat --bin extract_pattern examples/cwe1234/variant1.v locked_register_example`
-3. Check for compilation warnings: `cargo check`
+2. Verify the library compiles without warnings: `cargo check`
+3. Test the example usage in the integration tests
 
 ## License
 

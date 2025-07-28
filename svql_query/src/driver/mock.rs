@@ -26,7 +26,7 @@ impl MockDriver {
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
                             gate_name: "and".to_string(),
-                            file_path: "svql_query/verilog/many_ands.v".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                             line: "16".to_string(),
                             id: "3_Y".to_string(),
                         },
@@ -35,7 +35,7 @@ impl MockDriver {
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
                             gate_name: "and".to_string(),
-                            file_path: "svql_query/verilog/many_ands.v".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -48,7 +48,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/and.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -57,7 +57,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/many_ands.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                                 line: "16".to_string(),
                                 id: "3".to_string(),
                             },
@@ -75,7 +75,7 @@ impl MockDriver {
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
                             gate_name: "and".to_string(),
-                            file_path: "svql_query/verilog/many_ands.v".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -88,7 +88,7 @@ impl MockDriver {
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
                             gate_name: "and".to_string(),
-                            file_path: "svql_query/verilog/many_ands.v".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -101,7 +101,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/and.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -110,7 +110,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/many_ands.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                                 line: "16".to_string(),
                                 id: "2".to_string(),
                             },
@@ -128,7 +128,7 @@ impl MockDriver {
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
                             gate_name: "and".to_string(),
-                            file_path: "svql_query/verilog/many_ands.v".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -149,7 +149,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/and.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -158,7 +158,7 @@ impl MockDriver {
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
                                 gate_name: "and".to_string(),
-                                file_path: "svql_query/verilog/many_ands.v".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v".to_string(),
                                 line: "16".to_string(),
                                 id: "1".to_string(),
                             },
