@@ -1,10 +1,10 @@
-module locked_register_async
+
+module and_gate
 (
 input a,
 input b,
 output y
 );
 
-y = a && b;
-
+assign y = a & b;
 endmodule

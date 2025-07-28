@@ -407,6 +407,8 @@ mod tests {
             yosys_bin_path,
             plugin_lib_path,
         );
+
+        println!("Result: {:?}", result);
         assert!(result.is_ok(), "Expected successful pattern extraction");
         let expected: Pattern = Pattern {
             file_loc: verilog_file.to_string_lossy().to_string(),

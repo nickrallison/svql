@@ -29,18 +29,18 @@ endif()
 
 
 #### CMake Setup Custom Outputs ####
-set(GEN_SRCDIR ${CMAKE_CURRENT_BINARY_DIR}/build/svql_common)
+set(GEN_SRCDIR ${CMAKE_CURRENT_BINARY_DIR}/build/${PROJECT_NAME})
 file(MAKE_DIRECTORY "${GEN_SRCDIR}")
-set(SVQL_COMMON_CONFIG_CXX "${GEN_SRCDIR}/svql_common_config.cpp")
-set(SVQL_COMMON_CONFIG_H   "${GEN_SRCDIR}/svql_common_config.h")
+set(SVQL_COMMON_CONFIG_CXX "${GEN_SRCDIR}/${PROJECT_NAME}_config.cpp")
+set(SVQL_COMMON_CONFIG_H   "${GEN_SRCDIR}/${PROJECT_NAME}_config.h")
 
-set(SVQL_COMMON_MATCHES_CXX "${GEN_SRCDIR}/svql_common_matches.cpp")
-set(SVQL_COMMON_MATCHES_H   "${GEN_SRCDIR}/svql_common_matches.h")
+set(SVQL_COMMON_MATCHES_CXX "${GEN_SRCDIR}/${PROJECT_NAME}_matches.cpp")
+set(SVQL_COMMON_MATCHES_H   "${GEN_SRCDIR}/${PROJECT_NAME}_matches.h")
 
-set(SVQL_COMMON_PATTERN_CXX "${GEN_SRCDIR}/svql_common_pattern.cpp")
-set(SVQL_COMMON_PATTERN_H   "${GEN_SRCDIR}/svql_common_pattern.h")
+set(SVQL_COMMON_PATTERN_CXX "${GEN_SRCDIR}/${PROJECT_NAME}_pattern.cpp")
+set(SVQL_COMMON_PATTERN_H   "${GEN_SRCDIR}/${PROJECT_NAME}_pattern.h")
 
-set(SVQL_COMMON_LIB "${CMAKE_BINARY_DIR}/cargo_target/${TARGET_DIR}/libsvql_common.a")
+set(SVQL_COMMON_LIB "${CMAKE_BINARY_DIR}/cargo_target/${TARGET_DIR}/lib${PROJECT_NAME}.a")
 
 add_custom_command(
     OUTPUT ${SVQL_COMMON_LIB} ${SVQL_COMMON_CONFIG_CXX} ${SVQL_COMMON_CONFIG_H} ${SVQL_COMMON_MATCHES_CXX} ${SVQL_COMMON_MATCHES_H} ${SVQL_COMMON_PATTERN_CXX} ${SVQL_COMMON_PATTERN_H}
@@ -80,6 +80,6 @@ target_link_libraries(${PROJECT_NAME} pthread dl ${SVQL_COMMON_LIB})
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gen)
 
-add_test(NAME svql_common_test 
+add_test(NAME ${PROJECT_NAME}_test 
     COMMAND ${CARGO_EXECUTABLE} test
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
