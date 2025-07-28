@@ -40,20 +40,20 @@ set(SVQL_COMMON_MATCHES_H   "${GEN_SRCDIR}/svql_common_matches.h")
 set(SVQL_COMMON_PATTERN_CXX "${GEN_SRCDIR}/svql_common_pattern.cpp")
 set(SVQL_COMMON_PATTERN_H   "${GEN_SRCDIR}/svql_common_pattern.h")
 
-set(SVQL_COMMON_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libsvql_common.a")
+set(SVQL_COMMON_LIB "${CMAKE_BINARY_DIR}/cargo_target/${TARGET_DIR}/libsvql_common.a")
 
 add_custom_command(
     OUTPUT ${SVQL_COMMON_LIB} ${SVQL_COMMON_CONFIG_CXX} ${SVQL_COMMON_CONFIG_H} ${SVQL_COMMON_MATCHES_CXX} ${SVQL_COMMON_MATCHES_H} ${SVQL_COMMON_PATTERN_CXX} ${SVQL_COMMON_PATTERN_H}
     COMMAND ${CMAKE_COMMAND} -E env
-            CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/cargo_target
             RUSTFLAGS=${RUST_FLAGS}
             ${CARGO_CMD}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.cc ${SVQL_COMMON_CONFIG_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/config.rs.h  ${SVQL_COMMON_CONFIG_H}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/matches.rs.cc ${SVQL_COMMON_MATCHES_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/matches.rs.h  ${SVQL_COMMON_MATCHES_H}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/pattern.rs.cc ${SVQL_COMMON_PATTERN_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/${PROJECT_NAME}/src/pattern.rs.h  ${SVQL_COMMON_PATTERN_H}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/config.rs.cc ${SVQL_COMMON_CONFIG_CXX}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/config.rs.h  ${SVQL_COMMON_CONFIG_H}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/matches.rs.cc ${SVQL_COMMON_MATCHES_CXX}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/matches.rs.h  ${SVQL_COMMON_MATCHES_H}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/pattern.rs.cc ${SVQL_COMMON_PATTERN_CXX}
+    COMMAND cp ${CMAKE_BINARY_DIR}/cargo_target/cxxbridge/${PROJECT_NAME}/src/pattern.rs.h  ${SVQL_COMMON_PATTERN_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building Rust+generating CXX bridge"
     VERBATIM

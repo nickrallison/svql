@@ -5,7 +5,7 @@ include(ExternalProject)
 
 find_program(CARGO_EXECUTABLE     cargo     REQUIRED)
 
-set(SVQL_COMMON_TARGET_DIR  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_target)
+set(SVQL_COMMON_TARGET_DIR  ${CMAKE_BINARY_DIR}/cargo_target)
 
 ExternalProject_Add(
     ${PROJECT_NAME}_build
