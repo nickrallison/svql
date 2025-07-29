@@ -10,10 +10,10 @@ pub trait RtlModuleTrait {
     fn module_name(&self) -> &'static str;
     // fn valid_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool;
     // fn set_instance(&mut self, inst: Arc<String>);
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>);
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize);
 }
 
 pub trait RtlModuleResultTrait {
     fn from_portmap(port_map: HashMap<IdString, IdString>) -> Self;
-    fn find_port(&self, port_name: VecDeque<Arc<String>>) -> Option<&IdString>;
+    fn find_port(&self, port_name: VecDeque<Arc<String>>, height: usize) -> Option<&IdString>;
 }

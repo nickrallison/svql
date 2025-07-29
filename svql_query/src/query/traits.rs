@@ -12,24 +12,25 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>);
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize);
     fn query(
         &self,
         driver: &Driver,
         inst: Arc<String>,
         full_path: VecDeque<Arc<String>>,
+        height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError>;
 }
 
 pub trait RtlQueryResultTrait {
-    fn validate_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>) -> bool {
+    fn validate_connections(&self, connections: &HashSet<Connection<InPort, OutPort>>, height: usize) -> bool {
         for conn in connections {
-            if !self.validate_connection(conn) {
+            if !self.validate_connection(conn, height) {
                 return false;
             }
         }
         true
     }
-    fn validate_connection(&self, connections: &Connection<InPort, OutPort>) -> bool;
-    fn find_port(&self, port_name: VecDeque<Arc<String>>) -> Option<&IdString>;
+    fn validate_connection(&self, connection: &Connection<InPort, OutPort>, height: usize) -> bool;
+    fn find_port(&self,port_name: VecDeque<Arc<String>>, height: usize) -> Option<&IdString>;
 }

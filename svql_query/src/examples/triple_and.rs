@@ -41,10 +41,10 @@ impl RtlQueryTrait for TripleAnd {
         connections
     }
 
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>) {
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize) {
         // Initialize full path for both AND gates
-        self.double_and.init_full_path(full_path.clone());
-        self.and.init_full_path(full_path.clone());
+        self.double_and.init_full_path(full_path.clone(), height + 1);
+        self.and.init_full_path(full_path.clone(), height + 1);
     }
 
     fn query(
@@ -52,6 +52,7 @@ impl RtlQueryTrait for TripleAnd {
         driver: &Driver,
         inst: Arc<String>,
         full_path: VecDeque<Arc<String>>,
+        height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
         // Get the query iterators for both AND gates
 
@@ -70,7 +71,7 @@ impl RtlQueryTrait for TripleAnd {
         let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
             .filter(|match_result| {
                 // Check if the match is valid based on the connections
-                match_result.query.validate_connections(&self.connect())
+                match_result.query.validate_connections(&self.connect(), height)
             })
             .collect();
 
@@ -91,9 +92,14 @@ impl TripleAndResult {
 }
 
 impl RtlQueryResultTrait for TripleAndResult {
-    fn validate_connection(&self, connection: &Connection<InPort, OutPort>) -> bool {
-        let in_port_id = self.find_port(connection.in_port.full_path.clone());
-        let out_port_id = self.find_port(connection.out_port.full_path.clone());
+    fn validate_connection(&self, connection: &Connection<InPort, OutPort>, height: usize) -> bool {
+        // DEBUGGING
+        // if self.double_and.query.and2.module.y.to_string().contains("2_Y") && self.and.module.a.to_string().contains("2_Y") {
+        //     println!("Validating connection: {:?}: {:?} -> {:?}", connection, self.double_and.query.and2.module.y, self.and.module.a);
+        // }
+
+        let in_port_id = self.find_port(connection.in_port.full_path.clone(), height);
+        let out_port_id = self.find_port(connection.out_port.full_path.clone(), height);
 
         if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
             return in_port == out_port;
@@ -101,16 +107,15 @@ impl RtlQueryResultTrait for TripleAndResult {
         false
     }
 
-    fn find_port(&self, mut port_name: VecDeque<Arc<String>>) -> Option<&IdString> {
-        let _top_str_option = port_name.pop_front();
+    fn find_port(&self, port_name: VecDeque<Arc<String>>, height: usize) -> Option<&IdString> {
+        let child_id_opt: Option<Arc<String>> = port_name.get(height + 1).map(|s| s.clone());
 
-        let peeked_str_option = port_name.iter().next();
-        if let Some(peeked_str) = peeked_str_option {
+        if let Some(child_id) = child_id_opt {
             // for module in modules, check if the port matches
-            if *peeked_str == self.double_and.inst {
-                return self.double_and.query.find_port(port_name);
-            } else if *peeked_str == self.and.inst {
-                return self.and.module.find_port(port_name);
+            if child_id == self.double_and.inst {
+                return self.double_and.query.find_port(port_name, height + 1);
+            } else if child_id == self.and.inst {
+                return self.and.module.find_port(port_name, height + 1);
             }
         }
         None

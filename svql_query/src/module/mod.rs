@@ -19,6 +19,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct RtlModule<ModuleType> {
+    pub height: usize,
     pub inst: Arc<String>,
     pub full_path: VecDeque<Arc<String>>,
     // ################
@@ -36,8 +37,9 @@ where
             full_path: vec![].into(),
             // connections: EMPTY_CONNECTIONS.clone(),
             module,
+            height: 0,
         };
-        module.init_full_path(vec![].into());
+        module.init_full_path(vec![].into(), 0);
         module
     }
 
@@ -53,13 +55,14 @@ where
         cfg
     }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
+    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
         let mut full_path = parent_path.clone();
         full_path.push_back(self.inst.clone());
         self.full_path = full_path.clone();
+        self.height = height;
 
         // Initialize full path for module's ports
-        self.module.init_full_path(full_path);
+        self.module.init_full_path(full_path, height);
     }
 
     #[allow(dead_code)]

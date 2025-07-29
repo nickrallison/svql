@@ -14,7 +14,3 @@ use svql_query_proc_macro::module;
     svql_pat_plugin_path = "./build/svql_pat_lib/libsvql_pat_lib.so"
 )]
 pub struct And;
-
-mod test {
-    use crate::examples::and::And;
-}

@@ -28,7 +28,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     let init_full_path_calls = ir.ports.iter().map(|p| {
         let id = &p.ident;
-        quote! { self.#id.init_full_path(full_path.clone()); }
+        quote! { self.#id.init_full_path(full_path.clone(), height + 1); }
     });
 
     // --------------------------- result struct ---------------------------
@@ -68,7 +68,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
             fn file_path(&self) -> std::path::PathBuf { #file_path.into() }
             fn module_name(&self) -> &'static str { #module_name }
-            fn init_full_path(&mut self, full_path: std::collections::VecDeque<std::sync::Arc<String>>) {
+            fn init_full_path(&mut self, full_path: std::collections::VecDeque<std::sync::Arc<String>>, height: usize) {
                 #(#init_full_path_calls)*
             }
         }
@@ -90,12 +90,17 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
             fn find_port(
                 &self,
-                port_name: std::collections::VecDeque<std::sync::Arc<String>>
+                port_name: std::collections::VecDeque<std::sync::Arc<String>>,
+                height: usize
             ) -> Option<&svql_common::matches::IdString> {
-                if port_name.len() != 2 { return None; }
-                match port_name[1].as_str() {
-                    #(#find_arms ,)*
-                    _ => None,
+                let port_name = port_name.get(height + 1).map(|s| s.clone());
+                if let Some(port_name) = port_name {
+                    match port_name.as_str() {
+                        #(#find_arms ,)*
+                        _ => None,
+                    }
+                } else {
+                    None
                 }
             }
         }

@@ -39,10 +39,10 @@ impl RtlQueryTrait for DoubleAnd {
         connections
     }
 
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>) {
+    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize) {
         // Initialize full path for both AND gates
-        self.and1.init_full_path(full_path.clone());
-        self.and2.init_full_path(full_path.clone());
+        self.and1.init_full_path(full_path.clone(), height + 1);
+        self.and2.init_full_path(full_path.clone(), height + 1);
     }
 
     fn query(
@@ -50,6 +50,7 @@ impl RtlQueryTrait for DoubleAnd {
         driver: &Driver,
         inst: Arc<String>,
         full_path: VecDeque<Arc<String>>,
+        height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
         // Get the query iterators for both AND gates
 
@@ -68,7 +69,7 @@ impl RtlQueryTrait for DoubleAnd {
         let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
             .filter(|match_result| {
                 // Check if the match is valid based on the connections
-                match_result.query.validate_connections(&self.connect())
+                match_result.query.validate_connections(&self.connect(), height)
             })
             .collect();
 
@@ -89,9 +90,9 @@ impl DoubleAndResult {
 }
 
 impl RtlQueryResultTrait for DoubleAndResult {
-    fn validate_connection(&self, connection: &Connection<InPort, OutPort>) -> bool {
-        let in_port_id = self.find_port(connection.in_port.full_path.clone());
-        let out_port_id = self.find_port(connection.out_port.full_path.clone());
+    fn validate_connection(&self, connection: &Connection<InPort, OutPort>, height: usize) -> bool {
+        let in_port_id = self.find_port(connection.in_port.full_path.clone(), height);
+        let out_port_id = self.find_port(connection.out_port.full_path.clone(), height);
 
         if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
             return in_port == out_port;
@@ -99,16 +100,15 @@ impl RtlQueryResultTrait for DoubleAndResult {
         false
     }
 
-    fn find_port(&self, mut port_name: VecDeque<Arc<String>>) -> Option<&IdString> {
-        let _top_str_option = port_name.pop_front();
+    fn find_port(&self, port_name: VecDeque<Arc<String>>, height: usize) -> Option<&IdString> {
+        let child_id_opt: Option<Arc<String>> = port_name.get(height + 1).map(|s| s.clone());
 
-        let peeked_str_option = port_name.iter().next();
-        if let Some(peeked_str) = peeked_str_option {
+        if let Some(child_id) = child_id_opt {
             // for module in modules, check if the port matches
-            if *peeked_str == self.and1.inst {
-                return self.and1.module.find_port(port_name);
-            } else if *peeked_str == self.and2.inst {
-                return self.and2.module.find_port(port_name);
+            if child_id == self.and1.inst {
+                return self.and1.module.find_port(port_name, height + 1);
+            } else if child_id == self.and2.inst {
+                return self.and2.module.find_port(port_name, height + 1);
             }
         }
         None

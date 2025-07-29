@@ -11,6 +11,7 @@ pub mod traits;
 
 #[derive(Debug, Clone)]
 pub struct RtlQuery<QueryType> {
+    pub height: usize,
     pub inst: Arc<String>,
     pub full_path: VecDeque<Arc<String>>,
     // ################
@@ -28,8 +29,9 @@ where
             full_path: vec![].into(),
             // connections: QueryType::connect(&query),
             query,
+            height: 0,
         };
-        query.init_full_path(vec![].into());
+        query.init_full_path(vec![].into(), 0);
         query
     }
 
@@ -42,13 +44,14 @@ where
     //     self.connections.insert(conn);
     // }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>) {
+    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
         let mut full_path = parent_path.clone();
         full_path.push_back(self.inst.clone());
         self.full_path = full_path.clone();
+        self.height = height;
 
         // Initialize full path for module's ports
-        self.query.init_full_path(full_path);
+        self.query.init_full_path(full_path, height);
     }
 
     pub fn query(
@@ -57,6 +60,6 @@ where
     ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
         let inst = self.inst.clone();
         let full_path = self.full_path.clone();
-        self.query.query(driver, inst, full_path)
+        self.query.query(driver, inst, full_path, self.height)
     }
 }
