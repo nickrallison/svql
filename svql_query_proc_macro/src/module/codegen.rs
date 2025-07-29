@@ -19,11 +19,10 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     let new_inits = ir.ports.iter().map(|p| {
         let id = &p.ident;
-        let name = &p.orig_name;
         match p.dir {
-            Direction::In => quote! { #id : crate::ports::InPort   ::new(#name) },
-            Direction::Out => quote! { #id : crate::ports::OutPort  ::new(#name) },
-            Direction::InOut => quote! { #id : crate::ports::InOutPort::new(#name) },
+            Direction::In => quote! { #id : crate::ports::InPort   ::new(stringify!(#id)) },
+            Direction::Out => quote! { #id : crate::ports::OutPort  ::new(stringify!(#id)) },
+            Direction::InOut => quote! { #id : crate::ports::InOutPort::new(stringify!(#id)) },
         }
     });
 
@@ -40,14 +39,12 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     let lookup_arms = ir.ports.iter().map(|p| {
         let id   = &p.ident;
-        // let name = &p.orig_name;
         quote! { #id : crate::module::lookup(&port_map, stringify!(#id)).expect(concat!("Port '", stringify!(#id), "' not found")) }
     });
 
     let find_arms = ir.ports.iter().map(|p| {
         let id = &p.ident;
-        let name = &p.orig_name;
-        quote! { #name => Some(&self.#id) }
+        quote! { stringify!(#id) => Some(&self.#id) }
     });
 
     // --------------------------- assemble -------------------------------
@@ -115,4 +112,39 @@ fn field_tokens(ir: &Ir, dir: Direction, ty: TokenStream) -> Vec<TokenStream> {
             quote! { #vis #id : #ty }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::lower::{Port, Direction};
+    use proc_macro2::Span;
+    use syn::{Ident, Visibility, VisPublic};
+
+    #[test]
+    fn test_codegen_fields() {
+        // Create a fake Ir with two ports
+        let ir = Ir {
+            vis: Visibility::Public(VisPublic { pub_token: Default::default() }),
+            iface_ident: Ident::new("Foo", Span::call_site()),
+            result_ident: Ident::new("FooResult", Span::call_site()),
+            file_path: "path/to/file.v".to_string(),
+            module_name: "foo_mod".to_string(),
+            ports: vec![
+                Port { orig_name: "a".into(), ident: Ident::new("a", Span::call_site()), dir: Direction::In },
+                Port { orig_name: "b".into(), ident: Ident::new("b", Span::call_site()), dir: Direction::Out },
+            ],
+        };
+        let ts = codegen(ir);
+        let code = ts.to_string();
+        // Should contain struct definitions and field names
+    
+        assert!(code.contains("struct Foo"));
+        assert!(code.contains("pub a : crate :: ports :: InPort"));
+        assert!(code.contains("pub b : crate :: ports :: OutPort"));
+        // Check result struct and lookup
+        assert!(code.contains("struct FooResult"));
+        assert!(code.contains("pub a : svql_common :: matches :: IdString"));
+        assert!(code.contains("pub b : svql_common :: matches :: IdString"));
+    }
 }
