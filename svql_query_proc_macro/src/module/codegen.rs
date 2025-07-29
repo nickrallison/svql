@@ -40,8 +40,8 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     let lookup_arms = ir.ports.iter().map(|p| {
         let id   = &p.ident;
-        let name = &p.orig_name;
-        quote! { #id : crate::module::lookup(&port_map, #name).expect(concat!("Port '", #name, "' not found")) }
+        // let name = &p.orig_name;
+        quote! { #id : crate::module::lookup(&port_map, stringify!(#id)).expect(concat!("Port '", stringify!(#id), "' not found")) }
     });
 
     let find_arms = ir.ports.iter().map(|p| {

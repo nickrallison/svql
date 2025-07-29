@@ -54,5 +54,8 @@ mod tests {
         let matches = and.query(&driver);
         assert!(matches.is_ok());
         let matches = matches.unwrap();
-    } 
+        for m in matches.iter() {
+            println!("-----\n{:#?}", m);
+        }
+    }
 }
