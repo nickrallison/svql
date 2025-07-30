@@ -16,7 +16,7 @@ mod examples;
 mod module;
 mod ports;
 // mod query;
-mod full_path;
+mod instance;
 
 fn main() {
     // Initialize logger

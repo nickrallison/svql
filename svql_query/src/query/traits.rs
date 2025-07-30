@@ -13,12 +13,12 @@ pub trait RtlQueryTrait {
 
     /// The set of extra connections the query wants to impose.
     fn connect(&self) -> HashSet<Connection<InPort, OutPort>>;
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize);
+    fn init_instance(&mut self, instance: VecDeque<Arc<String>>, height: usize);
     fn query(
         &self,
         driver: &Driver,
         inst: Arc<String>,
-        full_path: VecDeque<Arc<String>>,
+        instance: VecDeque<Arc<String>>,
         height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError>;
 }

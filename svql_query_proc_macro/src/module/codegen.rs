@@ -26,9 +26,9 @@ pub fn codegen(ir: Ir) -> TokenStream {
         }
     });
 
-    let init_full_path_calls = ir.ports.iter().map(|p| {
+    let init_instance_calls = ir.ports.iter().map(|p| {
         let id = &p.ident;
-        quote! { self.#id.init_full_path(full_path.clone(), height + 1); }
+        quote! { self.#id.init_instance(instance.clone(), height + 1); }
     });
 
     // --------------------------- result struct ---------------------------
@@ -68,8 +68,8 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
             fn file_path(&self) -> std::path::PathBuf { #file_path.into() }
             fn module_name(&self) -> &'static str { #module_name }
-            fn init_full_path(&mut self, full_path: std::collections::VecDeque<std::sync::Arc<String>>, height: usize) {
-                #(#init_full_path_calls)*
+            fn init_instance(&mut self, instance: std::collections::VecDeque<std::sync::Arc<String>>, height: usize) {
+                #(#init_instance_calls)*
             }
         }
 

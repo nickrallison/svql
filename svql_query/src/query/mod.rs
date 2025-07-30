@@ -13,7 +13,7 @@ pub mod traits;
 pub struct RtlQuery<QueryType> {
     pub height: usize,
     pub inst: Arc<String>,
-    pub full_path: VecDeque<Arc<String>>,
+    pub instance: VecDeque<Arc<String>>,
     // ################
     // pub connections: HashSet<Connection<InPort, OutPort>>,
     pub query: QueryType,
@@ -26,32 +26,32 @@ where
     pub fn new(query: QueryType, inst: String) -> Self {
         let mut query = RtlQuery {
             inst: Arc::new(inst),
-            full_path: vec![].into(),
+            instance: vec![].into(),
             // connections: QueryType::connect(&query),
             query,
             height: 0,
         };
-        query.init_full_path(vec![].into(), 0);
+        query.init_instance(vec![].into(), 0);
         query
     }
 
     #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
-        inst_path(&self.full_path)
+        inst_path(&self.instance)
     }
 
     // pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
     //     self.connections.insert(conn);
     // }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
-        let mut full_path = parent_path.clone();
-        full_path.push_back(self.inst.clone());
-        self.full_path = full_path.clone();
+    pub(crate) fn init_instance(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
+        let mut instance = parent_path.clone();
+        instance.push_back(self.inst.clone());
+        self.instance = instance.clone();
         self.height = height;
 
         // Initialize full path for module's ports
-        self.query.init_full_path(full_path, height);
+        self.query.init_instance(instance, height);
     }
 
     pub fn query(
@@ -59,7 +59,7 @@ where
         driver: &Driver,
     ) -> Result<Vec<RtlQueryResult<QueryType::Result>>, DriverError> {
         let inst = self.inst.clone();
-        let full_path = self.full_path.clone();
-        self.query.query(driver, inst, full_path, self.height)
+        let instance = self.instance.clone();
+        self.query.query(driver, inst, instance, self.height)
     }
 }

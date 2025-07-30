@@ -39,17 +39,17 @@ impl RtlQueryTrait for DoubleAnd {
         connections
     }
 
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize) {
+    fn init_instance(&mut self, instance: VecDeque<Arc<String>>, height: usize) {
         // Initialize full path for both AND gates
-        self.and1.init_full_path(full_path.clone(), height + 1);
-        self.and2.init_full_path(full_path.clone(), height + 1);
+        self.and1.init_instance(instance.clone(), height + 1);
+        self.and2.init_instance(instance.clone(), height + 1);
     }
 
     fn query(
         &self,
         driver: &Driver,
         inst: Arc<String>,
-        full_path: VecDeque<Arc<String>>,
+        instance: VecDeque<Arc<String>>,
         height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
         // Get the query iterators for both AND gates
@@ -63,7 +63,7 @@ impl RtlQueryTrait for DoubleAnd {
         // Map the cartesian product to DoubleAndResult instances
         let matches = cartesian_product.map(|(and1_result, and2_result)| {
             let double_and_result = DoubleAndResult::new(and1_result, and2_result);
-            RtlQueryResult::new(double_and_result, inst.clone(), full_path.clone())
+            RtlQueryResult::new(double_and_result, inst.clone(), instance.clone())
         });
 
         let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
@@ -91,8 +91,8 @@ impl DoubleAndResult {
 
 impl RtlQueryResultTrait for DoubleAndResult {
     fn validate_connection(&self, connection: &Connection<InPort, OutPort>, height: usize) -> bool {
-        let in_port_id = self.find_port(connection.in_port.full_path.clone(), height);
-        let out_port_id = self.find_port(connection.out_port.full_path.clone(), height);
+        let in_port_id = self.find_port(connection.in_port.instance.clone(), height);
+        let out_port_id = self.find_port(connection.out_port.instance.clone(), height);
 
         if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
             return in_port == out_port;

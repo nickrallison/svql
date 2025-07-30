@@ -2,7 +2,7 @@ pub mod result;
 pub mod traits;
 
 use crate::driver::{Driver, DriverConversionError, DriverError};
-use crate::full_path::FullPath;
+use crate::instance::Instance;
 use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
@@ -20,7 +20,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct RtlModule<ModuleType> {
-    pub path: FullPath,
+    pub path: Instance,
     pub module: ModuleType,
 }
 
@@ -29,11 +29,11 @@ where
     ModuleType: RtlModuleTrait,
 {
     pub fn new_root(inst: String) -> Self {
-        let path = FullPath::new_root(inst);
+        let path = Instance::new_root(inst);
         Self::new(path)
     }
 
-    pub fn new(path: FullPath) -> Self {
+    pub fn new(path: Instance) -> Self {
         let module = ModuleType::initialize(path.clone());
         Self { path, module }
     }
@@ -47,19 +47,19 @@ where
         cfg
     }
 
-    pub(crate) fn init_full_path(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
-        let mut full_path = parent_path.clone();
-        full_path.push_back(self.inst.clone());
-        self.full_path = full_path.clone();
+    pub(crate) fn init_instance(&mut self, parent_path: VecDeque<Arc<String>>, height: usize) {
+        let mut instance = parent_path.clone();
+        instance.push_back(self.inst.clone());
+        self.instance = instance.clone();
         self.height = height;
 
         // Initialize full path for module's ports
-        self.module.init_full_path(full_path, height);
+        self.module.init_instance(instance, height);
     }
 
     #[allow(dead_code)]
     pub fn inst_path(&self) -> String {
-        inst_path(&self.full_path)
+        inst_path(&self.instance)
     }
 
     pub fn query(
@@ -70,14 +70,14 @@ where
         let matches = driver.query(&cfg)?;
 
         let inst = self.inst.clone();
-        let full_path = self.full_path.clone();
+        let instance = self.instance.clone();
 
         let iter = matches
             .into_iter()
             .map(RtlModuleResult::from_match)
             .map(|mut result| {
                 result.inst = inst.clone();
-                result.full_path = full_path.clone();
+                result.instance = instance.clone();
                 result
             })
             .collect();
@@ -99,8 +99,8 @@ pub fn lookup(m: &HashMap<IdString, IdString>, pin: &str) -> Result<IdString, Qu
         .ok_or_else(|| QueryError::MissingPort(m.clone(), pin.to_string()))
 }
 
-pub fn inst_path(full_path: &VecDeque<Arc<String>>) -> String {
-    full_path
+pub fn inst_path(instance: &VecDeque<Arc<String>>) -> String {
+    instance
         .iter()
         .map(|s| s.to_string())
         .collect::<Vec<String>>()

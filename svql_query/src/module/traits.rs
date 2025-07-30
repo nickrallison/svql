@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use svql_common::id_string::IdString;
 
-use crate::full_path::FullPath;
+use crate::instance::Instance;
 
 pub trait RtlModuleTrait {
     type Result: Debug + RtlModuleResultTrait;
@@ -17,7 +17,7 @@ pub trait RtlModuleTrait {
     fn svql_pat_plugin_path() -> &'static str;
 
     // Recursive Functionality
-    fn initialize(path: FullPath) -> Self;
+    fn initialize(path: Instance) -> Self;
 }
 
 pub trait RtlModuleResultTrait {

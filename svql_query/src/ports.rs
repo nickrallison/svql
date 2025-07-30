@@ -1,17 +1,17 @@
-use crate::full_path::FullPath;
+use crate::instance::Instance;
 use crate::module::inst_path;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct InPort {
-    pub path: FullPath
+    pub path: Instance
 }
 
 impl InPort {
-    pub fn new<S: Into<String>>(s: S, parent_path: FullPath) -> InPort {
+    pub fn new<S: Into<String>>(s: S, parent_path: Instance) -> InPort {
         let inst = Arc::new(s.into());
-        let path: FullPath = parent_path.create_child(inst);
+        let path: Instance = parent_path.create_child(inst);
         InPort { path }
     }
 
@@ -23,11 +23,11 @@ impl InPort {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct OutPort {
-    pub path: FullPath
+    pub path: Instance
 }
 
 impl OutPort {
-    pub fn new<S: Into<String>>(s: S, parent_path: FullPath) -> OutPort {
+    pub fn new<S: Into<String>>(s: S, parent_path: Instance) -> OutPort {
         let inst = Arc::new(s.into());
         let path = parent_path.create_child(inst);
         OutPort { path }

@@ -41,17 +41,17 @@ impl RtlQueryTrait for TripleAnd {
         connections
     }
 
-    fn init_full_path(&mut self, full_path: VecDeque<Arc<String>>, height: usize) {
+    fn init_instance(&mut self, instance: VecDeque<Arc<String>>, height: usize) {
         // Initialize full path for both AND gates
-        self.double_and.init_full_path(full_path.clone(), height + 1);
-        self.and.init_full_path(full_path.clone(), height + 1);
+        self.double_and.init_instance(instance.clone(), height + 1);
+        self.and.init_instance(instance.clone(), height + 1);
     }
 
     fn query(
         &self,
         driver: &Driver,
         inst: Arc<String>,
-        full_path: VecDeque<Arc<String>>,
+        instance: VecDeque<Arc<String>>,
         height: usize
     ) -> Result<Vec<RtlQueryResult<Self::Result>>, DriverError> {
         // Get the query iterators for both AND gates
@@ -65,7 +65,7 @@ impl RtlQueryTrait for TripleAnd {
         // Map the cartesian product to TripleAndResult instances
         let matches = cartesian_product.map(|(and_result, double_and_result)| {
             let triple_and_result = TripleAndResult::new(double_and_result, and_result);
-            RtlQueryResult::new(triple_and_result, inst.clone(), full_path.clone())
+            RtlQueryResult::new(triple_and_result, inst.clone(), instance.clone())
         });
 
         let filtered_matches: Vec<RtlQueryResult<Self::Result>> = matches
@@ -98,8 +98,8 @@ impl RtlQueryResultTrait for TripleAndResult {
         //     println!("Validating connection: {:?}: {:?} -> {:?}", connection, self.double_and.query.and2.module.y, self.and.module.a);
         // }
 
-        let in_port_id = self.find_port(connection.in_port.full_path.clone(), height);
-        let out_port_id = self.find_port(connection.out_port.full_path.clone(), height);
+        let in_port_id = self.find_port(connection.in_port.instance.clone(), height);
+        let out_port_id = self.find_port(connection.out_port.instance.clone(), height);
 
         if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
             return in_port == out_port;

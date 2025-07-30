@@ -7,7 +7,7 @@ pub struct RtlQueryResult<QueryResultType> {
     #[allow(dead_code)]
     pub inst: Arc<String>,
     #[allow(dead_code)]
-    pub full_path: VecDeque<Arc<String>>,
+    pub instance: VecDeque<Arc<String>>,
     // ################
     pub query: QueryResultType,
 }
@@ -19,11 +19,11 @@ where
     pub fn new(
         query: QueryResultType,
         inst: Arc<String>,
-        full_path: VecDeque<Arc<String>>,
+        instance: VecDeque<Arc<String>>,
     ) -> Self {
         RtlQueryResult {
             inst,
-            full_path,
+            instance,
             query,
         }
     }
