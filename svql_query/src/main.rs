@@ -15,7 +15,8 @@ mod driver;
 mod examples;
 mod module;
 mod ports;
-mod query;
+// mod query;
+mod full_path;
 
 fn main() {
     // Initialize logger
@@ -26,15 +27,15 @@ fn main() {
     log::trace!("Starting svql_query");
 
     // Directly query the driver for AND gate matches
-    let triple_and: RtlQuery<TripleAnd> = RtlQuery::new(TripleAnd::new(), "triple_and".to_string());
-    // let and = RtlModule::<And>::new(And::new(), "and_gate".to_string());
+    // let triple_and: RtlQuery<TripleAnd> = RtlQuery::new(TripleAnd::new(), "triple_and".to_string());
+    let and = RtlModule::<And>::root("and_gate".to_string());
     
     // let driver = Driver::new_net("localhost:9999".to_string());
     let driver = Driver::new_mock();
 
-    match triple_and.query(&driver) {
+    match and.query(&driver) {
         Ok(matches) => {
-            log::trace!("Triple And query returned {} matches", matches.len());
+            log::trace!("And query returned {} matches", matches.len());
             for m in matches.iter() {
                 println!("-----\n{:#?}", m);
             }

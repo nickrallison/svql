@@ -1,10 +1,11 @@
+use svql_common::id_string::IdString;
+
 use crate::driver::{Driver, DriverError};
 use crate::ports::{Connection, InPort, OutPort};
 use crate::query::result::RtlQueryResult;
 use std::collections::{HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
-use svql_common::matches::IdString;
 
 pub trait RtlQueryTrait {
     /// Type produced for every successful match of this query.

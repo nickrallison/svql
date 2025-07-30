@@ -3,6 +3,7 @@
 use crate::driver::mock::MockDriver;
 use crate::driver::net::{NetDriver, SvqlDriverNetError};
 use svql_common::config::ffi::SvqlRuntimeConfig;
+use svql_common::id_string::IdStringError;
 use svql_common::matches::SanitizedQueryMatch;
 
 use thiserror::Error;
@@ -70,7 +71,7 @@ impl Driver {
 #[derive(Debug, Clone, Error)]
 pub enum DriverConversionError {
     #[error("Query match conversion error: {0}")]
-    IdStringError(#[from] svql_common::matches::IdStringError),
+    IdStringError(#[from] IdStringError),
 }
 
 #[derive(Debug, Error)]

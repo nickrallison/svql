@@ -1,16 +1,8 @@
+use crate::id_string::{parse_idstring, IdString, IdStringError};
 use crate::matches::ffi::{CellData, QueryMatchList};
-use lazy_static::lazy_static;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
-use thiserror::Error;
-
-lazy_static! {
-    static ref NAMED_IDSTRING_RE: Regex = Regex::new(r"^\\(\S*)$").unwrap();
-    static ref UNNAMED_IDSTRING_RE: Regex =
-        Regex::new(r"^\$([^\$]*)\$([^:]*):([^\$]*)\$(.*)$").unwrap();
-}
 
 #[cxx::bridge]
 pub mod ffi {
@@ -48,58 +40,6 @@ pub mod ffi {
         fn matchlist_into_json_string(cfg: &QueryMatchList) -> String;
         fn matchlist_from_json_string(json: &str) -> QueryMatchList;
     }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub enum IdString {
-    // "\\[name]"
-    Named(String),
-    // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y
-    // $and$examples/patterns/basic/and/verilog/and.v:9$11
-    // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2
-    Unnamed {
-        gate_name: String,
-        file_path: String,
-        line: String,
-        id: String,
-    },
-}
-
-impl Display for IdString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IdString::Named(name) => write!(f, "\\{name}"),
-            IdString::Unnamed {
-                gate_name,
-                file_path,
-                line,
-                id,
-            } => {
-                write!(f, "${gate_name}${file_path}:{line}${id}")
-            }
-        }
-    }
-}
-
-#[derive(Error, Clone, Debug)]
-pub enum IdStringError {
-    #[error("{0}")]
-    InvalidFormat(String),
-}
-
-pub fn parse_idstring(idstring: &str) -> Result<IdString, IdStringError> {
-    if let Some(caps) = NAMED_IDSTRING_RE.captures(idstring) {
-        return Ok(IdString::Named(caps[1].to_string()));
-    } else if let Some(caps) = UNNAMED_IDSTRING_RE.captures(idstring) {
-        return Ok(IdString::Unnamed {
-            gate_name: caps[1].to_string(),
-            file_path: caps[2].to_string(),
-            line: caps[3].to_string(),
-            id: caps[4].to_string(),
-        });
-    }
-    // panic!("Invalid idstring format: {}", idstring);
-    Err(IdStringError::InvalidFormat(idstring.to_string()))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -161,8 +101,8 @@ impl TryInto<SanitizedQueryMatch> for ffi::QueryMatch {
             .port_map
             .into_iter()
             .map(|pair| {
-                let needle: IdString = pair.needle.try_into()?;
-                let haystack: IdString = pair.haystack.try_into()?;
+                let needle: IdString = parse_idstring(&pair.needle)?;
+                let haystack: IdString = parse_idstring(&pair.haystack)?;
                 Ok((needle, haystack))
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
@@ -191,13 +131,6 @@ impl TryInto<SanitizedCellData> for CellData {
     }
 }
 
-impl TryInto<IdString> for String {
-    type Error = IdStringError;
-    fn try_into(self) -> Result<IdString, Self::Error> {
-        parse_idstring(&self)
-    }
-}
-
 pub fn matchlist_into_json_string(cfg: &QueryMatchList) -> String {
     serde_json::to_string(cfg).expect("Failed to serialize QueryMatchList to JSON")
 }
@@ -214,7 +147,7 @@ mod tests {
     #[test]
     fn test_parse_named_idstring() {
         let named_id = "\\test_signal";
-        let result = parse_idstring(named_id).unwrap();
+        let result = named_id.try_into().unwrap();
         match result {
             IdString::Named(name) => assert_eq!(name, "test_signal"),
             _ => panic!("Expected Named variant"),
@@ -224,7 +157,7 @@ mod tests {
     #[test]
     fn test_parse_unnamed_idstring() {
         let unnamed_id = "$and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y";
-        let result = parse_idstring(unnamed_id).unwrap();
+        let result = unnamed_id.try_into().unwrap();
         match result {
             IdString::Unnamed {
                 gate_name,
@@ -244,7 +177,7 @@ mod tests {
     #[test]
     fn test_parse_unnamed_idstring_simple() {
         let unnamed_id = "$and$examples/patterns/basic/and/verilog/and.v:9$11";
-        let result = parse_idstring(unnamed_id).unwrap();
+        let result = unnamed_id.try_into().unwrap();
         match result {
             IdString::Unnamed {
                 gate_name,
@@ -264,7 +197,7 @@ mod tests {
     #[test]
     fn test_parse_invalid_idstring() {
         let invalid_id = "invalid_format";
-        let result = parse_idstring(invalid_id);
+        let result: Result<IdString, IdStringError> = invalid_id.try_into();
         assert!(result.is_err());
         match result.unwrap_err() {
             IdStringError::InvalidFormat(msg) => assert_eq!(msg, "invalid_format"),

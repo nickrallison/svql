@@ -2,15 +2,16 @@ pub mod result;
 pub mod traits;
 
 use crate::driver::{Driver, DriverConversionError, DriverError};
+use crate::full_path::FullPath;
 use crate::module::result::RtlModuleResult;
 use crate::module::traits::RtlModuleTrait;
 use crate::ports::{Connection, InPort, OutPort};
 use lazy_static::lazy_static;
+use svql_common::id_string::IdString;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use svql_common::matches::IdString;
 use thiserror::Error;
 
 lazy_static! {
@@ -19,11 +20,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct RtlModule<ModuleType> {
-    pub height: usize,
-    pub inst: Arc<String>,
-    pub full_path: VecDeque<Arc<String>>,
-    // ################
-    // pub connections: HashSet<Connection<InPort, OutPort>>,
+    pub path: FullPath,
     pub module: ModuleType,
 }
 
@@ -31,21 +28,16 @@ impl<ModuleType> RtlModule<ModuleType>
 where
     ModuleType: RtlModuleTrait,
 {
-    pub fn new(module: ModuleType, inst: String) -> Self {
-        let mut module = RtlModule {
-            inst: Arc::new(inst),
-            full_path: vec![].into(),
-            // connections: EMPTY_CONNECTIONS.clone(),
-            module,
-            height: 0,
-        };
-        module.init_full_path(vec![].into(), 0);
-        module
+    pub fn new_root(inst: String) -> Self {
+        let path = FullPath::new_root(inst);
+        Self::new(path)
     }
 
-    // pub fn add_connection(&mut self, conn: Connection<InPort, OutPort>) {
-    //     self.connections.insert(conn);
-    // }
+    pub fn new(path: FullPath) -> Self {
+        let module = ModuleType::initialize(path.clone());
+        Self { path, module }
+    }
+
 
     pub(crate) fn config(&self) -> SvqlRuntimeConfig {
         let mut cfg = SvqlRuntimeConfig::default();

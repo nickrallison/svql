@@ -34,7 +34,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     // --------------------------- result struct ---------------------------
     let result_fields = ir.ports.iter().map(|p| {
         let id = &p.ident;
-        quote! { #vis #id : svql_common::matches::IdString }
+        quote! { #vis #id : svql_common::id_string::IdString }
     });
 
     let lookup_arms = ir.ports.iter().map(|p| {
@@ -82,8 +82,8 @@ pub fn codegen(ir: Ir) -> TokenStream {
         impl crate::module::traits::RtlModuleResultTrait for #result_ident {
             fn from_portmap(
                 port_map: std::collections::HashMap<
-                    svql_common::matches::IdString,
-                    svql_common::matches::IdString>
+                    svql_common::id_string::IdString,
+                    svql_common::id_string::IdString>
             ) -> Self {
                 Self { #(#lookup_arms ,)* }
             }
@@ -92,7 +92,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 &self,
                 port_name: std::collections::VecDeque<std::sync::Arc<String>>,
                 height: usize
-            ) -> Option<&svql_common::matches::IdString> {
+            ) -> Option<&svql_common::id_string::IdString> {
                 let port_name = port_name.get(height + 1).map(|s| s.clone());
                 if let Some(port_name) = port_name {
                     match port_name.as_str() {

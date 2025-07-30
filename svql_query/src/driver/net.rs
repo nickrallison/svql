@@ -3,6 +3,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::config::svql_runtime_config_into_json_string;
+use svql_common::id_string::IdStringError;
 use svql_common::matches::ffi::QueryMatchList;
 use svql_common::matches::matchlist_from_json_string;
 use svql_common::matches::SanitizedQueryMatch;
@@ -34,7 +35,7 @@ pub enum SvqlDriverNetError {
     #[error("Parse error: {0}")]
     ParseError(String),
     #[error("Query match conversion error: {0}")]
-    IdStringError(#[from] svql_common::matches::IdStringError),
+    IdStringError(#[from] IdStringError),
 }
 
 // Make the function public for use in mock driver
