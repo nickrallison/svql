@@ -46,5 +46,8 @@ impl Instance {
             .collect::<Vec<String>>()
             .join(".")
     }
+    pub fn height(&self) -> usize {
+        self.height
+    }
 
 }
