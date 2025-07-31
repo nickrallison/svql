@@ -1,8 +1,10 @@
-use crate::instance::Instance;
-use std::collections::HashSet;
+use crate::{driver::Driver, instance::Instance};
+use std::collections::{HashMap, HashSet};
 use itertools::{iproduct, Itertools};
+use svql_common::{config::ffi::SvqlRuntimeConfig, id_string::IdString};
 
 mod instance;
+mod driver;
 
 // ########################
 // Base Search Types
@@ -10,32 +12,36 @@ mod instance;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Search;
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Match;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Match {
+    pub id: IdString
+}
 
-// ########################
-// Driver
-// ########################
-
-pub struct Driver;
+impl Default for Match {
+    fn default() -> Self {
+        Self { id: IdString::Named("default".into()) }
+    }
+}
 
 // ########################
 // Helpers
 // ########################
 
 
-// fn swapped<A: Clone, B: Clone>((x, y): (A, B)) -> (A, B) {
-//     (y, x)
-// }
+pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a IdString> {
+    m.get(&IdString::Named(pin.into()))
+}
 
 // ########################
 // Traits
 // ########################
 
-pub trait Searchable: Clone {
-    type Hit;
-    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
-}
+// pub trait Searchable: Clone {
+//     type Hit;
+//     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
+// }
+
+type QueryMatch = svql_common::matches::SanitizedQueryMatch;
 
 pub trait Netlist {
 
@@ -52,14 +58,33 @@ pub trait Netlist {
     fn svql_driver_plugin() -> &'static str;
 
     // ####
-    fn swappable() -> Vec<HashSet<String>>;
+    fn config() -> SvqlRuntimeConfig {
+        let mut cfg = SvqlRuntimeConfig::default();
+        cfg.pat_filename = Self::file_path().to_string();
+        cfg.pat_module_name = Self::module_name().to_string();
+        cfg.verbose = true;
+        cfg
+    }
 }
 
-pub trait Composite {
+pub trait SearchableNetlist: Netlist {
+    type Hit;
+    fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit;
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
+}
+
+pub trait Composite<T> {
     type Tuple;
 
     fn into_tuple(self) -> Self::Tuple;
     fn from_tuple(tuple: Self::Tuple) -> Self;
+
+    fn connections(&self) -> Vec<Connection<T>>;
+}
+
+pub trait SearchableComposite: Clone {
+    type Hit;
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
 }
 
 // ########################
@@ -87,7 +112,7 @@ pub trait PermutableComposite: Sized {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Wire<T> {
     pub path: Instance,
-    pub val: T,
+    pub val: Option<T>,
 }
 
 impl <T: Default> Wire<T> {
@@ -96,9 +121,22 @@ impl <T: Default> Wire<T> {
         Self::new(path)
     }
     pub fn new(path: Instance) -> Self {
-        Self { path, val: T::default() }
+        Self { path, val: None }
+    }
+    pub fn with_val(path: Instance, val: T) -> Self {
+        Self { path, val: Some(val) }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Connection<T> {
+    pub from: Wire<T>,
+    pub to: Wire<T>,
+}
+
+// ########################
+// Examples
+// ########################
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct And<T> {
@@ -121,10 +159,29 @@ impl<T: Default> And<T> {
     }
 }
 
-impl Searchable for And<Search> {
+impl SearchableNetlist for And<Search> {
     type Hit = And<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
-        todo!("This should be a simple call to the driver's query method");
+        let results = driver.query(&Self::config())
+            .expect("Failed to query driver")
+            .map(|match_| {
+                Self::from_query_match(match_, path.clone())
+            })
+            .collect();
+        results
+    }
+        
+    fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit {
+        let a: Match = Match { id: lookup(&match_.port_map, "a").cloned().expect(concat!("Port a not found")) };
+        let b: Match = Match { id: lookup(&match_.port_map, "b").cloned().expect(concat!("Port b not found")) };
+        let y: Match = Match { id: lookup(&match_.port_map, "y").cloned().expect(concat!("Port y not found")) };
+
+        Self::Hit {
+            a: Wire::with_val(path.child("a".to_string()), a),
+            b: Wire::with_val(path.child("b".to_string()), b),
+            y: Wire::with_val(path.child("y".to_string()), y),
+            path,
+        }
     }
 }
 
@@ -152,9 +209,6 @@ impl<T> Netlist for And<T> {
     }
     fn svql_driver_plugin() -> &'static str {
         "./build/svql_driver/libsvql_driver.so"
-    }
-    fn swappable() -> Vec<HashSet<String>> {
-        vec![HashSet::from(["a".to_string(), "b".to_string()])]
     }
 }
 
@@ -194,14 +248,14 @@ impl<T: Default> DoubleAnd<T> {
     }
 }
 
-impl Searchable for DoubleAnd<Search> {
+impl SearchableComposite for DoubleAnd<Search> {
     type Hit = DoubleAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("This should be calls to query for each And in DoubleAnd, compose them with itertools' cartesian product, then a filter to combine them");
     }
 }
 
-impl<T> Composite for DoubleAnd<T> {
+impl<T: Clone> Composite<T> for DoubleAnd<T> {
     type Tuple = (And<T>, And<T>, Instance);
     fn into_tuple(self) -> Self::Tuple {
         (self.and1, self.and2, self.path)
@@ -209,6 +263,16 @@ impl<T> Composite for DoubleAnd<T> {
     fn from_tuple(tuple: Self::Tuple) -> Self {
         let (and1, and2, path) = tuple;
         Self { and1, and2, path }
+    }
+    
+    fn connections(&self) -> Vec<Connection<T>> {
+        let mut connections = Vec::new();
+        let mut connection = Connection {
+            from: self.and1.a.clone(),
+            to: self.and2.y.clone(),
+        };
+        connections.push(connection);
+        connections
     }
 
 }
@@ -244,7 +308,7 @@ impl<T: Default> TripleAnd<T> {
     }
 }
 
-impl<T> Composite for TripleAnd<T> {
+impl<T> Composite<T> for TripleAnd<T> {
     type Tuple = (DoubleAnd<T>, And<T>, Instance);
     fn into_tuple(self) -> Self::Tuple {
         (self.double_and, self.and, self.path)
@@ -253,9 +317,13 @@ impl<T> Composite for TripleAnd<T> {
         let (double_and, and, path) = tuple;
         Self { double_and, and, path }
     }
+    
+    fn connections(&self) -> Vec<Connection<T>> {
+        todo!()
+    }
 }
 
-impl<T: Clone> Searchable for TripleAnd<T> {
+impl<T: Clone> SearchableComposite for TripleAnd<T> {
     type Hit = TripleAnd<T>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("This should look similar to DoubleAnd's query, but with a call to double_and, and then a call to and");
@@ -296,7 +364,7 @@ impl<T: Default> OtherTripleAnd<T> {
     }
 }
 
-impl<T> Composite for OtherTripleAnd<T> {
+impl<T> Composite<T> for OtherTripleAnd<T> {
     type Tuple = (And<T>, And<T>, And<T>, Instance);
     fn into_tuple(self) -> Self::Tuple {
         (self.and1, self.and2, self.and3, self.path)
@@ -305,9 +373,13 @@ impl<T> Composite for OtherTripleAnd<T> {
         let (and1, and2, and3, path) = tuple;
         Self { and1, and2, and3, path }
     }
+    
+    fn connections(&self) -> Vec<Connection<T>> {
+        todo!()
+    }
 }
 
-impl Searchable for OtherTripleAnd<Search> {
+impl SearchableComposite for OtherTripleAnd<Search> {
     type Hit = OtherTripleAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("This should look similar to DoubleAnd's query, but with a call to double_and, and then a call to and");
@@ -368,7 +440,7 @@ impl<T: Default> RecursiveAnd<T> {
 //     }
 // }
 
-impl Searchable for RecursiveAnd<Search> {
+impl SearchableComposite for RecursiveAnd<Search> {
     type Hit = RecursiveAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("TODO: Work upwards from the base case and filtering each step until no more is found");

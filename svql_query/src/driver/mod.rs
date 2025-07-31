@@ -32,18 +32,6 @@ impl DriverIterator {
     pub fn new(matches: Vec<SanitizedQueryMatch>) -> Self {
         DriverIterator { matches }
     }
-
-    // pub fn len(&self) -> usize {
-    //     self.matches.len()
-    // }
-    //
-    // pub fn is_empty(&self) -> bool {
-    //     self.matches.is_empty()
-    // }
-    //
-    // pub fn iter(&self) -> std::slice::Iter<SanitizedQueryMatch> {
-    //     self.matches.iter()
-    // }
 }
 
 pub enum Driver {
