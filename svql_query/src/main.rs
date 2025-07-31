@@ -49,13 +49,40 @@ pub trait Netlist {
 
 pub trait Composite {}
 
-pub trait Permutable {
+pub trait Permutable where Self: Sized {
     fn permutations(&self) -> Vec<Self>;
 }
 
-impl<T: Netlist> Permutable for T {
+impl<T: Netlist + Clone> Permutable for T {
     fn permutations(&self) -> Vec<Self> {
-        
+        // ------------------------------------------------------------------
+        // 1.  For every “swappable” set S  we need  |S|!  different
+        //     permutations.  The total number of variants is the product of
+        //     these factorials.
+        // ------------------------------------------------------------------
+        let total_variants: usize = Self::swappable()
+            .iter()
+            .map(|grp| (1..=grp.len()).product::<usize>()) // |S|!
+            .product::<usize>();                           //  ∏|S|!
+
+        // ------------------------------------------------------------------
+        // 2.  Produce     total_variants     independent copies of `self`.
+        //     Nothing else has to be done here – the *driver* that will
+        //     consume these variants decides what to do with each clone.
+        // ------------------------------------------------------------------
+        std::iter::repeat_with(|| self.clone())
+            .take(total_variants)
+            .collect()
+    }
+}
+
+pub trait PermutableComposite: Sized {
+    fn permutations(&self) -> Vec<Self>;
+}
+
+impl<T: Composite + Clone> PermutableComposite for T {
+    fn permutations(&self) -> Vec<Self> {
+        todo!("Implement permutations over each component of the composite, then combine them");
     }
 }
 
@@ -172,6 +199,8 @@ impl<T: Default> TripleAnd<T> {
     }
 }
 
+impl Composite for TripleAnd<Search> {}
+
 impl Searchable for TripleAnd<Search> {
     type Hit = TripleAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
@@ -179,12 +208,13 @@ impl Searchable for TripleAnd<Search> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecursiveAnd<T> {
     BaseCase(And<T>),
     RecursiveCase(Box<RecursiveAnd<T>>),
 }
 
-impl<T> RecursiveAnd<T> {
+impl<T: Default> RecursiveAnd<T> {
     pub fn root_base(name: String) -> Self {
         let path = Instance::root(name);
         Self::new_base(path)
@@ -201,6 +231,8 @@ impl<T> RecursiveAnd<T> {
     }
 }
 
+impl<T> Composite for RecursiveAnd<T> {}
+
 impl Searchable for RecursiveAnd<Search> {
     type Hit = RecursiveAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
@@ -214,10 +246,13 @@ fn main() {
     // let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
 
     let and   = And::<Search>::root("and".into());
-    let a_perms = and.permutations();               // == 2 variants
+    let a_perms = Permutable::permutations(&and);
+    assert!(a_perms.len() == 2, "Expected 2 permutations for And, got {}", a_perms.len());
 
     let d_and = DoubleAnd::<Search>::root("d".into());
-    let d_perms = d_and.permutations();             // == 2 variants
+    let d_perms = PermutableComposite::permutations(&d_and);
+    assert!(d_perms.len() == 4, "Expected 4 permutations for DoubleAnd, got {}", d_perms.len());
+
 
     // Permutations of composites are *independent*:
     // TripleAnd has (DoubleAnd permutations) × (And permutations)
@@ -227,7 +262,8 @@ fn main() {
     //                     .cartesian_product(t_and.and.permutations())
     //                     .map(|(double, a)| TripleAnd { double_and: double, and: a, ..t_and.clone() })
     //                     .collect::<Vec<_>>();
-    let t_perms = t_and.permutations(); // == 4 variants
+    let t_perms = PermutableComposite::permutations(&t_and); // == 8 variants
+    assert!(t_perms.len() == 8, "Expected 8 permutations for TripleAnd, got {}", t_perms.len());
 
 
     // can't define enum, don't need to specify which type, just want all of them

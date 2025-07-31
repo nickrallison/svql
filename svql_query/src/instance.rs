@@ -10,12 +10,17 @@ pub struct Instance {
 impl Instance {
     pub fn root(inst: String) -> Self {
         let inst = Arc::new(inst);
+        let path = vec![inst.clone()];
         let new = Self {
             inst: inst.clone(),
-            path: Vec::new(),
+            path,
             height: 0,
         };
-        debug_assert!(new.get_item(new.height) == Some(inst));
+
+        // Debug assertions
+        let actual = new.get_item(new.height);
+        let expected = Some(inst.clone());
+        debug_assert!(actual == expected, "Expected {:?}, but got {:?}", expected, actual);
         new
     }
     pub fn child(&self, child: String) -> Self {
@@ -23,7 +28,11 @@ impl Instance {
         let mut new_path = self.path.clone();
         new_path.push(child.clone());
         let new = Self { inst: child.clone(), path: new_path, height: self.height + 1 };
-        debug_assert!(new.get_item(new.height) == Some(child));
+
+        // Debug assertions
+        let actual = new.get_item(new.height);
+        let expected = Some(child.clone());
+        debug_assert!(actual == expected, "Expected {:?}, but got {:?}", expected, actual);
         new
     }
 
