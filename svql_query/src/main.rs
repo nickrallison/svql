@@ -112,6 +112,11 @@ impl<T> MatchedComposite for T where T: Composite<Match> {
 }
 
 // ########################
+// CompositeEnum
+// ########################
+
+
+// ########################
 // Containers
 // ########################
 
@@ -472,90 +477,87 @@ impl SearchableComposite for OtherTripleAnd<Search> {
     }
 }
 
+// When Searching, look for the base case first, then the recursive case, 
+// Retuen the combined results
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RecursiveAnd<T> {
-    BaseCase(And<T>),
-    RecursiveCase(Box<RecursiveAnd<T>>),
+pub struct RecursiveAnd<T> {
+    pub path: Instance,
+    pub and: And<T>,
+    pub rec_and: Option<Box<RecursiveAnd<T>>>,
 }
-
-
 
 impl<T: Default> RecursiveAnd<T> {
     pub fn root_base(name: String) -> Self {
         let path = Instance::root(name);
-        Self::new_base(path)
+        Self::new(path)
     }
-    pub fn new_base(path: Instance) -> Self {
+    pub fn new(path: Instance) -> Self {
         let and = And::new(path.child("and".to_string()));
-        Self::BaseCase(and)
-    }
-
-    // ###
-
-    pub fn recursive(val: RecursiveAnd<T>) -> Self {
-        Self::RecursiveCase(Box::new(val))
+        let rec_and = None;
+        Self { path, and, rec_and }
     }
 }
 
-
-
-impl<T> Composite<T> for RecursiveAnd<T> {
-    type Tuple = Self;
+impl<T: Clone> Composite<T> for RecursiveAnd<T> {
+    type Tuple = (And<T>, Option<Box<RecursiveAnd<T>>>, Instance);
 
     fn into_tuple(self) -> Self::Tuple {
-        self
+        (self.and, self.rec_and, self.path)
     }
 
     fn from_tuple(tuple: Self::Tuple) -> Self {
-        tuple
+        let (and, rec_and, path) = tuple;
+        Self { and, rec_and, path }
     }
 
     fn connections(&self) -> Vec<Connection<T>> {
-        todo!()
+        let mut connections = Vec::new();
+        if let Some(recursive) = &self.rec_and {
+            let connection = Connection {
+                from: self.and.a.clone(),
+                to: recursive.and.y.clone(),
+            };
+            connections.push(connection);
+        }
+        connections
     }
 
     fn path(&self) -> Instance {
-        todo!()
+        self.path.clone()
     }
     fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
-        // match self {
-        //     Self::BaseCase(and) => and.find_port(port_name),
-        //     Self::RecursiveCase(recursive) => recursive.find_port(port_name),
-        // }
-        todo!()
+        let self_height = self.path.height();
+        let child_height = self_height + 1;
+        let child_name = port_name.get_item(child_height);
+        if let Some(name) = child_name {
+            if name == Arc::new("and".to_string()) {
+                return self.and.find_port(port_name);
+            }
+            if name == Arc::new("rec_and".to_string()) {
+                if let Some(recursive) = &self.rec_and {
+                    return recursive.find_port(port_name);
+                }
+            }
+        }
+        None
     }
 }
 
 impl SearchableComposite for RecursiveAnd<Search> {
     type Hit = RecursiveAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
-        todo!("TODO: Work upwards from the base case and filtering each step until no more is found");
+        let and_search_result: Vec<And<Match>> = And::<Search>::query(driver, path.child("and".to_string()));
+        todo!();
     }
 }
-
+ 
 fn main() {
-    // let and_search: And<Search> = And::root("and".to_string());
-    // let double_and_search: DoubleAnd<Search> = DoubleAnd::root("double_and".to_string());
-    // let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
 
     let driver = Driver::new_mock();
 
-    let and: And<Search> = And::<Search>::root("and".into());
-    let and_search_result: Vec<And<Match>> = And::<Search>::query(&driver, and.path());
-    assert_eq!(and_search_result.len(), 3, "Expected 3 matches for And, got {}", and_search_result.len());
-
-    let d_and = DoubleAnd::<Search>::root("d".into());
-    let d_and_search_result: Vec<DoubleAnd<Match>> = DoubleAnd::<Search>::query(&driver, d_and.path());
-    assert_eq!(d_and_search_result.len(), 2, "Expected 2 matches for DoubleAnd, got {}", d_and_search_result.len());
-
-    let t_and = TripleAnd::<Search>::root("t".into());
-    let t_and_search_result: Vec<TripleAnd<Match>> = TripleAnd::<Search>::query(&driver, t_and.path());
-    assert_eq!(t_and_search_result.len(), 1, "Expected 1 match for TripleAnd, got {}", t_and_search_result.len());
-
-    // OtherTripleAnd has (And permutations) × (And permutations) × (And permutations)
-    let o_and = OtherTripleAnd::<Search>::root("o".into());
-    let o_and_search_result: Vec<OtherTripleAnd<Match>> = OtherTripleAnd::<Search>::query(&driver, o_and.path());
-    assert_eq!(o_and_search_result.len(), 1, "Expected 1 match for OtherTripleAnd, got {}", o_and_search_result.len());
+    let rec_and = RecursiveAnd::<Search>::root_base("rec_and".into());
+    let rec_and_search_result: Vec<RecursiveAnd<Match>> = RecursiveAnd::<Search>::query(&driver, rec_and.path());
+    assert_eq!(rec_and_search_result.len(), 6, "Expected 6 matches for RecursiveAnd, got {}", rec_and_search_result.len());
 
 }
 
