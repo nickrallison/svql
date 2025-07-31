@@ -38,7 +38,7 @@ pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a I
 
 type QueryMatch = svql_common::matches::SanitizedQueryMatch;
 
-pub trait Netlist {
+pub trait Netlist<T> {
 
     type Tuple;
 
@@ -61,9 +61,10 @@ pub trait Netlist {
         cfg
     }
     fn path(&self) -> Instance;
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>>;
 }
 
-pub trait SearchableNetlist: Netlist {
+pub trait SearchableNetlist: Netlist<Search> {
     type Hit;
     fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
@@ -72,12 +73,12 @@ pub trait SearchableNetlist: Netlist {
 pub trait Composite<T> {
     type Tuple;
     
-
     fn into_tuple(self) -> Self::Tuple;
     fn from_tuple(tuple: Self::Tuple) -> Self;
 
     fn connections(&self) -> Vec<Connection<T>>;
     fn path(&self) -> Instance;
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>>;
 }
 
 pub trait SearchableComposite: Composite<Search> {
@@ -86,7 +87,6 @@ pub trait SearchableComposite: Composite<Search> {
 }
 
 pub trait MatchedComposite: Composite<Match> {
-    fn find_port(&self, port_name: &Instance) -> Option<&IdString>;
     fn validate_connection(&self, connection: Connection<Match>) -> bool;
     fn validate_connections(&self, connections: Vec<Connection<Match>>) -> bool {
         for conn in connections {
@@ -192,7 +192,7 @@ impl SearchableNetlist for And<Search> {
     }
 }
 
-impl<T> Netlist for And<T> {
+impl<T> Netlist<T> for And<T> {
 
     type Tuple = (Wire<T>, Wire<T>, Wire<T>, Instance);
 
@@ -221,6 +221,22 @@ impl<T> Netlist for And<T> {
     // ##################
     fn path(&self) -> Instance {
         self.path.clone()
+    }
+    
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        let self_height = self.path.height();
+        let child_height = self_height + 1;
+        let child_name = port_name.get_item(child_height);
+        if let Some(name) = child_name {
+            if name == Arc::new("a".to_string()) {
+                return Some(&self.a);
+            } else if name == Arc::new("b".to_string()) {
+                return Some(&self.b);
+            } else if name == Arc::new("y".to_string()) {
+                return Some(&self.y);
+            }
+        }
+        None
     }
 }
 
@@ -265,6 +281,20 @@ impl<T: Clone> Composite<T> for DoubleAnd<T> {
     fn path(&self) -> Instance {
         self.path.clone()
     }
+    
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        let self_height = self.path.height();
+        let child_height = self_height + 1;
+        let child_name = port_name.get_item(child_height);
+        if let Some(name) = child_name {
+            if name == Arc::new("and1".to_string()) {
+                return self.and1.find_port(port_name);
+            } else if name == Arc::new("and2".to_string()) {
+                return self.and2.find_port(port_name);
+            }
+        }
+        None
+    }
 
 }
 
@@ -291,28 +321,10 @@ impl MatchedComposite for DoubleAnd<Match> {
         let out_port_id = self.find_port(&connection.to.path);
 
         if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
-            return in_port == out_port;
+            return in_port.val == out_port.val;
         }
         false
     }
-    
-    fn find_port(&self, port_name: &Instance) -> Option<&IdString> {
-        let self_height = self.path.height();
-        let child_height = self_height + 1;
-        let child_name = port_name.get_item(child_height);
-        if let Some(name) = child_name {
-            if name == Arc::new("a".to_string()) {
-                return Some(&self.and1.a.val.as_ref()?.id);
-            } else if name == Arc::new("b".to_string()) {
-                return Some(&self.and1.b.val.as_ref()?.id);
-            } else if name == Arc::new("y".to_string()) {
-                return Some(&self.and1.y.val.as_ref()?.id);
-            }
-        }
-        None
-
-    }
-    
 }
 
 // impl<T> PermutableComposite for DoubleAnd<T> {
@@ -346,7 +358,7 @@ impl<T: Default> TripleAnd<T> {
     }
 }
 
-impl<T> Composite<T> for TripleAnd<T> {
+impl<T: Clone> Composite<T> for TripleAnd<T> {
     type Tuple = (DoubleAnd<T>, And<T>, Instance);
     fn into_tuple(self) -> Self::Tuple {
         (self.double_and, self.and, self.path)
@@ -361,6 +373,19 @@ impl<T> Composite<T> for TripleAnd<T> {
     }
     fn path(&self) -> Instance {
         self.path.clone()
+    }
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        let self_height = self.path.height();
+        let child_height = self_height + 1;
+        let child_name = port_name.get_item(child_height);
+        if let Some(name) = child_name {
+            if name == Arc::new("double_and".to_string()) {
+                return self.double_and.find_port(port_name);
+            } else if name == Arc::new("and".to_string()) {
+                return self.and.find_port(port_name);
+            }
+        }
+        None
     }
 }
 
@@ -420,6 +445,22 @@ impl<T> Composite<T> for OtherTripleAnd<T> {
     }
     fn path(&self) -> Instance {
         self.path.clone()
+    }
+    
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        let self_height = self.path.height();
+        let child_height = self_height + 1;
+        let child_name = port_name.get_item(child_height);
+        if let Some(name) = child_name {
+            if name == Arc::new("and1".to_string()) {
+                return self.and1.find_port(port_name);
+            } else if name == Arc::new("and2".to_string()) {
+                return self.and2.find_port(port_name);
+            } else if name == Arc::new("and3".to_string()) {
+                return self.and3.find_port(port_name);
+            }
+        }
+        None
     }
 }
 
@@ -487,6 +528,13 @@ impl<T> Composite<T> for RecursiveAnd<T> {
     }
 
     fn path(&self) -> Instance {
+        todo!()
+    }
+    fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        // match self {
+        //     Self::BaseCase(and) => and.find_port(port_name),
+        //     Self::RecursiveCase(recursive) => recursive.find_port(port_name),
+        // }
         todo!()
     }
 }
