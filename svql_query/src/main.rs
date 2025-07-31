@@ -1,5 +1,6 @@
 use crate::instance::Instance;
 use std::collections::HashSet;
+use itertools::Itertools;
 
 mod instance;
 
@@ -19,13 +20,21 @@ pub struct Match;
 pub struct Driver;
 
 // ########################
+// Helpers
+// ########################
+
+
+// fn swapped<A: Clone, B: Clone>((x, y): (A, B)) -> (A, B) {
+//     (y, x)
+// }
+
+// ########################
 // Traits
 // ########################
 
-pub trait Searchable: Clone + Default {
+pub trait Searchable: Clone {
     type Hit;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
-    fn permutations(&self) -> Vec<Self>;
 }
 
 pub trait Netlist {
@@ -39,6 +48,16 @@ pub trait Netlist {
 }
 
 pub trait Composite {}
+
+pub trait Permutable {
+    fn permutations(&self) -> Vec<Self>;
+}
+
+impl<T: Netlist> Permutable for T {
+    fn permutations(&self) -> Vec<Self> {
+        
+    }
+}
 
 // ########################
 // Containers
@@ -168,7 +187,7 @@ pub enum RecursiveAnd<T> {
 impl<T> RecursiveAnd<T> {
     pub fn root_base(name: String) -> Self {
         let path = Instance::root(name);
-        Self::new_base(path, base)
+        Self::new_base(path)
     }
     pub fn new_base(path: Instance) -> Self {
         let and = And::new(path.child("and".to_string()));
@@ -190,10 +209,25 @@ impl Searchable for RecursiveAnd<Search> {
 }
 
 fn main() {
-    let and_search: And<Search> = And::root("and".to_string());
-    let double_and_search: DoubleAnd<Search> = DoubleAnd::root("double_and".to_string());
-    let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
+    // let and_search: And<Search> = And::root("and".to_string());
+    // let double_and_search: DoubleAnd<Search> = DoubleAnd::root("double_and".to_string());
+    // let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
 
+    let and   = And::<Search>::root("and".into());
+    let a_perms = and.permutations();               // == 2 variants
+
+    let d_and = DoubleAnd::<Search>::root("d".into());
+    let d_perms = d_and.permutations();             // == 2 variants
+
+    // Permutations of composites are *independent*:
+    // TripleAnd has (DoubleAnd permutations) × (And permutations)
+    let t_and = TripleAnd::<Search>::root("t".into());
+    // let t_perms = t_and.double_and.permutations()
+    //                     .into_iter()
+    //                     .cartesian_product(t_and.and.permutations())
+    //                     .map(|(double, a)| TripleAnd { double_and: double, and: a, ..t_and.clone() })
+    //                     .collect::<Vec<_>>();
+    let t_perms = t_and.permutations(); // == 4 variants
 
 
     // can't define enum, don't need to specify which type, just want all of them
