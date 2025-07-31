@@ -38,6 +38,14 @@ pub trait Searchable: Clone {
 }
 
 pub trait Netlist {
+
+    type Tuple;
+
+    fn into_tuple(self) -> Self::Tuple;
+    fn from_tuple(tuple: Self::Tuple) -> Self;
+
+    // ####
+
     fn module_name() -> &'static str;
     fn file_path() -> &'static str;
     fn yosys() -> &'static str;
@@ -47,13 +55,22 @@ pub trait Netlist {
     fn swappable() -> Vec<HashSet<String>>;
 }
 
-pub trait Composite {}
+pub trait Composite {
+    type Tuple;
 
-pub trait Permutable where Self: Sized {
+    fn into_tuple(self) -> Self::Tuple;
+    fn from_tuple(tuple: Self::Tuple) -> Self;
+}
+
+// ########################
+// Permutation Traits
+// ########################
+
+pub trait PermutableNetlist where Self: Sized {
     fn permutations(&self) -> Vec<Self>;
 }
 
-impl<T: Netlist + Clone> Permutable for T {
+impl<T: Netlist + Clone> PermutableNetlist for T {
     fn permutations(&self) -> Vec<Self> {
         // ------------------------------------------------------------------
         // 1.  For every “swappable” set S  we need  |S|!  different
@@ -135,6 +152,18 @@ impl Searchable for And<Search> {
 }
 
 impl<T> Netlist for And<T> {
+
+    type Tuple = (Wire<T>, Wire<T>, Wire<T>, Instance);
+
+    fn into_tuple(self) -> Self::Tuple {
+        (self.a, self.b, self.y, self.path)
+    }
+    
+    fn from_tuple(tuple: Self::Tuple) -> Self {
+        let (a, b, y, path) = tuple;
+        Self { a, b, y, path }
+    }
+
     fn module_name() -> &'static str {
         "and_gate"
     }
@@ -178,7 +207,17 @@ impl Searchable for DoubleAnd<Search> {
     }
 }
 
-impl<T> Composite for DoubleAnd<T> {}
+impl<T> Composite for DoubleAnd<T> {
+    type Tuple = (And<T>, And<T>, Instance);
+    fn into_tuple(self) -> Self::Tuple {
+        (self.and1, self.and2, self.path)
+    }
+    fn from_tuple(tuple: Self::Tuple) -> Self {
+        let (and1, and2, path) = tuple;
+        Self { and1, and2, path }
+    }
+
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripleAnd<T> {
@@ -199,10 +238,58 @@ impl<T: Default> TripleAnd<T> {
     }
 }
 
-impl Composite for TripleAnd<Search> {}
+impl Composite for TripleAnd<Search> {
+    type Tuple = (DoubleAnd<Search>, And<Search>, Instance);
+    fn into_tuple(self) -> Self::Tuple {
+        (self.double_and, self.and, self.path)
+    }
+    fn from_tuple(tuple: Self::Tuple) -> Self {
+        let (double_and, and, path) = tuple;
+        Self { double_and, and, path }
+    }
+}
 
 impl Searchable for TripleAnd<Search> {
     type Hit = TripleAnd<Match>;
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
+        todo!("This should look similar to DoubleAnd's query, but with a call to double_and, and then a call to and");
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OtherTripleAnd<T> {
+    pub path: Instance,
+    pub and1: And<T>,
+    pub and2: And<T>,
+    pub and3: And<T>,
+}
+
+impl<T: Default> OtherTripleAnd<T> {
+    pub fn root(name: String) -> Self {
+        let path = Instance::root(name);
+        Self::new(path)
+    }
+    pub fn new(path: Instance) -> Self {
+        let and1 = And::new(path.child("and1".to_string()));
+        let and2 = And::new(path.child("and2".to_string()));
+        let and3 = And::new(path.child("and3".to_string()));
+        Self { path, and1, and2, and3 }
+    }
+}
+
+impl Composite for OtherTripleAnd<Search> {
+    type Tuple = (And<Search>, And<Search>, And<Search>, Instance);
+    fn into_tuple(self) -> Self::Tuple {
+        (self.and1, self.and2, self.and3, self.path)
+    }
+    fn from_tuple(tuple: Self::Tuple) -> Self {
+        let (and1, and2, and3, path) = tuple;
+        Self { and1, and2, and3, path }
+    }
+}
+
+impl Searchable for OtherTripleAnd<Search> {
+    type Hit = OtherTripleAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("This should look similar to DoubleAnd's query, but with a call to double_and, and then a call to and");
     }
@@ -231,7 +318,22 @@ impl<T: Default> RecursiveAnd<T> {
     }
 }
 
-impl<T> Composite for RecursiveAnd<T> {}
+// impl<T> Composite for RecursiveAnd<T> {
+//     type Tuple = (And<T>, Instance);
+//     fn into_tuple(self) -> Self::Tuple {
+//         match self {
+//             RecursiveAnd::BaseCase(and) => (and, and.path.clone()),
+//             RecursiveAnd::RecursiveCase(recursive) => {
+//                 let (and, path) = recursive.into_tuple();
+//                 (and, path)
+//             }
+//         }
+//     }
+//     fn from_tuple(tuple: Self::Tuple) -> Self {
+//         let (and, path) = tuple;
+//         Self::BaseCase(and)
+//     }
+// }
 
 impl Searchable for RecursiveAnd<Search> {
     type Hit = RecursiveAnd<Match>;
@@ -246,7 +348,7 @@ fn main() {
     // let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
 
     let and   = And::<Search>::root("and".into());
-    let a_perms = Permutable::permutations(&and);
+    let a_perms = PermutableNetlist::permutations(&and);
     assert!(a_perms.len() == 2, "Expected 2 permutations for And, got {}", a_perms.len());
 
     let d_and = DoubleAnd::<Search>::root("d".into());
@@ -265,11 +367,8 @@ fn main() {
     let t_perms = PermutableComposite::permutations(&t_and); // == 8 variants
     assert!(t_perms.len() == 8, "Expected 8 permutations for TripleAnd, got {}", t_perms.len());
 
-
-    // can't define enum, don't need to specify which type, just want all of them
-
-    // let and_matches: Vec<And<Match>> = and_search.query().unwrap();
-    // let double_and_matches: Vec<DoubleAnd<Match>> = double_and_search.query().unwrap();
-    // let triple_and_matches: Vec<TripleAnd<Match>> = triple_and_search.query().unwrap();
-    //... 
+    // OtherTripleAnd has (And permutations) × (And permutations) × (And permutations)
+    let o_and = OtherTripleAnd::<Search>::root("o".into());
+    let o_perms = PermutableComposite::permutations(&o_and); // == 8 variants
+    assert!(o_perms.len() == 8, "Expected 8 permutations for OtherTripleAnd, got {}", o_perms.len());
 }
