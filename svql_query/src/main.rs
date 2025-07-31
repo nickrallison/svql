@@ -1,6 +1,6 @@
 use crate::{driver::Driver, instance::Instance};
-use std::collections::{HashMap, HashSet};
-use itertools::{iproduct, Itertools};
+use std::collections::{HashMap};
+use itertools::{iproduct};
 use svql_common::{config::ffi::SvqlRuntimeConfig, id_string::IdString};
 
 mod instance;
@@ -65,6 +65,7 @@ pub trait Netlist {
         cfg.verbose = true;
         cfg
     }
+    fn path(&self) -> Instance;
 }
 
 pub trait SearchableNetlist: Netlist {
@@ -80,6 +81,7 @@ pub trait Composite<T> {
     fn from_tuple(tuple: Self::Tuple) -> Self;
 
     fn connections(&self) -> Vec<Connection<T>>;
+    fn path(&self) -> Instance;
 }
 
 pub trait SearchableComposite: Clone {
@@ -210,6 +212,11 @@ impl<T> Netlist for And<T> {
     fn svql_driver_plugin() -> &'static str {
         "./build/svql_driver/libsvql_driver.so"
     }
+
+    // ##################
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
 }
 
 impl<T: Clone> PermutableNetlist for And<T>{
@@ -221,7 +228,7 @@ impl<T: Clone> PermutableNetlist for And<T>{
         let b = self_owned.b.clone();
         let y = self_owned.y.clone();
 
-        let mut results = vec![
+        let results = vec![
             Self::from_tuple((a.clone(), b.clone(), y.clone(), self_owned.path.clone())),
             Self::from_tuple((b.clone(), a.clone(), y.clone(), self_owned.path.clone())),
         ];
@@ -274,6 +281,9 @@ impl<T: Clone> Composite<T> for DoubleAnd<T> {
         connections.push(connection);
         connections
     }
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
 
 }
 
@@ -321,10 +331,13 @@ impl<T> Composite<T> for TripleAnd<T> {
     fn connections(&self) -> Vec<Connection<T>> {
         todo!()
     }
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
 }
 
-impl<T: Clone> SearchableComposite for TripleAnd<T> {
-    type Hit = TripleAnd<T>;
+impl SearchableComposite for TripleAnd<Search> {
+    type Hit = TripleAnd<Match>;
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         todo!("This should look similar to DoubleAnd's query, but with a call to double_and, and then a call to and");
     }
@@ -376,6 +389,9 @@ impl<T> Composite<T> for OtherTripleAnd<T> {
     
     fn connections(&self) -> Vec<Connection<T>> {
         todo!()
+    }
+    fn path(&self) -> Instance {
+        self.path.clone()
     }
 }
 
@@ -452,28 +468,58 @@ fn main() {
     // let double_and_search: DoubleAnd<Search> = DoubleAnd::root("double_and".to_string());
     // let triple_and_search: TripleAnd<Search> = TripleAnd::root("triple_and".to_string());
 
-    let and   = And::<Search>::root("and".into());
+    let driver = Driver::new_mock();
+
+    let and: And<Search> = And::<Search>::root("and".into());
+    let and_search_result: Vec<And<Match>> = And::<Search>::query(&driver, and.path());
+    assert_eq!(and_search_result.len(), 3, "Expected 3 matches for And, got {}", and_search_result.len());
+
     let a_perms = PermutableNetlist::permutations(and);
     assert!(a_perms.len() == 2, "Expected 2 permutations for And, got {}", a_perms.len());
 
     let d_and = DoubleAnd::<Search>::root("d".into());
+    let d_and_search_result: Vec<DoubleAnd<Match>> = DoubleAnd::<Search>::query(&driver, d_and.path());
+    assert_eq!(d_and_search_result.len(), 2, "Expected 2 matches for DoubleAnd, got {}", d_and_search_result.len());
+
     let d_perms = PermutableComposite::permutations(d_and);
     assert!(d_perms.len() == 4, "Expected 4 permutations for DoubleAnd, got {}", d_perms.len());
 
-
-    // Permutations of composites are *independent*:
-    // TripleAnd has (DoubleAnd permutations) × (And permutations)
     let t_and = TripleAnd::<Search>::root("t".into());
-    // let t_perms = t_and.double_and.permutations()
-    //                     .into_iter()
-    //                     .cartesian_product(t_and.and.permutations())
-    //                     .map(|(double, a)| TripleAnd { double_and: double, and: a, ..t_and.clone() })
-    //                     .collect::<Vec<_>>();
+    let t_and_search_result: Vec<TripleAnd<Match>> = TripleAnd::<Search>::query(&driver, t_and.path());
+    assert_eq!(t_and_search_result.len(), 1, "Expected 1 match for TripleAnd, got {}", t_and_search_result.len());
+
     let t_perms = PermutableComposite::permutations(t_and); // == 8 variants
     assert!(t_perms.len() == 8, "Expected 8 permutations for TripleAnd, got {}", t_perms.len());
 
     // OtherTripleAnd has (And permutations) × (And permutations) × (And permutations)
     let o_and = OtherTripleAnd::<Search>::root("o".into());
+    let o_and_search_result: Vec<OtherTripleAnd<Match>> = OtherTripleAnd::<Search>::query(&driver, o_and.path());
+    assert_eq!(o_and_search_result.len(), 1, "Expected 1 match for OtherTripleAnd, got {}", o_and_search_result.len());
+
     let o_perms = PermutableComposite::permutations(o_and); // == 8 variants
     assert!(o_perms.len() == 8, "Expected 8 permutations for OtherTripleAnd, got {}", o_perms.len());
+}
+
+#[cfg(test)] 
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    // ###############
+    // Instance Tests
+    // ###############
+    #[test]
+    fn test_instance() {
+        let inst = Instance::root("test".to_string());
+        let child1 = inst.child("child1".to_string());
+        let child2 = child1.child("child2".to_string());
+        assert_eq!(inst.inst_path(), "test");
+        assert_eq!(child1.inst_path(), "test.child1");
+        assert_eq!(child2.inst_path(), "test.child1.child2");
+        assert_eq!(child2.get_item(0), Some(Arc::new("test".to_string())));
+        assert_eq!(child2.get_item(1), Some(Arc::new("child1".to_string())));
+        assert_eq!(child2.get_item(2), Some(Arc::new("child2".to_string())));
+        assert_eq!(child2.get_item(3), None);
+    }
 }
