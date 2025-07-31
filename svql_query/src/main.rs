@@ -581,4 +581,60 @@ mod tests {
         assert_eq!(child2.get_item(2), Some(Arc::new("child2".to_string())));
         assert_eq!(child2.get_item(3), None);
     }
+
+    // ###############
+    // Netlist Tests
+    // ###############
+    #[test]
+    fn test_and_netlist() {
+        let driver = Driver::new_mock();
+
+        let and = And::<Search>::root("and".to_string());
+        assert_eq!(and.path().inst_path(), "and");
+        assert_eq!(and.a.path.inst_path(), "and.a");
+        assert_eq!(and.b.path.inst_path(), "and.b");
+        assert_eq!(and.y.path.inst_path(), "and.y");    
+        
+        let and_search_result = And::<Search>::query(&driver, and.path());
+        assert_eq!(and_search_result.len(), 3, "Expected 3 matches for And, got {}", and_search_result.len());
+    }
+
+    // ###############
+    // Composite Tests
+    // ###############
+    #[test]
+    fn test_double_and_composite() {
+        let driver = Driver::new_mock();
+        let double_and = DoubleAnd::<Search>::root("double_and".to_string());
+        assert_eq!(double_and.path().inst_path(), "double_and");
+        assert_eq!(double_and.and1.path().inst_path(), "double_and.and1");
+        assert_eq!(double_and.and2.path().inst_path(), "double_and.and2");
+        assert_eq!(double_and.and1.y.path.inst_path(), "double_and.and1.y");
+        let double_and_search_result = DoubleAnd::<Search>::query(&driver, double_and.path());
+        assert_eq!(double_and_search_result.len(), 2, "Expected 2 matches for DoubleAnd, got {}", double_and_search_result.len());
+    }
+
+    #[test]
+    fn test_triple_and_composite() {
+        let driver = Driver::new_mock();    
+        let triple_and = TripleAnd::<Search>::root("triple_and".to_string());
+        assert_eq!(triple_and.path().inst_path(), "triple_and");
+        assert_eq!(triple_and.double_and.path().inst_path(), "triple_and.double_and");
+        assert_eq!(triple_and.and.y.path.inst_path(), "triple_and.and.y");
+        let triple_and_search_result = TripleAnd::<Search>::query(&driver, triple_and.path());
+        assert_eq!(triple_and_search_result.len(), 1, "Expected 1 match for TripleAnd, got {}", triple_and_search_result.len());
+    }
+
+    #[test]
+    fn test_other_triple_and_composite() {
+        let driver = Driver::new_mock();
+        let other_triple_and = OtherTripleAnd::<Search>::root("other_triple_and".to_string());
+        assert_eq!(other_triple_and.path().inst_path(), "other_triple_and");
+        assert_eq!(other_triple_and.and1.path().inst_path(), "other_triple_and.and1");
+        assert_eq!(other_triple_and.and2.path().inst_path(), "other_triple_and.and2");
+        assert_eq!(other_triple_and.and3.path().inst_path(), "other_triple_and.and3");
+        let other_triple_and_search_result = OtherTripleAnd::<Search>::query(&driver, other_triple_and.path());
+        assert_eq!(other_triple_and_search_result.len(), 1, "Expected 1 match for OtherTripleAnd, got {}", other_triple_and_search_result.len());
+    }
+
 }
