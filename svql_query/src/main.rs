@@ -7,16 +7,26 @@
     mod driver;
 
     // ########################
-    // Base Search Types
+    // Type Definitions
+    // ########################
+    type QueryMatch = svql_common::matches::SanitizedQueryMatch;
+
+    // ########################
+    // Type State Tags
     // ########################
 
-    #[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
-    pub struct Search;
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub struct Match {
-        pub id: IdString
-    }
+    // ------------  Compile–time state tags  ------------
+    pub trait State: Clone {}
+    pub trait QueryableState: State {}
 
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct Search;
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Match { pub id: IdString }
+
+    impl State for Search {}
+    impl State for Match {}
+    impl QueryableState for Search {}
     impl Default for Match {
         fn default() -> Self {
             Self { id: IdString::Named("default".into()) }
@@ -33,39 +43,62 @@
     }
 
     // ########################
-    // Traits
+    // Core Traits & Containers
     // ########################
 
-    type QueryMatch = svql_common::matches::SanitizedQueryMatch;
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Wire<S> where S: State {
+        pub path: Instance,
+        pub val: Option<S>,
+    }
 
-    pub trait Netlist<T> {
-        const MODULE_NAME: &'static str;
-        const FILE_PATH: &'static str;
-        const YOSYS: &'static str;
-        const SVQL_DRIVER_PLUGIN: &'static str;
+    impl<S> Wire<S> where S: State {
+        pub fn root(name: String) -> Self {
+            let path = Instance::root(name);
+            Self::new(path)
+        }
+        pub fn new(path: Instance) -> Self {
+            Self { path, val: None }
+        }
+        pub fn with_val(path: Instance, val: S) -> Self {
+            Self { path, val: Some(val) }
+        }
+    }
 
-        // ####
+    pub trait Netlist<S> where S: State {
+        // --- Constants ---
+        const MODULE_NAME        : &'static str;
+        const FILE_PATH          : &'static str;
+        const YOSYS              : &'static str;
+        const SVQL_DRIVER_PLUGIN : &'static str;
+
+        // --- Shared Functionality ---
+        fn path(&self) -> Instance;
+        fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
         fn config() -> SvqlRuntimeConfig {
             let mut cfg = SvqlRuntimeConfig::default();
-            cfg.pat_filename = Self::FILE_PATH.to_string();
-            cfg.pat_module_name = Self::MODULE_NAME.to_string();
-            cfg.verbose = true;
+            cfg.pat_filename    = Self::FILE_PATH.into();
+            cfg.pat_module_name = Self::MODULE_NAME.into();
+            cfg.verbose         = true;
             cfg
         }
-        fn path(&self) -> Instance;
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>>;
     }
 
     pub trait SearchableNetlist: Netlist<Search> {
         type Hit;
         fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit;
-        fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
+        fn query(driver:&Driver, path:Instance) -> Vec<Self::Hit> {
+            driver.query(&Self::config())
+                .expect("driver error")
+                .map(|m| Self::from_query_match(m, path.clone()))
+                .collect()
+        }
     }
 
-    pub trait Composite<T> {
-        fn connections(&self) -> Vec<Vec<Connection<T>>>;
+    pub trait Composite<S> where S: State {
+        fn connections(&self) -> Vec<Vec<Connection<S>>>;
         fn path(&self) -> Instance;
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>>;
+        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>>;
     }
 
     pub trait SearchableComposite: Composite<Search> {
@@ -78,7 +111,7 @@
         fn validate_connections(&self, connections: Vec<Vec<Connection<Match>>>) -> bool;
     }
 
-    impl<T> MatchedComposite for T where T: Composite<Match> {
+    impl<S> MatchedComposite for S where S: Composite<Match> {
         fn validate_connection(&self, connection: Connection<Match>) -> bool {
             let in_port_id = self.find_port(&connection.from.path);
             let out_port_id = self.find_port(&connection.to.path);
@@ -111,28 +144,9 @@
     // ########################
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub struct Wire<T> {
-        pub path: Instance,
-        pub val: Option<T>,
-    }
-
-    impl <T: Default> Wire<T> {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
-            Self { path, val: None }
-        }
-        pub fn with_val(path: Instance, val: T) -> Self {
-            Self { path, val: Some(val) }
-        }
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub struct Connection<T> {
-        pub from: Wire<T>,
-        pub to: Wire<T>,
+    pub struct Connection<S> where S: State {
+        pub from: Wire<S>,
+        pub to: Wire<S>,
     }
 
     // ########################
@@ -140,14 +154,14 @@
     // ########################
 
     #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct And<T> {
+    pub struct And<S> where S: State {
         pub path: Instance,
-        pub a: Wire<T>,
-        pub b: Wire<T>,
-        pub y: Wire<T>,
+        pub a: Wire<S>,
+        pub b: Wire<S>,
+        pub y: Wire<S>,
     }
 
-    impl<T: Default> And<T> {
+    impl<S> And<S> where S: State {
         pub fn root(name: String) -> Self {
             let path = Instance::root(name);
             Self::new(path)
@@ -160,47 +174,18 @@
         }
     }
 
-    impl SearchableNetlist for And<Search> {
-        type Hit = And<Match>;
-        fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
-            let results = driver.query(&Self::config())
-                .expect("Failed to query driver")
-                .map(|match_| {
-                    Self::from_query_match(match_, path.clone())
-                })
-                .collect();
-            results
-        }
-            
-        fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit {
-            let a: Match = Match { id: lookup(&match_.port_map, "a").cloned().expect(concat!("Port a not found")) };
-            let b: Match = Match { id: lookup(&match_.port_map, "b").cloned().expect(concat!("Port b not found")) };
-            let y: Match = Match { id: lookup(&match_.port_map, "y").cloned().expect(concat!("Port y not found")) };
+    impl<S> Netlist<S> for And<S> where S: State {
+        const MODULE_NAME        : &'static str = "and_gate";
+        const FILE_PATH          : &'static str = "./examples/patterns/basic/and/verilog/and.v";
+        const YOSYS              : &'static str = "./yosys/yosys";
+        const SVQL_DRIVER_PLUGIN : &'static str = "./build/svql_driver/libsvql_driver.so";
 
-            Self::Hit {
-                a: Wire::with_val(path.child("a".to_string()), a.clone()),
-                b: Wire::with_val(path.child("b".to_string()), b.clone()),
-                y: Wire::with_val(path.child("y".to_string()), y.clone()),
-                path: path.clone(),
-            }
-        }
-    }
+        fn path(&self) -> Instance { self.path.clone() }
 
-    impl<T> Netlist<T> for And<T> {
-        const MODULE_NAME: &'static str = "and_gate";
-        const FILE_PATH: &'static str = "./examples/patterns/basic/and/verilog/and.v";
-        const YOSYS: &'static str = "./yosys/yosys";
-        const SVQL_DRIVER_PLUGIN: &'static str = "./build/svql_driver/libsvql_driver.so";
-
-        // ##################
-        fn path(&self) -> Instance {
-            self.path.clone()
-        }
-        
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
             let self_height = self.path.height();
             let child_height = self_height + 1;
-            let child_name = port_name.get_item(child_height);
+            let child_name = p.get_item(child_height);
             if let Some(name) = child_name {
                 if name == Arc::new("a".to_string()) {
                     return Some(&self.a);
@@ -214,14 +199,30 @@
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct DoubleAnd<T> {
-        pub path: Instance,
-        pub and1: And<T>,
-        pub and2: And<T>,
+    impl SearchableNetlist for And<Search> {
+        type Hit = And<Match>;
+
+        fn from_query_match(m: QueryMatch, path:Instance) -> Self::Hit {
+            let a = Match { id: lookup(&m.port_map,"a").cloned().unwrap() };
+            let b = Match { id: lookup(&m.port_map,"b").cloned().unwrap() };
+            let y = Match { id: lookup(&m.port_map,"y").cloned().unwrap() };
+            And::<Match>{
+                path: path.clone(),
+                a: Wire::with_val(path.child("a".into()), a),
+                b: Wire::with_val(path.child("b".into()), b),
+                y: Wire::with_val(path.child("y".into()), y),
+            }
+        }
     }
 
-    impl<T: Default> DoubleAnd<T> {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct DoubleAnd<S> where S: State {
+        pub path: Instance,
+        pub and1: And<S>,
+        pub and2: And<S>,
+    }
+
+    impl<S> DoubleAnd<S> where S: State {
         pub fn root(name: String) -> Self {
             let path = Instance::root(name);
             Self::new(path)
@@ -233,10 +234,9 @@
         }
     }
 
-    impl<T> Composite<T> for DoubleAnd<T> where 
-        T: Clone + Eq + Hash {
-        fn connections(&self) -> Vec<Vec<Connection<T>>> {
-            let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
+    impl<S> Composite<S> for DoubleAnd<S> where S: State {
+        fn connections(&self) -> Vec<Vec<Connection<S>>> {
+            let mut connections: Vec<Vec<Connection<S>>> = Vec::new();
             let connection1 = Connection {
                 from: self.and1.y.clone(),
                 to: self.and2.a.clone(),
@@ -255,7 +255,7 @@
             self.path.clone()
         }
         
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
             let self_height = self.path.height();
             let child_height = self_height + 1;
             let child_name = port_name.get_item(child_height);
@@ -289,13 +289,13 @@
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct TripleAnd<T> {
+    pub struct TripleAnd<S> where S: State {
         pub path: Instance,
-        pub double_and: DoubleAnd<T>,
-        pub and: And<T>,
+        pub double_and: DoubleAnd<S>,
+        pub and: And<S>,
     }
 
-    impl<T: Default> TripleAnd<T> {
+    impl<S> TripleAnd<S> where S: State {
         pub fn root(name: String) -> Self {
             let path = Instance::root(name);
             Self::new(path)
@@ -307,10 +307,9 @@
         }
     }
 
-    impl<T> Composite<T> for TripleAnd<T> where 
-        T: Clone + Eq + Hash {
-        fn connections(&self) -> Vec<Vec<Connection<T>>> {
-            let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
+    impl<S> Composite<S> for TripleAnd<S> where S: State {
+        fn connections(&self) -> Vec<Vec<Connection<S>>> {
+            let mut connections: Vec<Vec<Connection<S>>> = Vec::new();
             let connection1 = Connection {
                 from: self.double_and.and2.y.clone(),
                 to: self.and.a.clone(),
@@ -328,7 +327,7 @@
         fn path(&self) -> Instance {
             self.path.clone()
         }
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
             let self_height = self.path.height();
             let child_height = self_height + 1;
             let child_name = port_name.get_item(child_height);
@@ -362,14 +361,14 @@
 
 
     #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct OtherTripleAnd<T> {
+    pub struct OtherTripleAnd<S> where S: State {
         pub path: Instance,
-        pub and1: And<T>,
-        pub and2: And<T>,
-        pub and3: And<T>,
+        pub and1: And<S>,
+        pub and2: And<S>,
+        pub and3: And<S>,
     }
 
-    impl<T: Default> OtherTripleAnd<T> {
+    impl<S> OtherTripleAnd<S> where S: State {
         pub fn root(name: String) -> Self {
             let path = Instance::root(name);
             Self::new(path)
@@ -382,11 +381,10 @@
         }
     }
 
-    impl<T> Composite<T> for OtherTripleAnd<T> where 
-        T: Clone + Eq + Hash {
+    impl<S> Composite<S> for OtherTripleAnd<S> where S: State {
         
-        fn connections(&self) -> Vec<Vec<Connection<T>>> {
-            let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
+        fn connections(&self) -> Vec<Vec<Connection<S>>> {
+            let mut connections: Vec<Vec<Connection<S>>> = Vec::new();
 
             let connection1 = Connection {
                 from: self.and1.y.clone(),
@@ -422,7 +420,7 @@
             self.path.clone()
         }
         
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
             let self_height = self.path.height();
             let child_height = self_height + 1;
             let child_name = port_name.get_item(child_height);
@@ -458,13 +456,13 @@
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct RecursiveAnd<T> {
+    pub struct RecursiveAnd<S> where S: State {
         pub path: Instance,
-        pub and: And<T>,
-        pub rec_and: Option<Box<RecursiveAnd<T>>>,
+        pub and: And<S>,
+        pub rec_and: Option<Box<RecursiveAnd<S>>>,
     }
 
-    impl<T: Default> RecursiveAnd<T> {
+    impl<S> RecursiveAnd<S> where S: State {
         pub fn root_base(name: String) -> Self {
             let path = Instance::root(name);
             Self::new(path)
@@ -476,10 +474,9 @@
         }
     }
 
-    impl<T> Composite<T> for RecursiveAnd<T> where
-        T: Clone + Eq + Hash {
+    impl<S> Composite<S> for RecursiveAnd<S> where S: State {
 
-        fn connections(&self) -> Vec<Vec<Connection<T>>> {
+        fn connections(&self) -> Vec<Vec<Connection<S>>> {
             let mut connections = Vec::new();
             if let Some(recursive) = &self.rec_and {
                 let connection1 = Connection {
@@ -502,7 +499,7 @@
         fn path(&self) -> Instance {
             self.path.clone()
         }
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>> {
+        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
             let self_height = self.path.height();
             let child_height = self_height + 1;
             let child_name = port_name.get_item(child_height);
