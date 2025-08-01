@@ -428,6 +428,16 @@
         pub rec_and: Option<Box<RecursiveAnd<S>>>,
     }
 
+    impl<S> RecursiveAnd<S> where S: State {
+        pub fn size(&self) -> usize {
+            let mut size = 1; // Count this instance
+            if let Some(recursive) = &self.rec_and {
+                size += recursive.size()
+            }
+            size
+        }
+    }
+
     impl<S> WithPath<S> for RecursiveAnd<S> where S: State {
         fn new(path: Instance) -> Self {
             let and = And::new(path.child("and".to_string()));
@@ -563,16 +573,6 @@
 
             uniq_hits
         }
-    }
-    
-    fn main() {
-
-        let driver = Driver::new_mock();
-
-        let rec_and = RecursiveAnd::<Search>::root("rec_and");
-        let rec_and_search_result: Vec<RecursiveAnd<Match>> = RecursiveAnd::<Search>::query(&driver, rec_and.path());
-        assert_eq!(rec_and_search_result.len(), 6, "Expected 6 matches for RecursiveAnd, got {}", rec_and_search_result.len());
-
     }
 
     #[cfg(test)] 
