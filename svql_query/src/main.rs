@@ -66,7 +66,7 @@
 
     pub trait SearchableNetlist: Netlist<Search> {
         type Hit;
-        fn from_query_match(match_: QueryMatch, path: Instance) -> Vec<Self::Hit>;
+        fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit;
         fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
     }
 
@@ -178,32 +178,24 @@
         fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
             let results = driver.query(&Self::config())
                 .expect("Failed to query driver")
-                .flat_map(|match_| {
+                .map(|match_| {
                     Self::from_query_match(match_, path.clone())
                 })
                 .collect();
             results
         }
             
-        fn from_query_match(match_: QueryMatch, path: Instance) -> Vec<Self::Hit> {
+        fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit {
             let a: Match = Match { id: lookup(&match_.port_map, "a").cloned().expect(concat!("Port a not found")) };
             let b: Match = Match { id: lookup(&match_.port_map, "b").cloned().expect(concat!("Port b not found")) };
             let y: Match = Match { id: lookup(&match_.port_map, "y").cloned().expect(concat!("Port y not found")) };
 
-            let hit1 = Self::Hit {
+            Self::Hit {
                 a: Wire::with_val(path.child("a".to_string()), a.clone()),
                 b: Wire::with_val(path.child("b".to_string()), b.clone()),
                 y: Wire::with_val(path.child("y".to_string()), y.clone()),
                 path: path.clone(),
-            };
-            // let hit2 = Self::Hit {
-            //     a: Wire::with_val(path.child("a".to_string()), b.clone()),
-            //     b: Wire::with_val(path.child("b".to_string()), a.clone()),
-            //     y: Wire::with_val(path.child("y".to_string()), y.clone()),
-            //     path,
-            // };
-            // vec![hit1, hit2]
-            vec![hit1]
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, sync::Arc};
+use std::{sync::Arc};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {
