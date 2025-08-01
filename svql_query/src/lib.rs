@@ -3,8 +3,8 @@
     use itertools::{iproduct};
     use svql_common::{config::ffi::SvqlRuntimeConfig, id_string::IdString};
 
-    mod instance;
-    mod driver;
+    pub mod instance;
+    pub mod driver;
 
     // ########################
     // Type Definitions

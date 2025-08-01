@@ -3,7 +3,6 @@ members = [
     "svql_common",
     "svql_pat",
     "svql_query",
-    "svql_query_proc_macro",
 ]
 resolver = "3"
 
@@ -11,7 +10,6 @@ resolver = "3"
 svql_common = { path = "svql_common" }
 svql_pat = { path = "svql_pat" }
 svql_query = { path = "svql_query" }
-# svql_query_proc_macro = { path = "svql_query_proc_macro" }
 # ---------------------
 
 lazy_static = "1.5.0"

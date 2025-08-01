@@ -3,6 +3,8 @@ name = "svql_query"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+
 [dependencies]
 
 svql_common.workspace = true

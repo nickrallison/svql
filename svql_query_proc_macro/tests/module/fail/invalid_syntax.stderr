@@ -1,5 +1,0 @@
-error: unexpected token
- --> tests/fail/invalid_syntax.rs:4:12
-  |
-4 |     module!(meow);
-  |                     ^^^^
