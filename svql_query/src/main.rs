@@ -142,11 +142,6 @@
     }
 
     pub trait MatchedComposite: Composite<Match> {
-        fn validate_connection(&self, connection: Connection<Match>) -> bool;
-        fn validate_connections(&self, connections: Vec<Vec<Connection<Match>>>) -> bool;
-    }
-
-    impl<S> MatchedComposite for S where S: Composite<Match> {
         fn validate_connection(&self, connection: Connection<Match>) -> bool {
             let in_port_id = self.find_port(&connection.from.path);
             let out_port_id = self.find_port(&connection.to.path);
@@ -173,6 +168,7 @@
             true
         }
     }
+    impl<S> MatchedComposite for S where S: Composite<Match> {}
 
     // ########################
     // Containers
