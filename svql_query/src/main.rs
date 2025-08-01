@@ -39,24 +39,16 @@
     type QueryMatch = svql_common::matches::SanitizedQueryMatch;
 
     pub trait Netlist<T> {
-
-        type Tuple;
-
-        fn into_tuple(self) -> Self::Tuple;
-        fn from_tuple(tuple: Self::Tuple) -> Self;
-
-        // ####
-
-        fn module_name() -> &'static str;
-        fn file_path() -> &'static str;
-        fn yosys() -> &'static str;
-        fn svql_driver_plugin() -> &'static str;
+        const MODULE_NAME: &'static str;
+        const FILE_PATH: &'static str;
+        const YOSYS: &'static str;
+        const SVQL_DRIVER_PLUGIN: &'static str;
 
         // ####
         fn config() -> SvqlRuntimeConfig {
             let mut cfg = SvqlRuntimeConfig::default();
-            cfg.pat_filename = Self::file_path().to_string();
-            cfg.pat_module_name = Self::module_name().to_string();
+            cfg.pat_filename = Self::FILE_PATH.to_string();
+            cfg.pat_module_name = Self::MODULE_NAME.to_string();
             cfg.verbose = true;
             cfg
         }
@@ -71,11 +63,6 @@
     }
 
     pub trait Composite<T> {
-        type Tuple;
-        
-        fn into_tuple(self) -> Self::Tuple;
-        fn from_tuple(tuple: Self::Tuple) -> Self;
-
         fn connections(&self) -> Vec<Vec<Connection<T>>>;
         fn path(&self) -> Instance;
         fn find_port(&self, port_name: &Instance) -> Option<&Wire<T>>;
@@ -200,30 +187,10 @@
     }
 
     impl<T> Netlist<T> for And<T> {
-
-        type Tuple = (Wire<T>, Wire<T>, Wire<T>, Instance);
-
-        fn into_tuple(self) -> Self::Tuple {
-            (self.a, self.b, self.y, self.path)
-        }
-        
-        fn from_tuple(tuple: Self::Tuple) -> Self {
-            let (a, b, y, path) = tuple;
-            Self { a, b, y, path }
-        }
-
-        fn module_name() -> &'static str {
-            "and_gate"
-        }
-        fn file_path() -> &'static str {
-            "./examples/patterns/basic/and/verilog/and.v"
-        }
-        fn yosys() -> &'static str {
-            "./yosys/yosys"
-        }
-        fn svql_driver_plugin() -> &'static str {
-            "./build/svql_driver/libsvql_driver.so"
-        }
+        const MODULE_NAME: &'static str = "and_gate";
+        const FILE_PATH: &'static str = "./examples/patterns/basic/and/verilog/and.v";
+        const YOSYS: &'static str = "./yosys/yosys";
+        const SVQL_DRIVER_PLUGIN: &'static str = "./build/svql_driver/libsvql_driver.so";
 
         // ##################
         fn path(&self) -> Instance {
@@ -268,15 +235,6 @@
 
     impl<T> Composite<T> for DoubleAnd<T> where 
         T: Clone + Eq + Hash {
-        type Tuple = (And<T>, And<T>, Instance);
-        fn into_tuple(self) -> Self::Tuple {
-            (self.and1, self.and2, self.path)
-        }
-        fn from_tuple(tuple: Self::Tuple) -> Self {
-            let (and1, and2, path) = tuple;
-            Self { and1, and2, path }
-        }
-        
         fn connections(&self) -> Vec<Vec<Connection<T>>> {
             let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
             let connection1 = Connection {
@@ -320,7 +278,7 @@
             let and2_search_result: Vec<And<Match>> = And::<Search>::query(driver, path.child("and2".to_string()));
             let results = iproduct!(and1_search_result, and2_search_result)
                 .map(|(and1, and2)| {
-                    Self::Hit::from_tuple((and1, and2, path.clone()))
+                    Self::Hit { and1, and2, path: path.clone() }
                 })
                 .filter(|s| {
                     Self::Hit::validate_connections(s, s.connections())
@@ -351,15 +309,6 @@
 
     impl<T> Composite<T> for TripleAnd<T> where 
         T: Clone + Eq + Hash {
-        type Tuple = (DoubleAnd<T>, And<T>, Instance);
-        fn into_tuple(self) -> Self::Tuple {
-            (self.double_and, self.and, self.path)
-        }
-        fn from_tuple(tuple: Self::Tuple) -> Self {
-            let (double_and, and, path) = tuple;
-            Self { double_and, and, path }
-        }
-        
         fn connections(&self) -> Vec<Vec<Connection<T>>> {
             let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
             let connection1 = Connection {
@@ -401,7 +350,7 @@
             let and_search_result: Vec<And<Match>> = And::<Search>::query(driver, path.child("and".to_string()));
             let results = iproduct!(double_and_search_result, and_search_result)
                 .map(|(double_and, and)| {
-                    Self::Hit::from_tuple((double_and, and, path.clone()))
+                    Self::Hit { double_and, and, path: path.clone() }
                 })
                 .filter(|s| {
                     Self::Hit::validate_connections(s, s.connections())
@@ -435,14 +384,6 @@
 
     impl<T> Composite<T> for OtherTripleAnd<T> where 
         T: Clone + Eq + Hash {
-        type Tuple = (And<T>, And<T>, And<T>, Instance);
-        fn into_tuple(self) -> Self::Tuple {
-            (self.and1, self.and2, self.and3, self.path)
-        }
-        fn from_tuple(tuple: Self::Tuple) -> Self {
-            let (and1, and2, and3, path) = tuple;
-            Self { and1, and2, and3, path }
-        }
         
         fn connections(&self) -> Vec<Vec<Connection<T>>> {
             let mut connections: Vec<Vec<Connection<T>>> = Vec::new();
@@ -506,7 +447,7 @@
             let and3_search_result: Vec<And<Match>> = And::<Search>::query(driver, path.child("and3".to_string()));
             let results = iproduct!(and1_search_result, and2_search_result, and3_search_result)
                 .map(|(and1, and2, and3)| {
-                    Self::Hit::from_tuple((and1, and2, and3, path.clone()))
+                    Self::Hit { and1, and2, and3, path: path.clone() }
                 })
                 .filter(|s| {
                     Self::Hit::validate_connections(s, s.connections())
@@ -537,16 +478,6 @@
 
     impl<T> Composite<T> for RecursiveAnd<T> where
         T: Clone + Eq + Hash {
-        type Tuple = (And<T>, Option<Box<RecursiveAnd<T>>>, Instance);
-
-        fn into_tuple(self) -> Self::Tuple {
-            (self.and, self.rec_and, self.path)
-        }
-
-        fn from_tuple(tuple: Self::Tuple) -> Self {
-            let (and, rec_and, path) = tuple;
-            Self { and, rec_and, path }
-        }
 
         fn connections(&self) -> Vec<Vec<Connection<T>>> {
             let mut connections = Vec::new();
