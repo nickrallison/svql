@@ -1,5 +1,5 @@
     use crate::{driver::Driver, instance::Instance};
-    use std::{collections::{HashMap, HashSet}, hash::Hash, sync::Arc, vec};
+    use std::{collections::{HashMap}, hash::Hash, sync::Arc, vec};
     use itertools::{iproduct};
     use svql_common::{config::ffi::SvqlRuntimeConfig, id_string::IdString};
 
@@ -42,9 +42,31 @@
         m.get(&IdString::Named(pin.into()))
     }
 
+    macro_rules! impl_find_port {
+        ($ty:ident, $($field:ident),+) => {
+            fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+                let idx  = self.path.height() + 1;
+                match p.get_item(idx).as_ref().map(|s| s.as_str()) {
+                    $(Some(stringify!($field)) => self.$field.find_port(p),)+
+                    _ => None,
+                }
+            }
+        };
+    }
+
     // ########################
     // Core Traits & Containers
     // ########################
+
+    pub trait WithPath<S>: Sized where S: State {
+        fn new(path: Instance) -> Self;
+
+        fn root(name: impl Into<String>) -> Self {
+            Self::new(Instance::root(name.into()))
+        }
+        fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
+        fn path(&self) -> Instance;
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Wire<S> where S: State {
@@ -53,19 +75,36 @@
     }
 
     impl<S> Wire<S> where S: State {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
-            Self { path, val: None }
-        }
         pub fn with_val(path: Instance, val: S) -> Self {
             Self { path, val: Some(val) }
         }
     }
 
-    pub trait Netlist<S> where S: State {
+    impl<S> WithPath<S> for Wire<S> where S: State {
+        fn new(path: Instance) -> Self {
+            Self { path, val: None }
+        }
+        fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+            if p.height() < self.path.height() {
+                return None;
+            }
+
+            let item = p.get_item(p.height()).expect("WithPath::find_port(p): cannot find item");
+            let self_name = self.path.get_item(self.path.height()).expect("WithPath::find_port(p): cannot find item");
+
+            if item == self_name {
+                Some(self)
+            } else {
+                None
+            }
+        }
+
+        fn path(&self) -> Instance {
+            self.path.clone()
+        }
+    }
+
+    pub trait Netlist<S>: WithPath<S> where S: State {
         // --- Constants ---
         const MODULE_NAME        : &'static str;
         const FILE_PATH          : &'static str;
@@ -73,8 +112,6 @@
         const SVQL_DRIVER_PLUGIN : &'static str;
 
         // --- Shared Functionality ---
-        fn path(&self) -> Instance;
-        fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
         fn config() -> SvqlRuntimeConfig {
             let mut cfg = SvqlRuntimeConfig::default();
             cfg.pat_filename    = Self::FILE_PATH.into();
@@ -95,10 +132,8 @@
         }
     }
 
-    pub trait Composite<S> where S: State {
+    pub trait Composite<S>: WithPath<S> where S: State {
         fn connections(&self) -> Vec<Vec<Connection<S>>>;
-        fn path(&self) -> Instance;
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>>;
     }
 
     pub trait SearchableComposite: Composite<Search> {
@@ -161,16 +196,18 @@
         pub y: Wire<S>,
     }
 
-    impl<S> And<S> where S: State {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
+    impl<S> WithPath<S> for And<S> where S: State {
+        fn new(path: Instance) -> Self {
             let a = Wire::new(path.child("a".to_string()));
             let b = Wire::new(path.child("b".to_string()));
             let y = Wire::new(path.child("y".to_string()));
             Self { path, a, b, y }
+        }
+
+        impl_find_port!(And, a, b, y);
+
+        fn path(&self) -> Instance {
+            self.path.clone()
         }
     }
 
@@ -179,24 +216,6 @@
         const FILE_PATH          : &'static str = "./examples/patterns/basic/and/verilog/and.v";
         const YOSYS              : &'static str = "./yosys/yosys";
         const SVQL_DRIVER_PLUGIN : &'static str = "./build/svql_driver/libsvql_driver.so";
-
-        fn path(&self) -> Instance { self.path.clone() }
-
-        fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-            let self_height = self.path.height();
-            let child_height = self_height + 1;
-            let child_name = p.get_item(child_height);
-            if let Some(name) = child_name {
-                if name == Arc::new("a".to_string()) {
-                    return Some(&self.a);
-                } else if name == Arc::new("b".to_string()) {
-                    return Some(&self.b);
-                } else if name == Arc::new("y".to_string()) {
-                    return Some(&self.y);
-                }
-            }
-            None
-        }
     }
 
     impl SearchableNetlist for And<Search> {
@@ -222,15 +241,16 @@
         pub and2: And<S>,
     }
 
-    impl<S> DoubleAnd<S> where S: State {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
+    impl<S> WithPath<S> for DoubleAnd<S> where S: State {
+        fn new(path: Instance) -> Self {
             let and1 = And::new(path.child("and1".to_string()));
             let and2 = And::new(path.child("and2".to_string()));
             Self { path, and1, and2 }
+        }
+
+        impl_find_port!(DoubleAnd, and1, and2);
+        fn path(&self) -> Instance {
+            self.path.clone()
         }
     }
 
@@ -250,23 +270,6 @@
             set.push(connection2);
             connections.push(set);
             connections
-        }
-        fn path(&self) -> Instance {
-            self.path.clone()
-        }
-        
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
-            let self_height = self.path.height();
-            let child_height = self_height + 1;
-            let child_name = port_name.get_item(child_height);
-            if let Some(name) = child_name {
-                if name == Arc::new("and1".to_string()) {
-                    return self.and1.find_port(port_name);
-                } else if name == Arc::new("and2".to_string()) {
-                    return self.and2.find_port(port_name);
-                }
-            }
-            None
         }
 
     }
@@ -295,15 +298,16 @@
         pub and: And<S>,
     }
 
-    impl<S> TripleAnd<S> where S: State {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
+    impl <S> WithPath<S> for TripleAnd<S> where S: State {
+        fn new(path: Instance) -> Self {
             let double_and = DoubleAnd::new(path.child("double_and".to_string()));
             let and = And::new(path.child("and".to_string()));
             Self { path, double_and, and }
+        }
+
+        impl_find_port!(TripleAnd, double_and, and);
+        fn path(&self) -> Instance {
+            self.path.clone()
         }
     }
 
@@ -323,22 +327,6 @@
             set.push(connection2);
             connections.push(set);
             connections
-        }
-        fn path(&self) -> Instance {
-            self.path.clone()
-        }
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
-            let self_height = self.path.height();
-            let child_height = self_height + 1;
-            let child_name = port_name.get_item(child_height);
-            if let Some(name) = child_name {
-                if name == Arc::new("double_and".to_string()) {
-                    return self.double_and.find_port(port_name);
-                } else if name == Arc::new("and".to_string()) {
-                    return self.and.find_port(port_name);
-                }
-            }
-            None
         }
     }
 
@@ -368,16 +356,17 @@
         pub and3: And<S>,
     }
 
-    impl<S> OtherTripleAnd<S> where S: State {
-        pub fn root(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
+    impl<S> WithPath<S> for OtherTripleAnd<S> where S: State {
+        fn new(path: Instance) -> Self {
             let and1 = And::new(path.child("and1".to_string()));
             let and2 = And::new(path.child("and2".to_string()));
             let and3 = And::new(path.child("and3".to_string()));
             Self { path, and1, and2, and3 }
+        }
+
+        impl_find_port!(OtherTripleAnd, and1, and2, and3);
+        fn path(&self) -> Instance {
+            self.path.clone()
         }
     }
 
@@ -416,25 +405,6 @@
 
             connections
         }
-        fn path(&self) -> Instance {
-            self.path.clone()
-        }
-        
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
-            let self_height = self.path.height();
-            let child_height = self_height + 1;
-            let child_name = port_name.get_item(child_height);
-            if let Some(name) = child_name {
-                if name == Arc::new("and1".to_string()) {
-                    return self.and1.find_port(port_name);
-                } else if name == Arc::new("and2".to_string()) {
-                    return self.and2.find_port(port_name);
-                } else if name == Arc::new("and3".to_string()) {
-                    return self.and3.find_port(port_name);
-                }
-            }
-            None
-        }
     }
 
     impl SearchableComposite for OtherTripleAnd<Search> {
@@ -462,15 +432,28 @@
         pub rec_and: Option<Box<RecursiveAnd<S>>>,
     }
 
-    impl<S> RecursiveAnd<S> where S: State {
-        pub fn root_base(name: String) -> Self {
-            let path = Instance::root(name);
-            Self::new(path)
-        }
-        pub fn new(path: Instance) -> Self {
+    impl<S> WithPath<S> for RecursiveAnd<S> where S: State {
+        fn new(path: Instance) -> Self {
             let and = And::new(path.child("and".to_string()));
             let rec_and = None;
             Self { path, and, rec_and }
+        }
+        fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+            let idx = self.path.height() + 1;
+            match p.get_item(idx).as_ref().map(|s| s.as_str()) {
+                Some("and") => self.and.find_port(p),
+                Some("rec_and") => {
+                    if let Some(recursive) = &self.rec_and {
+                        recursive.find_port(p)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        }
+        fn path(&self) -> Instance {
+            self.path.clone()
         }
     }
 
@@ -494,26 +477,6 @@
             }
             connections
             
-        }
-
-        fn path(&self) -> Instance {
-            self.path.clone()
-        }
-        fn find_port(&self, port_name: &Instance) -> Option<&Wire<S>> {
-            let self_height = self.path.height();
-            let child_height = self_height + 1;
-            let child_name = port_name.get_item(child_height);
-            if let Some(name) = child_name {
-                if name == Arc::new("and".to_string()) {
-                    return self.and.find_port(port_name);
-                }
-                if name == Arc::new("rec_and".to_string()) {
-                    if let Some(recursive) = &self.rec_and {
-                        return recursive.find_port(port_name);
-                    }
-                }
-            }
-            None
         }
     }
 
@@ -610,7 +573,7 @@
 
         let driver = Driver::new_mock();
 
-        let rec_and = RecursiveAnd::<Search>::root_base("rec_and".into());
+        let rec_and = RecursiveAnd::<Search>::root("rec_and");
         let rec_and_search_result: Vec<RecursiveAnd<Match>> = RecursiveAnd::<Search>::query(&driver, rec_and.path());
         assert_eq!(rec_and_search_result.len(), 6, "Expected 6 matches for RecursiveAnd, got {}", rec_and_search_result.len());
 
@@ -674,7 +637,7 @@
         #[test]
         fn test_triple_and_composite() {
             let driver = Driver::new_mock();    
-            let triple_and = TripleAnd::<Search>::root("triple_and".to_string());
+            let triple_and = TripleAnd::<Search>::root("triple_and");
             assert_eq!(triple_and.path().inst_path(), "triple_and");
             assert_eq!(triple_and.double_and.path().inst_path(), "triple_and.double_and");
             assert_eq!(triple_and.and.y.path.inst_path(), "triple_and.and.y");
@@ -685,7 +648,7 @@
         #[test]
         fn test_other_triple_and_composite() {
             let driver = Driver::new_mock();
-            let other_triple_and = OtherTripleAnd::<Search>::root("other_triple_and".to_string());
+            let other_triple_and = OtherTripleAnd::<Search>::root("other_triple_and");
             assert_eq!(other_triple_and.path().inst_path(), "other_triple_and");
             assert_eq!(other_triple_and.and1.path().inst_path(), "other_triple_and.and1");
             assert_eq!(other_triple_and.and2.path().inst_path(), "other_triple_and.and2");
@@ -697,7 +660,7 @@
         #[test]
         fn test_recursive_and_composite() {
             let driver = Driver::new_mock();
-            let rec_and = RecursiveAnd::<Search>::root_base("rec_and".to_string());
+            let rec_and = RecursiveAnd::<Search>::root("rec_and");
             assert_eq!(rec_and.path().inst_path(), "rec_and");
             assert_eq!(rec_and.and.path().inst_path(), "rec_and.and");
             assert_eq!(rec_and.rec_and.is_none(), true, "Expected rec_and.rec_and to be None, got {:?}", rec_and.rec_and);
