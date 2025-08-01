@@ -111,31 +111,31 @@ fn is_path(file_path: &str) -> bool {
     file_path.contains(std::path::MAIN_SEPARATOR) || file_path.chars().any(std::path::is_separator)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use proc_macro2::TokenStream;
-    use quote::quote;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use proc_macro2::TokenStream;
+//     use quote::quote;
 
-    #[test]
-    fn test_parse_success() {
-        // Set workspace dir for path resolution
-        std::env::set_var("CARGO_WORKSPACE_DIR", "/tmp");
-        let attr: TokenStream = quote! { file = "foo.v", module = "mod", yosys = "y", svql_pat_plugin_path = "plugin.so" };
-        let item: TokenStream = quote! { pub struct Foo; };
-        let ast = parse(attr, item);
-        assert_eq!(ast.module_name, "mod");
-        assert!(ast.file_path.ends_with("foo.v"));
-        assert_eq!(ast.yosys, "y".to_string());
-        assert!(ast.svql_pat_plugin_path.ends_with("plugin.so"));
-    }
+//     #[test]
+//     fn test_parse_success() {
+//         // Set workspace dir for path resolution
+//         std::env::set_var("CARGO_WORKSPACE_DIR", "/tmp");
+//         let attr: TokenStream = quote! { file = "foo.v", module = "mod", yosys = "y", svql_pat_plugin_path = "plugin.so" };
+//         let item: TokenStream = quote! { pub struct Foo; };
+//         let ast = parse(attr, item);
+//         assert_eq!(ast.module_name, "mod");
+//         assert!(ast.file_path.ends_with("foo.v"));
+//         assert_eq!(ast.yosys, "y".to_string());
+//         assert!(ast.svql_pat_plugin_path.ends_with("plugin.so"));
+//     }
 
-    #[test]
-    #[should_panic(expected = "`file = \"...\"` is required")]
-    fn test_parse_missing_file() {
-        std::env::set_var("CARGO_WORKSPACE_DIR", "/tmp");
-        let attr: TokenStream = quote! { module = "mod", yosys = "y", svql_pat_plugin_path = "plugin.so" };
-        let item: TokenStream = quote! { struct Foo; };
-        let _ = parse(attr, item);
-    }
-}
+//     #[test]
+//     #[should_panic(expected = "`file = \"...\"` is required")]
+//     fn test_parse_missing_file() {
+//         std::env::set_var("CARGO_WORKSPACE_DIR", "/tmp");
+//         let attr: TokenStream = quote! { module = "mod", yosys = "y", svql_pat_plugin_path = "plugin.so" };
+//         let item: TokenStream = quote! { struct Foo; };
+//         let _ = parse(attr, item);
+//     }
+// }

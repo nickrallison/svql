@@ -11,13 +11,13 @@ resolver = "3"
 svql_common = { path = "svql_common" }
 svql_pat = { path = "svql_pat" }
 svql_query = { path = "svql_query" }
-svql_query_proc_macro = { path = "svql_query_proc_macro" }
+# svql_query_proc_macro = { path = "svql_query_proc_macro" }
 # ---------------------
 
 lazy_static = "1.5.0"
 regex = "1.11.1"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1.0.104"
 thiserror = "2.0"
 log = "0.4.27"
 env_logger = "0.11.5"
