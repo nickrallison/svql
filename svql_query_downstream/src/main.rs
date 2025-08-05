@@ -1,5 +1,7 @@
-use svql_query::*;
+use svql_query::queries::RecursiveAnd;
 use svql_query::driver::Driver;
+use svql_query::{Match, Search, WithPath};
+use svql_query::composite::SearchableComposite;
 
 fn main() {
 
