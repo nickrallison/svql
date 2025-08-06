@@ -395,7 +395,7 @@ mod tests {
     fn test_extract_pattern() {
         let workspace_root: PathBuf =
             PathBuf::from(std::env::var("CARGO_WORKSPACE_DIR").expect("workspace root not set"));
-        let relative_path = PathBuf::from("examples/patterns/basic/and/verilog/and.v");
+        let relative_path = PathBuf::from("../../examples/patterns/basic/and/and.v");
         let verilog_file = workspace_root.join(relative_path);
         let module_name = "and_gate";
         let yosys_bin_path = Some(workspace_root.join(PathBuf::from("yosys/yosys")));
