@@ -2,10 +2,8 @@
 // Examples
 // ########################
 
-use crate::driver::Driver;
 use crate::instance::Instance;
 use crate::netlist::{Netlist, SearchableNetlist};
-use crate::queries::basic::or::Or;
 use crate::{lookup, Match, QueryMatch, Search, State, Wire, WithPath};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,26 +66,26 @@ impl SearchableNetlist for Not<Search> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // ###############
     // Netlist Tests
     // ###############
     #[test]
     fn test_not_netlist() {
-        let driver = Driver::new_mock();
+        panic!("Not netlist tests are not implemented yet");
 
-        let not = Not::<Search>::root("not".to_string());
-        assert_eq!(not.path().inst_path(), "not");
-        assert_eq!(not.a.path.inst_path(), "not.a");
-        assert_eq!(not.y.path.inst_path(), "not.y");
+        // let driver = Driver::new_mock();
 
-        let not_search_result = Or::<Search>::query(&driver, not.path());
-        assert_eq!(
-            not_search_result.len(),
-            3,
-            "Expected 3 matches for Not, got {}",
-            not_search_result.len()
-        );
+        // let not = Not::<Search>::root("not".to_string());
+        // assert_eq!(not.path().inst_path(), "not");
+        // assert_eq!(not.a.path.inst_path(), "not.a");
+        // assert_eq!(not.y.path.inst_path(), "not.y");
+        //
+        // let not_search_result = Or::<Search>::query(&driver, not.path());
+        // assert_eq!(
+        //     not_search_result.len(),
+        //     3,
+        //     "Expected 3 matches for Not, got {}",
+        //     not_search_result.len()
+        // );
     }
 }

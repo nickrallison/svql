@@ -510,13 +510,15 @@ impl SearchableComposite for RecursiveAnd<Search> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::driver::mock::MockDriverThreeAnd;
 
     // ###############
     // Netlist Tests
     // ###############
     #[test]
     fn test_and_netlist() {
-        let driver = Driver::new_mock();
+        let and_mock = MockDriverThreeAnd::new();
+        let driver = Driver::new_mock(and_mock.into());
 
         let and = And::<Search>::root("and".to_string());
         assert_eq!(and.path().inst_path(), "and");
@@ -539,7 +541,9 @@ mod tests {
 
     #[test]
     fn test_recursive_and_composite() {
-        let driver = Driver::new_mock();
+        let and_mock = MockDriverThreeAnd::new();
+        let driver = Driver::new_mock(and_mock.into());
+
         let rec_and = RecursiveAnd::<Search>::root("rec_and");
         assert_eq!(rec_and.path().inst_path(), "rec_and");
         assert_eq!(rec_and.and.path().inst_path(), "rec_and.and");

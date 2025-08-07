@@ -44,8 +44,8 @@ impl Driver {
         Driver::Net(NetDriver::new(addr))
     }
 
-    pub fn new_mock() -> Self {
-        Driver::Mock(MockDriver::new())
+    pub fn new_mock(mock: MockDriver) -> Self {
+        Driver::Mock(mock)
     }
 
     pub fn query(&self, cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, DriverError> {

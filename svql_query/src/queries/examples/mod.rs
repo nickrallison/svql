@@ -244,13 +244,16 @@ impl SearchableComposite for OtherTripleAnd<Search> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::driver::mock::MockDriverThreeAnd;
 
     // ###############
     // Composite Tests
     // ###############
     #[test]
     fn test_double_and_composite() {
-        let driver = Driver::new_mock();
+        let and_mock = MockDriverThreeAnd::new();
+        let driver = Driver::new_mock(and_mock.into());
+
         let double_and = DoubleAnd::<Search>::root("double_and".to_string());
         assert_eq!(double_and.path().inst_path(), "double_and");
         assert_eq!(double_and.and1.path().inst_path(), "double_and.and1");
@@ -267,7 +270,8 @@ mod tests {
 
     #[test]
     fn test_triple_and_composite() {
-        let driver = Driver::new_mock();
+        let and_mock = MockDriverThreeAnd::new();
+        let driver = Driver::new_mock(and_mock.into());
         let triple_and = TripleAnd::<Search>::root("triple_and");
         assert_eq!(triple_and.path().inst_path(), "triple_and");
         assert_eq!(
@@ -286,7 +290,8 @@ mod tests {
 
     #[test]
     fn test_other_triple_and_composite() {
-        let driver = Driver::new_mock();
+        let and_mock = MockDriverThreeAnd::new();
+        let driver = Driver::new_mock(and_mock.into());
         let other_triple_and = OtherTripleAnd::<Search>::root("other_triple_and");
         assert_eq!(other_triple_and.path().inst_path(), "other_triple_and");
         assert_eq!(
