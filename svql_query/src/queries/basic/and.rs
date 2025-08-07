@@ -76,7 +76,8 @@ where
 {
     pub path: Instance,
     pub and: And<S>,
-    pub rec_and: Option<Box<RecursiveAnd<S>>>,
+    pub rec_and_1: Option<Box<RecursiveAnd<S>>>,
+    pub rec_and_2: Option<Box<RecursiveAnd<S>>>,
 }
 
 impl<S> RecursiveAnd<S>
@@ -85,7 +86,10 @@ where
 {
     pub fn size(&self) -> usize {
         let mut size = 1; // Count this instance
-        if let Some(recursive) = &self.rec_and {
+        if let Some(recursive) = &self.rec_and_1 {
+            size += recursive.size()
+        }
+        if let Some(recursive) = &self.rec_and_2 {
             size += recursive.size()
         }
         size
@@ -98,15 +102,28 @@ where
 {
     fn new(path: Instance) -> Self {
         let and = And::new(path.child("and".to_string()));
-        let rec_and = None;
-        Self { path, and, rec_and }
+        let rec_and_1 = None;
+        let rec_and_2 = None;
+        Self {
+            path,
+            and,
+            rec_and_1,
+            rec_and_2,
+        }
     }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         let idx = self.path.height() + 1;
         match p.get_item(idx).as_ref().map(|s| s.as_str()) {
             Some("and") => self.and.find_port(p),
-            Some("rec_and") => {
-                if let Some(recursive) = &self.rec_and {
+            Some("rec_and_1") => {
+                if let Some(recursive) = &self.rec_and_1 {
+                    recursive.find_port(p)
+                } else {
+                    None
+                }
+            }
+            Some("rec_and_2") => {
+                if let Some(recursive) = &self.rec_and_2 {
                     recursive.find_port(p)
                 } else {
                     None
@@ -126,14 +143,28 @@ where
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
         let mut connections = Vec::new();
-        if let Some(recursive) = &self.rec_and {
+        if let Some(recursive) = &self.rec_and_1 {
             let connection1 = Connection {
-                from: self.and.y.clone(),
-                to: recursive.and.a.clone(),
+                from: self.and.a.clone(),
+                to: recursive.and.y.clone(),
             };
             let connection2 = Connection {
-                from: self.and.y.clone(),
-                to: recursive.and.b.clone(),
+                from: self.and.b.clone(),
+                to: recursive.and.y.clone(),
+            };
+            let mut set = Vec::new();
+            set.push(connection1);
+            set.push(connection2);
+            connections.push(set);
+        }
+        if let Some(recursive) = &self.rec_and_2 {
+            let connection1 = Connection {
+                from: self.and.a.clone(),
+                to: recursive.and.y.clone(),
+            };
+            let connection2 = Connection {
+                from: self.and.b.clone(),
+                to: recursive.and.y.clone(),
             };
             let mut set = Vec::new();
             set.push(connection1);
@@ -148,77 +179,7 @@ impl SearchableComposite for RecursiveAnd<Search> {
     type Hit = RecursiveAnd<Match>;
 
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
-        fn chain_to_recursive(chain: &[And<Match>], path: &Instance) -> RecursiveAnd<Match> {
-            let head_and = chain[0].clone();
-
-            if chain.len() == 1 {
-                RecursiveAnd {
-                    path: path.clone(),
-                    and: head_and,
-                    rec_and: None,
-                }
-            } else {
-                let inner_path = path.child("rec_and".to_string());
-                let tail = chain_to_recursive(&chain[1..], &inner_path);
-                RecursiveAnd {
-                    path: path.clone(),
-                    and: head_and,
-                    rec_and: Some(Box::new(tail)),
-                }
-            }
-        }
-
-        fn build_chains(
-            driver: &Driver,
-            cur_path: &Instance,
-            first_and: &And<Match>,
-        ) -> Vec<Vec<And<Match>>> {
-            let mut chains: Vec<Vec<And<Match>>> = vec![vec![first_and.clone()]];
-            let next_block_path = cur_path.child("rec_and".to_string());
-            let next_and_path = next_block_path.child("and".to_string());
-            let inner_ands: Vec<And<Match>> = And::<Search>::query(driver, next_and_path);
-            let this_y_id = first_and.y.val.as_ref().map(|m| &m.id);
-
-            for inner in inner_ands {
-                let inner_a_id = inner.a.val.as_ref().map(|m| &m.id);
-
-                if this_y_id == inner_a_id {
-                    let tails = build_chains(driver, &next_block_path, &inner);
-                    for mut tail in tails {
-                        tail.insert(0, first_and.clone());
-                        chains.push(tail);
-                    }
-                }
-            }
-
-            chains
-        }
-
-        let and_hits: Vec<And<Match>> = And::<Search>::query(driver, path.child("and".to_string()));
-        if and_hits.is_empty() {
-            return Vec::new();
-        }
-
-        let mut all_hits: Vec<RecursiveAnd<Match>> = Vec::new();
-        for top_and in &and_hits {
-            let chains = build_chains(driver, &path, top_and);
-
-            for chain in chains {
-                let rec_hit = chain_to_recursive(&chain, &path);
-                if rec_hit.validate_connections(rec_hit.connections()) {
-                    all_hits.push(rec_hit);
-                }
-            }
-        }
-
-        let mut uniq_hits: Vec<RecursiveAnd<Match>> = Vec::new();
-        for hit in all_hits {
-            if !uniq_hits.contains(&hit) {
-                uniq_hits.push(hit);
-            }
-        }
-
-        uniq_hits
+        todo!()
     }
 }
 
@@ -259,10 +220,10 @@ mod tests {
         assert_eq!(rec_and.path().inst_path(), "rec_and");
         assert_eq!(rec_and.and.path().inst_path(), "rec_and.and");
         assert_eq!(
-            rec_and.rec_and.is_none(),
+            rec_and.rec_and_1.is_none(),
             true,
-            "Expected rec_and.rec_and to be None, got {:?}",
-            rec_and.rec_and
+            "Expected rec_and.rec_and_1 to be None, got {:?}",
+            rec_and.rec_and_1
         );
         let rec_and_search_result = RecursiveAnd::<Search>::query(&driver, rec_and.path());
         assert_eq!(

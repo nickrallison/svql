@@ -1,3 +1,3 @@
 pub mod and;
-mod not;
+pub mod not;
 pub mod or;

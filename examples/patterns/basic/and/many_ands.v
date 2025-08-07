@@ -2,10 +2,13 @@
 module many_ands
 (
 input a,
+input p,
+input q,
+input r,
 input b,
-input c,
 output y
 );
 
-assign y = (((a & b) & c) & d);
+assign y = (((a & p) & q) & r) & b;
+
 endmodule

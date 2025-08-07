@@ -25,12 +25,13 @@ always @(posedge clk or negedge resetn)
     begin
         lock_status <= lock_status;
     end
+    
 always @(posedge clk or negedge resetn)
     if (~resetn) // Register is reset resetn
     begin
         data_out <= 16'h0000;
     end
-    else if (write & (~lock_status | scan_mode | debug_unlocked) ) // Register protected by lock bit input, overrides supported for scan_mode & debug_unlocked
+    else if (write & (~lock_status | scan_mode | debug_unlocked) )
     begin
         data_out <= data_in;
     end
@@ -39,3 +40,6 @@ always @(posedge clk or negedge resetn)
         data_out <= data_out;
     end
 endmodule
+
+
+
