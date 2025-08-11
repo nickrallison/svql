@@ -164,13 +164,31 @@ fn wait_until_ready(
 ) -> Result<(), String> {
     let (tx, rx) = std::sync::mpsc::channel::<String>();
 
+    // Capture stdout
     if let Some(stdout) = yosys_process.stdout.take() {
+        let tx_stdout = tx.clone();
         std::thread::spawn(move || {
             use std::io::{BufRead, BufReader};
             let reader = BufReader::new(stdout);
             for line in reader.lines() {
                 if let Ok(l) = line {
-                    let _ = tx.send(l);
+                    let _ = tx_stdout.send(l);
+                } else {
+                    break;
+                }
+            }
+        });
+    }
+
+    // Capture stderr as well (optional but useful for error messages)
+    if let Some(stderr) = yosys_process.stderr.take() {
+        let tx_stderr = tx.clone();
+        std::thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    let _ = tx_stderr.send(l);
                 } else {
                     break;
                 }
@@ -189,6 +207,15 @@ fn wait_until_ready(
         match rx.recv_timeout(remaining) {
             Ok(line) => {
                 let is_match = line.contains(&ready_marker);
+                // Detect Yosys error messages early
+                if line.contains("ERROR:") {
+                    error!(target: "wait_until_ready", "Yosys reported an error: {}", line);
+                    return Err(format!(
+                        "Yosys reported an error: {}. Recent output:\n{}",
+                        line,
+                        recent.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n")
+                    ));
+                }
                 trace!(target: "wait_until_ready", "line: '{}' | match: {}", line, is_match);
                 if recent.len() == recent.capacity() {
                     recent.pop_front();
@@ -205,8 +232,18 @@ fn wait_until_ready(
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 // Channel closed, but keep waiting until timeout
-                // disconnected = true; // unused
                 std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+        // Check if the process has exited early with an error
+        if let Ok(Some(status)) = yosys_process.try_wait() {
+            if !status.success() {
+                error!(target: "wait_until_ready", "Yosys process exited early with status {}", status);
+                return Err(format!(
+                    "Yosys process exited early with status {}. Recent output:\n{}",
+                    status,
+                    recent.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n")
+                ));
             }
         }
     }
