@@ -1,13 +1,23 @@
-use itertools::iproduct;
 use svql_common::id_string::IdString;
-use svql_query::{composite::{Composite, MatchedComposite, SearchableComposite}, driver::Driver, impl_find_port, instance::Instance, netlist::SearchableNetlist, queries::basic::and::And, Connection, Match, Search, State, WithPath};
+use svql_query::{
+    composite::{Composite, MatchedComposite, SearchableComposite},
+    driver::Driver,
+    impl_find_port,
+    instance::Instance,
+    netlist::SearchableNetlist,
+    queries::basic::and::And,
+    Connection,
+    Match,
+    Search,
+    State,
+    WithPath,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
     static ref A_RE: Regex = Regex::new(r"^\\a$").unwrap();
-    static ref B_RE: Regex =
-        Regex::new(r"^\\b$").unwrap();
+    static ref B_RE: Regex = Regex::new(r"^\\b$").unwrap();
 }
 
 
@@ -26,7 +36,7 @@ where
 {
     fn new(path: Instance) -> Self {
         let and = And::new(path.child("and".to_string()));
-        Self { path, and}
+        Self { path, and }
     }
 
     impl_find_port!(AndAB, and);
@@ -49,9 +59,10 @@ impl SearchableComposite for AndAB<Search> {
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         let and_search_result: Vec<And<Match>> =
             And::<Search>::query(driver, path.child("and".to_string()));
-        let results = iproduct!(and_search_result)
+        let results = and_search_result
+            .into_iter()
             .map(|and| Self::Hit {
-                and: and.0,
+                and,
                 path: path.clone(),
             })
             .filter(|s| {
@@ -65,17 +76,24 @@ impl SearchableComposite for AndAB<Search> {
     }
 }
 
-impl MatchedComposite for AndAB<Match> {
-    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+impl AndAB<Match> {
+    pub fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
         let a_lambda = |s: &Self| {
             if let Some(port) = s.find_port(&s.and.a.path) {
-                if let Some(Match { id: IdString::Named(name)}) = &port.val {
-                    return A_RE.is_match(&name);
+                if let Some(Match { id: IdString::Named(name) }) = &port.val {
+                    return A_RE.is_match(name);
                 }
             }
             false
         };
-
-        todo!()
+        let b_lambda = |s: &Self| {
+            if let Some(port) = s.find_port(&s.and.b.path) {
+                if let Some(Match { id: IdString::Named(name) }) = &port.val {
+                    return B_RE.is_match(name);
+                }
+            }
+            false
+        };
+        vec![Box::new(a_lambda), Box::new(b_lambda)]
     }
 }

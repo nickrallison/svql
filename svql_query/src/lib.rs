@@ -52,7 +52,7 @@ pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a I
 #[macro_export]
 macro_rules! impl_find_port {
     ($ty:ident, $($field:ident),+) => {
-        fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+        fn find_port(&self, p: &Instance) -> Option<&$crate::Wire<S>> {
             let idx  = self.path.height() + 1;
             match p.get_item(idx).as_ref().map(|s| s.as_str()) {
                 $(Some(stringify!($field)) => self.$field.find_port(p),)+
