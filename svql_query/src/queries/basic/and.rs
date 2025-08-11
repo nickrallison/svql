@@ -516,7 +516,7 @@ impl MatchedComposite for RecursiveAnd<Match> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::driver::mock::MockDriverThreeAnd;
+    use crate::driver::mock::and_three::MockDriverThreeAnd;
 
     // ###############
     // Netlist Tests

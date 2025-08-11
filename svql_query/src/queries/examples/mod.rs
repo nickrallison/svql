@@ -277,8 +277,9 @@ impl MatchedComposite for OtherTripleAnd<Match> {
 
 #[cfg(test)]
 mod tests {
+    use crate::driver::mock::and_three::MockDriverThreeAnd;
+
     use super::*;
-    use crate::driver::mock::MockDriverThreeAnd;
 
     // ###############
     // Composite Tests

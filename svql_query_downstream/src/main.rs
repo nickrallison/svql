@@ -1,5 +1,5 @@
 use svql_query::composite::SearchableComposite;
-use svql_query::driver::mock::MockDriverThreeAnd;
+use svql_query::driver::mock::and_three::MockDriverThreeAnd;
 use svql_query::driver::Driver;
 use svql_query::queries::basic::and::RecursiveAnd;
 use svql_query::{Match, Search, WithPath};

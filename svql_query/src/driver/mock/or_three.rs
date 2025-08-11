@@ -6,11 +6,11 @@ use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::id_string::IdString;
 use svql_common::matches::{SanitizedCellData, SanitizedQueryMatch};
 
-pub struct MockDriverThreeAnd;
+pub struct MockDriverThreeOr;
 
-impl MockDriverThreeAnd {
+impl MockDriverThreeOr {
     pub fn new() -> Self {
-        MockDriverThreeAnd
+        MockDriverThreeOr
     }
 
     pub fn query(&self, _cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
@@ -27,9 +27,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "and".to_string(),
-                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
-                                .to_string(),
+                            gate_name: "or".to_string(),
+                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
                             id: "3_Y".to_string(),
                         },
@@ -37,9 +36,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
-                            gate_name: "and".to_string(),
-                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
-                                .to_string(),
+                            gate_name: "or".to_string(),
+                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -51,8 +49,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -60,8 +58,8 @@ impl MockDriverThreeAnd {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "3".to_string(),
@@ -79,9 +77,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
-                            gate_name: "and".to_string(),
-                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
-                                .to_string(),
+                            gate_name: "or".to_string(),
+                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -93,9 +90,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "and".to_string(),
-                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
-                                .to_string(),
+                            gate_name: "or".to_string(),
+                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -107,8 +103,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -116,8 +112,8 @@ impl MockDriverThreeAnd {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "2".to_string(),
@@ -135,9 +131,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "and".to_string(),
-                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
-                                .to_string(),
+                            gate_name: "or".to_string(),
+                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -157,8 +152,8 @@ impl MockDriverThreeAnd {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -166,8 +161,8 @@ impl MockDriverThreeAnd {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "and".to_string(),
-                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                gate_name: "or".to_string(),
+                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "1".to_string(),
@@ -184,8 +179,8 @@ impl MockDriverThreeAnd {
     }
 }
 
-impl From<MockDriverThreeAnd> for MockDriver {
-    fn from(driver: MockDriverThreeAnd) -> Self {
-        MockDriver::ThreeAnd(driver)
+impl From<MockDriverThreeOr> for MockDriver {
+    fn from(driver: MockDriverThreeOr) -> Self {
+        MockDriver::ThreeOr(driver)
     }
 }

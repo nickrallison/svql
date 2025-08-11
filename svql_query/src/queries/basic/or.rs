@@ -515,8 +515,10 @@ impl MatchedComposite for RecursiveOr<Match> {
 
 #[cfg(test)]
 mod tests {
+    use crate::driver::mock::or_three::MockDriverThreeOr;
+
     use super::*;
-    use crate::driver::mock::MockDriverThreeOr;
+    
 
     // ###############
     // Netlist Tests
