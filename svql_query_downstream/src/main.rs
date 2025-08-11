@@ -1,3 +1,4 @@
+use svql_driver_handler::YosysProc;
 use svql_query::composite::SearchableComposite;
 use svql_driver_handler::driver::mock::and_three::MockDriverThreeAnd;
 use svql_driver_handler::driver::Driver;
@@ -10,19 +11,21 @@ mod and;
 
 fn main() {
     // let mock_and = MockDriverThreeAnd::new();
-    let driver = Driver::new_net("localhost:9999".to_string());
+    let yosys_proc: YosysProc = YosysProc::new("examples/patterns/basic/and/many_ands_2.v".into(), "many_ands".into()).unwrap();
 
-    let and_ab = AndAB::<Search>::root("rec_and");
-    let and_ab_search_result: Vec<AndAB<Match>> =
-        AndAB::<Search>::query(&driver, and_ab.path());
-    assert_eq!(
-        and_ab_search_result.len(),
-        6,
-        "Expected 6 matches for AndAB, got {}",
-        and_ab_search_result.len()
-    );
-    // for match_ in and_ab_search_result {
-    //     println!("Match Size: {}", match_.size());
-    //     // println!("Match: {:#?}", match_);
-    // }
+    let driver = yosys_proc.driver();
+
+    let cmd = yosys_proc.get_command();
+    println!("Yosys Command: {}", cmd);
+
+    // let and_ab = AndAB::<Search>::root("rec_and");
+    // let and_ab_search_result: Vec<AndAB<Match>> =
+    //     AndAB::<Search>::query(&driver, and_ab.path());
+    // assert_eq!(
+    //     and_ab_search_result.len(),
+    //     6,
+    //     "Expected 6 matches for AndAB, got {}",
+    //     and_ab_search_result.len()
+    // );
+
 }

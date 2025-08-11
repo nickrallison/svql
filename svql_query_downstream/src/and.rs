@@ -117,8 +117,6 @@ mod tests {
             "many_ands".to_string(),
         ).expect("Failed to create YosysProc");
 
-        
-
         let driver = yosys_process.driver();
 
         let and_ab = AndAB::<Search>::root("rec_and");

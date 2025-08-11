@@ -1,3 +1,4 @@
+use core::arch;
 use std::{path::{Path, PathBuf}, process::Child};
 use driver::Driver;
 
@@ -10,12 +11,13 @@ pub struct YosysProc {
 
     // ###
     yosys: PathBuf,
-    design: PathBuf,
     svql_driver: PathBuf,
+    design: PathBuf,
+    module_name: String,
 }
 
 impl YosysProc {
-    pub fn new(design: PathBuf, module_name: String) -> Result<Self, String> {
+    pub fn new_nonblocking(design: PathBuf, module_name: String) -> Result<Self, String> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = workspace.join("yosys/yosys");
         let svql_driver = workspace.join("build/svql_driver/libsvql_driver.so");
@@ -25,7 +27,51 @@ impl YosysProc {
             workspace.join(design)
         };
     
+        Self::new_yosys_nonblocking(yosys, svql_driver, design, module_name)
+    }
+
+    pub fn new(design: PathBuf, module_name: String) -> Result<Self, String> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let yosys = workspace.join("yosys/yosys");
+        let svql_driver = workspace.join("build/svql_driver/libsvql_driver.so");
+        let design = if design.is_absolute() {
+            design
+        } else {
+            workspace.join(design)
+        };
+
         Self::new_yosys(yosys, svql_driver, design, module_name)
+    }
+
+    pub fn new_yosys_nonblocking(yosys: PathBuf, svql_driver: PathBuf, design: PathBuf, module_name: String) -> Result<Self, String> {
+
+        if !yosys.exists() {
+            return Err(format!("Yosys binary not found at: {}", yosys.display()));
+        }
+        if !svql_driver.exists() {
+            return Err(format!("SVQL driver not found at: {}", svql_driver.display()));
+        }
+        if !design.exists() {
+            return Err(format!("Design file not found at: {}", design.display()));
+        }
+
+        let openport = openport::pick_unused_port(15000..25000).expect("Failed to find open port");
+
+        let mut cmd = std::process::Command::new(&yosys);
+        cmd.args(get_command_args_slice(&svql_driver, &design, &module_name, openport));
+
+        let yosys_process = cmd.spawn().expect("Failed to start yosys process");
+
+        let yosys_proc = YosysProc {
+            child: yosys_process,
+            port: openport,
+
+            yosys,
+            svql_driver,
+            design,
+            module_name,
+        };
+        Ok(yosys_proc)
     }
 
     pub fn new_yosys(yosys: PathBuf, svql_driver: PathBuf, design: PathBuf, module_name: String) -> Result<Self, String> {
@@ -42,20 +88,10 @@ impl YosysProc {
 
         let openport = openport::pick_unused_port(15000..25000).expect("Failed to find open port");
 
-        let mut yosys_process = std::process::Command::new("yosys")
-            .arg("-p")
-            .arg(format!("\"read_verilog {}\"", design.display()))
-            .arg("-p")
-            .arg(format!("\"hierarchy -top {}\"", module_name))
-            .arg("-p")
-            .arg("proc")
-            .arg("-p")
-            .arg(format!("\"svql_driver -net -port {}\"", openport))
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .expect("Failed to start yosys process");
+        let mut cmd = std::process::Command::new(&yosys);
+        cmd.args(get_command_args_slice(&svql_driver, &design, &module_name, openport));
+
+        let mut yosys_process = cmd.spawn().expect("Failed to start yosys process");
 
         // Wait for yosys to be ready
         let ready_marker = "SVQL DRIVER server listening on port";
@@ -68,16 +104,49 @@ impl YosysProc {
             port: openport,
 
             yosys,
-            design,
             svql_driver,
+            design,
+            module_name,
         };
         Ok(yosys_proc)
     }
+            
 
     pub fn driver(&self) -> Driver {
         let net_driver = Driver::new_net(format!("localhost:{}", self.port));
         net_driver
     }
+
+    pub fn get_command(&self) -> String {
+        get_command(&self.yosys, &self.svql_driver, &self.design, &self.module_name, self.port)
+    }
+}
+
+fn get_command_args_slice(svql_driver: &Path, design: &Path, module_name: &str, port: u16) -> Vec<String> {
+    vec![
+        "-m".to_string(),
+        format!("{}", svql_driver.display()),
+        "-p".to_string(),
+        format!("read_verilog {}", design.display()),
+        "-p".to_string(),
+        format!("hierarchy -top {}", module_name),
+        "-p".to_string(),
+        "proc".to_string(),
+        "-p".to_string(),
+        format!("svql_driver -net -port {}", port),
+    ]
+}
+
+fn get_command(yosys: &Path, svql_driver: &Path, design: &Path, module_name: &str, port: u16) -> String {
+    let args = get_command_args_slice(svql_driver, design, module_name, port);
+    let args = args.into_iter().map(|s| 
+        match s.contains(" ") {
+            true => format!("\"{}\"", s),
+            false => s,
+        }
+    ).collect::<Vec<_>>();
+    let args = args.join(" ");
+    format!("{} {}", yosys.display(), args)
 }
 
 fn wait_until_ready(
