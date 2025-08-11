@@ -1,6 +1,8 @@
+use std::path::PathBuf;
+
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use crate::{QueryMatch, Search, State, WithPath};
-use svql_driver_handler::driver::Driver;
+use svql_driver_handler::Driver;
 use crate::instance::Instance;
 
 pub trait Netlist<S>: WithPath<S> where S: State {
@@ -13,7 +15,16 @@ pub trait Netlist<S>: WithPath<S> where S: State {
     // --- Shared Functionality ---
     fn config() -> SvqlRuntimeConfig {
         let mut cfg = SvqlRuntimeConfig::default();
-        cfg.pat_filename    = Self::FILE_PATH.into();
+
+        let workspace_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        
+        let pat_filename = PathBuf::from(Self::FILE_PATH);
+
+        cfg.pat_filename = match pat_filename.is_absolute() {
+            true => pat_filename.display().to_string(),
+            false => workspace_path.join(pat_filename).display().to_string(),
+        };
+
         cfg.pat_module_name = Self::MODULE_NAME.into();
         cfg.verbose         = true;
         cfg

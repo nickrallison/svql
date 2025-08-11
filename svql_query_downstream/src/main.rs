@@ -1,7 +1,9 @@
-use svql_driver_handler::YosysProc;
+
+use std::path::{Path, PathBuf};
+
 use svql_query::composite::SearchableComposite;
-use svql_driver_handler::driver::mock::and_three::MockDriverThreeAnd;
-use svql_driver_handler::driver::Driver;
+use svql_driver_handler::mock::and_three::MockDriverThreeAnd;
+use svql_driver_handler::Driver;
 use svql_query::queries::basic::and::RecursiveAnd;
 use svql_query::{Match, Search, WithPath};
 
@@ -16,18 +18,10 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    // let yosys_proc: YosysProc = YosysProc::new_nonblocking("examples/patterns/basic/and/many_ands_2.v".into(), "many_ands".into()).unwrap();
-    let yosys_proc: YosysProc = YosysProc::new("examples/patterns/basic/and/many_ands_2.v".into(), "many_ands".into()).unwrap();
+    let design = PathBuf::from("examples/patterns/basic/and/many_ands_2.v");
+    let module_name = "many_ands".to_string();
 
-
-
-    let driver = yosys_proc.driver();
-
-    let cmd = yosys_proc.get_command();
-
-    let _ = yosys_proc.kill();
-
-    println!("Yosys Command: {}", cmd);
+    let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
     let and_ab = AndAB::<Search>::root("rec_and");
     let and_ab_search_result: Vec<AndAB<Match>> =

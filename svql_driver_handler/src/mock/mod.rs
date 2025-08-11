@@ -1,15 +1,17 @@
-use crate::driver::mock::and_three::MockDriverThreeAnd;
-use crate::driver::mock::or_three::MockDriverThreeOr;
-use crate::driver::net::SvqlDriverNetError;
-use crate::driver::DriverIterator;
 use std::collections::HashMap;
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::id_string::IdString;
 use svql_common::matches::{SanitizedCellData, SanitizedQueryMatch};
 
+use crate::mock::and_three::MockDriverThreeAnd;
+use crate::mock::or_three::MockDriverThreeOr;
+use crate::net::SvqlDriverNetError;
+use crate::DriverIterator;
+
 pub mod and_three;
 pub mod or_three;
 
+#[derive(Debug, Clone)]
 pub enum MockDriver {
     ThreeAnd(MockDriverThreeAnd),
     ThreeOr(MockDriverThreeOr),

@@ -1,16 +1,17 @@
-use crate::driver::mock::MockDriver;
-use crate::driver::net::SvqlDriverNetError;
-use crate::driver::DriverIterator;
+use crate::mock::MockDriver;
+use crate::net::SvqlDriverNetError;
+use crate::DriverIterator;
 use std::collections::HashMap;
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use svql_common::id_string::IdString;
 use svql_common::matches::{SanitizedCellData, SanitizedQueryMatch};
 
-pub struct MockDriverThreeOr;
+#[derive(Debug, Clone)]
+pub struct MockDriverThreeAnd;
 
-impl MockDriverThreeOr {
+impl MockDriverThreeAnd {
     pub fn new() -> Self {
-        MockDriverThreeOr
+        MockDriverThreeAnd
     }
 
     pub fn query(&self, _cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
@@ -27,8 +28,9 @@ impl MockDriverThreeOr {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "or".to_string(),
-                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
+                            gate_name: "and".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                .to_string(),
                             line: "16".to_string(),
                             id: "3_Y".to_string(),
                         },
@@ -36,8 +38,9 @@ impl MockDriverThreeOr {
                     map.insert(
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
-                            gate_name: "or".to_string(),
-                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
+                            gate_name: "and".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                .to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -49,8 +52,8 @@ impl MockDriverThreeOr {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -58,8 +61,8 @@ impl MockDriverThreeOr {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "3".to_string(),
@@ -77,8 +80,9 @@ impl MockDriverThreeOr {
                     map.insert(
                         IdString::Named("a".to_string()),
                         IdString::Unnamed {
-                            gate_name: "or".to_string(),
-                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
+                            gate_name: "and".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                .to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -90,8 +94,9 @@ impl MockDriverThreeOr {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "or".to_string(),
-                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
+                            gate_name: "and".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                .to_string(),
                             line: "16".to_string(),
                             id: "2_Y".to_string(),
                         },
@@ -103,8 +108,8 @@ impl MockDriverThreeOr {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -112,8 +117,8 @@ impl MockDriverThreeOr {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "2".to_string(),
@@ -131,8 +136,9 @@ impl MockDriverThreeOr {
                     map.insert(
                         IdString::Named("y".to_string()),
                         IdString::Unnamed {
-                            gate_name: "or".to_string(),
-                            file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
+                            gate_name: "and".to_string(),
+                            file_path: "examples/patterns/basic/and/verilog/many_ands.v"
+                                .to_string(),
                             line: "16".to_string(),
                             id: "1_Y".to_string(),
                         },
@@ -152,8 +158,8 @@ impl MockDriverThreeOr {
                     map.insert(
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
                                 id: "41".to_string(),
                             },
@@ -161,8 +167,8 @@ impl MockDriverThreeOr {
                         },
                         SanitizedCellData {
                             cell_name: IdString::Unnamed {
-                                gate_name: "or".to_string(),
-                                file_path: "examples/patterns/basic/or/verilog/many_ors.v"
+                                gate_name: "and".to_string(),
+                                file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),
                                 line: "16".to_string(),
                                 id: "1".to_string(),
@@ -179,8 +185,8 @@ impl MockDriverThreeOr {
     }
 }
 
-impl From<MockDriverThreeOr> for MockDriver {
-    fn from(driver: MockDriverThreeOr) -> Self {
-        MockDriver::ThreeOr(driver)
+impl From<MockDriverThreeAnd> for MockDriver {
+    fn from(driver: MockDriverThreeAnd) -> Self {
+        MockDriver::ThreeAnd(driver)
     }
 }

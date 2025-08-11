@@ -3,7 +3,7 @@
 // ########################
 
 use crate::composite::{Composite, MatchedComposite, SearchableComposite};
-use svql_driver_handler::driver::Driver;
+use svql_driver_handler::Driver;
 use crate::instance::Instance;
 use crate::netlist::SearchableNetlist;
 use crate::queries::basic::and::And;
@@ -277,7 +277,7 @@ impl MatchedComposite for OtherTripleAnd<Match> {
 
 #[cfg(test)]
 mod tests {
-    use svql_driver_handler::driver::mock::and_three::MockDriverThreeAnd;
+    use svql_driver_handler::mock::and_three::MockDriverThreeAnd;
 
     use super::*;
 

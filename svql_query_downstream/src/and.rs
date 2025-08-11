@@ -1,5 +1,5 @@
 use svql_common::id_string::IdString;
-use svql_driver_handler::driver::Driver;
+use svql_driver_handler::Driver;
 use svql_query::{
     composite::{Composite, MatchedComposite, SearchableComposite},
     impl_find_port,
@@ -107,17 +107,16 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use svql_driver_handler::YosysProc;
     use svql_query::Search;
     
     #[test]
     fn test_and_ab() {
-        let yosys_process: YosysProc = YosysProc::new(
-            PathBuf::from("examples/patterns/basic/and/many_ands_2.v"),
-            "many_ands".to_string(),
-        ).expect("Failed to create YosysProc");
+        
 
-        let driver = yosys_process.driver();
+        let design = PathBuf::from("examples/patterns/basic/and/many_ands_2.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let and_ab = AndAB::<Search>::root("rec_and");
         let and_ab_search_result: Vec<AndAB<Match>> =
