@@ -66,26 +66,36 @@ impl SearchableNetlist for Not<Search> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    use svql_driver_handler::Driver;
+
+    use crate::Search;
+
     // ###############
     // Netlist Tests
     // ###############
     #[test]
     fn test_not_netlist() {
-        panic!("Not netlist tests are not implemented yet");
 
-        // let driver = Driver::new_mock();
+        let design = PathBuf::from("examples/patterns/basic/not/many_nots.v");
+        let module_name = "many_nots".to_string();
 
-        // let not = Not::<Search>::root("not".to_string());
-        // assert_eq!(not.path().inst_path(), "not");
-        // assert_eq!(not.a.path.inst_path(), "not.a");
-        // assert_eq!(not.y.path.inst_path(), "not.y");
-        //
-        // let not_search_result = Or::<Search>::query(&driver, not.path());
-        // assert_eq!(
-        //     not_search_result.len(),
-        //     3,
-        //     "Expected 3 matches for Not, got {}",
-        //     not_search_result.len()
-        // );
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+
+        let not = Not::<Search>::root("not".to_string());
+        assert_eq!(not.path().inst_path(), "not");
+        assert_eq!(not.a.path.inst_path(), "not.a");
+        assert_eq!(not.y.path.inst_path(), "not.y");
+
+        let not_search_result = Not::<Search>::query(&driver, not.path());
+        assert_eq!(
+            not_search_result.len(),
+            2,
+            "Expected 2 matches for Not, got {}",
+            not_search_result.len()
+        );
     }
 }

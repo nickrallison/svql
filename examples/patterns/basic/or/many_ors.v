@@ -1,5 +1,5 @@
 
-module many_ands
+module many_ors
 (
 input a,
 input b,

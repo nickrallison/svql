@@ -2,9 +2,7 @@
 use std::path::{Path, PathBuf};
 
 use svql_query::composite::SearchableComposite;
-use svql_driver_handler::mock::and_three::MockDriverThreeAnd;
 use svql_driver_handler::Driver;
-use svql_query::queries::basic::and::RecursiveAnd;
 use svql_query::{Match, Search, WithPath};
 
 use crate::and::AndAB;
@@ -28,8 +26,8 @@ fn main() {
         AndAB::<Search>::query(&driver, and_ab.path());
     assert_eq!(
         and_ab_search_result.len(),
-        6,
-        "Expected 6 matches for AndAB, got {}",
+        1,
+        "Expected 1 match for AndAB, got {}",
         and_ab_search_result.len()
     );
 

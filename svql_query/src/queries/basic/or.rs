@@ -515,8 +515,7 @@ impl MatchedComposite for RecursiveOr<Match> {
 
 #[cfg(test)]
 mod tests {
-    use svql_driver_handler::mock::or_three::MockDriverThreeOr;
-
+    use std::path::PathBuf;
     use super::*;
     
 
@@ -525,8 +524,10 @@ mod tests {
     // ###############
     #[test]
     fn test_or_netlist() {
-        let or_mock = MockDriverThreeOr::new();
-        let driver = Driver::new_mock(or_mock.into());
+        let design = PathBuf::from("examples/patterns/basic/or/many_ors.v");
+        let module_name = "many_ors".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let or = Or::<Search>::root("or".to_string());
         assert_eq!(or.path().inst_path(), "or");
@@ -549,8 +550,10 @@ mod tests {
 
     #[test]
     fn test_recursive_or_composite() {
-        let or_mock = MockDriverThreeOr::new();
-        let driver = Driver::new_mock(or_mock.into());
+        let design = PathBuf::from("examples/patterns/basic/or/many_ors.v");
+        let module_name = "many_ors".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let rec_or = RecursiveOr::<Search>::root("rec_or");
         assert_eq!(rec_or.path().inst_path(), "rec_or");

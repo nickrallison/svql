@@ -123,8 +123,8 @@ mod tests {
             AndAB::<Search>::query(&driver, and_ab.path());
         assert_eq!(
             and_ab_search_result.len(),
-            6,
-            "Expected 6 matches for AndAB, got {}",
+            1,
+            "Expected 1 match for AndAB, got {}",
             and_ab_search_result.len()
         );
     }

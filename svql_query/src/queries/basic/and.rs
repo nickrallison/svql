@@ -516,8 +516,7 @@ impl MatchedComposite for RecursiveAnd<Match> {
 #[cfg(test)]
 mod tests {
 
-    use svql_driver_handler::mock::and_three::MockDriverThreeAnd;
-
+    use std::path::PathBuf;
     use super::*;
 
     // ###############
@@ -525,8 +524,10 @@ mod tests {
     // ###############
     #[test]
     fn test_and_netlist() {
-        let and_mock = MockDriverThreeAnd::new();
-        let driver = Driver::new_mock(and_mock.into());
+        let design = PathBuf::from("examples/patterns/basic/and/many_ands.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let and = And::<Search>::root("and".to_string());
         assert_eq!(and.path().inst_path(), "and");
@@ -537,8 +538,8 @@ mod tests {
         let and_search_result = And::<Search>::query(&driver, and.path());
         assert_eq!(
             and_search_result.len(),
-            3,
-            "Expected 3 matches for And, got {}",
+            4,
+            "Expected 4 matches for And, got {}",
             and_search_result.len()
         );
     }
@@ -549,8 +550,10 @@ mod tests {
 
     #[test]
     fn test_recursive_and_composite() {
-        let and_mock = MockDriverThreeAnd::new();
-        let driver = Driver::new_mock(and_mock.into());
+        let design = PathBuf::from("examples/patterns/basic/and/many_ands.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let rec_and = RecursiveAnd::<Search>::root("rec_and");
         assert_eq!(rec_and.path().inst_path(), "rec_and");
@@ -564,8 +567,8 @@ mod tests {
         let rec_and_search_result = RecursiveAnd::<Search>::query(&driver, rec_and.path());
         assert_eq!(
             rec_and_search_result.len(),
-            6,
-            "Expected 6 matches for RecursiveAnd, got {}",
+            10,
+            "Expected 10 matches for RecursiveAnd, got {}",
             rec_and_search_result.len()
         );
     }
