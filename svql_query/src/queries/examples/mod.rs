@@ -286,8 +286,10 @@ mod tests {
     // ###############
     #[test]
     fn test_double_and_composite() {
-        let and_mock = MockDriverThreeAnd::new();
-        let driver = Driver::new_mock(and_mock.into());
+        let design = std::path::PathBuf::from("examples/patterns/basic/and/many_ands.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
         let double_and = DoubleAnd::<Search>::root("double_and".to_string());
         assert_eq!(double_and.path().inst_path(), "double_and");
@@ -297,16 +299,19 @@ mod tests {
         let double_and_search_result = DoubleAnd::<Search>::query(&driver, double_and.path());
         assert_eq!(
             double_and_search_result.len(),
-            2,
-            "Expected 2 matches for DoubleAnd, got {}",
+            3,
+            "Expected 3 matches for DoubleAnd, got {}",
             double_and_search_result.len()
         );
     }
 
     #[test]
     fn test_triple_and_composite() {
-        let and_mock = MockDriverThreeAnd::new();
-        let driver = Driver::new_mock(and_mock.into());
+        let design = std::path::PathBuf::from("examples/patterns/basic/and/many_ands.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
         let triple_and = TripleAnd::<Search>::root("triple_and");
         assert_eq!(triple_and.path().inst_path(), "triple_and");
         assert_eq!(
@@ -317,16 +322,18 @@ mod tests {
         let triple_and_search_result = TripleAnd::<Search>::query(&driver, triple_and.path());
         assert_eq!(
             triple_and_search_result.len(),
-            1,
-            "Expected 1 match for TripleAnd, got {}",
+            2,
+            "Expected 2 matches for TripleAnd, got {}",
             triple_and_search_result.len()
         );
     }
 
     #[test]
     fn test_other_triple_and_composite() {
-        let and_mock = MockDriverThreeAnd::new();
-        let driver = Driver::new_mock(and_mock.into());
+        let design = std::path::PathBuf::from("examples/patterns/basic/and/many_ands.v");
+        let module_name = "many_ands".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
         let other_triple_and = OtherTripleAnd::<Search>::root("other_triple_and");
         assert_eq!(other_triple_and.path().inst_path(), "other_triple_and");
         assert_eq!(
@@ -345,8 +352,8 @@ mod tests {
             OtherTripleAnd::<Search>::query(&driver, other_triple_and.path());
         assert_eq!(
             other_triple_and_search_result.len(),
-            1,
-            "Expected 1 match for OtherTripleAnd, got {}",
+            2,
+            "Expected 2 matches for OtherTripleAnd, got {}",
             other_triple_and_search_result.len()
         );
     }
