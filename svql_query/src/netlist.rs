@@ -1,6 +1,6 @@
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use crate::{QueryMatch, Search, State, WithPath};
-use crate::driver::Driver;
+use svql_driver_handler::driver::Driver;
 use crate::instance::Instance;
 
 pub trait Netlist<S>: WithPath<S> where S: State {

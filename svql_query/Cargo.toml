@@ -8,6 +8,7 @@ edition = "2024"
 [dependencies]
 
 svql_common.workspace = true
+svql_driver_handler.workspace = true
 # svql_query_proc_macro.workspace = true
 
 # ---------------------

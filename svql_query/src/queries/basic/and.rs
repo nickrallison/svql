@@ -3,7 +3,7 @@
 // ########################
 
 use crate::composite::{Composite, MatchedComposite, SearchableComposite};
-use crate::driver::Driver;
+use svql_driver_handler::driver::Driver;
 use crate::instance::Instance;
 use crate::netlist::{Netlist, SearchableNetlist};
 use crate::{lookup, Connection, Match, QueryMatch, Search, State, Wire, WithPath};
@@ -515,8 +515,10 @@ impl MatchedComposite for RecursiveAnd<Match> {
 
 #[cfg(test)]
 mod tests {
+
+    use svql_driver_handler::driver::mock::and_three::MockDriverThreeAnd;
+
     use super::*;
-    use crate::driver::mock::and_three::MockDriverThreeAnd;
 
     // ###############
     // Netlist Tests

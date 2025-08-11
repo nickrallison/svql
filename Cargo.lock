@@ -454,6 +454,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "svql_driver_handler"
+version = "0.1.0"
+dependencies = [
+ "openport",
+ "svql_common",
+ "thiserror",
+]
+
+[[package]]
 name = "svql_pat"
 version = "0.1.0"
 dependencies = [
@@ -475,6 +484,7 @@ dependencies = [
  "serde",
  "serde_json",
  "svql_common",
+ "svql_driver_handler",
  "thiserror",
 ]
 
@@ -487,6 +497,7 @@ dependencies = [
  "openport",
  "regex",
  "svql_common",
+ "svql_driver_handler",
  "svql_query",
 ]
 

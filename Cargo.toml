@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "svql_common",
+    "svql_common", 
+    "svql_driver_handler",
     "svql_pat",
     "svql_query",
     "svql_query_downstream",
@@ -9,6 +10,7 @@ resolver = "3"
 
 [workspace.dependencies]
 svql_common = { path = "svql_common" }
+svql_driver_handler = { path = "svql_driver_handler" }
 svql_pat = { path = "svql_pat" }
 svql_query = { path = "svql_query" }
 svql_query_downstream = { path = "svql_query_downstream" }

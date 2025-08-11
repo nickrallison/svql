@@ -1,0 +1,10 @@
+[package]
+name = "svql_driver_handler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+svql_common.workspace = true
+
+openport.workspace = true
+thiserror.workspace = true

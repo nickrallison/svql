@@ -3,7 +3,6 @@ use std::{collections::HashMap, hash::Hash};
 use svql_common::id_string::IdString;
 
 pub mod composite;
-pub mod driver;
 pub mod instance;
 pub mod netlist;
 pub mod queries;

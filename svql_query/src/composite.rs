@@ -1,5 +1,5 @@
 use crate::{Connection, Match, Search, State, WithPath};
-use crate::driver::Driver;
+use svql_driver_handler::driver::Driver;
 use crate::instance::Instance;
 
 pub trait Composite<S>: WithPath<S> where S: State {

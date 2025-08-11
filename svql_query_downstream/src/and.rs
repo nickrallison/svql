@@ -1,7 +1,7 @@
 use svql_common::id_string::IdString;
+use svql_driver_handler::driver::Driver;
 use svql_query::{
     composite::{Composite, MatchedComposite, SearchableComposite},
-    driver::Driver,
     impl_find_port,
     instance::Instance,
     netlist::SearchableNetlist,
@@ -104,37 +104,22 @@ impl MatchedComposite for AndAB<Match> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use svql_query::driver::Driver;
+    use svql_driver_handler::YosysProc;
     use svql_query::Search;
     
     #[test]
     fn test_and_ab() {
-
-        // read_verilog examples/patterns/basic/and/many_ands_2.v
-        // hierarchy -top many_ands
-        // proc
-        // # svql_driver -cmd -pat svql_query/verilog/and.v and_gate -verbose
-        // svql_driver -net -port 9999
-
-        // get random port 
-        let openport = openport::pick_unused_port(15000..25000).expect("Failed to find open port");
-
-        let mut yosys_process = std::process::Command::new("yosys")
-            .arg("-p")
-            .arg("read_verilog examples/patterns/basic/and/many_ands_2.v")
-            .arg("-p")
-            .arg("hierarchy -top many_ands")
-            .arg("-p")
-            .arg("proc")
-            .arg("-p")
-            .arg(format!("svql_driver -net -port {}", openport))
-            .spawn()
-            .expect("Failed to start yosys process");
+        let yosys_process: YosysProc = YosysProc::new(
+            PathBuf::from("examples/patterns/basic/and/many_ands_2.v"),
+            "many_ands".to_string(),
+        ).expect("Failed to create YosysProc");
 
         
 
-        let driver = Driver::new_net(format!("localhost:{}", openport));
+        let driver = yosys_process.driver();
 
         let and_ab = AndAB::<Search>::root("rec_and");
         let and_ab_search_result: Vec<AndAB<Match>> =
@@ -145,12 +130,5 @@ mod tests {
             "Expected 6 matches for AndAB, got {}",
             and_ab_search_result.len()
         );
-
-        // kill yosys process
-        if let Err(e) = yosys_process.kill() {
-            eprintln!("Failed to kill yosys process: {}", e);
-        } else {
-            println!("Yosys process killed successfully");  
-        }
     }
 }
