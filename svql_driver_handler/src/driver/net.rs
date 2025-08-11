@@ -12,6 +12,7 @@ use thiserror::Error;
 
 use super::DriverIterator;
 
+#[derive(Debug, Clone)]
 pub struct NetDriver {
     addr: String,
 }

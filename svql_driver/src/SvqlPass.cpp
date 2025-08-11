@@ -222,13 +222,14 @@ void SvqlPass::execute_net(std::vector<std::string> args,
     std::string error_msg;
     size_t argsidx;
     auto port_opt = parse_args_net(argsidx, args, error_msg);
-    uint16_t port = port_opt.value_or(8080);
+    uint16_t port = port_opt.value_or(9999);
 
     using boost::asio::ip::tcp;
     try {
         boost::asio::io_context io;
         tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), port));
-        log("SVQL DRIVER server listening on port %d.\n", port);
+        std::cout << "SVQL DRIVER server - TCP acceptor created - port " << port << std::endl;
+        log("listening on port %d.\n\n", port);
 
         while (true) {
             tcp::socket socket(io);

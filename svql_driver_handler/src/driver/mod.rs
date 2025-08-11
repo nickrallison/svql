@@ -34,6 +34,7 @@ impl DriverIterator {
     }
 }
 
+#[derive(Debug)]
 pub enum Driver {
     Net(NetDriver),
     Mock(MockDriver),
