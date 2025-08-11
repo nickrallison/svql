@@ -1,33 +1,33 @@
-# Async Locked Regs
-
-read_verilog examples/patterns/access_control/locked_register/verilog/locked_register_async.v
-hierarchy -top locked_register_async
-
+# adff_mux
+read_verilog examples/patterns/access_control/locked_register/verilog/adff_mux.v
+hierarchy -top adff_mux
 proc
 clean
-
 write_rtlil examples/patterns/access_control/locked_register/rtlil/adff_mux.il
 show -format dot -prefix adff_mux
 
+# adffe
+read_verilog examples/patterns/access_control/locked_register/verilog/adffe.v
+hierarchy -top adffe
+proc
 opt
 clean
-
 write_rtlil examples/patterns/access_control/locked_register/rtlil/adffe.il
 show -format dot -prefix adffe
 
-# Sync Locked Regs
-
-read_verilog examples/patterns/access_control/locked_register/verilog/locked_register_sync.v
-hierarchy -top locked_register_sync
-
+# dff_mux
+read_verilog examples/patterns/access_control/locked_register/verilog/adff_mux.v
+hierarchy -top dff_mux
 proc
 clean
-
 write_rtlil examples/patterns/access_control/locked_register/rtlil/dff_mux.il
 show -format dot -prefix dff_mux
 
+# dffe
+read_verilog examples/patterns/access_control/locked_register/verilog/dffe.v
+hierarchy -top dffe
+proc
 opt
 clean
-
 write_rtlil examples/patterns/access_control/locked_register/rtlil/dffe.il
 show -format dot -prefix dffe

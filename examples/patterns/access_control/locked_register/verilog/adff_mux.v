@@ -1,4 +1,4 @@
-module locked_register_async
+module adff_mux
 (
 input [15:0] data_in,
 input clk,
