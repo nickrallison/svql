@@ -119,7 +119,7 @@ where
     S: State,
 {
     const MODULE_NAME: &'static str = "and_gate";
-    const FILE_PATH: &'static str = "./examples/patterns/basic/and/verilog/and.v";
+    const FILE_PATH: &'static str = "./examples/patterns/basic/and/and.v";
     const YOSYS: &'static str = "./yosys/yosys";
     const SVQL_DRIVER_PLUGIN: &'static str = "./build/svql_driver/libsvql_driver.so";
 }

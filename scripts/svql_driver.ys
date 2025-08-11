@@ -1,4 +1,4 @@
-read_verilog svql_query/verilog/many_ands.v
+read_verilog examples/patterns/basic/and/many_ands_2.v
 hierarchy -top many_ands
 proc
 # svql_driver -cmd -pat svql_query/verilog/and.v and_gate -verbose

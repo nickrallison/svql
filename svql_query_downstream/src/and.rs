@@ -16,8 +16,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
-    static ref A_RE: Regex = Regex::new(r"^\\a$").unwrap();
-    static ref B_RE: Regex = Regex::new(r"^\\b$").unwrap();
+    static ref A_RE: Regex = Regex::new(r"^a$").unwrap();
+    static ref B_RE: Regex = Regex::new(r"^b$").unwrap();
 }
 
 
@@ -81,7 +81,9 @@ impl MatchedComposite for AndAB<Match> {
         let a_lambda = |s: &Self| {
             if let Some(port) = s.find_port(&s.and.a.path) {
                 if let Some(Match { id: IdString::Named(name) }) = &port.val {
-                    return A_RE.is_match(&name);
+                    let a_is_match = A_RE.is_match(&name);
+                    let b_is_match = B_RE.is_match(&name);
+                    return a_is_match || b_is_match;
                 }
             }
             false
@@ -89,7 +91,9 @@ impl MatchedComposite for AndAB<Match> {
         let b_lambda = |s: &Self| {
             if let Some(port) = s.find_port(&s.and.b.path) {
                 if let Some(Match { id: IdString::Named(name) }) = &port.val {
-                    return B_RE.is_match(&name);
+                    let a_is_match = A_RE.is_match(&name);
+                    let b_is_match = B_RE.is_match(&name);
+                    return a_is_match || b_is_match;
                 }
             }
             false
