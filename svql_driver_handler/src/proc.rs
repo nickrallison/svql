@@ -73,7 +73,8 @@ impl ProcDriver {
             return Err(format!("Design file not found at: {}", design.path().display()));
         }
 
-        let openport = openport::pick_unused_port(15000..25000).expect("Failed to find open port");
+        let openport = openport::pick_random_unused_port()
+            .expect("Failed to find an open port");
 
         let mut cmd = std::process::Command::new(&yosys);
         cmd.args(get_command_args_slice(&svql_driver, &design, &module_name, openport));
