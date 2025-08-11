@@ -50,9 +50,6 @@ impl SearchableNetlist for Not<Search> {
         let a = Match {
             id: lookup(&m.port_map, "a").cloned().unwrap(),
         };
-        let b = Match {
-            id: lookup(&m.port_map, "b").cloned().unwrap(),
-        };
         let y = Match {
             id: lookup(&m.port_map, "y").cloned().unwrap(),
         };
