@@ -7,8 +7,10 @@ use thiserror::Error;
 
 lazy_static! {
     static ref NAMED_IDSTRING_RE: Regex = Regex::new(r"^\\(\S*)$").unwrap();
-    static ref UNNAMED_IDSTRING_RE: Regex =
+    static ref UNNAMED_LOCATION_IDSTRING_RE: Regex =
         Regex::new(r"^\$([^\$]*)\$([^:]*):([^\$]*)\$(.*)$").unwrap();
+    static ref UNNAMED_NO_LOCATION_IDSTRING_RE: Regex =
+        Regex::new(r"^\$([^\$]*)\$(.*)$").unwrap();
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -18,10 +20,15 @@ pub enum IdString {
     // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y
     // $and$examples/patterns/basic/and/verilog/and.v:9$11
     // $and$examples/patterns/basic/and/verilog/many_ands.v:14$2
-    Unnamed {
+    UnnamedLocation {
         gate_name: String,
         file_path: String,
         line: String,
+        id: String,
+    },
+    // $procdff$22 - usually from opt as far as I can tell
+    UnnamedNoLocation {
+        gate_name: String,
         id: String,
     },
 }
@@ -30,14 +37,17 @@ impl Display for IdString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IdString::Named(name) => write!(f, "\\{name}"),
-            IdString::Unnamed {
+            IdString::UnnamedLocation {
                 gate_name,
                 file_path,
                 line,
                 id,
             } => {
                 write!(f, "${gate_name}${file_path}:{line}${id}")
-            }
+            },
+            IdString::UnnamedNoLocation { gate_name, id } => {
+                write!(f, "${gate_name}${id}")
+            },
         }
     }
 }
@@ -54,12 +64,17 @@ impl TryFrom<&str> for IdString {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if let Some(caps) = NAMED_IDSTRING_RE.captures(value) {
             return Ok(IdString::Named(caps[1].to_string()));
-        } else if let Some(caps) = UNNAMED_IDSTRING_RE.captures(value) {
-            return Ok(IdString::Unnamed {
+        } else if let Some(caps) = UNNAMED_LOCATION_IDSTRING_RE.captures(value) {
+            return Ok(IdString::UnnamedLocation {
                 gate_name: caps[1].to_string(),
                 file_path: caps[2].to_string(),
                 line: caps[3].to_string(),
                 id: caps[4].to_string(),
+            });
+        } else if let Some(caps) = UNNAMED_NO_LOCATION_IDSTRING_RE.captures(value) {
+            return Ok(IdString::UnnamedNoLocation {
+                gate_name: caps[1].to_string(),
+                id: caps[2].to_string(),
             });
         }
         Err(IdStringError::InvalidFormat(value.to_string()))

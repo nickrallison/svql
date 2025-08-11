@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_sync_en_locked_reg_netlist() {
 
-        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/async_en.il");
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il");
         let module_name = "sync_en".to_string();
 
         let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");

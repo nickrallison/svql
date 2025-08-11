@@ -155,11 +155,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_unnamed_idstring() {
+    fn test_parse_unnamed_location_idstring() {
         let unnamed_id = "$and$examples/patterns/basic/and/verilog/many_ands.v:14$2_Y";
         let result = unnamed_id.try_into().unwrap();
         match result {
-            IdString::Unnamed {
+            IdString::UnnamedLocation {
                 gate_name,
                 file_path,
                 line,
@@ -170,16 +170,16 @@ mod tests {
                 assert_eq!(line, "14");
                 assert_eq!(id, "2_Y");
             }
-            _ => panic!("Expected Unnamed variant"),
+            _ => panic!("Expected UnnamedLocation variant"),
         }
     }
 
     #[test]
-    fn test_parse_unnamed_idstring_simple() {
+    fn test_parse_unnamed_location_idstring_simple() {
         let unnamed_id = "$and$examples/patterns/basic/and/verilog/and.v:9$11";
         let result = unnamed_id.try_into().unwrap();
         match result {
-            IdString::Unnamed {
+            IdString::UnnamedLocation {
                 gate_name,
                 file_path,
                 line,
@@ -190,7 +190,20 @@ mod tests {
                 assert_eq!(line, "9");
                 assert_eq!(id, "11");
             }
-            _ => panic!("Expected Unnamed variant"),
+            _ => panic!("Expected UnnamedLocation variant"),
+        }
+    }
+
+    #[test]
+    fn test_parse_unnamed_no_location_idstring() {
+        let unnamed_id = "$procdff$22";
+        let result = unnamed_id.try_into().unwrap();
+        match result {
+            IdString::UnnamedNoLocation { gate_name, id } => {
+                assert_eq!(gate_name, "procdff");
+                assert_eq!(id, "22");
+            }
+            _ => panic!("Expected UnnamedNoLocation variant"),
         }
     }
 

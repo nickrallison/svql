@@ -19,8 +19,6 @@ fn main() {
     let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/async_en.il");
     let module_name = "async_en".to_string();
 
-
-
     let proc_driver = ProcDriver::new(design, module_name).expect("Failed to create proc driver");
     let cmd = proc_driver.get_command();
     println!("Command: {}", cmd);
