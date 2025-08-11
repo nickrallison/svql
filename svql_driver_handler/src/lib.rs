@@ -44,13 +44,13 @@ impl YosysProc {
 
         let mut yosys_process = std::process::Command::new("yosys")
             .arg("-p")
-            .arg(format!("read_verilog {}", design.display()))
+            .arg(format!("\"read_verilog {}\"", design.display()))
             .arg("-p")
-            .arg(format!("hierarchy -top {}", module_name))
+            .arg(format!("\"hierarchy -top {}\"", module_name))
             .arg("-p")
             .arg("proc")
             .arg("-p")
-            .arg(format!("svql_driver -net -port {}", openport))
+            .arg(format!("\"svql_driver -net -port {}\"", openport))
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -107,6 +107,7 @@ fn wait_until_ready(
     let mut recent: std::collections::VecDeque<String> =
         std::collections::VecDeque::with_capacity(50);
 
+    let mut disconnected = false;
     while start.elapsed() < timeout {
         let remaining = timeout.saturating_sub(start.elapsed());
         match rx.recv_timeout(remaining) {
@@ -120,8 +121,15 @@ fn wait_until_ready(
                     break;
                 }
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                // Timeout waiting for a line, break and report error
+                break;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                // Channel closed, but keep waiting until timeout
+                disconnected = true;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
         }
     }
 
