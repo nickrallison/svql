@@ -1,8 +1,8 @@
 
 use std::path::{Path, PathBuf};
 
-use svql_query::composite::SearchableComposite;
-use svql_driver_handler::Driver;
+use svql_query::{composite::SearchableComposite, netlist::SearchableNetlist, queries::security::access_control::locked_reg::sync_en::SyncEnLockedReg};
+use svql_driver_handler::{proc::ProcDriver, Driver};
 use svql_query::{Match, Search, WithPath};
 
 use crate::and::AndAB;
@@ -16,19 +16,31 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let design = PathBuf::from("examples/patterns/basic/and/many_ands_2.v");
-    let module_name = "many_ands".to_string();
+    let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/async_en.il");
+    let module_name = "async_en".to_string();
 
-    let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
-    let and_ab = AndAB::<Search>::root("rec_and");
-    let and_ab_search_result: Vec<AndAB<Match>> =
-        AndAB::<Search>::query(&driver, and_ab.path());
+
+    let proc_driver = ProcDriver::new(design, module_name).expect("Failed to create proc driver");
+    let cmd = proc_driver.get_command();
+    println!("Command: {}", cmd);
+    let driver = Driver::from(proc_driver);
+
+
+    let sync_en = SyncEnLockedReg::<Search>::root("sync_en".to_string());
+    assert_eq!(sync_en.path().inst_path(), "sync_en");
+    assert_eq!(sync_en.data_in.path.inst_path(), "sync_en.data_in");
+    assert_eq!(sync_en.clk.path.inst_path(), "sync_en.clk");
+    assert_eq!(sync_en.resetn.path.inst_path(), "sync_en.resetn");
+    assert_eq!(sync_en.write_en.path.inst_path(), "sync_en.write_en");
+    assert_eq!(sync_en.data_out.path.inst_path(), "sync_en.data_out");
+
+    let sync_en_search_result = SyncEnLockedReg::<Search>::query(&driver, sync_en.path());
     assert_eq!(
-        and_ab_search_result.len(),
+        sync_en_search_result.len(),
         1,
-        "Expected 1 match for AndAB, got {}",
-        and_ab_search_result.len()
+        "Expected 1 match for SyncEnLockedReg, got {}",
+        sync_en_search_result.len()
     );
 
 }

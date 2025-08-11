@@ -2,7 +2,7 @@ use log::{error, trace};
 use svql_common::config::ffi::SvqlRuntimeConfig;
 use std::{path::{self, Path, PathBuf}, process::{Child, Stdio}};
 
-use crate::{net::{NetDriver, SvqlDriverNetError}, DriverIterator};
+use crate::{net::{NetDriver, SvqlDriverNetError}, Driver, DriverIterator};
 
 #[derive(Debug)]
 pub struct ProcDriver {
@@ -114,6 +114,12 @@ impl ProcDriver {
     pub fn query(&self, cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
         trace!("ProcDriver::query called with config: {:?}", cfg);
         self.driver.query(cfg)
+    }
+}
+
+impl From<ProcDriver> for Driver {
+    fn from(proc_driver: ProcDriver) -> Self {
+        Driver::Proc(proc_driver)
     }
 }
 

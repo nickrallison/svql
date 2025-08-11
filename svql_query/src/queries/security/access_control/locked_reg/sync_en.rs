@@ -45,8 +45,8 @@ impl<S> Netlist<S> for SyncEnLockedReg<S>
 where
     S: State,
 {
-    const MODULE_NAME: &'static str = "dffe";
-    const FILE_PATH: &'static str = "examples/patterns/access_control/locked_register/rtlil/dffe.il";
+    const MODULE_NAME: &'static str = "sync_en";
+    const FILE_PATH: &'static str = "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il";
     const YOSYS: &'static str = "./yosys/yosys";
     const SVQL_DRIVER_PLUGIN: &'static str = "./build/svql_driver/libsvql_driver.so";
 }
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_sync_en_locked_reg_netlist() {
 
-        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il");
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/async_en.il");
         let module_name = "sync_en".to_string();
 
         let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
