@@ -27,7 +27,7 @@ impl MockDriverThreeAnd {
                     );
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "and".to_string(),
                             file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                 .to_string(),
@@ -37,7 +37,7 @@ impl MockDriverThreeAnd {
                     );
                     map.insert(
                         IdString::Named("a".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "and".to_string(),
                             file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                 .to_string(),
@@ -51,7 +51,7 @@ impl MockDriverThreeAnd {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
@@ -60,7 +60,7 @@ impl MockDriverThreeAnd {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),
@@ -79,7 +79,7 @@ impl MockDriverThreeAnd {
                     let mut map = HashMap::new();
                     map.insert(
                         IdString::Named("a".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "and".to_string(),
                             file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                 .to_string(),
@@ -93,7 +93,7 @@ impl MockDriverThreeAnd {
                     );
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "and".to_string(),
                             file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                 .to_string(),
@@ -107,7 +107,7 @@ impl MockDriverThreeAnd {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
@@ -116,7 +116,7 @@ impl MockDriverThreeAnd {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),
@@ -135,7 +135,7 @@ impl MockDriverThreeAnd {
                     let mut map = HashMap::new();
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "and".to_string(),
                             file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                 .to_string(),
@@ -157,7 +157,7 @@ impl MockDriverThreeAnd {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/and.v".to_string(),
                                 line: "9".to_string(),
@@ -166,7 +166,7 @@ impl MockDriverThreeAnd {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "and".to_string(),
                                 file_path: "examples/patterns/basic/and/verilog/many_ands.v"
                                     .to_string(),

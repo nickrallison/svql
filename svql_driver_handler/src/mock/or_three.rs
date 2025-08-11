@@ -27,7 +27,7 @@ impl MockDriverThreeOr {
                     );
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "or".to_string(),
                             file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
@@ -36,7 +36,7 @@ impl MockDriverThreeOr {
                     );
                     map.insert(
                         IdString::Named("a".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "or".to_string(),
                             file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
@@ -49,7 +49,7 @@ impl MockDriverThreeOr {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
@@ -58,7 +58,7 @@ impl MockDriverThreeOr {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
@@ -77,7 +77,7 @@ impl MockDriverThreeOr {
                     let mut map = HashMap::new();
                     map.insert(
                         IdString::Named("a".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "or".to_string(),
                             file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
@@ -90,7 +90,7 @@ impl MockDriverThreeOr {
                     );
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "or".to_string(),
                             file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
@@ -103,7 +103,7 @@ impl MockDriverThreeOr {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
@@ -112,7 +112,7 @@ impl MockDriverThreeOr {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
@@ -131,7 +131,7 @@ impl MockDriverThreeOr {
                     let mut map = HashMap::new();
                     map.insert(
                         IdString::Named("y".to_string()),
-                        IdString::Unnamed {
+                        IdString::UnnamedLocation {
                             gate_name: "or".to_string(),
                             file_path: "examples/patterns/basic/or/verilog/many_ors.v".to_string(),
                             line: "16".to_string(),
@@ -152,7 +152,7 @@ impl MockDriverThreeOr {
                     let mut map = HashMap::new();
                     map.insert(
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/or.v".to_string(),
                                 line: "9".to_string(),
@@ -161,7 +161,7 @@ impl MockDriverThreeOr {
                             cell_index: 553,
                         },
                         SanitizedCellData {
-                            cell_name: IdString::Unnamed {
+                            cell_name: IdString::UnnamedLocation {
                                 gate_name: "or".to_string(),
                                 file_path: "examples/patterns/basic/or/verilog/many_ors.v"
                                     .to_string(),
