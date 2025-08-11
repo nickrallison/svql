@@ -507,6 +507,12 @@ impl SearchableComposite for RecursiveAnd<Search> {
     }
 }
 
+impl MatchedComposite for RecursiveAnd<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -76,12 +76,12 @@ impl SearchableComposite for AndAB<Search> {
     }
 }
 
-impl AndAB<Match> {
-    pub fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+impl MatchedComposite for AndAB<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
         let a_lambda = |s: &Self| {
             if let Some(port) = s.find_port(&s.and.a.path) {
                 if let Some(Match { id: IdString::Named(name) }) = &port.val {
-                    return A_RE.is_match(name);
+                    return A_RE.is_match(&name);
                 }
             }
             false
@@ -89,7 +89,7 @@ impl AndAB<Match> {
         let b_lambda = |s: &Self| {
             if let Some(port) = s.find_port(&s.and.b.path) {
                 if let Some(Match { id: IdString::Named(name) }) = &port.val {
-                    return B_RE.is_match(name);
+                    return B_RE.is_match(&name);
                 }
             }
             false

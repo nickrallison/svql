@@ -83,6 +83,12 @@ impl SearchableComposite for DoubleAnd<Search> {
     }
 }
 
+impl MatchedComposite for DoubleAnd<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripleAnd<S>
 where
@@ -155,6 +161,12 @@ impl SearchableComposite for TripleAnd<Search> {
             })
             .collect::<Vec<_>>();
         results
+    }
+}
+
+impl MatchedComposite for TripleAnd<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
     }
 }
 
@@ -255,6 +267,14 @@ impl SearchableComposite for OtherTripleAnd<Search> {
         results
     }
 }
+
+impl MatchedComposite for OtherTripleAnd<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
