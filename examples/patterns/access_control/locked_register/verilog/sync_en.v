@@ -1,4 +1,4 @@
-module adffe
+module sync_en
 (
 input [15:0] data_in,
 input clk,
@@ -7,7 +7,7 @@ input write_en,
 output reg [15:0] data_out
 );
 
-always @(posedge clk or negedge resetn)
+always @(posedge clk)
     if (~resetn) // Register is reset resetn
     begin
         data_out <= 16'h0000;
