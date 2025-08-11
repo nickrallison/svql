@@ -1,5 +1,5 @@
-use core::arch;
-use std::{path::{Path, PathBuf}, process::Child};
+use log::{error, trace};
+use std::{path::{Path, PathBuf}, process::{Child, Stdio}};
 use driver::Driver;
 
 pub mod driver;
@@ -18,6 +18,7 @@ pub struct YosysProc {
 
 impl YosysProc {
     pub fn new_nonblocking(design: PathBuf, module_name: String) -> Result<Self, String> {
+        trace!("new_nonblocking called with design: {:?}, module_name: {}", design, module_name);
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = workspace.join("yosys/yosys");
         let svql_driver = workspace.join("build/svql_driver/libsvql_driver.so");
@@ -59,6 +60,8 @@ impl YosysProc {
 
         let mut cmd = std::process::Command::new(&yosys);
         cmd.args(get_command_args_slice(&svql_driver, &design, &module_name, openport));
+        // Suppress direct stdout/stderr of the Yosys process; we'll capture it via wait_until_ready
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
         let yosys_process = cmd.spawn().expect("Failed to start yosys process");
 
@@ -75,7 +78,7 @@ impl YosysProc {
     }
 
     pub fn new_yosys(yosys: PathBuf, svql_driver: PathBuf, design: PathBuf, module_name: String) -> Result<Self, String> {
-
+        trace!("new_yosys called with yosys: {:?}, svql_driver: {:?}, design: {:?}, module_name: {}", yosys, svql_driver, design, module_name);
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()));
         }
@@ -90,6 +93,8 @@ impl YosysProc {
 
         let mut cmd = std::process::Command::new(&yosys);
         cmd.args(get_command_args_slice(&svql_driver, &design, &module_name, openport));
+        // Suppress direct stdout/stderr of the Yosys process; we'll capture it via wait_until_ready
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
         let mut yosys_process = cmd.spawn().expect("Failed to start yosys process");
 
@@ -176,16 +181,17 @@ fn wait_until_ready(
     let mut recent: std::collections::VecDeque<String> =
         std::collections::VecDeque::with_capacity(50);
 
-    let mut disconnected = false;
     while start.elapsed() < timeout {
         let remaining = timeout.saturating_sub(start.elapsed());
         match rx.recv_timeout(remaining) {
             Ok(line) => {
+                let is_match = line.contains(&ready_marker);
+                trace!(target: "wait_until_ready", "line: '{}' | match: {}", line, is_match);
                 if recent.len() == recent.capacity() {
                     recent.pop_front();
                 }
                 recent.push_back(line.clone());
-                if line.contains(&ready_marker) {
+                if is_match {
                     ready = true;
                     break;
                 }
@@ -196,19 +202,19 @@ fn wait_until_ready(
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 // Channel closed, but keep waiting until timeout
-                disconnected = true;
+                // disconnected = true; // unused
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
         }
     }
 
     if !ready {
+        error!(target: "wait_until_ready", "Timed out waiting for yosys to be ready. Expected line containing: '{}'. Recent output: {}", ready_marker, recent.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
         return Err(format!(
             "Timed out waiting for yosys to be ready. Expected line containing: '{}'.\nRecent output:\n{}",
             ready_marker,
             recent.into_iter().collect::<Vec<_>>().join("\n")
         ));
     }
-
     Ok(())
 }

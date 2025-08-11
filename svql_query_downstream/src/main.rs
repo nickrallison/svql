@@ -10,7 +10,12 @@ use crate::and::AndAB;
 mod and;
 
 fn main() {
-    // let mock_and = MockDriverThreeAnd::new();
+    // env logger
+
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Trace)
+        .init();
+
     let yosys_proc: YosysProc = YosysProc::new("examples/patterns/basic/and/many_ands_2.v".into(), "many_ands".into()).unwrap();
 
     let driver = yosys_proc.driver();

@@ -11,3 +11,5 @@ itertools.workspace = true
 regex.workspace = true
 lazy_static.workspace = true
 openport.workspace = true
+env_logger.workspace = true
+log.workspace = true

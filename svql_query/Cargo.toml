@@ -17,5 +17,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 lazy_static.workspace = true
 log.workspace = true
-env_logger.workspace = true
 itertools.workspace = true

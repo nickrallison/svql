@@ -457,6 +457,7 @@ dependencies = [
 name = "svql_driver_handler"
 version = "0.1.0"
 dependencies = [
+ "log",
  "openport",
  "svql_common",
  "thiserror",
@@ -477,7 +478,6 @@ dependencies = [
 name = "svql_query"
 version = "0.1.0"
 dependencies = [
- "env_logger",
  "itertools",
  "lazy_static",
  "log",
@@ -492,8 +492,10 @@ dependencies = [
 name = "svql_query_downstream"
 version = "0.1.0"
 dependencies = [
+ "env_logger",
  "itertools",
  "lazy_static",
+ "log",
  "openport",
  "regex",
  "svql_common",
