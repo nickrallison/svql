@@ -311,6 +311,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
+name = "openport"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "365c699f76305b3e62588961a288be10f0819ef1391f25870a69b35a213577cc"
+
+[[package]]
 name = "portable-atomic"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -478,6 +484,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "lazy_static",
+ "openport",
  "regex",
  "svql_common",
  "svql_query",
