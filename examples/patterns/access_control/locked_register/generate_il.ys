@@ -4,7 +4,7 @@ hierarchy -top adff_mux
 proc
 clean
 write_rtlil examples/patterns/access_control/locked_register/rtlil/adff_mux.il
-show -format dot -prefix adff_mux
+# show -format dot -prefix adff_mux
 
 # adffe
 read_verilog examples/patterns/access_control/locked_register/verilog/adffe.v
@@ -13,15 +13,15 @@ proc
 opt
 clean
 write_rtlil examples/patterns/access_control/locked_register/rtlil/adffe.il
-show -format dot -prefix adffe
+# show -format dot -prefix adffe
 
 # dff_mux
-read_verilog examples/patterns/access_control/locked_register/verilog/adff_mux.v
+read_verilog examples/patterns/access_control/locked_register/verilog/dff_mux.v
 hierarchy -top dff_mux
 proc
 clean
 write_rtlil examples/patterns/access_control/locked_register/rtlil/dff_mux.il
-show -format dot -prefix dff_mux
+# show -format dot -prefix dff_mux
 
 # dffe
 read_verilog examples/patterns/access_control/locked_register/verilog/dffe.v
@@ -30,4 +30,4 @@ proc
 opt
 clean
 write_rtlil examples/patterns/access_control/locked_register/rtlil/dffe.il
-show -format dot -prefix dffe
+# show -format dot -prefix dffe

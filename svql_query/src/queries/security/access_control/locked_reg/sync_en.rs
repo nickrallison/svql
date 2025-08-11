@@ -45,26 +45,38 @@ impl<S> Netlist<S> for SyncEnLockedReg<S>
 where
     S: State,
 {
-    const MODULE_NAME: &'static str = "not_gate";
-    const FILE_PATH: &'static str = "./examples/patterns/access_control/locked_register/rtlil/dffe.il";
+    const MODULE_NAME: &'static str = "dffe";
+    const FILE_PATH: &'static str = "examples/patterns/access_control/locked_register/rtlil/dffe.il";
     const YOSYS: &'static str = "./yosys/yosys";
     const SVQL_DRIVER_PLUGIN: &'static str = "./build/svql_driver/libsvql_driver.so";
 }
 
-impl SearchableNetlist for Not<Search> {
-    type Hit = Not<Match>;
+impl SearchableNetlist for SyncEnLockedReg<Search> {
+    type Hit = SyncEnLockedReg<Match>;
 
     fn from_query_match(m: QueryMatch, path: Instance) -> Self::Hit {
-        let a = Match {
-            id: lookup(&m.port_map, "a").cloned().unwrap(),
+        let data_in = Match {
+            id: lookup(&m.port_map, "data_in").cloned().unwrap(),
         };
-        let y = Match {
-            id: lookup(&m.port_map, "y").cloned().unwrap(),
+        let clk = Match {
+            id: lookup(&m.port_map, "clk").cloned().unwrap(),
         };
-        Not::<Match> {
+        let resetn = Match {
+            id: lookup(&m.port_map, "resetn").cloned().unwrap(),
+        };
+        let write_en = Match {
+            id: lookup(&m.port_map, "write_en").cloned().unwrap(),
+        };
+        let data_out = Match {
+            id: lookup(&m.port_map, "data_out").cloned().unwrap(),
+        };
+        SyncEnLockedReg::<Match> {
             path: path.clone(),
-            a: Wire::with_val(path.child("a".into()), a),
-            y: Wire::with_val(path.child("y".into()), y),
+            data_in: Wire::with_val(path.child("data_in".into()), data_in),
+            clk: Wire::with_val(path.child("clk".into()), clk),
+            resetn: Wire::with_val(path.child("resetn".into()), resetn),
+            write_en: Wire::with_val(path.child("write_en".into()), write_en),
+            data_out: Wire::with_val(path.child("data_out".into()), data_out),
         }
     }
 }
@@ -82,25 +94,28 @@ mod tests {
     // Netlist Tests
     // ###############
     #[test]
-    fn test_not_netlist() {
+    fn test_sync_en_locked_reg_netlist() {
 
-        let design = PathBuf::from("examples/patterns/basic/not/many_nots.v");
-        let module_name = "many_nots".to_string();
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il");
+        let module_name = "sync_en".to_string();
 
         let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
 
-        let not = Not::<Search>::root("not".to_string());
-        assert_eq!(not.path().inst_path(), "not");
-        assert_eq!(not.a.path.inst_path(), "not.a");
-        assert_eq!(not.y.path.inst_path(), "not.y");
+        let sync_en = SyncEnLockedReg::<Search>::root("sync_en".to_string());
+        assert_eq!(sync_en.path().inst_path(), "sync_en");
+        assert_eq!(sync_en.data_in.path.inst_path(), "sync_en.data_in");
+        assert_eq!(sync_en.clk.path.inst_path(), "sync_en.clk");
+        assert_eq!(sync_en.resetn.path.inst_path(), "sync_en.resetn");
+        assert_eq!(sync_en.write_en.path.inst_path(), "sync_en.write_en");
+        assert_eq!(sync_en.data_out.path.inst_path(), "sync_en.data_out");
 
-        let not_search_result = Not::<Search>::query(&driver, not.path());
+        let sync_en_search_result = SyncEnLockedReg::<Search>::query(&driver, sync_en.path());
         assert_eq!(
-            not_search_result.len(),
-            2,
-            "Expected 2 matches for Not, got {}",
-            not_search_result.len()
+            sync_en_search_result.len(),
+            1,
+            "Expected 1 match for SyncEnLockedReg, got {}",
+            sync_en_search_result.len()
         );
     }
 }

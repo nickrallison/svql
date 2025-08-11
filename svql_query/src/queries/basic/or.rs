@@ -200,7 +200,7 @@ where
     }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         let idx = self.path.height() + 1;
-        match p.get_item(idx).as_ref().map(|s| s.as_str()) {
+        match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
             Some("or") => self.or.find_port(p),
             Some("rec_or_1") => {
                 if let Some(recursive) = &self.rec_or_1 {

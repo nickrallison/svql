@@ -1,9 +1,8 @@
 use log::{error, trace};
 use svql_common::config::ffi::SvqlRuntimeConfig;
-use std::{path::{Path, PathBuf}, process::{Child, Stdio}};
+use std::{path::{self, Path, PathBuf}, process::{Child, Stdio}};
 
 use crate::{net::{NetDriver, SvqlDriverNetError}, DriverIterator};
-
 
 #[derive(Debug)]
 pub struct ProcDriver {
@@ -14,8 +13,35 @@ pub struct ProcDriver {
     // ###
     yosys: PathBuf,
     svql_driver: PathBuf,
-    design: PathBuf,
+    design: Design,
     module_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum Design {
+    Verilog(PathBuf),
+    Rtlil(PathBuf),
+}
+
+impl Design {
+    pub fn new(path: PathBuf) -> Result<Self, String> {
+        if path.extension().and_then(|s| s.to_str()) == Some("v") {
+            Ok(Design::Verilog(path))
+        } else if path.extension().and_then(|s| s.to_str()) == Some("il") {
+            Ok(Design::Rtlil(path))
+        } else {
+            Err(format!("Unsupported design file extension: {:?}", path.extension()))
+        }
+    }
+    pub fn path(&self) -> &Path {
+        match self {
+            Design::Verilog(p) => p,
+            Design::Rtlil(p) => p,
+        }
+    }
+    pub fn exists(&self) -> bool {
+        self.path().exists()
+    }
 }
 
 impl ProcDriver {
@@ -30,10 +56,12 @@ impl ProcDriver {
             workspace.join(design)
         };
 
+        let design = Design::new(design).map_err(|e| format!("Failed to create design: {}", e))?;
+
         Self::new_yosys(yosys, svql_driver, design, module_name)
     }
 
-    pub fn new_yosys(yosys: PathBuf, svql_driver: PathBuf, design: PathBuf, module_name: String) -> Result<Self, String> {
+    pub fn new_yosys(yosys: PathBuf, svql_driver: PathBuf, design: Design, module_name: String) -> Result<Self, String> {
         trace!("new_yosys called with yosys: {:?}, svql_driver: {:?}, design: {:?}, module_name: {}", yosys, svql_driver, design, module_name);
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()));
@@ -42,7 +70,7 @@ impl ProcDriver {
             return Err(format!("SVQL driver not found at: {}", svql_driver.display()));
         }
         if !design.exists() {
-            return Err(format!("Design file not found at: {}", design.display()));
+            return Err(format!("Design file not found at: {}", design.path().display()));
         }
 
         let openport = openport::pick_unused_port(15000..25000).expect("Failed to find open port");
@@ -90,12 +118,18 @@ impl ProcDriver {
 }
 
 
-fn get_command_args_slice(svql_driver: &Path, design: &Path, module_name: &str, port: u16) -> Vec<String> {
+fn get_command_args_slice(svql_driver: &Path, design: &Design, module_name: &str, port: u16) -> Vec<String> {
+
+    let read_cmd = match design {
+        Design::Verilog(_) => "read_verilog",
+        Design::Rtlil(_) => "read_rtlil",
+    };
+
     vec![
         "-m".to_string(),
         format!("{}", svql_driver.display()),
         "-p".to_string(),
-        format!("read_verilog {}", design.display()),
+        format!("{} {}", read_cmd, design.path().display()),
         "-p".to_string(),
         format!("hierarchy -top {}", module_name),
         "-p".to_string(),
@@ -105,7 +139,7 @@ fn get_command_args_slice(svql_driver: &Path, design: &Path, module_name: &str, 
     ]
 }
 
-fn get_command(yosys: &Path, svql_driver: &Path, design: &Path, module_name: &str, port: u16) -> String {
+fn get_command(yosys: &Path, svql_driver: &Path, design: &Design, module_name: &str, port: u16) -> String {
     let args = get_command_args_slice(svql_driver, design, module_name, port);
     let args = args.into_iter().map(|s| 
         match s.contains(" ") {

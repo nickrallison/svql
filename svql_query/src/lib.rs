@@ -53,7 +53,7 @@ macro_rules! impl_find_port {
     ($ty:ident, $($field:ident),+) => {
         fn find_port(&self, p: &Instance) -> Option<&$crate::Wire<S>> {
             let idx  = self.path.height() + 1;
-            match p.get_item(idx).as_ref().map(|s| s.as_str()) {
+            match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
                 $(Some(stringify!($field)) => self.$field.find_port(p),)+
                 _ => None,
             }
@@ -156,9 +156,9 @@ mod tests {
         assert_eq!(inst.inst_path(), "test");
         assert_eq!(child1.inst_path(), "test.child1");
         assert_eq!(child2.inst_path(), "test.child1.child2");
-        assert_eq!(child2.get_item(0), Some(Arc::new("test".to_string())));
-        assert_eq!(child2.get_item(1), Some(Arc::new("child1".to_string())));
-        assert_eq!(child2.get_item(2), Some(Arc::new("child2".to_string())));
+        assert_eq!(child2.get_item(0), Some(Arc::from("test".to_string())));
+        assert_eq!(child2.get_item(1), Some(Arc::from("child1".to_string())));
+        assert_eq!(child2.get_item(2), Some(Arc::from("child2".to_string())));
         assert_eq!(child2.get_item(3), None);
     }
 }

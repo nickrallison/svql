@@ -2,14 +2,14 @@ use std::{sync::Arc};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {
-    pub inst: Arc<String>,
-    pub path: Vec<Arc<String>>,
+    pub inst: Arc<str>,
+    pub path: Vec<Arc<str>>,
     pub height: usize,
 }
 
 impl Instance {
     pub fn root(inst: String) -> Self {
-        let inst = Arc::new(inst);
+        let inst: Arc<str> = Arc::from(inst);
         let path = vec![inst.clone()];
         let new = Self {
             inst: inst.clone(),
@@ -24,7 +24,7 @@ impl Instance {
         new
     }
     pub fn child(&self, child: String) -> Self {
-        let child = Arc::new(child);
+        let child: Arc<str> = Arc::from(child);
         let mut new_path = self.path.clone();
         new_path.push(child.clone());
         let new = Self { inst: child.clone(), path: new_path, height: self.height + 1 };
@@ -36,7 +36,7 @@ impl Instance {
         new
     }
 
-    pub fn get_item(&self, index: usize) -> Option<Arc<String>> {
+    pub fn get_item(&self, index: usize) -> Option<Arc<str>> {
         self.path.get(index).cloned()
     }
     pub fn inst_path(&self) -> String {
