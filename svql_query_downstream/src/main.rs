@@ -1,10 +1,14 @@
 use svql_query::composite::SearchableComposite;
+use svql_query::driver::mock::MockDriverThreeAnd;
 use svql_query::driver::Driver;
 use svql_query::queries::basic::and::RecursiveAnd;
 use svql_query::{Match, Search, WithPath};
 
+mod and;
+
 fn main() {
-    let driver = Driver::new_mock();
+    let mock_and = MockDriverThreeAnd::new();
+    let driver = Driver::new_mock(mock_and.into());
 
     let rec_and = RecursiveAnd::<Search>::root("rec_and");
     let rec_and_search_result: Vec<RecursiveAnd<Match>> =

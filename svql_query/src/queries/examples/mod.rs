@@ -65,14 +65,20 @@ impl SearchableComposite for DoubleAnd<Search> {
             And::<Search>::query(driver, path.child("and1".to_string()));
         let and2_search_result: Vec<And<Match>> =
             And::<Search>::query(driver, path.child("and2".to_string()));
+        // let other_filters: Vec<Box<dyn Fn(&Self) -> bool>> = Self::Hit::other_filters();
         let results = iproduct!(and1_search_result, and2_search_result)
             .map(|(and1, and2)| Self::Hit {
                 and1,
                 and2,
                 path: path.clone(),
             })
-            .filter(|s| Self::Hit::validate_connections(s, s.connections()))
+            .filter(|s| {
+                let conn_ok = s.validate_connections(s.connections());
+                let other_ok = s.other_filters().iter().all(|f| f(s));
+                conn_ok && other_ok
+            })
             .collect::<Vec<_>>();
+        
         results
     }
 }
@@ -142,7 +148,11 @@ impl SearchableComposite for TripleAnd<Search> {
                 and,
                 path: path.clone(),
             })
-            .filter(|s| Self::Hit::validate_connections(s, s.connections()))
+            .filter(|s| {
+                let conn_ok = s.validate_connections(s.connections());
+                let other_ok = s.other_filters().iter().all(|f| f(s));
+                conn_ok && other_ok
+            })
             .collect::<Vec<_>>();
         results
     }
@@ -236,7 +246,11 @@ impl SearchableComposite for OtherTripleAnd<Search> {
                 and3,
                 path: path.clone(),
             })
-            .filter(|s| Self::Hit::validate_connections(s, s.connections()))
+            .filter(|s| {
+                let conn_ok = s.validate_connections(s.connections());
+                let other_ok = s.other_filters().iter().all(|f| f(s));
+                conn_ok && other_ok
+            })
             .collect::<Vec<_>>();
         results
     }

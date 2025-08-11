@@ -12,6 +12,11 @@ pub trait SearchableComposite: Composite<Search> {
 }
 
 pub trait MatchedComposite: Composite<Match> {
+
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        Vec::new()
+    }
+
     fn validate_connection(&self, connection: Connection<Match>) -> bool {
         let in_port_id = self.find_port(&connection.from.path);
         let out_port_id = self.find_port(&connection.to.path);
@@ -37,5 +42,6 @@ pub trait MatchedComposite: Composite<Match> {
         }
         true
     }
+
 }
 impl<S> MatchedComposite for S where S: Composite<Match> {}
