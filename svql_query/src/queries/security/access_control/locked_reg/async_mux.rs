@@ -94,7 +94,32 @@ mod tests {
     // Netlist Tests
     // ###############
     #[test]
-    fn test_async_mux_locked_reg_netlist() {
+    fn test_async_mux_many_locked_regs() {
+
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/many_locked_regs.il");
+        let module_name = "many_locked_regs".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+        let async_mux = AsyncMuxLockedReg::<Search>::root("async_mux".to_string());
+        assert_eq!(async_mux.path().inst_path(), "async_mux");
+        assert_eq!(async_mux.data_in.path.inst_path(), "async_mux.data_in");
+        assert_eq!(async_mux.clk.path.inst_path(), "async_mux.clk");
+        assert_eq!(async_mux.resetn.path.inst_path(), "async_mux.resetn");
+        assert_eq!(async_mux.write_en.path.inst_path(), "async_mux.write_en");
+        assert_eq!(async_mux.data_out.path.inst_path(), "async_mux.data_out");
+
+        let async_mux_search_result = AsyncMuxLockedReg::<Search>::query(&driver, async_mux.path());
+        assert_eq!(
+            async_mux_search_result.len(),
+            2,
+            "Expected 2 matches for AsyncMuxLockedReg, got {}",
+            async_mux_search_result.len()
+        );
+    }
+
+    #[test]
+    fn test_async_mux_single() {
 
         let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il");
         let module_name = "async_mux".to_string();

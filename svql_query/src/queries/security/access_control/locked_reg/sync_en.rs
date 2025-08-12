@@ -94,7 +94,33 @@ mod tests {
     // Netlist Tests
     // ###############
     #[test]
-    fn test_sync_en_locked_reg_netlist() {
+    fn test_sync_en_many_locked_regs() {
+
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/many_locked_regs.il");
+        let module_name = "many_locked_regs".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+
+        let sync_en = SyncEnLockedReg::<Search>::root("sync_en".to_string());
+        assert_eq!(sync_en.path().inst_path(), "sync_en");
+        assert_eq!(sync_en.data_in.path.inst_path(), "sync_en.data_in");
+        assert_eq!(sync_en.clk.path.inst_path(), "sync_en.clk");
+        assert_eq!(sync_en.resetn.path.inst_path(), "sync_en.resetn");
+        assert_eq!(sync_en.write_en.path.inst_path(), "sync_en.write_en");
+        assert_eq!(sync_en.data_out.path.inst_path(), "sync_en.data_out");
+
+        let sync_en_search_result = SyncEnLockedReg::<Search>::query(&driver, sync_en.path());
+        assert_eq!(
+            sync_en_search_result.len(),
+            2,
+            "Expected 2 matches for SyncEnLockedReg, got {}",
+            sync_en_search_result.len()
+        );
+    }
+
+    #[test]
+    fn test_sync_en_single() {
 
         let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il");
         let module_name = "sync_en".to_string();
