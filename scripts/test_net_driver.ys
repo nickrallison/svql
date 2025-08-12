@@ -1,4 +1,4 @@
-read_verilog examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v
-hierarchy -top many_locked_regs
+read_rtlil examples/larger_designs/opentitan_otbn.il
+hierarchy -top otbn_core
 proc; flatten; opt_clean
 svql_driver -net -port 9999

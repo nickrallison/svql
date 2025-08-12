@@ -14,10 +14,11 @@
           buildInputs = [ 
             ## Project
             clang 
-            gcc 
+            gcc13 
             cmake
             ninja
             pkg-config
+            boost
             asio
 
             ## Rust

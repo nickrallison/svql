@@ -20,6 +20,9 @@ separate_arguments (YOSYS_CXXFLAGS_LIST  UNIX_COMMAND "${YOSYS_CXXFLAGS}")
 separate_arguments (YOSYS_LDFLAGS_LIST   UNIX_COMMAND "${YOSYS_LDFLAGS}")
 separate_arguments (YOSYS_LDLIBS_LIST    UNIX_COMMAND "${YOSYS_LDLIBS}")
 
+# Find Boost
+find_package(Boost REQUIRED)
+
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
     src/GraphConversion.cpp
@@ -34,6 +37,7 @@ target_include_directories (${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${yosys_SOURCE_DIR}/
         ${svql_common_BINARY_DIR}/
+        ${Boost_INCLUDE_DIRS}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
@@ -43,6 +47,7 @@ target_link_options       (${PROJECT_NAME} PRIVATE ${YOSYS_LDFLAGS_LIST})
 target_link_libraries     (${PROJECT_NAME} PRIVATE ${YOSYS_LDLIBS_LIST} 
     yosys
     svql_common
+    ${Boost_LIBRARIES}
 )
 
 add_dependencies(${PROJECT_NAME} svql_common)
