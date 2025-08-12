@@ -146,10 +146,6 @@ impl SearchableNetlist for And<Search> {
     }
 }
 
-/* -----------------------------------------------------------------
-   The rest of the file is unchanged.
------------------------------------------------------------------ */
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecursiveAnd<S>
 where
@@ -157,11 +153,170 @@ where
 {
     pub path: Instance,
     pub and: And<S>,
-    pub rec_and_1: Option<Box<RecursiveAnd<S>>>,
-    pub rec_and_2: Option<Box<RecursiveAnd<S>>>,
+    pub rec_and: Option<Box<RecursiveAnd<S>>>,
 }
 
 impl<S> RecursiveAnd<S>
+where
+    S: State,
+{
+    pub fn size(&self) -> usize {
+        let mut size = 1; // Count this instance
+        if let Some(recursive) = &self.rec_and {
+            size += recursive.size()
+        }
+        size
+    }
+}
+
+impl<S> WithPath<S> for RecursiveAnd<S>
+where
+    S: State,
+{
+    fn new(path: Instance) -> Self {
+        let and = And::new(path.child("and".to_string()));
+        let rec_and = None;
+        Self { path, and, rec_and }
+    }
+    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+        let idx = self.path.height() + 1;
+        match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
+            Some("and") => self.and.find_port(p),
+            Some("rec_and") => {
+                if let Some(recursive) = &self.rec_and {
+                    recursive.find_port(p)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
+}
+
+impl<S> Composite<S> for RecursiveAnd<S>
+where
+    S: State,
+{
+    fn connections(&self) -> Vec<Vec<Connection<S>>> {
+        let mut connections = Vec::new();
+        if let Some(recursive) = &self.rec_and {
+            let connection1 = Connection {
+                from: self.and.y.clone(),
+                to: recursive.and.a.clone(),
+            };
+            let connection2 = Connection {
+                from: self.and.y.clone(),
+                to: recursive.and.b.clone(),
+            };
+            let mut set = Vec::new();
+            set.push(connection1);
+            set.push(connection2);
+            connections.push(set);
+        }
+        connections
+    }
+}
+
+impl SearchableComposite for RecursiveAnd<Search> {
+    type Hit = RecursiveAnd<Match>;
+
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
+        fn chain_to_recursive(chain: &[And<Match>], path: &Instance) -> RecursiveAnd<Match> {
+            let head_and = chain[0].clone();
+
+            if chain.len() == 1 {
+                RecursiveAnd {
+                    path: path.clone(),
+                    and: head_and,
+                    rec_and: None,
+                }
+            } else {
+                let inner_path = path.child("rec_and".to_string());
+                let tail = chain_to_recursive(&chain[1..], &inner_path);
+                RecursiveAnd {
+                    path: path.clone(),
+                    and: head_and,
+                    rec_and: Some(Box::new(tail)),
+                }
+            }
+        }
+
+        fn build_chains(
+            driver: &Driver,
+            cur_path: &Instance,
+            first_and: &And<Match>,
+        ) -> Vec<Vec<And<Match>>> {
+            let mut chains: Vec<Vec<And<Match>>> = vec![vec![first_and.clone()]];
+            let next_block_path = cur_path.child("rec_and".to_string());
+            let next_and_path = next_block_path.child("and".to_string());
+            let inner_ands: Vec<And<Match>> = And::<Search>::query(driver, next_and_path);
+            let this_y_id = first_and.y.val.as_ref().map(|m| &m.id);
+
+            for inner in inner_ands {
+                let inner_a_id = inner.a.val.as_ref().map(|m| &m.id);
+
+                if this_y_id == inner_a_id {
+                    let tails = build_chains(driver, &next_block_path, &inner);
+                    for mut tail in tails {
+                        tail.insert(0, first_and.clone());
+                        chains.push(tail);
+                    }
+                }
+            }
+
+            chains
+        }
+
+        let and_hits: Vec<And<Match>> = And::<Search>::query(driver, path.child("and".to_string()));
+        if and_hits.is_empty() {
+            return Vec::new();
+        }
+
+        let mut all_hits: Vec<RecursiveAnd<Match>> = Vec::new();
+        for top_and in &and_hits {
+            let chains = build_chains(driver, &path, top_and);
+
+            for chain in chains {
+                let rec_hit = chain_to_recursive(&chain, &path);
+                if rec_hit.validate_connections(rec_hit.connections()) {
+                    all_hits.push(rec_hit);
+                }
+            }
+        }
+
+        let mut uniq_hits: Vec<RecursiveAnd<Match>> = Vec::new();
+        for hit in all_hits {
+            if !uniq_hits.contains(&hit) {
+                uniq_hits.push(hit);
+            }
+        }
+
+        uniq_hits
+    }
+}
+
+impl MatchedComposite for RecursiveAnd<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DoubleRecAnd<S>
+where
+    S: State,
+{
+    pub path: Instance,
+    pub and: And<S>,
+    pub rec_and_1: Option<Box<DoubleRecAnd<S>>>,
+    pub rec_and_2: Option<Box<DoubleRecAnd<S>>>,
+}
+
+impl<S> DoubleRecAnd<S>
 where
     S: State,
 {
@@ -183,7 +338,7 @@ where
    key‑generation logic internally.
 ----------------------------------------------------------------- */
 
-impl<S> WithPath<S> for RecursiveAnd<S>
+impl<S> WithPath<S> for DoubleRecAnd<S>
 where
     S: State,
 {
@@ -224,7 +379,7 @@ where
     }
 }
 
-impl<S> Composite<S> for RecursiveAnd<S>
+impl<S> Composite<S> for DoubleRecAnd<S>
 where
     S: State,
 {
@@ -262,8 +417,8 @@ where
     }
 }
 
-impl SearchableComposite for RecursiveAnd<Search> {
-    type Hit = RecursiveAnd<Match>;
+impl SearchableComposite for DoubleRecAnd<Search> {
+    type Hit = DoubleRecAnd<Match>;
 
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         use std::collections::{BTreeSet, HashMap, HashSet};
@@ -414,14 +569,14 @@ impl SearchableComposite for RecursiveAnd<Search> {
             }
         }
 
-        // 5) Build RecursiveAnd<Match> values, rebasing paths per placement.
+        // 5) Build DoubleRecAnd<Match> values, rebasing paths per placement.
         fn build_tree(
             root: &NodeKey,
             set: &BTreeSet<NodeKey>,
             nodes: &HashMap<NodeKey, And<Match>>,
             meta: &HashMap<NodeKey, (String, String, String)>,
             base_path: Instance,
-        ) -> RecursiveAnd<Match> {
+        ) -> DoubleRecAnd<Match> {
             let gate = nodes.get(root).expect("root gate not found");
             let gate_rebased = gate.rebase(base_path.child("and".to_string()));
 
@@ -463,7 +618,7 @@ impl SearchableComposite for RecursiveAnd<Search> {
                 ))
             });
 
-            RecursiveAnd {
+            DoubleRecAnd {
                 path: base_path,
                 and: gate_rebased,
                 rec_and_1: rec_a,
@@ -477,12 +632,12 @@ impl SearchableComposite for RecursiveAnd<Search> {
 
             // Debug assertions: ensure connectivity constraints hold and size matches nodes used.
             debug_assert!(
-                RecursiveAnd::<Match>::validate_connections(&tree, tree.connections()),
+                DoubleRecAnd::<Match>::validate_connections(&tree, tree.connections()),
                 "Built tree does not satisfy connection constraints"
             );
 
             let mut actual_size = 0usize;
-            fn count(n: &RecursiveAnd<Match>, acc: &mut usize) {
+            fn count(n: &DoubleRecAnd<Match>, acc: &mut usize) {
                 *acc += 1;
                 if let Some(c) = &n.rec_and_1 {
                     count(c, acc);
@@ -507,7 +662,7 @@ impl SearchableComposite for RecursiveAnd<Search> {
     }
 }
 
-impl MatchedComposite for RecursiveAnd<Match> {
+impl MatchedComposite for DoubleRecAnd<Match> {
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
         vec![]
     }
@@ -549,13 +704,13 @@ mod tests {
     // ###############
 
     #[test]
-    fn test_recursive_and_composite() {
+    fn test_double_rec_and_composite() {
         let design = PathBuf::from("examples/patterns/basic/and/many_ands.v");
         let module_name = "many_ands".to_string();
 
         let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
-        let rec_and = RecursiveAnd::<Search>::root("rec_and");
+        let rec_and = DoubleRecAnd::<Search>::root("rec_and");
         assert_eq!(rec_and.path().inst_path(), "rec_and");
         assert_eq!(rec_and.and.path().inst_path(), "rec_and.and");
         assert_eq!(
@@ -564,11 +719,11 @@ mod tests {
             "Expected rec_and.rec_and_1 to be None, got {:?}",
             rec_and.rec_and_1
         );
-        let rec_and_search_result = RecursiveAnd::<Search>::query(&driver, rec_and.path());
+        let rec_and_search_result = DoubleRecAnd::<Search>::query(&driver, rec_and.path());
         assert_eq!(
             rec_and_search_result.len(),
             10,
-            "Expected 10 matches for RecursiveAnd, got {}",
+            "Expected 10 matches for DoubleRecAnd, got {}",
             rec_and_search_result.len()
         );
     }

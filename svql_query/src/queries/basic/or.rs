@@ -76,7 +76,7 @@ impl Or<Match> {
     /// Return a *stable* key that uniquely identifies this concrete
     /// match.  The key consists of the three port identifiers
     /// (`a`, `b`, `y`).  The returned tuple implements `Hash`,
-    /// `PartialEq`, or `Eq` because `IdString` already implements them.
+    /// `PartialEq`, and `Eq` because `IdString` already implements them.
     pub fn key(&self) -> (IdString, IdString, IdString) {
         (
             self.a
@@ -146,10 +146,6 @@ impl SearchableNetlist for Or<Search> {
     }
 }
 
-/* -----------------------------------------------------------------
-   The rest of the file is unchanged.
------------------------------------------------------------------ */
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecursiveOr<S>
 where
@@ -157,11 +153,170 @@ where
 {
     pub path: Instance,
     pub or: Or<S>,
-    pub rec_or_1: Option<Box<RecursiveOr<S>>>,
-    pub rec_or_2: Option<Box<RecursiveOr<S>>>,
+    pub rec_or: Option<Box<RecursiveOr<S>>>,
 }
 
 impl<S> RecursiveOr<S>
+where
+    S: State,
+{
+    pub fn size(&self) -> usize {
+        let mut size = 1; // Count this instance
+        if let Some(recursive) = &self.rec_or {
+            size += recursive.size()
+        }
+        size
+    }
+}
+
+impl<S> WithPath<S> for RecursiveOr<S>
+where
+    S: State,
+{
+    fn new(path: Instance) -> Self {
+        let or = Or::new(path.child("or".to_string()));
+        let rec_or = None;
+        Self { path, or, rec_or }
+    }
+    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
+        let idx = self.path.height() + 1;
+        match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
+            Some("or") => self.or.find_port(p),
+            Some("rec_or") => {
+                if let Some(recursive) = &self.rec_or {
+                    recursive.find_port(p)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
+}
+
+impl<S> Composite<S> for RecursiveOr<S>
+where
+    S: State,
+{
+    fn connections(&self) -> Vec<Vec<Connection<S>>> {
+        let mut connections = Vec::new();
+        if let Some(recursive) = &self.rec_or {
+            let connection1 = Connection {
+                from: self.or.y.clone(),
+                to: recursive.or.a.clone(),
+            };
+            let connection2 = Connection {
+                from: self.or.y.clone(),
+                to: recursive.or.b.clone(),
+            };
+            let mut set = Vec::new();
+            set.push(connection1);
+            set.push(connection2);
+            connections.push(set);
+        }
+        connections
+    }
+}
+
+impl SearchableComposite for RecursiveOr<Search> {
+    type Hit = RecursiveOr<Match>;
+
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
+        fn chain_to_recursive(chain: &[Or<Match>], path: &Instance) -> RecursiveOr<Match> {
+            let head_or = chain[0].clone();
+
+            if chain.len() == 1 {
+                RecursiveOr {
+                    path: path.clone(),
+                    or: head_or,
+                    rec_or: None,
+                }
+            } else {
+                let inner_path = path.child("rec_or".to_string());
+                let tail = chain_to_recursive(&chain[1..], &inner_path);
+                RecursiveOr {
+                    path: path.clone(),
+                    or: head_or,
+                    rec_or: Some(Box::new(tail)),
+                }
+            }
+        }
+
+        fn build_chains(
+            driver: &Driver,
+            cur_path: &Instance,
+            first_or: &Or<Match>,
+        ) -> Vec<Vec<Or<Match>>> {
+            let mut chains: Vec<Vec<Or<Match>>> = vec![vec![first_or.clone()]];
+            let next_block_path = cur_path.child("rec_or".to_string());
+            let next_or_path = next_block_path.child("or".to_string());
+            let inner_ors: Vec<Or<Match>> = Or::<Search>::query(driver, next_or_path);
+            let this_y_id = first_or.y.val.as_ref().map(|m| &m.id);
+
+            for inner in inner_ors {
+                let inner_a_id = inner.a.val.as_ref().map(|m| &m.id);
+
+                if this_y_id == inner_a_id {
+                    let tails = build_chains(driver, &next_block_path, &inner);
+                    for mut tail in tails {
+                        tail.insert(0, first_or.clone());
+                        chains.push(tail);
+                    }
+                }
+            }
+
+            chains
+        }
+
+        let or_hits: Vec<Or<Match>> = Or::<Search>::query(driver, path.child("or".to_string()));
+        if or_hits.is_empty() {
+            return Vec::new();
+        }
+
+        let mut all_hits: Vec<RecursiveOr<Match>> = Vec::new();
+        for top_or in &or_hits {
+            let chains = build_chains(driver, &path, top_or);
+
+            for chain in chains {
+                let rec_hit = chain_to_recursive(&chain, &path);
+                if rec_hit.validate_connections(rec_hit.connections()) {
+                    all_hits.push(rec_hit);
+                }
+            }
+        }
+
+        let mut uniq_hits: Vec<RecursiveOr<Match>> = Vec::new();
+        for hit in all_hits {
+            if !uniq_hits.contains(&hit) {
+                uniq_hits.push(hit);
+            }
+        }
+
+        uniq_hits
+    }
+}
+
+impl MatchedComposite for RecursiveOr<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
+        vec![]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DoubleRecOr<S>
+where
+    S: State,
+{
+    pub path: Instance,
+    pub or: Or<S>,
+    pub rec_or_1: Option<Box<DoubleRecOr<S>>>,
+    pub rec_or_2: Option<Box<DoubleRecOr<S>>>,
+}
+
+impl<S> DoubleRecOr<S>
 where
     S: State,
 {
@@ -183,7 +338,7 @@ where
    key‑generation logic internally.
 ----------------------------------------------------------------- */
 
-impl<S> WithPath<S> for RecursiveOr<S>
+impl<S> WithPath<S> for DoubleRecOr<S>
 where
     S: State,
 {
@@ -224,7 +379,7 @@ where
     }
 }
 
-impl<S> Composite<S> for RecursiveOr<S>
+impl<S> Composite<S> for DoubleRecOr<S>
 where
     S: State,
 {
@@ -262,8 +417,8 @@ where
     }
 }
 
-impl SearchableComposite for RecursiveOr<Search> {
-    type Hit = RecursiveOr<Match>;
+impl SearchableComposite for DoubleRecOr<Search> {
+    type Hit = DoubleRecOr<Match>;
 
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit> {
         use std::collections::{BTreeSet, HashMap, HashSet};
@@ -396,7 +551,7 @@ impl SearchableComposite for RecursiveOr<Search> {
             })
             .collect();
 
-        // 4) Aggregate all connected subsets from every possible root or dedup globally.
+        // 4) Aggregate all connected subsets from every possible root and dedup globally.
         let mut memo: HashMap<NodeKey, Vec<BTreeSet<NodeKey>>> = HashMap::new();
         let mut stack: HashSet<NodeKey> = HashSet::new();
 
@@ -414,14 +569,14 @@ impl SearchableComposite for RecursiveOr<Search> {
             }
         }
 
-        // 5) Build RecursiveOr<Match> values, rebasing paths per placement.
+        // 5) Build DoubleRecOr<Match> values, rebasing paths per placement.
         fn build_tree(
             root: &NodeKey,
             set: &BTreeSet<NodeKey>,
             nodes: &HashMap<NodeKey, Or<Match>>,
             meta: &HashMap<NodeKey, (String, String, String)>,
             base_path: Instance,
-        ) -> RecursiveOr<Match> {
+        ) -> DoubleRecOr<Match> {
             let gate = nodes.get(root).expect("root gate not found");
             let gate_rebased = gate.rebase(base_path.child("or".to_string()));
 
@@ -463,7 +618,7 @@ impl SearchableComposite for RecursiveOr<Search> {
                 ))
             });
 
-            RecursiveOr {
+            DoubleRecOr {
                 path: base_path,
                 or: gate_rebased,
                 rec_or_1: rec_a,
@@ -475,14 +630,14 @@ impl SearchableComposite for RecursiveOr<Search> {
         for (root, set) in sets_to_build {
             let tree = build_tree(&root, &set, &nodes_or, &nodes_meta, path.clone());
 
-            // Debug assertions: ensure connectivity constraints hold or size matches nodes used.
+            // Debug assertions: ensure connectivity constraints hold and size matches nodes used.
             debug_assert!(
-                RecursiveOr::<Match>::validate_connections(&tree, tree.connections()),
+                DoubleRecOr::<Match>::validate_connections(&tree, tree.connections()),
                 "Built tree does not satisfy connection constraints"
             );
 
             let mut actual_size = 0usize;
-            fn count(n: &RecursiveOr<Match>, acc: &mut usize) {
+            fn count(n: &DoubleRecOr<Match>, acc: &mut usize) {
                 *acc += 1;
                 if let Some(c) = &n.rec_or_1 {
                     count(c, acc);
@@ -507,7 +662,7 @@ impl SearchableComposite for RecursiveOr<Search> {
     }
 }
 
-impl MatchedComposite for RecursiveOr<Match> {
+impl MatchedComposite for DoubleRecOr<Match> {
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
         vec![]
     }
@@ -515,9 +670,9 @@ impl MatchedComposite for RecursiveOr<Match> {
 
 #[cfg(test)]
 mod tests {
+
     use std::path::PathBuf;
     use super::*;
-    
 
     // ###############
     // Netlist Tests
@@ -538,8 +693,8 @@ mod tests {
         let or_search_result = Or::<Search>::query(&driver, or.path());
         assert_eq!(
             or_search_result.len(),
-            3,
-            "Expected 3 matches for Or, got {}",
+            4,
+            "Expected 4 matches for Or, got {}",
             or_search_result.len()
         );
     }
@@ -549,13 +704,13 @@ mod tests {
     // ###############
 
     #[test]
-    fn test_recursive_or_composite() {
+    fn test_double_rec_or_composite() {
         let design = PathBuf::from("examples/patterns/basic/or/many_ors.v");
         let module_name = "many_ors".to_string();
 
         let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
 
-        let rec_or = RecursiveOr::<Search>::root("rec_or");
+        let rec_or = DoubleRecOr::<Search>::root("rec_or");
         assert_eq!(rec_or.path().inst_path(), "rec_or");
         assert_eq!(rec_or.or.path().inst_path(), "rec_or.or");
         assert_eq!(
@@ -564,11 +719,11 @@ mod tests {
             "Expected rec_or.rec_or_1 to be None, got {:?}",
             rec_or.rec_or_1
         );
-        let rec_or_search_result = RecursiveOr::<Search>::query(&driver, rec_or.path());
+        let rec_or_search_result = DoubleRecOr::<Search>::query(&driver, rec_or.path());
         assert_eq!(
             rec_or_search_result.len(),
-            6,
-            "Expected 6 matches for RecursiveOr, got {}",
+            10,
+            "Expected 10 matches for DoubleRecOr, got {}",
             rec_or_search_result.len()
         );
     }
