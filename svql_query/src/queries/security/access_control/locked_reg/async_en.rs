@@ -2,12 +2,6 @@ use crate::instance::Instance;
 use crate::netlist::{Netlist, SearchableNetlist};
 use crate::{lookup, Match, QueryMatch, Search, State, Wire, WithPath};
 
-// input [15:0] data_in,
-// input clk,
-// input resetn,
-// input write_en,
-// output reg [15:0] data_out
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AsyncEnLockedReg<S>
 where

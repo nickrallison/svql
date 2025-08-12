@@ -42,5 +42,14 @@ pub trait MatchedComposite: Composite<Match> {
     }
 
 }
-// impl<S> MatchedComposite for S where S: Composite<Match> {
-// }
+
+pub trait EnumComposite<S> where S: State {}
+
+pub trait SearchableEnumComposite: EnumComposite<Search> {
+    type Hit;
+    fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
+}
+
+pub trait MatchedEnumComposite: EnumComposite<Match> {
+    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>>;
+}
