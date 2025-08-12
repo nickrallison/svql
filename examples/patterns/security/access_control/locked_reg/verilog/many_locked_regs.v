@@ -1,22 +1,8 @@
 // many_locked_regs.v
-// ------------------------------------------------------------
-// Example top‑level module that instantiates 2× each locked‑
-// register type (total 8 instances).  The RTLIL files are
-// converted to Verilog (see the “packing RTLIL” section below)
-// and then included with `include` statements.
-// ------------------------------------------------------------
-
 `timescale 1ns/1ps
 
-// ------------------------------------------------------------------
-// Include the generated Verilog versions of the RTLIL modules.
-// The include paths assume the generated files are placed next to
-// this file (or adjust the relative path as needed).
-// ------------------------------------------------------------------
-
 // #### NOTE ####
-// The en modules do not work, they parse as muxes inside of yosys
-
+// The en modules do not work, they parse as muxes inside of yosys, need to use .il files instead.
 `include "async_en.v"
 `include "async_mux.v"
 `include "sync_en.v"

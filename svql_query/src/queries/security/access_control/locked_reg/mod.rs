@@ -78,7 +78,6 @@ mod tests {
     fn test_locked_reg_many_v() {
 
         let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v");
-        // let design = PathBuf::from("generated/many_locked_regs.il");
 
         let module_name = "many_locked_regs".to_string();
 
