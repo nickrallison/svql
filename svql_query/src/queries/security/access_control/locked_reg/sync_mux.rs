@@ -143,4 +143,30 @@ mod tests {
             sync_mux_search_result.len()
         );
     }
+
+    #[test]
+    fn test_sync_mux_on_bad_sync_en() {
+
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/verilog/sync_en.v");
+        let module_name = "sync_en".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+
+        let sync_mux = SyncMuxLockedReg::<Search>::root("sync_mux".to_string());
+        assert_eq!(sync_mux.path().inst_path(), "sync_mux");
+        assert_eq!(sync_mux.data_in.path.inst_path(), "sync_mux.data_in");
+        assert_eq!(sync_mux.clk.path.inst_path(), "sync_mux.clk");
+        assert_eq!(sync_mux.resetn.path.inst_path(), "sync_mux.resetn");
+        assert_eq!(sync_mux.write_en.path.inst_path(), "sync_mux.write_en");
+        assert_eq!(sync_mux.data_out.path.inst_path(), "sync_mux.data_out");
+
+        let sync_mux_search_result = SyncMuxLockedReg::<Search>::query(&driver, sync_mux.path());
+        assert_eq!(
+            sync_mux_search_result.len(),
+            1,
+            "Expected 1 match for SyncMuxLockedReg, got {}",
+            sync_mux_search_result.len()
+        );
+    }
 }

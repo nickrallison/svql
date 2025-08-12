@@ -140,7 +140,7 @@ fn get_command_args_slice(svql_driver: &Path, design: &Design, module_name: &str
         "-p".to_string(),
         format!("hierarchy -top {}", module_name),
         "-p".to_string(),
-        "proc".to_string(),
+        "proc; flatten; opt_clean".to_string(),
         "-p".to_string(),
         format!("svql_driver -net -port {}", port),
     ]

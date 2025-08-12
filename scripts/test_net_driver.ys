@@ -1,0 +1,4 @@
+read_verilog examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v
+hierarchy -top many_locked_regs
+proc; flatten; opt_clean
+svql_driver -net -port 9999

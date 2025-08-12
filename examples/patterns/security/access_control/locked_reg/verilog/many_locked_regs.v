@@ -8,6 +8,20 @@
 
 `timescale 1ns/1ps
 
+// ------------------------------------------------------------------
+// Include the generated Verilog versions of the RTLIL modules.
+// The include paths assume the generated files are placed next to
+// this file (or adjust the relative path as needed).
+// ------------------------------------------------------------------
+
+// #### NOTE ####
+// The en modules do not work, they parse as muxes inside of yosys
+
+`include "async_en.v"
+`include "async_mux.v"
+`include "sync_en.v"
+`include "sync_mux.v"
+
 module many_locked_regs (
     input  wire        clk,
     input  wire        rst_n,

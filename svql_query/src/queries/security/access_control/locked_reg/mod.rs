@@ -66,3 +66,49 @@ impl MatchedEnumComposite for LockedReg<Match> {
         vec![]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::queries::security::access_control::locked_reg::LockedReg;
+
+    #[test]
+    fn test_locked_reg_many_v() {
+
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v");
+        // let design = PathBuf::from("generated/many_locked_regs.il");
+
+        let module_name = "many_locked_regs".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+        let locked_reg_search_result = LockedReg::<Search>::query(&driver, Instance::root("many_locked_regs".to_string()));
+
+        assert_eq!(
+            locked_reg_search_result.len(),
+            8,
+            "Expected 8 matches for LockedReg, got {}",
+            locked_reg_search_result.len()
+        );
+    }
+
+    #[test]
+    fn test_locked_reg_many_il() {
+
+        let design = PathBuf::from("examples/patterns/security/access_control/locked_reg/rtlil/many_locked_regs.il");
+        let module_name = "many_locked_regs".to_string();
+
+        let driver = Driver::new_proc(design, module_name).expect("Failed to create proc driver");
+
+        let locked_reg_search_result = LockedReg::<Search>::query(&driver, Instance::root("many_locked_regs".to_string()));
+
+        assert_eq!(
+            locked_reg_search_result.len(),
+            8,
+            "Expected 8 matches for LockedReg, got {}",
+            locked_reg_search_result.len()
+        );
+    }
+}

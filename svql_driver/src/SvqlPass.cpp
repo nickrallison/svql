@@ -561,12 +561,16 @@ RTLIL::Design *SvqlPass::setup_needle_design(const SvqlRuntimeConfig &cfg,
                  : "verilog"));
         f.close();
 
-        if (pat_filename.size() <= 3 ||
-            pat_filename.compare(pat_filename.size() - 3, std::string::npos,
-                                 ".il") != 0) {
-            Pass::call(needle_design, "proc");
-            Pass::call(needle_design, "opt_clean");
-        }
+        // if (pat_filename.size() <= 3 ||
+        //     pat_filename.compare(pat_filename.size() - 3, std::string::npos,
+        //                          ".il") != 0) {
+        //     Pass::call(needle_design, "proc");
+        //     Pass::call(needle_design, "opt_clean");
+        // }
+        Pass::call(needle_design, "proc");
+        Pass::call(needle_design, "flatten");
+        Pass::call(needle_design, "opt_clean");
+
     }
     return needle_design;
 }
