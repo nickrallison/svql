@@ -187,3 +187,39 @@ pub fn find_gate_subgraphs_by_anchor_kind(
 
     results
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{cell_index, get_name, read_input};
+
+    use super::*;
+
+    #[test]
+    fn test_many_regs() {
+        let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
+        let haystack_design = read_input(None, haystack_path.to_string()).expect("Failed to read input design");
+        let haystack_name = get_name(&haystack_path);
+
+        let needle_path = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
+        let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
+        let needle_name = get_name(&needle_path);
+
+        // Compute anchor kinds by product of gate counts across the two designs
+        let anchors = cell_index::anchor_kinds_by_product(&haystack_design, &needle_design);
+        println!("Anchor kinds by product (rarest first):");
+        for (k, prod) in &anchors {
+            println!("  {:?} -> product {}", k, prod);
+        }
+
+        let chosen_kind = if let Some((k, _)) = anchors.first() {
+            *k
+        } else {
+            panic!("No anchor kinds found");
+        };
+
+        // Find subgraphs using the chosen anchor kind
+        let matches = find_gate_subgraphs_by_anchor_kind(&needle_design, &haystack_design, chosen_kind);
+        assert_eq!(matches.len(), 2, "Expected exactly two matches for {} with {}", needle_name, haystack_name);
+
+    }
+}

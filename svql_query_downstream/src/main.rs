@@ -15,10 +15,19 @@ use cell_index::{CellTypeIndex, CellKind};
 
 
 fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
+
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let path = Path::new(&name);
+    let abs_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        workspace.join(path)
+    };
+
     if name.ends_with(".uir") {
-        Ok(prjunnamed_netlist::parse(target, &std::fs::read_to_string(name)?)?)
+        Ok(prjunnamed_netlist::parse(target, &std::fs::read_to_string(abs_path)?)?)
     } else if name.ends_with(".json") {
-        let designs = prjunnamed_yosys_json::import(target, &mut File::open(name)?)?;
+        let designs = prjunnamed_yosys_json::import(target, &mut File::open(abs_path)?)?;
         assert_eq!(designs.len(), 1, "can only convert single-module Yosys JSON to Unnamed IR");
         Ok(designs.into_values().next().unwrap())
     } else if name.is_empty() {
@@ -37,7 +46,6 @@ fn get_name(name: &str) -> String {
 
 fn main() {
     // env logger
-
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
@@ -50,7 +58,7 @@ fn main() {
     let haystack_design = read_input(None, haystack_path.to_string()).expect("Failed to read input design");
     let haystack_name = get_name(&haystack_path);
 
-    let needle_path = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
+    let needle_path = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
     let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
     let needle_name = get_name(&needle_path);
 
