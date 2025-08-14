@@ -1,6 +1,7 @@
 
-use std::path::{Path, PathBuf};
+use std::{cell, error::Error, fs::File, path::{Path, PathBuf}, sync::Arc};
 
+use prjunnamed_netlist::Target;
 use svql_query::{composite::SearchableComposite, netlist::SearchableNetlist, queries::security::access_control::locked_reg::{sync_en::SyncEnLockedReg, sync_mux::SyncMuxLockedReg}};
 use svql_driver_handler::{proc::ProcDriver, Driver};
 use svql_query::{Match, Search, WithPath};
@@ -9,6 +10,22 @@ use crate::and::AndAB;
 
 mod and;
 
+
+fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
+    if name.ends_with(".uir") {
+        Ok(prjunnamed_netlist::parse(target, &std::fs::read_to_string(name)?)?)
+    } else if name.ends_with(".json") {
+        let designs = prjunnamed_yosys_json::import(target, &mut File::open(name)?)?;
+        assert_eq!(designs.len(), 1, "can only convert single-module Yosys JSON to Unnamed IR");
+        Ok(designs.into_values().next().unwrap())
+    } else if name.is_empty() {
+        panic!("no input provided")
+    } else {
+        panic!("don't know what to do with input {name:?}")
+    }
+}
+
+
 fn main() {
     // env logger
 
@@ -16,30 +33,12 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    // let design = PathBuf::from("examples/larger_designs/opentitan_otbn.il");
-    // let module_name = "otbn_core".to_string();
+    let design_path = PathBuf::from("examples/larger_designs/otbn.json");
+    let design = read_input(None, design_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
-    // let proc_driver = ProcDriver::new(design, module_name).expect("Failed to create proc driver");
-    // let cmd = proc_driver.get_command();
-    // println!("Command: {}", cmd);
-    // let driver = Driver::from(proc_driver);
-
-    let driver = Driver::new_net("localhost:9999".to_string());
-
-    let sync_mux = SyncMuxLockedReg::<Search>::root("sync_mux".to_string());
-    assert_eq!(sync_mux.path().inst_path(), "sync_mux");
-    assert_eq!(sync_mux.data_in.path.inst_path(), "sync_mux.data_in");
-    assert_eq!(sync_mux.clk.path.inst_path(), "sync_mux.clk");
-    assert_eq!(sync_mux.resetn.path.inst_path(), "sync_mux.resetn");
-    assert_eq!(sync_mux.write_en.path.inst_path(), "sync_mux.write_en");
-    assert_eq!(sync_mux.data_out.path.inst_path(), "sync_mux.data_out");
-
-    let sync_mux_search_result = SyncMuxLockedReg::<Search>::query(&driver, sync_mux.path());
-    assert_eq!(
-        sync_mux_search_result.len(),
-        4,
-        "Expected 4 matches for SyncMuxLockedReg, got {}",
-        sync_mux_search_result.len()
-    );
+    for cell in design.iter_cells_topo() {
+        let cell_name = format!("{:?}", cell.get());
+        println!("Processing cell: {cell_name}");
+    }
 
 }

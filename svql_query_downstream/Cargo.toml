@@ -13,3 +13,7 @@ lazy_static.workspace = true
 openport.workspace = true
 env_logger.workspace = true
 log.workspace = true
+
+####
+prjunnamed-netlist.workspace = true
+prjunnamed-yosys_json.workspace = true

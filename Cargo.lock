@@ -662,6 +662,8 @@ dependencies = [
  "lazy_static",
  "log",
  "openport",
+ "prjunnamed-netlist",
+ "prjunnamed-yosys_json",
  "regex",
  "svql_common",
  "svql_driver_handler",

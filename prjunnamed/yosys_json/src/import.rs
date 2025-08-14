@@ -317,12 +317,23 @@ impl ModuleImporter<'_> {
     fn handle_cell(&mut self, name: &str, cell: &yosys::CellDetails) -> Result<(), Error> {
         let _guard = self.use_attribute_metadata(&self.design, name, &cell.attributes);
 
-        match &cell.type_[..] {
+        // if cell.type is of the pattern $_NAME_, change it to $name
+        let type_ = if cell.type_.starts_with("$_") && cell.type_.ends_with('_') {
+            format!("${}", &cell.type_[2..cell.type_.len() - 1]).to_lowercase()
+        } else {
+            cell.type_.to_lowercase()
+        };
+
+        // panic!("Move this section to caller where cell is mut")
+        // panic!("cell: {name:?}, type: {type_:?}, connections: {:?}", cell.connections);
+        
+
+        match type_.as_str() {
             "$not" | "$pos" | "$neg" => {
                 let width = cell.parameters.get("Y_WIDTH").unwrap().as_i32()? as usize;
                 let a_signed = cell.parameters.get("A_SIGNED").unwrap().as_bool()?;
                 let a = self.value_ext(cell, "A", width, a_signed);
-                let value = match &cell.type_[..] {
+                let value = match type_.as_str() {
                     "$not" => self.design.add_not(a),
                     "$pos" => a,
                     "$neg" => {
@@ -336,7 +347,7 @@ impl ModuleImporter<'_> {
             "$reduce_and" | "$reduce_or" | "$reduce_xor" | "$reduce_xnor" | "$reduce_bool" | "$logic_not" => {
                 let width = cell.parameters.get("Y_WIDTH").unwrap().as_i32()? as usize;
                 let a = self.port_value(cell, "A");
-                let net = match &cell.type_[..] {
+                let net = match type_.as_str() {
                     "$reduce_and" => self.design.add_eq(Value::ones(a.len()), a),
                     "$reduce_or" | "$reduce_bool" => self.design.add_ne(Value::zero(a.len()), a),
                     "$reduce_xor" => {
@@ -372,7 +383,7 @@ impl ModuleImporter<'_> {
                 assert_eq!(a_signed, b_signed);
                 let a = self.value_ext(cell, "A", width, a_signed);
                 let b = self.value_ext(cell, "B", width, b_signed);
-                let value = match &cell.type_[..] {
+                let value = match type_.as_str() {
                     "$and" => self.design.add_and(a, b),
                     "$or" => self.design.add_or(a, b),
                     "$xor" => self.design.add_xor(a, b),
@@ -430,7 +441,7 @@ impl ModuleImporter<'_> {
                     }
                 }
                 let b = self.port_value(cell, "B");
-                let value = match &cell.type_[..] {
+                let value = match type_.as_str() {
                     "$shl" | "$sshl" => self.design.add_shl(a, b, 1),
                     "$shr" => self.design.add_ushr(a, b, 1),
                     "$sshr" => {
@@ -462,7 +473,7 @@ impl ModuleImporter<'_> {
                 };
                 self.port_drive(cell, "Y", &value[..width]);
             }
-            "$lt" | "$le" | "$gt" | "$ge" | "$eq" | "$ne" => {
+            "$lt" | "$le" | "$gt" | "$ge" | "$eq" | "$ne" | "$eqx" | "$nex" => {
                 let y_width = cell.parameters.get("Y_WIDTH").unwrap().as_i32()? as usize;
                 let a_width = cell.parameters.get("A_WIDTH").unwrap().as_i32()? as usize;
                 let b_width = cell.parameters.get("B_WIDTH").unwrap().as_i32()? as usize;
@@ -472,7 +483,7 @@ impl ModuleImporter<'_> {
                 assert_eq!(a_signed, b_signed);
                 let a = self.value_ext(cell, "A", width, a_signed);
                 let b = self.value_ext(cell, "B", width, b_signed);
-                let (mut net, inv) = match &cell.type_[..] {
+                let (mut net, inv) = match type_.as_str() {
                     "$lt" if !a_signed => (self.design.add_ult(a, b), false),
                     "$gt" if !a_signed => (self.design.add_ult(b, a), false),
                     "$le" if !a_signed => (self.design.add_ult(b, a), true),
@@ -483,6 +494,11 @@ impl ModuleImporter<'_> {
                     "$ge" if a_signed => (self.design.add_slt(a, b), true),
                     "$eq" => (self.design.add_eq(a, b), false),
                     "$ne" => (self.design.add_eq(a, b), true),
+
+                    // temp fix
+                    "$eqx" => (self.design.add_eq(a, b), false),
+                    "$nex" => (self.design.add_eq(a, b), true),
+
                     _ => unreachable!(),
                 };
                 if inv {
@@ -504,7 +520,7 @@ impl ModuleImporter<'_> {
                 let b = self.port_value(cell, "B");
                 let b = self.design.add_eq(Value::zero(b.len()), b);
                 let b = self.design.add_not(b);
-                let mut value = match &cell.type_[..] {
+                let mut value = match type_.as_str() {
                     "$logic_and" => self.design.add_and(a, b),
                     "$logic_or" => self.design.add_or(a, b),
                     _ => unreachable!(),
