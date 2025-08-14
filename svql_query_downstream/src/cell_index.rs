@@ -178,3 +178,30 @@ pub fn cells_of_kind<'a>(design: &'a Design, kind: CellKind) -> Vec<CellRef<'a>>
         .filter(|c| CellKind::from(&*c.get()) == kind)
         .collect()
 }
+
+pub fn anchor_kinds_by_product(design_a: &Design, design_b: &Design) -> Vec<(CellKind, usize)> {
+    use std::collections::HashMap;
+
+    fn gate_counts(design: &Design) -> HashMap<CellKind, usize> {
+        let mut counts: HashMap<CellKind, usize> = HashMap::new();
+        for cell in design.iter_cells() {
+            let k = CellKind::from(&*cell.get());
+            if is_gate_kind(k) {
+                *counts.entry(k).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    let a = gate_counts(design_a);
+    let b = gate_counts(design_b);
+
+    let mut pairs: Vec<(CellKind, usize)> = a
+        .iter()
+        .filter_map(|(k, ca)| b.get(k).map(|cb| (*k, *ca * *cb)))
+        .filter(|(_k, prod)| *prod > 0)
+        .collect();
+
+    pairs.sort_by_key(|(_k, prod)| *prod);
+    pairs
+}

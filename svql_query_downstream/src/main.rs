@@ -46,9 +46,22 @@ fn main() {
     let sync_mux_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/sync_mux.json");
     let sync_mux_design = read_input(None, sync_mux_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
-    // for cell in sync_mux_design.iter_cells_topo().rev() {
-    //     println!("\nid: {}, cell: {:?}", cell.debug_index(), cell.get());
-    // }
+    
+    // Compute anchor kinds by product of gate counts across the two designs
+    let anchors = cell_index::anchor_kinds_by_product(&many_regs_design, &sync_mux_design);
+    println!("Anchor kinds by product (rarest first):");
+    for (k, prod) in &anchors {
+        println!("  {:?} -> product {}", k, prod);
+    }
+
+    let chosen_kind = if let Some((k, _)) = anchors.first() {
+        *k
+    } else {
+        panic!("No anchor kinds found");
+    };
+
+    
+
 
     // Demonstrate least-common gate kind and its cells (non-gate types filtered out)
     let index = CellTypeIndex::build(&sync_mux_design);
