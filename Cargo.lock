@@ -62,6 +62,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "argparse"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f8ebf5827e4ac4fd5946560e6a99776ea73b596d80898f357007317a7141e47"
+
+[[package]]
 name = "cc"
 version = "1.2.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -182,6 +188,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "easy-smt"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "515cd4ec35e586919a532a81ed1e9285e2502ed3f49ecb9ba75fa3fe29eb950f"
+dependencies = [
+ "log",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -295,6 +311,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jzon"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ab85f84ca42c5ec520e6f3c9966ba1fd62909ce260f8837e248857d2560509"
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -364,6 +386,84 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "prjunnamed-cli"
+version = "0.1.0"
+dependencies = [
+ "argparse",
+ "env_logger",
+ "prjunnamed-generic",
+ "prjunnamed-graphviz",
+ "prjunnamed-netlist",
+ "prjunnamed-pattern",
+ "prjunnamed-siliconblue",
+ "prjunnamed-yosys_json",
+]
+
+[[package]]
+name = "prjunnamed-generic"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-netlist",
+ "prjunnamed-pattern",
+]
+
+[[package]]
+name = "prjunnamed-graphviz"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-netlist",
+]
+
+[[package]]
+name = "prjunnamed-lut"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-netlist",
+]
+
+[[package]]
+name = "prjunnamed-memory"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-netlist",
+]
+
+[[package]]
+name = "prjunnamed-netlist"
+version = "0.1.0"
+dependencies = [
+ "easy-smt",
+ "env_logger",
+ "indexmap",
+ "yap",
+]
+
+[[package]]
+name = "prjunnamed-pattern"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-netlist",
+]
+
+[[package]]
+name = "prjunnamed-siliconblue"
+version = "0.1.0"
+dependencies = [
+ "prjunnamed-generic",
+ "prjunnamed-lut",
+ "prjunnamed-memory",
+ "prjunnamed-netlist",
+]
+
+[[package]]
+name = "prjunnamed-yosys_json"
+version = "0.1.0"
+dependencies = [
+ "jzon",
+ "prjunnamed-netlist",
 ]
 
 [[package]]
@@ -569,6 +669,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "svql_subgraph_isomorphism"
+version = "0.1.0"
+
+[[package]]
 name = "syn"
 version = "2.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -613,6 +717,12 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"
@@ -713,6 +823,12 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "yap"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe269e7b803a5e8e20cbd97860e136529cd83bf2c9c6d37b142467e7e1f051f"
 
 [[package]]
 name = "zerocopy"

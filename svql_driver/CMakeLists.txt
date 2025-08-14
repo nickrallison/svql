@@ -26,7 +26,7 @@ find_package(Boost REQUIRED)
 # --- Source files ----------------------------------------------------------
 set (SVQL_SRC
     src/GraphConversion.cpp
-    src/SubCircuitReSolver.cpp
+    src/SubCircuitSolver.cpp
     src/SvqlPass.cpp
 )
 

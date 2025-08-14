@@ -1,0 +1,23 @@
+[package]
+name = "prjunnamed-netlist"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+doctest = false
+
+[features]
+trace = []
+verify = ["easy-smt"]
+
+[dependencies]
+indexmap.workspace = true
+yap.workspace = true
+easy-smt = { workspace = true, optional = true }
+
+[dev-dependencies]
+env_logger.workspace = true

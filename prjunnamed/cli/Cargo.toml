@@ -1,0 +1,29 @@
+[package]
+name = "prjunnamed-cli"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "prjunnamed"
+path = "src/main.rs"
+
+[dependencies]
+prjunnamed-netlist.workspace = true
+prjunnamed-pattern.workspace = true
+prjunnamed-generic.workspace = true
+prjunnamed-yosys_json.workspace = true
+prjunnamed-siliconblue.workspace = true
+prjunnamed-graphviz.workspace = true
+argparse.workspace = true
+env_logger.workspace = true
+
+[features]
+trace = [
+    "prjunnamed-netlist/trace",
+    "prjunnamed-pattern/trace",
+    "prjunnamed-generic/trace",
+]

@@ -2,7 +2,7 @@
 
 #include <optional>
 
-#include "SubCircuitReSolver.hpp"
+#include "SubCircuitSolver.hpp"
 #include "kernel/register.h"
 #include "kernel/rtlil.h"
 #include "kernel/yosys.h"
@@ -30,12 +30,12 @@ struct SvqlPass : public Pass {
     static std::optional<uint16_t> parse_args_net(
         size_t &argsidx, const std::vector<std::string> &args,
         std::string &error_msg);
-    static std::unique_ptr<SubCircuitReSolver> create_solver(
+    static std::unique_ptr<SubCircuitSolver> create_solver(
         const SvqlRuntimeConfig &cfg);
     static RTLIL::Design *setup_needle_design(const SvqlRuntimeConfig &cfg,
                                               std::string &error_msg);
     static std::optional<QueryMatchList> run_solver(
-        SubCircuitReSolver *solver, const SvqlRuntimeConfig &cfg,
+        SubCircuitSolver *solver, const SvqlRuntimeConfig &cfg,
         RTLIL::Design *needle, RTLIL::Design *haystack, std::string &error_msg);
 } SvqlPass;
 

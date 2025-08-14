@@ -9,7 +9,7 @@
 #include <thread>
 
 #include "GraphConversion.hpp"
-#include "SubCircuitReSolver.hpp"
+#include "SubCircuitSolver.hpp"
 #include "kernel/log.h"
 #include "kernel/rtlil.h"
 #include "kernel/sigtools.h"
@@ -437,9 +437,9 @@ std::optional<uint16_t> SvqlPass::parse_args_net(
     return port_found ? std::make_optional(port) : std::nullopt;
 }
 
-std::unique_ptr<SubCircuitReSolver> SvqlPass::create_solver(
+std::unique_ptr<SubCircuitSolver> SvqlPass::create_solver(
     const SvqlRuntimeConfig &cfg) {
-    auto solver = std::make_unique<SubCircuitReSolver>();
+    auto solver = std::make_unique<SubCircuitSolver>();
 
     if (cfg.verbose) solver->setVerbose();
     if (cfg.ignore_params) solver->ignoreParameters = true;
@@ -575,7 +575,7 @@ RTLIL::Design *SvqlPass::setup_needle_design(const SvqlRuntimeConfig &cfg,
     return needle_design;
 }
 
-std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitReSolver *solver,
+std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitSolver *solver,
                                                    const SvqlRuntimeConfig &cfg,
                                                    RTLIL::Design *needle_design,
                                                    RTLIL::Design *design,
@@ -611,7 +611,7 @@ std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitReSolver *solver,
     SubCircuit::Graph mod_graph;
     std::string graph_name = "needle_" + RTLIL::unescape_id(needle->name);
     log("Creating needle graph %s.\n", graph_name.c_str());
-    if (module2graph(mod_graph, needle, cfg.const_ports)) {
+    if (module2graph(mod_graph, needle, cfg.const_ports, nullptr, cfg.max_fanout, nullptr)) {
         solver->addGraph(graph_name, mod_graph);
         needle_map[graph_name] = needle;
     }
@@ -620,8 +620,7 @@ std::optional<QueryMatchList> SvqlPass::run_solver(SubCircuitReSolver *solver,
         SubCircuit::Graph mod_graph;
         std::string graph_name = "haystack_" + RTLIL::unescape_id(module->name);
         log("Creating haystack graph %s.\n", graph_name.c_str());
-        if (module2graph(mod_graph, module, cfg.const_ports, design, -1,
-                         nullptr)) {
+        if (module2graph(mod_graph, module, cfg.const_ports, design, cfg.max_fanout, nullptr)) {
             solver->addGraph(graph_name, mod_graph);
             haystack_map[graph_name] = module;
         }

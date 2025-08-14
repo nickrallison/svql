@@ -27,6 +27,7 @@ pub trait Netlist<S>: WithPath<S> where S: State {
 
         cfg.pat_module_name = Self::MODULE_NAME.into();
         cfg.verbose         = true;
+        cfg.max_fanout = 32;
         cfg
     }
 }

@@ -4,7 +4,18 @@ members = [
     "svql_driver_handler",
     "svql_pat",
     "svql_query",
-    "svql_query_downstream",
+    "svql_query_downstream", 
+    "svql_subgraph_isomorphism",
+    ######
+    "prjunnamed/netlist",
+    "prjunnamed/pattern",
+    "prjunnamed/generic",
+    "prjunnamed/lut",
+    "prjunnamed/memory",
+    "prjunnamed/yosys_json",
+    "prjunnamed/siliconblue",
+    "prjunnamed/graphviz",
+    "prjunnamed/cli",
 ]
 resolver = "3"
 
@@ -14,6 +25,8 @@ svql_driver_handler = { path = "svql_driver_handler" }
 svql_pat = { path = "svql_pat" }
 svql_query = { path = "svql_query" }
 svql_query_downstream = { path = "svql_query_downstream" }
+svql_subgraph_isomorphism = { path = "svql_subgraph_isomorphism" }
+
 # ---------------------
 
 lazy_static = "1.5.0"
@@ -25,3 +38,29 @@ log = "0.4.27"
 env_logger = "0.11.5"
 itertools = "0.14.0"
 openport = { version = "0.1.1", features = ["rand"] }
+
+# ---------------------
+# PRJUNNAMED
+# ---------------------
+
+prjunnamed-netlist.path = "prjunnamed/netlist"
+prjunnamed-pattern.path = "prjunnamed/pattern"
+prjunnamed-generic.path = "prjunnamed/generic"
+prjunnamed-lut.path = "prjunnamed/lut"
+prjunnamed-memory.path = "prjunnamed/memory"
+prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
+prjunnamed-siliconblue.path = "prjunnamed/siliconblue"
+prjunnamed-graphviz.path = "prjunnamed/graphviz"
+indexmap = "2.7.1"
+yap = "0.12.0"
+easy-smt = "0.3"
+argparse = "0.2"
+jzon = "0.12.5"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "0BSD OR Apache-2.0"
+repository = "https://github.com/nickrallison/svql"
+authors = []
+rust-version = "1.91"

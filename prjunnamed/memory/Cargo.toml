@@ -1,0 +1,11 @@
+[package]
+name = "prjunnamed-memory"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+prjunnamed-netlist.workspace = true

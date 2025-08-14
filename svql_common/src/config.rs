@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[cxx::bridge]
 pub mod ffi {
 
-    #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct SvqlRuntimeConfig {
         pub pat_module_name: String,
         pub pat_filename: String,
@@ -20,6 +20,7 @@ pub mod ffi {
         pub wire_attr: Vec<String>,
         pub ignore_params: bool,
         pub ignored_parameters: Vec<IgnoreParam>,
+        pub max_fanout: i32,
     }
 
     #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -50,6 +51,26 @@ pub mod ffi {
     extern "Rust" {
         fn svql_runtime_config_into_json_string(cfg: &SvqlRuntimeConfig) -> String;
         fn svql_runtime_config_from_json_string(json: &str) -> SvqlRuntimeConfig;
+    }
+}
+
+impl Default for SvqlRuntimeConfig {
+    fn default() -> Self {
+        SvqlRuntimeConfig {
+            pat_module_name: String::new(),
+            pat_filename: String::new(),
+            verbose: false,
+            const_ports: false,
+            nodefaultswaps: false,
+            compat_pairs: Vec::new(),
+            swap_ports: Vec::new(),
+            perm_ports: Vec::new(),
+            cell_attr: Vec::new(),
+            wire_attr: Vec::new(),
+            ignore_params: false,
+            ignored_parameters: Vec::new(),
+            max_fanout: -1,
+        }
     }
 }
 
