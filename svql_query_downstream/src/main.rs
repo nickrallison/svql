@@ -9,6 +9,7 @@ use crate::and::AndAB;
 
 mod and;
 mod cell_index;
+mod subgraph; // added
 
 use cell_index::{CellTypeIndex, CellKind};
 
@@ -35,8 +36,8 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
-    // let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
+    let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
+    let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
 
     let many_regs_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json");
@@ -60,16 +61,19 @@ fn main() {
         panic!("No anchor kinds found");
     };
 
-    
+    // Find subgraphs using the chosen anchor kind
+    let matches = subgraph::find_gate_subgraphs_by_anchor_kind(&sync_mux_design, &many_regs_design, chosen_kind);
+    println!("Found {} subgraph matches for {:?} (needle sync_mux in haystack many_locked_regs).", matches.len(), chosen_kind);
+
 
 
     // Demonstrate least-common gate kind and its cells (non-gate types filtered out)
-    let index = CellTypeIndex::build(&sync_mux_design);
-    for (kind, cells) in index.iter_gate_kind_buckets_rarest_first() {
-        println!("Rarest gate kind: {:?}", kind);
-        for c in cells {
-            println!("gate {:?} -> id {}", kind, c.debug_index());
-        }
-        // break; // only show the rarest bucket
-    }
+    // let index = CellTypeIndex::build(&sync_mux_design);
+    // for (kind, cells) in index.iter_gate_kind_buckets_rarest_first() {
+    //     println!("Rarest gate kind: {:?}", kind);
+    //     for c in cells {
+    //         println!("gate {:?} -> id {}", kind, c.debug_index());
+    //     }
+    //     // break; // only show the rarest bucket
+    // }
 }
