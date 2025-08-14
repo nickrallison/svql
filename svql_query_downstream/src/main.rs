@@ -1,4 +1,3 @@
-
 use std::{cell, error::Error, fs::File, path::{Path, PathBuf}, sync::Arc};
 
 use prjunnamed_netlist::Target;
@@ -9,6 +8,9 @@ use svql_query::{Match, Search, WithPath};
 use crate::and::AndAB;
 
 mod and;
+mod cell_index;
+
+use cell_index::{CellTypeIndex, CellKind};
 
 
 fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
@@ -44,13 +46,17 @@ fn main() {
     let sync_mux_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/sync_mux.json");
     let sync_mux_design = read_input(None, sync_mux_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
-    
+    // for cell in sync_mux_design.iter_cells_topo().rev() {
+    //     println!("\nid: {}, cell: {:?}", cell.debug_index(), cell.get());
+    // }
 
-    // let 
-
-    // let cells = sync_mux_design.iter_cells_topo().collect::<Vec<_>>();
-    for cell in sync_mux_design.iter_cells_topo() {
-        println!("\nid: {}, cell: {:?}", cell.debug_index(), cell.get());
+    // Demonstrate least-common gate kind and its cells (non-gate types filtered out)
+    let index = CellTypeIndex::build(&sync_mux_design);
+    for (kind, cells) in index.iter_gate_kind_buckets_rarest_first() {
+        println!("Rarest gate kind: {:?}", kind);
+        for c in cells {
+            println!("gate {:?} -> id {}", kind, c.debug_index());
+        }
+        // break; // only show the rarest bucket
     }
-
 }
