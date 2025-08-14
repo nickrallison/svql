@@ -1,0 +1,1005 @@
+{
+  "creator": "Yosys 0.33 (git sha1 2584903a060)",
+  "modules": {
+    "many_locked_regs": {
+      "attributes": {
+        "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:11.1-127.10",
+        "top": "00000000000000000000000000000001"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "rst_n": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "async_en_data_in_0": {
+          "direction": "input",
+          "bits": [ 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 ]
+        },
+        "async_en_write_en_0": {
+          "direction": "input",
+          "bits": [ 20 ]
+        },
+        "async_en_data_out_0": {
+          "direction": "output",
+          "bits": [ 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ]
+        },
+        "async_en_data_in_1": {
+          "direction": "input",
+          "bits": [ 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52 ]
+        },
+        "async_en_write_en_1": {
+          "direction": "input",
+          "bits": [ 53 ]
+        },
+        "async_en_data_out_1": {
+          "direction": "output",
+          "bits": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ]
+        },
+        "async_mux_data_in_0": {
+          "direction": "input",
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85 ]
+        },
+        "async_mux_write_en_0": {
+          "direction": "input",
+          "bits": [ 86 ]
+        },
+        "async_mux_data_out_0": {
+          "direction": "output",
+          "bits": [ 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102 ]
+        },
+        "async_mux_data_in_1": {
+          "direction": "input",
+          "bits": [ 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118 ]
+        },
+        "async_mux_write_en_1": {
+          "direction": "input",
+          "bits": [ 119 ]
+        },
+        "async_mux_data_out_1": {
+          "direction": "output",
+          "bits": [ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 ]
+        },
+        "sync_en_data_in_0": {
+          "direction": "input",
+          "bits": [ 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151 ]
+        },
+        "sync_en_write_en_0": {
+          "direction": "input",
+          "bits": [ 152 ]
+        },
+        "sync_en_data_out_0": {
+          "direction": "output",
+          "bits": [ 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168 ]
+        },
+        "sync_en_data_in_1": {
+          "direction": "input",
+          "bits": [ 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184 ]
+        },
+        "sync_en_write_en_1": {
+          "direction": "input",
+          "bits": [ 185 ]
+        },
+        "sync_en_data_out_1": {
+          "direction": "output",
+          "bits": [ 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201 ]
+        },
+        "sync_mux_data_in_0": {
+          "direction": "input",
+          "bits": [ 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217 ]
+        },
+        "sync_mux_write_en_0": {
+          "direction": "input",
+          "bits": [ 218 ]
+        },
+        "sync_mux_data_out_0": {
+          "direction": "output",
+          "bits": [ 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234 ]
+        },
+        "sync_mux_data_in_1": {
+          "direction": "input",
+          "bits": [ 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250 ]
+        },
+        "sync_mux_write_en_1": {
+          "direction": "input",
+          "bits": [ 251 ]
+        },
+        "sync_mux_data_out_1": {
+          "direction": "output",
+          "bits": [ 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267 ]
+        }
+      },
+      "cells": {
+        "$flatten\\u_async_en_0.$auto$ff.cc:266:slice$13": {
+          "hide_name": 1,
+          "type": "$adffe",
+          "parameters": {
+            "ARST_POLARITY": "00000000000000000000000000000000",
+            "ARST_VALUE": "0000000000000000",
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:10.1-22.8"
+          },
+          "port_directions": {
+            "ARST": "input",
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "ARST": [ 3 ],
+            "CLK": [ 2 ],
+            "D": [ 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 ],
+            "EN": [ 20 ],
+            "Q": [ 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ]
+          }
+        },
+        "$flatten\\u_async_en_1.$auto$ff.cc:266:slice$13": {
+          "hide_name": 1,
+          "type": "$adffe",
+          "parameters": {
+            "ARST_POLARITY": "00000000000000000000000000000000",
+            "ARST_VALUE": "0000000000000000",
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:10.1-22.8"
+          },
+          "port_directions": {
+            "ARST": "input",
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "ARST": [ 3 ],
+            "CLK": [ 2 ],
+            "D": [ 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52 ],
+            "EN": [ 53 ],
+            "Q": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ]
+          }
+        },
+        "$flatten\\u_async_mux_0.$procdff$6": {
+          "hide_name": 1,
+          "type": "$adff",
+          "parameters": {
+            "ARST_POLARITY": "0",
+            "ARST_VALUE": "0000000000000000",
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:10.1-22.8"
+          },
+          "port_directions": {
+            "ARST": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "ARST": [ 3 ],
+            "CLK": [ 2 ],
+            "D": [ 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283 ],
+            "Q": [ 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102 ]
+          }
+        },
+        "$flatten\\u_async_mux_0.$procmux$4": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:15.10-22.8|examples/patterns/access_control/locked_register/verilog/async_mux.v:15.14-15.22"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102 ],
+            "B": [ 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85 ],
+            "S": [ 86 ],
+            "Y": [ 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283 ]
+          }
+        },
+        "$flatten\\u_async_mux_1.$procdff$6": {
+          "hide_name": 1,
+          "type": "$adff",
+          "parameters": {
+            "ARST_POLARITY": "0",
+            "ARST_VALUE": "0000000000000000",
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:10.1-22.8"
+          },
+          "port_directions": {
+            "ARST": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "ARST": [ 3 ],
+            "CLK": [ 2 ],
+            "D": [ 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299 ],
+            "Q": [ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 ]
+          }
+        },
+        "$flatten\\u_async_mux_1.$procmux$4": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:15.10-22.8|examples/patterns/access_control/locked_register/verilog/async_mux.v:15.14-15.22"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 ],
+            "B": [ 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118 ],
+            "S": [ 119 ],
+            "Y": [ 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299 ]
+          }
+        },
+        "$flatten\\u_sync_en_0.$auto$ff.cc:266:slice$33": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000000",
+            "SRST_VALUE": "0000000000000000",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:10.1-22.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151 ],
+            "EN": [ 152 ],
+            "Q": [ 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$flatten\\u_sync_en_1.$auto$ff.cc:266:slice$33": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000000",
+            "SRST_VALUE": "0000000000000000",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:10.1-22.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184 ],
+            "EN": [ 185 ],
+            "Q": [ 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$flatten\\u_sync_mux_0.$procdff$22": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:10.1-22.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315 ],
+            "Q": [ 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234 ]
+          }
+        },
+        "$flatten\\u_sync_mux_0.$procmux$17": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:15.10-22.8|examples/patterns/access_control/locked_register/verilog/sync_mux.v:15.14-15.22"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234 ],
+            "B": [ 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217 ],
+            "S": [ 218 ],
+            "Y": [ 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331 ]
+          }
+        },
+        "$flatten\\u_sync_mux_0.$procmux$20": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:11.5-22.8|examples/patterns/access_control/locked_register/verilog/sync_mux.v:11.9-11.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "B": [ 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331 ],
+            "S": [ 3 ],
+            "Y": [ 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315 ]
+          }
+        },
+        "$flatten\\u_sync_mux_1.$procdff$22": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:10.1-22.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347 ],
+            "Q": [ 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267 ]
+          }
+        },
+        "$flatten\\u_sync_mux_1.$procmux$17": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:15.10-22.8|examples/patterns/access_control/locked_register/verilog/sync_mux.v:15.14-15.22"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267 ],
+            "B": [ 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250 ],
+            "S": [ 251 ],
+            "Y": [ 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363 ]
+          }
+        },
+        "$flatten\\u_sync_mux_1.$procmux$20": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:11.5-22.8|examples/patterns/access_control/locked_register/verilog/sync_mux.v:11.9-11.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "B": [ 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363 ],
+            "S": [ 3 ],
+            "Y": [ 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347 ]
+          }
+        }
+      },
+      "netnames": {
+        "$flatten\\u_async_mux_0.$0\\data_out[15:0]": {
+          "hide_name": 1,
+          "bits": [ 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:10.1-22.8"
+          }
+        },
+        "$flatten\\u_async_mux_1.$0\\data_out[15:0]": {
+          "hide_name": 1,
+          "bits": [ 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:10.1-22.8"
+          }
+        },
+        "$flatten\\u_sync_mux_0.$0\\data_out[15:0]": {
+          "hide_name": 1,
+          "bits": [ 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:10.1-22.8"
+          }
+        },
+        "$flatten\\u_sync_mux_0.$procmux$17_Y": {
+          "hide_name": 1,
+          "bits": [ 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331 ],
+          "attributes": {
+          }
+        },
+        "$flatten\\u_sync_mux_1.$0\\data_out[15:0]": {
+          "hide_name": 1,
+          "bits": [ 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:10.1-22.8"
+          }
+        },
+        "$flatten\\u_sync_mux_1.$procmux$17_Y": {
+          "hide_name": 1,
+          "bits": [ 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363 ],
+          "attributes": {
+          }
+        },
+        "async_en_data_in_0": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:16.24-16.42"
+          }
+        },
+        "async_en_data_in_1": {
+          "hide_name": 0,
+          "bits": [ 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:20.24-20.42"
+          }
+        },
+        "async_en_data_out_0": {
+          "hide_name": 0,
+          "bits": [ 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:18.24-18.43"
+          }
+        },
+        "async_en_data_out_1": {
+          "hide_name": 0,
+          "bits": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:22.24-22.43"
+          }
+        },
+        "async_en_write_en_0": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:17.24-17.43"
+          }
+        },
+        "async_en_write_en_1": {
+          "hide_name": 0,
+          "bits": [ 53 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:21.24-21.43"
+          }
+        },
+        "async_mux_data_in_0": {
+          "hide_name": 0,
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:25.24-25.43"
+          }
+        },
+        "async_mux_data_in_1": {
+          "hide_name": 0,
+          "bits": [ 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:29.24-29.43"
+          }
+        },
+        "async_mux_data_out_0": {
+          "hide_name": 0,
+          "bits": [ 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:27.24-27.44"
+          }
+        },
+        "async_mux_data_out_1": {
+          "hide_name": 0,
+          "bits": [ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:31.24-31.44"
+          }
+        },
+        "async_mux_write_en_0": {
+          "hide_name": 0,
+          "bits": [ 86 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:26.24-26.44"
+          }
+        },
+        "async_mux_write_en_1": {
+          "hide_name": 0,
+          "bits": [ 119 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:30.24-30.44"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:12.24-12.27"
+          }
+        },
+        "rst_n": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:13.24-13.29"
+          }
+        },
+        "sync_en_data_in_0": {
+          "hide_name": 0,
+          "bits": [ 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:34.24-34.41"
+          }
+        },
+        "sync_en_data_in_1": {
+          "hide_name": 0,
+          "bits": [ 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:38.24-38.41"
+          }
+        },
+        "sync_en_data_out_0": {
+          "hide_name": 0,
+          "bits": [ 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:36.24-36.42"
+          }
+        },
+        "sync_en_data_out_1": {
+          "hide_name": 0,
+          "bits": [ 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:40.24-40.42"
+          }
+        },
+        "sync_en_write_en_0": {
+          "hide_name": 0,
+          "bits": [ 152 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:35.24-35.42"
+          }
+        },
+        "sync_en_write_en_1": {
+          "hide_name": 0,
+          "bits": [ 185 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:39.24-39.42"
+          }
+        },
+        "sync_mux_data_in_0": {
+          "hide_name": 0,
+          "bits": [ 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:43.24-43.42"
+          }
+        },
+        "sync_mux_data_in_1": {
+          "hide_name": 0,
+          "bits": [ 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:47.24-47.42"
+          }
+        },
+        "sync_mux_data_out_0": {
+          "hide_name": 0,
+          "bits": [ 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:45.24-45.43"
+          }
+        },
+        "sync_mux_data_out_1": {
+          "hide_name": 0,
+          "bits": [ 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:49.24-49.43"
+          }
+        },
+        "sync_mux_write_en_0": {
+          "hide_name": 0,
+          "bits": [ 218 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:44.24-44.43"
+          }
+        },
+        "sync_mux_write_en_1": {
+          "hide_name": 0,
+          "bits": [ 251 ],
+          "attributes": {
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:48.24-48.43"
+          }
+        },
+        "u_async_en_0.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_async_en_0 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:4.7-4.10"
+          }
+        },
+        "u_async_en_0.data_in": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 ],
+          "attributes": {
+            "hdlname": "u_async_en_0 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:3.14-3.21"
+          }
+        },
+        "u_async_en_0.data_out": {
+          "hide_name": 0,
+          "bits": [ 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+          "attributes": {
+            "hdlname": "u_async_en_0 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:7.19-7.27"
+          }
+        },
+        "u_async_en_0.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_async_en_0 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:5.7-5.13"
+          }
+        },
+        "u_async_en_0.write_en": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "hdlname": "u_async_en_0 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:54.14-60.6|examples/patterns/access_control/locked_register/verilog/async_en.v:6.7-6.15"
+          }
+        },
+        "u_async_en_1.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_async_en_1 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:4.7-4.10"
+          }
+        },
+        "u_async_en_1.data_in": {
+          "hide_name": 0,
+          "bits": [ 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52 ],
+          "attributes": {
+            "hdlname": "u_async_en_1 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:3.14-3.21"
+          }
+        },
+        "u_async_en_1.data_out": {
+          "hide_name": 0,
+          "bits": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+          "attributes": {
+            "hdlname": "u_async_en_1 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:7.19-7.27"
+          }
+        },
+        "u_async_en_1.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_async_en_1 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:5.7-5.13"
+          }
+        },
+        "u_async_en_1.write_en": {
+          "hide_name": 0,
+          "bits": [ 53 ],
+          "attributes": {
+            "hdlname": "u_async_en_1 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:62.14-68.6|examples/patterns/access_control/locked_register/verilog/async_en.v:6.7-6.15"
+          }
+        },
+        "u_async_mux_0.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_async_mux_0 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:4.7-4.10"
+          }
+        },
+        "u_async_mux_0.data_in": {
+          "hide_name": 0,
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85 ],
+          "attributes": {
+            "hdlname": "u_async_mux_0 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:3.14-3.21"
+          }
+        },
+        "u_async_mux_0.data_out": {
+          "hide_name": 0,
+          "bits": [ 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102 ],
+          "attributes": {
+            "hdlname": "u_async_mux_0 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:7.19-7.27"
+          }
+        },
+        "u_async_mux_0.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_async_mux_0 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:5.7-5.13"
+          }
+        },
+        "u_async_mux_0.write_en": {
+          "hide_name": 0,
+          "bits": [ 86 ],
+          "attributes": {
+            "hdlname": "u_async_mux_0 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:73.15-79.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:6.7-6.15"
+          }
+        },
+        "u_async_mux_1.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_async_mux_1 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:4.7-4.10"
+          }
+        },
+        "u_async_mux_1.data_in": {
+          "hide_name": 0,
+          "bits": [ 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118 ],
+          "attributes": {
+            "hdlname": "u_async_mux_1 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:3.14-3.21"
+          }
+        },
+        "u_async_mux_1.data_out": {
+          "hide_name": 0,
+          "bits": [ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 ],
+          "attributes": {
+            "hdlname": "u_async_mux_1 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:7.19-7.27"
+          }
+        },
+        "u_async_mux_1.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_async_mux_1 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:5.7-5.13"
+          }
+        },
+        "u_async_mux_1.write_en": {
+          "hide_name": 0,
+          "bits": [ 119 ],
+          "attributes": {
+            "hdlname": "u_async_mux_1 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:81.15-87.6|examples/patterns/access_control/locked_register/verilog/async_mux.v:6.7-6.15"
+          }
+        },
+        "u_sync_en_0.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_sync_en_0 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:4.7-4.10"
+          }
+        },
+        "u_sync_en_0.data_in": {
+          "hide_name": 0,
+          "bits": [ 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151 ],
+          "attributes": {
+            "hdlname": "u_sync_en_0 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:3.14-3.21"
+          }
+        },
+        "u_sync_en_0.data_out": {
+          "hide_name": 0,
+          "bits": [ 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168 ],
+          "attributes": {
+            "hdlname": "u_sync_en_0 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:7.19-7.27"
+          }
+        },
+        "u_sync_en_0.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_sync_en_0 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:5.7-5.13"
+          }
+        },
+        "u_sync_en_0.write_en": {
+          "hide_name": 0,
+          "bits": [ 152 ],
+          "attributes": {
+            "hdlname": "u_sync_en_0 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:92.13-98.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:6.7-6.15"
+          }
+        },
+        "u_sync_en_1.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_sync_en_1 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:4.7-4.10"
+          }
+        },
+        "u_sync_en_1.data_in": {
+          "hide_name": 0,
+          "bits": [ 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184 ],
+          "attributes": {
+            "hdlname": "u_sync_en_1 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:3.14-3.21"
+          }
+        },
+        "u_sync_en_1.data_out": {
+          "hide_name": 0,
+          "bits": [ 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201 ],
+          "attributes": {
+            "hdlname": "u_sync_en_1 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:7.19-7.27"
+          }
+        },
+        "u_sync_en_1.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_sync_en_1 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:5.7-5.13"
+          }
+        },
+        "u_sync_en_1.write_en": {
+          "hide_name": 0,
+          "bits": [ 185 ],
+          "attributes": {
+            "hdlname": "u_sync_en_1 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:100.13-106.6|examples/patterns/access_control/locked_register/verilog/sync_en.v:6.7-6.15"
+          }
+        },
+        "u_sync_mux_0.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_0 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:4.7-4.10"
+          }
+        },
+        "u_sync_mux_0.data_in": {
+          "hide_name": 0,
+          "bits": [ 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_0 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:3.14-3.21"
+          }
+        },
+        "u_sync_mux_0.data_out": {
+          "hide_name": 0,
+          "bits": [ 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_0 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:7.19-7.27"
+          }
+        },
+        "u_sync_mux_0.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_0 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:5.7-5.13"
+          }
+        },
+        "u_sync_mux_0.write_en": {
+          "hide_name": 0,
+          "bits": [ 218 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_0 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:111.14-117.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:6.7-6.15"
+          }
+        },
+        "u_sync_mux_1.clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_1 clk",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:4.7-4.10"
+          }
+        },
+        "u_sync_mux_1.data_in": {
+          "hide_name": 0,
+          "bits": [ 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_1 data_in",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:3.14-3.21"
+          }
+        },
+        "u_sync_mux_1.data_out": {
+          "hide_name": 0,
+          "bits": [ 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_1 data_out",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:7.19-7.27"
+          }
+        },
+        "u_sync_mux_1.resetn": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_1 resetn",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:5.7-5.13"
+          }
+        },
+        "u_sync_mux_1.write_en": {
+          "hide_name": 0,
+          "bits": [ 251 ],
+          "attributes": {
+            "hdlname": "u_sync_mux_1 write_en",
+            "src": "examples/patterns/security/access_control/locked_reg/verilog/many_locked_regs.v:119.14-125.6|examples/patterns/access_control/locked_register/verilog/sync_mux.v:6.7-6.15"
+          }
+        }
+      }
+    }
+  }
+}

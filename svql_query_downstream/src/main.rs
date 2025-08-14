@@ -33,12 +33,24 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let design_path = PathBuf::from("examples/larger_designs/otbn.json");
-    let design = read_input(None, design_path.to_string_lossy().to_string()).expect("Failed to read input design");
+    // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
+    // let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
-    for cell in design.iter_cells_topo() {
-        let cell_name = format!("{:?}", cell.get());
-        println!("Processing cell: {cell_name}");
+
+    let many_regs_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json");
+    let many_regs_design = read_input(None, many_regs_path.to_string_lossy().to_string()).expect("Failed to read input design");
+
+
+    let sync_mux_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/sync_mux.json");
+    let sync_mux_design = read_input(None, sync_mux_path.to_string_lossy().to_string()).expect("Failed to read input design");
+
+    
+
+    // let 
+
+    // let cells = sync_mux_design.iter_cells_topo().collect::<Vec<_>>();
+    for cell in sync_mux_design.iter_cells_topo() {
+        println!("\nid: {}, cell: {:?}", cell.debug_index(), cell.get());
     }
 
 }
