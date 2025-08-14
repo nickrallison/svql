@@ -28,6 +28,12 @@ fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunname
     }
 }
 
+fn get_name(name: &str) -> String {
+    let path = PathBuf::from(name);
+    let file_stem = PathBuf::from(path.file_stem().unwrap());
+    let file_name = path.file_name().unwrap().to_string_lossy();
+    file_name.to_string()
+}
 
 fn main() {
     // env logger
@@ -36,20 +42,21 @@ fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
-    let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
+    // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
+    // let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
 
-    let many_regs_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json");
-    let many_regs_design = read_input(None, many_regs_path.to_string_lossy().to_string()).expect("Failed to read input design");
+    let many_regs_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
+    let many_regs_design = read_input(None, many_regs_path.to_string()).expect("Failed to read input design");
 
 
-    let sync_mux_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/sync_mux.json");
-    let sync_mux_design = read_input(None, sync_mux_path.to_string_lossy().to_string()).expect("Failed to read input design");
+    let needle_path = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
+    let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
 
-    
+    let needle_name = get_name(&needle_path);
+
     // Compute anchor kinds by product of gate counts across the two designs
-    let anchors = cell_index::anchor_kinds_by_product(&many_regs_design, &sync_mux_design);
+    let anchors = cell_index::anchor_kinds_by_product(&many_regs_design, &needle_design);
     println!("Anchor kinds by product (rarest first):");
     for (k, prod) in &anchors {
         println!("  {:?} -> product {}", k, prod);
@@ -62,8 +69,8 @@ fn main() {
     };
 
     // Find subgraphs using the chosen anchor kind
-    let matches = subgraph::find_gate_subgraphs_by_anchor_kind(&sync_mux_design, &many_regs_design, chosen_kind);
-    println!("Found {} subgraph matches for {:?} (needle sync_mux in haystack many_locked_regs).", matches.len(), chosen_kind);
+    let matches = subgraph::find_gate_subgraphs_by_anchor_kind(&needle_design, &many_regs_design, chosen_kind);
+    println!("Found {} subgraph matches for {:?} (needle {} in haystack many_locked_regs).", matches.len(), chosen_kind, needle_name);
 
 
 
