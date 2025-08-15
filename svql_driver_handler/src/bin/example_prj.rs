@@ -18,10 +18,16 @@ fn main() {
         let needle_name = get_name(&needle_path);
 
         // Find subgraphs using the chosen anchor kind
-        let matches: Vec<std::collections::HashMap<usize, usize>> = subgraph::find_subgraphs(&needle_design, &haystack_design);
+        let matches = subgraph::find_subgraphs(&needle_design, &haystack_design);
         assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, against haystack {}, got {}", needle_name, haystack_name, matches.len());
 
-        
+        for (i, match_map) in matches.iter().enumerate() {
+            println!("Match {} ({} pairs):", i + 1, match_map.len());
+            for (k, v) in match_map.iter() {
+                println!("  {} -> {}", k.debug_index(), v.debug_index());
+            }
+        }
+
 
 
 }

@@ -79,6 +79,47 @@ impl From<&Cell> for CellKind {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct SubgraphMatch<'p, 'd> {
+    pub pattern_to_design: HashMap<CellRef<'p>, CellRef<'d>>,
+}
+
+impl<'p, 'd> SubgraphMatch<'p, 'd> {
+    pub fn len(&self) -> usize { self.pattern_to_design.len() }
+    pub fn is_empty(&self) -> bool { self.pattern_to_design.is_empty() }
+}
+
+impl<'p, 'd> Iterator for SubgraphMatch<'p, 'd> {
+    type Item = (CellRef<'p>, CellRef<'d>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pattern_to_design.iter().next().map(|(k, v)| (*k, *v))
+    }
+}
+
+impl<'a, 'p, 'd> IntoIterator for &'a SubgraphMatch<'p, 'd> {
+    type Item = (&'a CellRef<'p>, &'a CellRef<'d>);
+    type IntoIter = std::collections::hash_map::Iter<'a, CellRef<'p>, CellRef<'d>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.pattern_to_design.iter()
+    }
+}
+
+impl<'a, 'p, 'd> IntoIterator for &'a mut SubgraphMatch<'p, 'd> {
+    type Item = (&'a CellRef<'p>, &'a mut CellRef<'d>);
+    type IntoIter = std::collections::hash_map::IterMut<'a, CellRef<'p>, CellRef<'d>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.pattern_to_design.iter_mut()
+    }
+}
+
+impl<'p, 'd> IntoIterator for SubgraphMatch<'p, 'd> {
+    type Item = (CellRef<'p>, CellRef<'d>);
+    type IntoIter = std::collections::hash_map::IntoIter<CellRef<'p>, CellRef<'d>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.pattern_to_design.into_iter()
+    }
+}
+
 fn count_cells_by_kind(design: &Design) -> Vec<(CellKind, usize)> {
     let mut counts = HashMap::new();
     for cell in design.iter_cells() {
@@ -121,7 +162,7 @@ fn is_gate_kind(kind: CellKind) -> bool {
 
 // Rename: build_precells -> collect_gate_cells, with clearer variable names
 fn collect_gate_cells<'a>(design: &'a Design) -> (
-    Vec<(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>)>,
+    Vec<(CellRef<'a>, CellKind, Vec<Result<(CellRef<'a>, usize), Trit>>)>,
     HashMap<usize, usize>,
     HashMap<CellKind, Vec<usize>>,
 ) {
@@ -132,10 +173,10 @@ fn collect_gate_cells<'a>(design: &'a Design) -> (
     for cell in design.iter_cells() {
         let kind = cell_kind(&*cell.get());
         if !is_gate_kind(kind) { continue; }
-        let mut input_connections: Vec<Result<(usize, usize), Trit>> = Vec::new();
+        let mut input_connections: Vec<Result<(CellRef<'a>, usize), Trit>> = Vec::new();
         cell.visit(|net| {
             match design.find_cell(net) {
-                Ok((src, bit)) => input_connections.push(Ok((src.debug_index(), bit))),
+                Ok((src, bit)) => input_connections.push(Ok((src, bit))),
                 Err(trit) => input_connections.push(Err(trit)),
             }
         });
@@ -149,18 +190,18 @@ fn collect_gate_cells<'a>(design: &'a Design) -> (
 }
 
 // Rename: compatible_inputs -> are_inputs_compatible
-fn are_inputs_compatible(
-    pattern_inputs: &[Result<(usize, usize), Trit>],
-    design_inputs: &[Result<(usize, usize), Trit>],
-    pattern_to_design: &HashMap<usize, usize>,
+fn are_inputs_compatible<'p, 'd>(
+    pattern_inputs: &[Result<(CellRef<'p>, usize), Trit>],
+    design_inputs: &[Result<(CellRef<'d>, usize), Trit>],
+    pattern_to_design: &HashMap<CellRef<'p>, CellRef<'d>>,
 ) -> bool {
     if pattern_inputs.len() != design_inputs.len() { return false; }
     for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
         match (p_in, d_in) {
             (Err(a), Err(b)) => { if a != b { return false; } },
             (Ok((p_src, p_bit)), Ok((d_src, d_bit))) => {
-                if let Some(&mapped_d_src) = pattern_to_design.get(p_src) {
-                    if mapped_d_src != *d_src || p_bit != d_bit { return false; }
+                if let Some(mapped_d_src) = pattern_to_design.get(p_src) {
+                    if mapped_d_src != d_src || p_bit != d_bit { return false; }
                 }
             }
             _ => return false,
@@ -170,44 +211,48 @@ fn are_inputs_compatible(
 }
 
 // Rename: choose_next_needle -> choose_next_pattern_cell_index
-fn choose_next_pattern_cell_index<'a>(
-    pattern_cells: &[(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
-    mapped_pattern_indices: &HashSet<usize>,
-    pattern_to_design: &HashMap<usize, usize>,
+fn choose_next_pattern_cell_index<'p>(
+    pattern_cells: &[(CellRef<'p>, CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>) ],
+    mapped_pattern_indices: &HashSet<CellRef<'p>>,
+    pattern_to_design: &SubgraphMatch<'p, '_>,
 ) -> Option<usize> {
     // Prefer cells whose inputs are all constants or mapped sources, to minimize branching
     for (i, (cref, _kind, inputs)) in pattern_cells.iter().enumerate() {
-        if mapped_pattern_indices.contains(&cref.debug_index()) { continue; }
+        if mapped_pattern_indices.contains(cref) { continue; }
         let mut all_sources_mapped = true;
         for inp in inputs {
             if let Ok((src, _)) = inp {
-                if !pattern_to_design.contains_key(src) { all_sources_mapped = false; break; }
+                if !pattern_to_design.pattern_to_design.contains_key(src) { all_sources_mapped = false; break; }
             }
         }
         if all_sources_mapped { return Some(i); }
     }
     // fallback: first unmapped
     for (i, (cref, ..)) in pattern_cells.iter().enumerate() {
-        if !mapped_pattern_indices.contains(&cref.debug_index()) { return Some(i); }
+        if !mapped_pattern_indices.contains(cref) { return Some(i); }
     }
     None
 }
 
 // Rename: backtrack -> backtrack_mappings, and rename parameters
-fn backtrack_mappings<'a>(
-    pattern_cells: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
-    design_cells: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
+fn backtrack_mappings<'p, 'd>(
+    pattern_cells: &[(CellRef<'p>, CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>) ],
+    design_cells: &[(CellRef<'d>, CellKind, Vec<Result<(CellRef<'d>, usize), Trit>>) ],
     design_cells_by_kind: &HashMap<CellKind, Vec<usize>>,
-    pattern_to_design: &mut HashMap<usize, usize>,
-    used_design_indices: &mut HashSet<usize>,
-    mappings_out: &mut Vec<HashMap<usize, usize>>,
+    pattern_to_design: &mut SubgraphMatch<'p, 'd>,
+    used_design_indices: &mut HashSet<CellRef<'d>>,
+    mappings_out: &mut Vec<SubgraphMatch<'p, 'd>>,
 ) {
-    if pattern_to_design.len() == pattern_cells.len() {
+    if pattern_to_design.pattern_to_design.len() == pattern_cells.len() {
         mappings_out.push(pattern_to_design.clone());
         return;
     }
 
-    let mapped_pattern_indices: HashSet<usize> = pattern_to_design.keys().copied().collect();
+    let mapped_pattern_indices: HashSet<CellRef<'p>> = pattern_to_design
+        .pattern_to_design
+        .keys()
+        .copied()
+        .collect();
     let Some(next_pattern_idx) = choose_next_pattern_cell_index(pattern_cells, &mapped_pattern_indices, pattern_to_design) else { return; };
     let (pattern_cref, pattern_kind, pattern_inputs) = &pattern_cells[next_pattern_idx];
 
@@ -215,23 +260,23 @@ fn backtrack_mappings<'a>(
 
     for &design_pos in design_candidate_positions {
         let (design_cref, _d_kind, design_inputs) = &design_cells[design_pos];
-        let pattern_key = pattern_cref.debug_index();
-        let design_key = design_cref.debug_index();
+        let pattern_key = *pattern_cref;
+        let design_key = *design_cref;
         if used_design_indices.contains(&design_key) { continue; }
-        if !are_inputs_compatible(pattern_inputs, design_inputs, pattern_to_design) { continue; }
+        if !are_inputs_compatible(pattern_inputs, design_inputs, &pattern_to_design.pattern_to_design) { continue; }
 
-        pattern_to_design.insert(pattern_key, design_key);
+        pattern_to_design.pattern_to_design.insert(pattern_key, design_key);
         used_design_indices.insert(design_key);
         backtrack_mappings(pattern_cells, design_cells, design_cells_by_kind, pattern_to_design, used_design_indices, mappings_out);
         used_design_indices.remove(&design_key);
-        pattern_to_design.remove(&pattern_key);
+        pattern_to_design.pattern_to_design.remove(&pattern_key);
     }
 }
 
-pub fn find_subgraphs(
-    pattern: &Design,
-    design: &Design,
-) -> Vec<HashMap<usize, usize>> {
+pub fn find_subgraphs<'p, 'd>(
+    pattern: &'p Design,
+    design: &'d Design,
+) -> Vec<SubgraphMatch<'p, 'd>> {
 
     let pattern_cell_types = count_cells_by_kind(pattern).into_iter().filter(|(kind, _)| is_gate_kind(*kind)).collect::<Vec<_>>();
     let design_cell_types = count_cells_by_kind(design).into_iter().filter(|(kind, _)| is_gate_kind(*kind)).collect::<Vec<_>>();
@@ -266,27 +311,27 @@ pub fn find_subgraphs(
         .map(|(i, _)| i)
         .collect();
 
-    let mut mappings = Vec::new();
+    let mut mappings: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
 
     let Some(pattern_anchor_index) = pattern_anchor_indices.first().copied() else {
         log::warn!("Pattern has no anchor cells of kind {:?}", anchor_kind);
         return mappings; // No anchors means no matches
     };
-    let pattern_anchor_key = pattern_cells_all[pattern_anchor_index].0.debug_index();
+    let pattern_anchor_key = pattern_cells_all[pattern_anchor_index].0;
 
     for &design_anchor_index in &design_anchor_indices {
-        let mut pattern_to_design_map: HashMap<usize, usize> = HashMap::new();
-        let mut used_design: HashSet<usize> = HashSet::new();
+        let mut mapping = SubgraphMatch { pattern_to_design: HashMap::new() };
+        let mut used_design: HashSet<CellRef<'d>> = HashSet::new();
 
-        let design_anchor_key = design_cells_all[design_anchor_index].0.debug_index();
-        pattern_to_design_map.insert(pattern_anchor_key, design_anchor_key);
+        let design_anchor_key = design_cells_all[design_anchor_index].0;
+        mapping.pattern_to_design.insert(pattern_anchor_key, design_anchor_key);
         used_design.insert(design_anchor_key);
 
         backtrack_mappings(
             &pattern_cells_all,
             &design_cells_all,
             &design_cells_by_kind,
-            &mut pattern_to_design_map,
+            &mut mapping,
             &mut used_design,
             &mut mappings,
         );
