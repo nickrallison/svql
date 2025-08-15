@@ -1,20 +1,15 @@
 use log::{error, trace};
-use svql_common::config::ffi::SvqlRuntimeConfig;
-use std::{path::{self, Path, PathBuf}, process::{Child, Stdio}};
+use std::{path::{Path, PathBuf}, process::Stdio};
 
-use crate::{net::{NetDriver, SvqlDriverNetError}, Driver, DriverIterator};
-
-use tempfile::{NamedTempFile, TempPath};
+use crate::{config::Config, read_input_to_design, subgraph::SubgraphMatch};
 
 #[derive(Debug)]
-pub struct PrjUnnamedDriver {
-    temp_json_file_loc: NamedTempFile,
-    design: Design,
+pub struct Driver {
+    design: prjunnamed_netlist::Design,
     module_name: String,
 }
 
-
-impl PrjUnnamedDriver {
+impl Driver {
     pub fn new(design: PathBuf, module_name: String) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = which::which("yosys")
@@ -25,12 +20,12 @@ impl PrjUnnamedDriver {
             workspace.join(design)
         };
 
-        let design = Design::new(design).map_err(|e| format!("Failed to create design: {}", e))?;
+        let design = DesignPath::new(design).map_err(|e| format!("Failed to create design: {}", e))?;
 
         Self::new_yosys(design, module_name, yosys)
     }
 
-    pub fn new_yosys(design: Design, module_name: String, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new_yosys(design: DesignPath, module_name: String, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         trace!("new_yosys called with yosys: {:?}, design: {:?}, module_name: {}", yosys, design, module_name);
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()).into());
@@ -67,8 +62,14 @@ impl PrjUnnamedDriver {
             return Err(format!("Yosys process failed with status: {:?}\nStderr: {}", exit_status, stderr_str).into());
         }
 
-        let driver = PrjUnnamedDriver {
-            temp_json_file_loc: json_temp_file,
+        let design = read_input_to_design(None, json_temp_file.path().to_string_lossy().to_string())
+            .map_err(|e| format!("Failed to read input design from Yosys output: {}", e))?;
+
+
+        // drop the tempfile to delete it
+        let _ = json_temp_file;
+
+        let driver = Driver {
             design,
             module_name,
         };
@@ -78,36 +79,36 @@ impl PrjUnnamedDriver {
 
     
 
-    pub fn query(&self, cfg: &SvqlRuntimeConfig) -> Result<DriverIterator, SvqlDriverNetError> {
+    pub fn query<'p>(&self, cfg: &Config) -> Vec<SubgraphMatch> {
         trace!("ProcDriver::query called with config: {:?}", cfg);
         todo!()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum Design {
+pub enum DesignPath {
     Verilog(PathBuf),
     Rtlil(PathBuf),
     Json(PathBuf),
 }
 
-impl Design {
+impl DesignPath {
     pub fn new(path: PathBuf) -> Result<Self, String> {
         if path.extension().and_then(|s| s.to_str()) == Some("v") {
-            Ok(Design::Verilog(path))
+            Ok(DesignPath::Verilog(path))
         } else if path.extension().and_then(|s| s.to_str()) == Some("il") {
-            Ok(Design::Rtlil(path))
+            Ok(DesignPath::Rtlil(path))
         } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            Ok(Design::Json(path))
+            Ok(DesignPath::Json(path))
         } else {
             Err(format!("Unsupported design file extension: {:?}", path.extension()))
         }
     }
     pub fn path(&self) -> &Path {
         match self {
-            Design::Verilog(p) => p,
-            Design::Rtlil(p) => p,
-            Design::Json(p) => p,
+            DesignPath::Verilog(p) => p,
+            DesignPath::Rtlil(p) => p,
+            DesignPath::Json(p) => p,
         }
     }
     pub fn exists(&self) -> bool {
@@ -115,12 +116,12 @@ impl Design {
     }
 }
 
-fn get_command_args_slice(design: &Design, module_name: &str, json_out: &Path) -> Vec<String> {
+fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Path) -> Vec<String> {
 
     let read_cmd = match design {
-        Design::Verilog(_) => "read_verilog",
-        Design::Rtlil(_) => "read_rtlil",
-        Design::Json(_) => "read_json",
+        DesignPath::Verilog(_) => "read_verilog",
+        DesignPath::Rtlil(_) => "read_rtlil",
+        DesignPath::Json(_) => "read_json",
     };
 
     vec![
@@ -135,7 +136,7 @@ fn get_command_args_slice(design: &Design, module_name: &str, json_out: &Path) -
     ]
 }
 
-fn get_command(yosys: &Path, design: &Design, module_name: &str, json_out: &Path) -> String {
+fn get_command(yosys: &Path, design: &DesignPath, module_name: &str, json_out: &Path) -> String {
     let args = get_command_args_slice(design, module_name, json_out);
     let args = args.into_iter().map(|s| 
         match s.contains(" ") {

@@ -6,10 +6,7 @@ edition = "2024"
 [lib]
 
 [dependencies]
-
-svql_common.workspace = true
-svql_driver_handler.workspace = true
-# svql_query_proc_macro.workspace = true
+svql_driver.workspace = true
 
 # ---------------------
 serde.workspace = true
@@ -19,3 +16,6 @@ lazy_static.workspace = true
 log.workspace = true
 itertools.workspace = true
 regex.workspace = true
+
+# ---------------------
+prjunnamed-netlist.workspace = true

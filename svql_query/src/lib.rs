@@ -1,16 +1,10 @@
 use crate::instance::Instance;
-use std::{collections::HashMap, hash::Hash};
-use svql_common::id_string::IdString;
+use std::{hash::Hash};
 
 pub mod composite;
 pub mod instance;
 pub mod netlist;
 pub mod queries;
-
-// ########################
-// Type Definitions
-// ########################
-type QueryMatch = svql_common::matches::SanitizedQueryMatch;
 
 // ########################
 // Type State Tags
@@ -23,17 +17,19 @@ pub trait QueryableState: State {}
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Match {
-    pub id: IdString,
+pub struct Match<'p, 'd> {
+    pub pat_meta: Option<prjunnamed_netlist::MetaItemRef<'p>>,
+    pub design_meta: Option<prjunnamed_netlist::MetaItemRef<'d>>,
 }
 
 impl State for Search {}
-impl State for Match {}
+impl State for Match<'_, '_> {}
 impl QueryableState for Search {}
-impl Default for Match {
+impl Default for Match<'_, '_> {
     fn default() -> Self {
         Self {
-            id: IdString::Named("default".into()),
+            pat_meta: None,
+            design_meta: None,
         }
     }
 }
@@ -42,11 +38,9 @@ impl Default for Match {
 // Helpers
 // ########################
 
-pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a IdString> {
-    m.get(&IdString::Named(pin.into()))
-}
-
-// export
+// pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a IdString> {
+//     m.get(&IdString::Named(pin.into()))
+// }
 
 #[macro_export]
 macro_rules! impl_find_port {

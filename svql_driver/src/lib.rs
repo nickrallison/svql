@@ -1,11 +1,17 @@
+#![allow(dead_code)]
+
 use std::{error::Error, fs::File, path::{Path, PathBuf}, sync::Arc};
 
 use prjunnamed_netlist::Target;
 
-pub mod subgraph;
 pub mod driver;
+pub mod subgraph;
+pub mod config;
 
-pub fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
+pub use driver::Driver;
+pub use subgraph::SubgraphMatch;
+
+pub fn read_input_to_design(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let path = Path::new(&name);
     let abs_path = if path.is_absolute() {
@@ -15,15 +21,16 @@ pub fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjun
     };
 
     if name.ends_with(".uir") {
-        Ok(prjunnamed_netlist::parse(target, &std::fs::read_to_string(abs_path)?)?)
+        let design = prjunnamed_netlist::parse(target, &std::fs::read_to_string(abs_path)?)?;
+        Ok(design)
     } else if name.ends_with(".json") {
         let designs = prjunnamed_yosys_json::import(target, &mut File::open(abs_path)?)?;
         assert_eq!(designs.len(), 1, "can only convert single-module Yosys JSON to Unnamed IR");
         Ok(designs.into_values().next().unwrap())
     } else if name.is_empty() {
-        panic!("no input provided")
+        return Err("No input file provided".into());
     } else {
-        panic!("don't know what to do with input {name:?}")
+        return Err(format!("Don't know what to do with input {name:?}").into());
     }
 }
 
@@ -48,26 +55,26 @@ mod tests {
             .init();
 
         // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
-        // let otbn_design = read_input(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
+        // let otbn_design = read_input_to_design(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
         let haystack_path = "examples/larger_designs/otbn.json";
         // let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
-        let haystack_design = read_input(None, haystack_path.to_string()).expect("Failed to read input design");
+        let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
 
         let needle_path_1 = "examples/patterns/security/access_control/locked_reg/json/async_en.json";
-        let needle_design_1 = read_input(None, needle_path_1.to_string()).expect("Failed to read input design");
+        let needle_design_1 = read_input_to_design(None, needle_path_1.to_string()).expect("Failed to read input design");
         let needle_name_1 = get_name(&needle_path_1);
 
         let needle_path_2 = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
-        let needle_design_2 = read_input(None, needle_path_2.to_string()).expect("Failed to read input design");
+        let needle_design_2 = read_input_to_design(None, needle_path_2.to_string()).expect("Failed to read input design");
         let needle_name_2 = get_name(&needle_path_2);
 
         let needle_path_3 = "examples/patterns/security/access_control/locked_reg/json/sync_en.json";
-        let needle_design_3 = read_input(None, needle_path_3.to_string()).expect("Failed to read input design");
+        let needle_design_3 = read_input_to_design(None, needle_path_3.to_string()).expect("Failed to read input design");
         let needle_name_3 = get_name(&needle_path_3);
 
         let needle_path_4 = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
-        let needle_design_4 = read_input(None, needle_path_4.to_string()).expect("Failed to read input design");
+        let needle_design_4 = read_input_to_design(None, needle_path_4.to_string()).expect("Failed to read input design");
         let needle_name_4 = get_name(&needle_path_4);
 
         // Find subgraphs using the chosen anchor kind

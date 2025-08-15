@@ -92,6 +92,14 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
+impl std::fmt::Debug for SubgraphMatch<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_map()
+            .entries(self.pattern_to_design.iter().map(|(p, d)| (p.debug_index(), d.debug_index())))
+            .finish()
+    }
+}
+
 fn count_cells_by_kind(design: &Design) -> Vec<(CellKind, usize)> {
     let mut counts = HashMap::new();
     for cell in design.iter_cells() {
@@ -300,18 +308,18 @@ pub fn find_subgraphs<'p, 'd>(
 #[cfg(test)]
 mod tests {
 
-    use crate::prjunnamed::{get_name, read_input};
+    use crate::{get_name, read_input_to_design};
 
     use super::*;
 
     #[test]
     fn test_many_regs() {
         let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
-        let haystack_design = read_input(None, haystack_path.to_string()).expect("Failed to read input design");
+        let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
         let haystack_name = get_name(&haystack_path);
 
         let needle_path = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
-        let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
+        let needle_design = read_input_to_design(None, needle_path.to_string()).expect("Failed to read input design");
         let needle_name = get_name(&needle_path);
 
         // Find subgraphs using the chosen anchor kind

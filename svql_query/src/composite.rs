@@ -1,5 +1,5 @@
 use crate::{Connection, Match, Search, State, WithPath};
-use svql_driver_handler::Driver;
+use svql_driver::Driver;
 use crate::instance::Instance;
 
 pub trait Composite<S>: WithPath<S> where S: State {
@@ -11,7 +11,7 @@ pub trait SearchableComposite: Composite<Search> {
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
 }
 
-pub trait MatchedComposite: Composite<Match> {
+pub trait MatchedComposite<'p, 'd>: Composite<Match<'p, 'd>> {
 
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>>;
 
@@ -50,6 +50,6 @@ pub trait SearchableEnumComposite: EnumComposite<Search> {
     fn query(driver: &Driver, path: Instance) -> Vec<Self::Hit>;
 }
 
-pub trait MatchedEnumComposite: EnumComposite<Match> {
+pub trait MatchedEnumComposite<'p, 'd>: EnumComposite<Match<'p, 'd>> {
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>>;
 }

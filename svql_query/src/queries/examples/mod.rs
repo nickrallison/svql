@@ -3,11 +3,11 @@
 // ########################
 
 use crate::composite::{Composite, MatchedComposite, SearchableComposite};
-use svql_driver_handler::Driver;
+use svql_driver::Driver;
 use crate::instance::Instance;
 use crate::netlist::SearchableNetlist;
 use crate::queries::basic::and::And;
-use crate::{Connection, Match, Search, State, Wire, WithPath};
+use crate::{Connection, Match, Search, State, WithPath};
 use itertools::iproduct;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
