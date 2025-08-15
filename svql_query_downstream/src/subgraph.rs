@@ -119,46 +119,48 @@ fn is_gate_kind(kind: CellKind) -> bool {
     )
 }
 
-fn build_precells<'a>(design: &'a Design) -> (
+// Rename: build_precells -> collect_gate_cells, with clearer variable names
+fn collect_gate_cells<'a>(design: &'a Design) -> (
     Vec<(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>)>,
     HashMap<usize, usize>,
     HashMap<CellKind, Vec<usize>>,
 ) {
-    let mut precells = Vec::new();
-    let mut index_to_pos = HashMap::new();
-    let mut by_kind: HashMap<CellKind, Vec<usize>> = HashMap::new();
+    let mut cell_entries = Vec::new();
+    let mut cell_index_to_position = HashMap::new();
+    let mut cells_by_kind: HashMap<CellKind, Vec<usize>> = HashMap::new();
 
     for cell in design.iter_cells() {
         let kind = cell_kind(&*cell.get());
         if !is_gate_kind(kind) { continue; }
-        let mut inputs: Vec<Result<(usize, usize), Trit>> = Vec::new();
+        let mut input_connections: Vec<Result<(usize, usize), Trit>> = Vec::new();
         cell.visit(|net| {
             match design.find_cell(net) {
-                Ok((src, bit)) => inputs.push(Ok((src.debug_index(), bit))),
-                Err(trit) => inputs.push(Err(trit)),
+                Ok((src, bit)) => input_connections.push(Ok((src.debug_index(), bit))),
+                Err(trit) => input_connections.push(Err(trit)),
             }
         });
-        let pos = precells.len();
-        index_to_pos.insert(cell.debug_index(), pos);
-        by_kind.entry(kind).or_default().push(pos);
-        precells.push((cell, kind, inputs));
+        let position = cell_entries.len();
+        cell_index_to_position.insert(cell.debug_index(), position);
+        cells_by_kind.entry(kind).or_default().push(position);
+        cell_entries.push((cell, kind, input_connections));
     }
 
-    (precells, index_to_pos, by_kind)
+    (cell_entries, cell_index_to_position, cells_by_kind)
 }
 
-fn compatible_inputs(
-    needle_inputs: &[Result<(usize, usize), Trit>],
-    hay_inputs: &[Result<(usize, usize), Trit>],
-    map_n2h: &HashMap<usize, usize>,
+// Rename: compatible_inputs -> are_inputs_compatible
+fn are_inputs_compatible(
+    pattern_inputs: &[Result<(usize, usize), Trit>],
+    design_inputs: &[Result<(usize, usize), Trit>],
+    pattern_to_design: &HashMap<usize, usize>,
 ) -> bool {
-    if needle_inputs.len() != hay_inputs.len() { return false; }
-    for (n, h) in needle_inputs.iter().zip(hay_inputs.iter()) {
-        match (n, h) {
+    if pattern_inputs.len() != design_inputs.len() { return false; }
+    for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
+        match (p_in, d_in) {
             (Err(a), Err(b)) => { if a != b { return false; } },
-            (Ok((src, bit)), Ok((hsrc, hbit))) => {
-                if let Some(&mapped_hsrc) = map_n2h.get(src) {
-                    if mapped_hsrc != *hsrc || bit != hbit { return false; }
+            (Ok((p_src, p_bit)), Ok((d_src, d_bit))) => {
+                if let Some(&mapped_d_src) = pattern_to_design.get(p_src) {
+                    if mapped_d_src != *d_src || p_bit != d_bit { return false; }
                 }
             }
             _ => return false,
@@ -167,118 +169,127 @@ fn compatible_inputs(
     true
 }
 
-fn choose_next_needle<'a>(
-    needle: &[(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
-    mapped: &HashSet<usize>,
-    map_n2h: &HashMap<usize, usize>,
+// Rename: choose_next_needle -> choose_next_pattern_cell_index
+fn choose_next_pattern_cell_index<'a>(
+    pattern_cells: &[(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
+    mapped_pattern_indices: &HashSet<usize>,
+    pattern_to_design: &HashMap<usize, usize>,
 ) -> Option<usize> {
     // Prefer cells whose inputs are all constants or mapped sources, to minimize branching
-    for (i, (cref, _kind, inputs)) in needle.iter().enumerate() {
-        if mapped.contains(&cref.debug_index()) { continue; }
-        let mut ok = true;
+    for (i, (cref, _kind, inputs)) in pattern_cells.iter().enumerate() {
+        if mapped_pattern_indices.contains(&cref.debug_index()) { continue; }
+        let mut all_sources_mapped = true;
         for inp in inputs {
             if let Ok((src, _)) = inp {
-                if !map_n2h.contains_key(src) { ok = false; break; }
+                if !pattern_to_design.contains_key(src) { all_sources_mapped = false; break; }
             }
         }
-        if ok { return Some(i); }
+        if all_sources_mapped { return Some(i); }
     }
     // fallback: first unmapped
-    for (i, (cref, ..)) in needle.iter().enumerate() {
-        if !mapped.contains(&cref.debug_index()) { return Some(i); }
+    for (i, (cref, ..)) in pattern_cells.iter().enumerate() {
+        if !mapped_pattern_indices.contains(&cref.debug_index()) { return Some(i); }
     }
     None
 }
 
-fn backtrack<'a>(
-    needle: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
-    hay: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
-    hay_by_kind: &HashMap<CellKind, Vec<usize>>,
-    map_n2h: &mut HashMap<usize, usize>,
-    used_hay: &mut HashSet<usize>,
-    out: &mut Vec<HashMap<usize, usize>>,
+// Rename: backtrack -> backtrack_mappings, and rename parameters
+fn backtrack_mappings<'a>(
+    pattern_cells: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
+    design_cells: &'a [(CellRef<'a>, CellKind, Vec<Result<(usize, usize), Trit>>) ],
+    design_cells_by_kind: &HashMap<CellKind, Vec<usize>>,
+    pattern_to_design: &mut HashMap<usize, usize>,
+    used_design_indices: &mut HashSet<usize>,
+    mappings_out: &mut Vec<HashMap<usize, usize>>,
 ) {
-    if map_n2h.len() == needle.len() {
-        out.push(map_n2h.clone());
+    if pattern_to_design.len() == pattern_cells.len() {
+        mappings_out.push(pattern_to_design.clone());
         return;
     }
 
-    let mapped_needles: HashSet<usize> = map_n2h.keys().copied().collect();
-    let Some(n_idx) = choose_next_needle(needle, &mapped_needles, map_n2h) else { return; };
-    let (n_cref, n_kind, n_inputs) = &needle[n_idx];
+    let mapped_pattern_indices: HashSet<usize> = pattern_to_design.keys().copied().collect();
+    let Some(next_pattern_idx) = choose_next_pattern_cell_index(pattern_cells, &mapped_pattern_indices, pattern_to_design) else { return; };
+    let (pattern_cref, pattern_kind, pattern_inputs) = &pattern_cells[next_pattern_idx];
 
-    let Some(hcands_pos) = hay_by_kind.get(n_kind) else { return; };
+    let Some(design_candidate_positions) = design_cells_by_kind.get(pattern_kind) else { return; };
 
-    for &h_pos in hcands_pos {
-        let (h_cref, _h_kind, h_inputs) = &hay[h_pos];
-        let n_key = n_cref.debug_index();
-        let h_key = h_cref.debug_index();
-        if used_hay.contains(&h_key) { continue; }
-        if !compatible_inputs(n_inputs, h_inputs, map_n2h) { continue; }
+    for &design_pos in design_candidate_positions {
+        let (design_cref, _d_kind, design_inputs) = &design_cells[design_pos];
+        let pattern_key = pattern_cref.debug_index();
+        let design_key = design_cref.debug_index();
+        if used_design_indices.contains(&design_key) { continue; }
+        if !are_inputs_compatible(pattern_inputs, design_inputs, pattern_to_design) { continue; }
 
-        map_n2h.insert(n_key, h_key);
-        used_hay.insert(h_key);
-        backtrack(needle, hay, hay_by_kind, map_n2h, used_hay, out);
-        used_hay.remove(&h_key);
-        map_n2h.remove(&n_key);
+        pattern_to_design.insert(pattern_key, design_key);
+        used_design_indices.insert(design_key);
+        backtrack_mappings(pattern_cells, design_cells, design_cells_by_kind, pattern_to_design, used_design_indices, mappings_out);
+        used_design_indices.remove(&design_key);
+        pattern_to_design.remove(&pattern_key);
     }
 }
 
 pub fn find_subgraphs(
-    needle: &Design,
-    haystack: &Design,
+    pattern: &Design,
+    design: &Design,
 ) -> Vec<HashMap<usize, usize>> {
 
-    let needle_cell_types = count_cells_by_kind(needle);
-    let haystack_cell_types = count_cells_by_kind(haystack);
+    let pattern_cell_types = count_cells_by_kind(pattern);
+    let design_cell_types = count_cells_by_kind(design);
 
-    // find the smallest cell kind in the haystack that is also in the needle
-    let anchor_kind = needle_cell_types
+    // find the smallest cell kind in the design that is also in the pattern
+    let anchor_kind = pattern_cell_types
         .iter()
         .filter_map(|(kind, _)| {
-            haystack_cell_types.iter().find(|(hkind, _)| hkind == kind).map(|_| *kind)
+            design_cell_types.iter().find(|(d_kind, _)| d_kind == kind).map(|_| *kind)
         })
         .min_by_key(|kind| {
-            haystack_cell_types.iter().find(|(hkind, _)| hkind == kind)
+            design_cell_types.iter().find(|(d_kind, _)| d_kind == kind)
                 .map_or(usize::MAX, |(_, count)| *count)
         })
-        .expect("No common cell kind found between needle and haystack");
+        .expect("No common cell kind found between pattern and design");
 
-    // Build gate-only precells and buckets
-    let (n_precells_all, _n_index_to_pos, _) = build_precells(needle);
-    let (h_precells_all, _h_index_to_pos, h_by_kind) = build_precells(haystack);
+    // Build gate-only cell entries and buckets
+    let (pattern_cells_all, _pattern_index_to_pos, _) = collect_gate_cells(pattern);
+    let (design_cells_all, _design_index_to_pos, design_cells_by_kind) = collect_gate_cells(design);
 
     // Extract anchors
-    let n_anchors: Vec<usize> = n_precells_all
+    let pattern_anchor_indices: Vec<usize> = pattern_cells_all
         .iter()
         .enumerate()
-        .filter(|(_i, pc)| pc.1 == anchor_kind)
+        .filter(|(_, entry)| { let (_, kind, _) = entry; *kind == anchor_kind })
         .map(|(i, _)| i)
         .collect();
-    let h_anchors: Vec<usize> = h_precells_all
+    let design_anchor_indices: Vec<usize> = design_cells_all
         .iter()
         .enumerate()
-        .filter(|(_i, pc)| pc.1 == anchor_kind)
+        .filter(|(_, entry)| { let (_, kind, _) = entry; *kind == anchor_kind })
         .map(|(i, _)| i)
         .collect();
 
-    let mut results = Vec::new();
+    let mut mappings = Vec::new();
 
-    for &na in &n_anchors {
-        for &ha in &h_anchors {
-            let mut map_n2h: HashMap<usize, usize> = HashMap::new();
-            let mut used_hay: HashSet<usize> = HashSet::new();
+    for &p_anchor in &pattern_anchor_indices {
+        for &d_anchor in &design_anchor_indices {
+            let mut pattern_to_design_map: HashMap<usize, usize> = HashMap::new();
+            let mut used_design: HashSet<usize> = HashSet::new();
 
-            let n_key = n_precells_all[na].0.debug_index();
-            let h_key = h_precells_all[ha].0.debug_index();
-            map_n2h.insert(n_key, h_key);
-            used_hay.insert(h_key);
+            let pattern_key = pattern_cells_all[p_anchor].0.debug_index();
+            let design_key = design_cells_all[d_anchor].0.debug_index();
+            pattern_to_design_map.insert(pattern_key, design_key);
+            used_design.insert(design_key);
 
-            backtrack(&n_precells_all, &h_precells_all, &h_by_kind, &mut map_n2h, &mut used_hay, &mut results);
+            backtrack_mappings(
+                &pattern_cells_all,
+                &design_cells_all,
+                &design_cells_by_kind,
+                &mut pattern_to_design_map,
+                &mut used_design,
+                &mut mappings,
+            );
         }
     }
 
-    results
+    mappings
 }
 
 #[cfg(test)]
@@ -294,7 +305,7 @@ mod tests {
         let haystack_design = read_input(None, haystack_path.to_string()).expect("Failed to read input design");
         let haystack_name = get_name(&haystack_path);
 
-        let needle_path = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
+        let needle_path = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
         let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
         let needle_name = get_name(&needle_path);
 
