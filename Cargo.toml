@@ -15,7 +15,6 @@ members = [
     "prjunnamed/yosys_json",
     "prjunnamed/siliconblue",
     "prjunnamed/graphviz",
-    "prjunnamed/cli",
 ]
 resolver = "3"
 

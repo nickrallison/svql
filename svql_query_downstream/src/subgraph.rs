@@ -2,7 +2,91 @@ use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design, Trit};
 
-use crate::cell_index::CellKind;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CellKind {
+    Buf,
+    Not,
+    And,
+    Or,
+    Xor,
+    Mux,
+    Adc,
+    Aig,
+    Eq,
+    ULt,
+    SLt,
+    Shl,
+    UShr,
+    SShr,
+    XShr,
+    Mul,
+    UDiv,
+    UMod,
+    SDivTrunc,
+    SDivFloor,
+    SModTrunc,
+    SModFloor,
+    Match,
+    Assign,
+    Dff,
+    Memory,
+    IoBuf,
+    Target,
+    Other,
+    Input,
+    Output,
+    Name,
+    Debug,
+}
+
+impl From<&Cell> for CellKind {
+    fn from(c: &Cell) -> Self {
+        match c {
+            Cell::Buf(..) => CellKind::Buf,
+            Cell::Not(..) => CellKind::Not,
+            Cell::And(..) => CellKind::And,
+            Cell::Or(..) => CellKind::Or,
+            Cell::Xor(..) => CellKind::Xor,
+            Cell::Mux(..) => CellKind::Mux,
+            Cell::Adc(..) => CellKind::Adc,
+            Cell::Aig(..) => CellKind::Aig,
+            Cell::Eq(..) => CellKind::Eq,
+            Cell::ULt(..) => CellKind::ULt,
+            Cell::SLt(..) => CellKind::SLt,
+            Cell::Shl(..) => CellKind::Shl,
+            Cell::UShr(..) => CellKind::UShr,
+            Cell::SShr(..) => CellKind::SShr,
+            Cell::XShr(..) => CellKind::XShr,
+            Cell::Mul(..) => CellKind::Mul,
+            Cell::UDiv(..) => CellKind::UDiv,
+            Cell::UMod(..) => CellKind::UMod,
+            Cell::SDivTrunc(..) => CellKind::SDivTrunc,
+            Cell::SDivFloor(..) => CellKind::SDivFloor,
+            Cell::SModTrunc(..) => CellKind::SModTrunc,
+            Cell::SModFloor(..) => CellKind::SModFloor,
+            Cell::Match(..) => CellKind::Match,
+            Cell::Assign(..) => CellKind::Assign,
+            Cell::Dff(..) => CellKind::Dff,
+            Cell::Memory(..) => CellKind::Memory,
+            Cell::IoBuf(..) => CellKind::IoBuf,
+            Cell::Target(..) => CellKind::Target,
+            Cell::Other(..) => CellKind::Other,
+            Cell::Input(..) => CellKind::Input,
+            Cell::Output(..) => CellKind::Output,
+            Cell::Name(..) => CellKind::Name,
+            Cell::Debug(..) => CellKind::Debug,
+        }
+    }
+}
+
+fn count_cells_by_kind(design: &Design) -> Vec<(CellKind, usize)> {
+    let mut counts = HashMap::new();
+    for cell in design.iter_cells() {
+        let kind = cell_kind(&*cell.get());
+        *counts.entry(kind).or_insert(0) += 1;
+    }
+    counts.into_iter().collect::<Vec<_>>()
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum InputSig {
@@ -146,11 +230,26 @@ fn backtrack<'a>(
     }
 }
 
-pub fn find_gate_subgraphs_by_anchor_kind(
+pub fn find_subgraphs(
     needle: &Design,
     haystack: &Design,
-    anchor_kind: CellKind,
 ) -> Vec<HashMap<usize, usize>> {
+
+    let needle_cell_types = count_cells_by_kind(needle);
+    let haystack_cell_types = count_cells_by_kind(haystack);
+
+    // find the smallest cell kind in the haystack that is also in the needle
+    let anchor_kind = needle_cell_types
+        .iter()
+        .filter_map(|(kind, count)| {
+            haystack_cell_types.iter().find(|(hkind, _)| hkind == kind).map(|_| *kind)
+        })
+        .min_by_key(|kind| {
+            haystack_cell_types.iter().find(|(hkind, _)| hkind == kind)
+                .map_or(usize::MAX, |(_, count)| *count)
+        })
+        .expect("No common cell kind found between needle and haystack");
+
     // Build gate-only precells and buckets
     let (n_precells_all, n_index_to_pos, _) = build_precells(needle);
     let (h_precells_all, _h_index_to_pos, h_by_kind) = build_precells(haystack);
@@ -190,7 +289,8 @@ pub fn find_gate_subgraphs_by_anchor_kind(
 
 #[cfg(test)]
 mod tests {
-    use crate::{cell_index, get_name, read_input};
+
+    use crate::{get_name, read_input};
 
     use super::*;
 
@@ -204,21 +304,8 @@ mod tests {
         let needle_design = read_input(None, needle_path.to_string()).expect("Failed to read input design");
         let needle_name = get_name(&needle_path);
 
-        // Compute anchor kinds by product of gate counts across the two designs
-        let anchors = cell_index::anchor_kinds_by_product(&haystack_design, &needle_design);
-        println!("Anchor kinds by product (rarest first):");
-        for (k, prod) in &anchors {
-            println!("  {:?} -> product {}", k, prod);
-        }
-
-        let chosen_kind = if let Some((k, _)) = anchors.first() {
-            *k
-        } else {
-            panic!("No anchor kinds found");
-        };
-
         // Find subgraphs using the chosen anchor kind
-        let matches = find_gate_subgraphs_by_anchor_kind(&needle_design, &haystack_design, chosen_kind);
+        let matches = find_subgraphs(&needle_design, &haystack_design);
         assert_eq!(matches.len(), 2, "Expected exactly two matches for {} with {}", needle_name, haystack_name);
 
     }
