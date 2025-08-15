@@ -4,8 +4,6 @@ members = [
     "svql_driver_handler",
     "svql_pat",
     "svql_query",
-    "svql_query_downstream", 
-    "svql_subgraph_isomorphism",
     ######
     "prjunnamed/netlist",
     "prjunnamed/pattern",

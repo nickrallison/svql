@@ -9,3 +9,7 @@ svql_common.workspace = true
 openport.workspace = true
 thiserror.workspace = true
 log.workspace = true
+env_logger.workspace = true
+
+prjunnamed-netlist.workspace = true
+prjunnamed-yosys_json.workspace = true

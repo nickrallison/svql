@@ -268,24 +268,19 @@ pub fn find_subgraphs(
 
     let mut mappings = Vec::new();
 
-    let p_anchor: Option<usize> = pattern_anchor_indices.first().map(|i| *i);
-
-    if p_anchor.is_none() {
+    let Some(pattern_anchor_index) = pattern_anchor_indices.first().copied() else {
         log::warn!("Pattern has no anchor cells of kind {:?}", anchor_kind);
         return mappings; // No anchors means no matches
-    }
+    };
+    let pattern_anchor_key = pattern_cells_all[pattern_anchor_index].0.debug_index();
 
-    let p_anchor = p_anchor.unwrap();
-
-    // for &p_anchor in &pattern_anchor_indices {
-    for &d_anchor in &design_anchor_indices {
+    for &design_anchor_index in &design_anchor_indices {
         let mut pattern_to_design_map: HashMap<usize, usize> = HashMap::new();
         let mut used_design: HashSet<usize> = HashSet::new();
 
-        let pattern_key = pattern_cells_all[p_anchor].0.debug_index();
-        let design_key = design_cells_all[d_anchor].0.debug_index();
-        pattern_to_design_map.insert(pattern_key, design_key);
-        used_design.insert(design_key);
+        let design_anchor_key = design_cells_all[design_anchor_index].0.debug_index();
+        pattern_to_design_map.insert(pattern_anchor_key, design_anchor_key);
+        used_design.insert(design_anchor_key);
 
         backtrack_mappings(
             &pattern_cells_all,
@@ -296,7 +291,6 @@ pub fn find_subgraphs(
             &mut mappings,
         );
     }
-    // }
 
     mappings
 }
@@ -304,7 +298,7 @@ pub fn find_subgraphs(
 #[cfg(test)]
 mod tests {
 
-    use crate::{get_name, read_input};
+    use crate::prjunnamed::{get_name, read_input};
 
     use super::*;
 

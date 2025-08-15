@@ -602,8 +602,11 @@ dependencies = [
 name = "svql_driver_handler"
 version = "0.1.0"
 dependencies = [
+ "env_logger",
  "log",
  "openport",
+ "prjunnamed-netlist",
+ "prjunnamed-yosys_json",
  "svql_common",
  "thiserror",
 ]
@@ -626,33 +629,13 @@ dependencies = [
  "itertools",
  "lazy_static",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "svql_common",
  "svql_driver_handler",
  "thiserror",
 ]
-
-[[package]]
-name = "svql_query_downstream"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "itertools",
- "lazy_static",
- "log",
- "openport",
- "prjunnamed-netlist",
- "prjunnamed-yosys_json",
- "regex",
- "svql_common",
- "svql_driver_handler",
- "svql_query",
-]
-
-[[package]]
-name = "svql_subgraph_isomorphism"
-version = "0.1.0"
 
 [[package]]
 name = "syn"
