@@ -23,8 +23,11 @@ fn main() {
 
         for (i, match_map) in matches.iter().enumerate() {
             println!("Match {} ({} pairs):", i + 1, match_map.len());
-            for (k, v) in match_map.iter() {
-                println!("  {} -> {}", k.debug_index(), v.debug_index());
+            for (needle_cell_ref, design_cell_ref) in match_map.iter() {
+                let needle_meta = needle_cell_ref.metadata();
+                let design_meta = design_cell_ref.metadata();
+                println!("Needle Cell: {:?}, \nDesign Cell: {:?}\n---\n", needle_meta.get(), design_meta.get());
+                // println!("  {:?} -> {:?}", needle_cell_ref.get().as_ref(), design_cell_ref.get().as_ref());
             }
         }
 
