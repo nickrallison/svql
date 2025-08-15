@@ -2,9 +2,10 @@ use std::{cell, error::Error, fs::File, path::{Path, PathBuf}, sync::Arc};
 
 use prjunnamed_netlist::Target;
 
-mod subgraph;
+pub mod subgraph;
+pub mod driver;
 
-fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
+pub fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let path = Path::new(&name);
     let abs_path = if path.is_absolute() {
@@ -26,7 +27,7 @@ fn read_input(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunname
     }
 }
 
-fn get_name(name: &str) -> String {
+pub fn get_name(name: &str) -> String {
     let path = PathBuf::from(name);
     let file_stem = PathBuf::from(path.file_stem().unwrap());
     let file_name = file_stem.file_name().unwrap().to_string_lossy();
