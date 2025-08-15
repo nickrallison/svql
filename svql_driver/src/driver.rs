@@ -85,14 +85,6 @@ impl Driver {
     }
 }
 
-#[derive(Clone)]
-pub struct SyncDriver(pub Arc<RwLock<Driver>>);
-
-impl From<Driver> for SyncDriver {
-    fn from(driver: Driver) -> Self {
-        SyncDriver(Arc::new(RwLock::new(driver)))
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum DesignPath {
