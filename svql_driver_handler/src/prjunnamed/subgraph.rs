@@ -87,36 +87,8 @@ pub struct SubgraphMatch<'p, 'd> {
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
     pub fn len(&self) -> usize { self.pattern_to_design.len() }
     pub fn is_empty(&self) -> bool { self.pattern_to_design.is_empty() }
-}
-
-impl<'p, 'd> Iterator for SubgraphMatch<'p, 'd> {
-    type Item = (CellRef<'p>, CellRef<'d>);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.pattern_to_design.iter().next().map(|(k, v)| (*k, *v))
-    }
-}
-
-impl<'a, 'p, 'd> IntoIterator for &'a SubgraphMatch<'p, 'd> {
-    type Item = (&'a CellRef<'p>, &'a CellRef<'d>);
-    type IntoIter = std::collections::hash_map::Iter<'a, CellRef<'p>, CellRef<'d>>;
-    fn into_iter(self) -> Self::IntoIter {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellRef<'p>, CellRef<'d>> {
         self.pattern_to_design.iter()
-    }
-}
-
-impl<'a, 'p, 'd> IntoIterator for &'a mut SubgraphMatch<'p, 'd> {
-    type Item = (&'a CellRef<'p>, &'a mut CellRef<'d>);
-    type IntoIter = std::collections::hash_map::IterMut<'a, CellRef<'p>, CellRef<'d>>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.pattern_to_design.iter_mut()
-    }
-}
-
-impl<'p, 'd> IntoIterator for SubgraphMatch<'p, 'd> {
-    type Item = (CellRef<'p>, CellRef<'d>);
-    type IntoIter = std::collections::hash_map::IntoIter<CellRef<'p>, CellRef<'d>>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.pattern_to_design.into_iter()
     }
 }
 
@@ -156,23 +128,22 @@ fn is_gate_kind(kind: CellKind) -> bool {
             | CellKind::SDivFloor
             | CellKind::SModTrunc
             | CellKind::SModFloor
-            | CellKind::Dff // added
+            | CellKind::Dff
     )
 }
 
-// Rename: build_precells -> collect_gate_cells, with clearer variable names
+// Collect only gate cells and organize them keyed by CellRef, with a by-kind index of CellRefs
 fn collect_gate_cells<'a>(design: &'a Design) -> (
-    Vec<(CellRef<'a>, CellKind, Vec<Result<(CellRef<'a>, usize), Trit>>)>,
-    HashMap<usize, usize>,
-    HashMap<CellKind, Vec<usize>>,
+    HashMap<CellRef<'a>, (CellKind, Vec<Result<(CellRef<'a>, usize), Trit>>)>,
+    HashMap<CellKind, Vec<CellRef<'a>>>,
 ) {
-    let mut cell_entries = Vec::new();
-    let mut cell_index_to_position = HashMap::new();
-    let mut cells_by_kind: HashMap<CellKind, Vec<usize>> = HashMap::new();
+    let mut cell_map: HashMap<CellRef<'a>, (CellKind, Vec<Result<(CellRef<'a>, usize), Trit>>)> = HashMap::new();
+    let mut cells_by_kind: HashMap<CellKind, Vec<CellRef<'a>>> = HashMap::new();
 
     for cell in design.iter_cells() {
         let kind = cell_kind(&*cell.get());
         if !is_gate_kind(kind) { continue; }
+
         let mut input_connections: Vec<Result<(CellRef<'a>, usize), Trit>> = Vec::new();
         cell.visit(|net| {
             match design.find_cell(net) {
@@ -180,16 +151,15 @@ fn collect_gate_cells<'a>(design: &'a Design) -> (
                 Err(trit) => input_connections.push(Err(trit)),
             }
         });
-        let position = cell_entries.len();
-        cell_index_to_position.insert(cell.debug_index(), position);
-        cells_by_kind.entry(kind).or_default().push(position);
-        cell_entries.push((cell, kind, input_connections));
+
+        let cref = cell;
+        cells_by_kind.entry(kind).or_default().push(cref);
+        cell_map.insert(cref, (kind, input_connections));
     }
 
-    (cell_entries, cell_index_to_position, cells_by_kind)
+    (cell_map, cells_by_kind)
 }
 
-// Rename: compatible_inputs -> are_inputs_compatible
 fn are_inputs_compatible<'p, 'd>(
     pattern_inputs: &[Result<(CellRef<'p>, usize), Trit>],
     design_inputs: &[Result<(CellRef<'d>, usize), Trit>],
@@ -210,37 +180,35 @@ fn are_inputs_compatible<'p, 'd>(
     true
 }
 
-// Rename: choose_next_needle -> choose_next_pattern_cell_index
-fn choose_next_pattern_cell_index<'p>(
-    pattern_cells: &[(CellRef<'p>, CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>) ],
-    mapped_pattern_indices: &HashSet<CellRef<'p>>,
+// Choose next unmapped pattern cell to extend mapping, preferring those whose inputs are all constants or already mapped sources
+fn choose_next_pattern_cell<'p>(
+    pattern_cells: &HashMap<CellRef<'p>, (CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>)>,
     pattern_to_design: &SubgraphMatch<'p, '_>,
-) -> Option<usize> {
+) -> Option<CellRef<'p>> {
     // Prefer cells whose inputs are all constants or mapped sources, to minimize branching
-    for (i, (cref, _kind, inputs)) in pattern_cells.iter().enumerate() {
-        if mapped_pattern_indices.contains(cref) { continue; }
+    for (&cref, (_kind, inputs)) in pattern_cells.iter() {
+        if pattern_to_design.pattern_to_design.contains_key(&cref) { continue; }
         let mut all_sources_mapped = true;
         for inp in inputs {
             if let Ok((src, _)) = inp {
                 if !pattern_to_design.pattern_to_design.contains_key(src) { all_sources_mapped = false; break; }
             }
         }
-        if all_sources_mapped { return Some(i); }
+        if all_sources_mapped { return Some(cref); }
     }
-    // fallback: first unmapped
-    for (i, (cref, ..)) in pattern_cells.iter().enumerate() {
-        if !mapped_pattern_indices.contains(cref) { return Some(i); }
+    // Fallback: any unmapped pattern cell
+    for (&cref, _) in pattern_cells.iter() {
+        if !pattern_to_design.pattern_to_design.contains_key(&cref) { return Some(cref); }
     }
     None
 }
 
-// Rename: backtrack -> backtrack_mappings, and rename parameters
 fn backtrack_mappings<'p, 'd>(
-    pattern_cells: &[(CellRef<'p>, CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>) ],
-    design_cells: &[(CellRef<'d>, CellKind, Vec<Result<(CellRef<'d>, usize), Trit>>) ],
-    design_cells_by_kind: &HashMap<CellKind, Vec<usize>>,
+    pattern_cells: &HashMap<CellRef<'p>, (CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>)>,
+    design_cells: &HashMap<CellRef<'d>, (CellKind, Vec<Result<(CellRef<'d>, usize), Trit>>)>,
+    design_cells_by_kind: &HashMap<CellKind, Vec<CellRef<'d>>>,
     pattern_to_design: &mut SubgraphMatch<'p, 'd>,
-    used_design_indices: &mut HashSet<CellRef<'d>>,
+    used_design_cells: &mut HashSet<CellRef<'d>>,
     mappings_out: &mut Vec<SubgraphMatch<'p, 'd>>,
 ) {
     if pattern_to_design.pattern_to_design.len() == pattern_cells.len() {
@@ -248,28 +216,21 @@ fn backtrack_mappings<'p, 'd>(
         return;
     }
 
-    let mapped_pattern_indices: HashSet<CellRef<'p>> = pattern_to_design
-        .pattern_to_design
-        .keys()
-        .copied()
-        .collect();
-    let Some(next_pattern_idx) = choose_next_pattern_cell_index(pattern_cells, &mapped_pattern_indices, pattern_to_design) else { return; };
-    let (pattern_cref, pattern_kind, pattern_inputs) = &pattern_cells[next_pattern_idx];
+    let Some(next_pattern_cref) = choose_next_pattern_cell(pattern_cells, pattern_to_design) else { return; };
+    let (pattern_kind, pattern_inputs) = &pattern_cells[&next_pattern_cref];
 
-    let Some(design_candidate_positions) = design_cells_by_kind.get(pattern_kind) else { return; };
+    let Some(design_candidate_crefs) = design_cells_by_kind.get(pattern_kind) else { return; };
 
-    for &design_pos in design_candidate_positions {
-        let (design_cref, _d_kind, design_inputs) = &design_cells[design_pos];
-        let pattern_key = *pattern_cref;
-        let design_key = *design_cref;
-        if used_design_indices.contains(&design_key) { continue; }
+    for &design_cref in design_candidate_crefs.iter() {
+        if used_design_cells.contains(&design_cref) { continue; }
+        let (_d_kind, design_inputs) = &design_cells[&design_cref];
         if !are_inputs_compatible(pattern_inputs, design_inputs, &pattern_to_design.pattern_to_design) { continue; }
 
-        pattern_to_design.pattern_to_design.insert(pattern_key, design_key);
-        used_design_indices.insert(design_key);
-        backtrack_mappings(pattern_cells, design_cells, design_cells_by_kind, pattern_to_design, used_design_indices, mappings_out);
-        used_design_indices.remove(&design_key);
-        pattern_to_design.pattern_to_design.remove(&pattern_key);
+        pattern_to_design.pattern_to_design.insert(next_pattern_cref, design_cref);
+        used_design_cells.insert(design_cref);
+        backtrack_mappings(pattern_cells, design_cells, design_cells_by_kind, pattern_to_design, used_design_cells, mappings_out);
+        used_design_cells.remove(&design_cref);
+        pattern_to_design.pattern_to_design.remove(&next_pattern_cref);
     }
 }
 
@@ -293,43 +254,39 @@ pub fn find_subgraphs<'p, 'd>(
         })
         .expect("No common cell kind found between pattern and design");
 
-    // Build gate-only cell entries and buckets
-    let (pattern_cells_all, _pattern_index_to_pos, _) = collect_gate_cells(pattern);
-    let (design_cells_all, _design_index_to_pos, design_cells_by_kind) = collect_gate_cells(design);
+    // Build gate-only cell maps and buckets keyed by CellRef
+    let (pattern_cells_map, _pattern_by_kind_unused) = collect_gate_cells(pattern);
+    let (design_cells_map, design_cells_by_kind) = collect_gate_cells(design);
 
-    // Extract anchors
-    let pattern_anchor_indices: Vec<usize> = pattern_cells_all
+    // Extract anchor CellRefs
+    let pattern_anchor_crefs: Vec<CellRef<'p>> = pattern_cells_map
         .iter()
-        .enumerate()
-        .filter(|(_, entry)| { let (_, kind, _) = entry; *kind == anchor_kind })
-        .map(|(i, _)| i)
+        .filter(|(_, (kind, _))| *kind == anchor_kind)
+        .map(|(&cref, _)| cref)
         .collect();
-    let design_anchor_indices: Vec<usize> = design_cells_all
-        .iter()
-        .enumerate()
-        .filter(|(_, entry)| { let (_, kind, _) = entry; *kind == anchor_kind })
-        .map(|(i, _)| i)
-        .collect();
+
+    let design_anchor_crefs: Vec<CellRef<'d>> = design_cells_by_kind
+        .get(&anchor_kind)
+        .cloned()
+        .unwrap_or_default();
 
     let mut mappings: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
 
-    let Some(pattern_anchor_index) = pattern_anchor_indices.first().copied() else {
+    let Some(pattern_anchor_cref) = pattern_anchor_crefs.first().copied() else {
         log::warn!("Pattern has no anchor cells of kind {:?}", anchor_kind);
         return mappings; // No anchors means no matches
     };
-    let pattern_anchor_key = pattern_cells_all[pattern_anchor_index].0;
 
-    for &design_anchor_index in &design_anchor_indices {
+    for &design_anchor_cref in &design_anchor_crefs {
         let mut mapping = SubgraphMatch { pattern_to_design: HashMap::new() };
         let mut used_design: HashSet<CellRef<'d>> = HashSet::new();
 
-        let design_anchor_key = design_cells_all[design_anchor_index].0;
-        mapping.pattern_to_design.insert(pattern_anchor_key, design_anchor_key);
-        used_design.insert(design_anchor_key);
+        mapping.pattern_to_design.insert(pattern_anchor_cref, design_anchor_cref);
+        used_design.insert(design_anchor_cref);
 
         backtrack_mappings(
-            &pattern_cells_all,
-            &design_cells_all,
+            &pattern_cells_map,
+            &design_cells_map,
             &design_cells_by_kind,
             &mut mapping,
             &mut used_design,
