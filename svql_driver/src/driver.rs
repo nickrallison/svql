@@ -1,5 +1,5 @@
 use log::{error, trace};
-use std::{path::{Path, PathBuf}, process::Stdio};
+use std::{path::{Path, PathBuf}, process::Stdio, sync::{Arc, RwLock}};
 
 use crate::{config::Config, read_input_to_design, subgraph::SubgraphMatch};
 
@@ -82,6 +82,15 @@ impl Driver {
     pub fn query<'p>(&self, cfg: &Config) -> Vec<SubgraphMatch> {
         trace!("ProcDriver::query called with config: {:?}", cfg);
         todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct SyncDriver(pub Arc<RwLock<Driver>>);
+
+impl From<Driver> for SyncDriver {
+    fn from(driver: Driver) -> Self {
+        SyncDriver(Arc::new(RwLock::new(driver)))
     }
 }
 

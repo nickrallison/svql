@@ -266,10 +266,10 @@ impl<'a> MetaStringRef<'a> {
         self.index == MetaStringIndex::EMPTY
     }
 
-    pub fn get(&self) -> Ref<'a, str> {
-        Ref::map(self.design.metadata(), |store| {
-            store.strings.get_index(self.index.0).expect("invalid metadata string reference").as_str()
-        })
+    pub fn get(&self) -> Cow<'a, str> {
+        let store = self.design.metadata();
+        let s = store.strings.get_index(self.index.0).expect("invalid metadata string reference");
+        Cow::Owned(s.clone())
     }
 }
 
@@ -282,10 +282,10 @@ impl<'a> MetaItemRef<'a> {
         self.index == MetaItemIndex::NONE
     }
 
-    fn get_repr(&self) -> Ref<'a, MetaItemRepr> {
-        Ref::map(self.design.metadata(), |store| {
-            store.items.get_index(self.index.0).expect("invalid metadata item reference")
-        })
+    fn get_repr(&self) -> Cow<'a, MetaItemRepr> {
+        let store = self.design.metadata();
+        let meta = store.items.get_index(self.index.0).expect("invalid metadata item reference");
+        Cow::Owned(meta.clone())
     }
 
     pub fn get(&self) -> MetaItem<'a> {
