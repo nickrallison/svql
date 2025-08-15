@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}};
 
 use prjunnamed_netlist::{Cell, CellRef, Design, Trit};
 
@@ -233,8 +233,8 @@ pub fn find_subgraphs(
     design: &Design,
 ) -> Vec<HashMap<usize, usize>> {
 
-    let pattern_cell_types = count_cells_by_kind(pattern);
-    let design_cell_types = count_cells_by_kind(design);
+    let pattern_cell_types = count_cells_by_kind(pattern).into_iter().filter(|(kind, _)| is_gate_kind(*kind)).collect::<Vec<_>>();
+    let design_cell_types = count_cells_by_kind(design).into_iter().filter(|(kind, _)| is_gate_kind(*kind)).collect::<Vec<_>>();
 
     // find the smallest cell kind in the design that is also in the pattern
     let anchor_kind = pattern_cell_types
@@ -244,7 +244,7 @@ pub fn find_subgraphs(
         })
         .min_by_key(|kind| {
             design_cell_types.iter().find(|(d_kind, _)| d_kind == kind)
-                .map_or(usize::MAX, |(_, count)| *count)
+                .map(|(_, count)| *count)
         })
         .expect("No common cell kind found between pattern and design");
 
@@ -268,26 +268,35 @@ pub fn find_subgraphs(
 
     let mut mappings = Vec::new();
 
-    for &p_anchor in &pattern_anchor_indices {
-        for &d_anchor in &design_anchor_indices {
-            let mut pattern_to_design_map: HashMap<usize, usize> = HashMap::new();
-            let mut used_design: HashSet<usize> = HashSet::new();
+    let p_anchor: Option<usize> = pattern_anchor_indices.first().map(|i| *i);
 
-            let pattern_key = pattern_cells_all[p_anchor].0.debug_index();
-            let design_key = design_cells_all[d_anchor].0.debug_index();
-            pattern_to_design_map.insert(pattern_key, design_key);
-            used_design.insert(design_key);
-
-            backtrack_mappings(
-                &pattern_cells_all,
-                &design_cells_all,
-                &design_cells_by_kind,
-                &mut pattern_to_design_map,
-                &mut used_design,
-                &mut mappings,
-            );
-        }
+    if p_anchor.is_none() {
+        log::warn!("Pattern has no anchor cells of kind {:?}", anchor_kind);
+        return mappings; // No anchors means no matches
     }
+
+    let p_anchor = p_anchor.unwrap();
+
+    // for &p_anchor in &pattern_anchor_indices {
+    for &d_anchor in &design_anchor_indices {
+        let mut pattern_to_design_map: HashMap<usize, usize> = HashMap::new();
+        let mut used_design: HashSet<usize> = HashSet::new();
+
+        let pattern_key = pattern_cells_all[p_anchor].0.debug_index();
+        let design_key = design_cells_all[d_anchor].0.debug_index();
+        pattern_to_design_map.insert(pattern_key, design_key);
+        used_design.insert(design_key);
+
+        backtrack_mappings(
+            &pattern_cells_all,
+            &design_cells_all,
+            &design_cells_by_kind,
+            &mut pattern_to_design_map,
+            &mut used_design,
+            &mut mappings,
+        );
+    }
+    // }
 
     mappings
 }
