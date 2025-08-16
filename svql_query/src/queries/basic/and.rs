@@ -36,67 +36,6 @@ where
     }
 }
 
-// impl And<Match> {
-//     pub fn new(&self, base: Instance) -> And<Match> {
-//         let a = self.a.val.as_ref().expect("a must have a value").clone();
-//         let b = self.b.val.as_ref().expect("b must have a value").clone();
-//         let y = self.y.val.as_ref().expect("y must have a value").clone();
-
-//         And::<Match> {
-//             path: base.clone(),
-//             a: Wire::with_val(base.child("a".into()), a),
-//             b: Wire::with_val(base.child("b".into()), b),
-//             y: Wire::with_val(base.child("y".into()), y),
-//         }
-//     }
-
-//     /// Stringified key for stable, ordered set/dedup operations.
-//     pub fn key_str(&self) -> (String, String, String) {
-//         let (a, b, y) = self.key();
-//         (format!("{:?}", a), format!("{:?}", b), format!("{:?}", y))
-//     }
-
-//     /// Return a *stable* key that uniquely identifies this concrete
-//     /// match.  The key consists of the three port identifiers
-//     /// (`a`, `b`, `y`).  The returned tuple implements `Hash`,
-//     /// `PartialEq`, and `Eq` because `IdString` already implements them.
-//     pub fn key(&self) -> (IdString, IdString, IdString) {
-//         (
-//             self.a
-//                 .val
-//                 .as_ref()
-//                 .expect("a port must have a value")
-//                 .id
-//                 .clone(),
-//             self.b
-//                 .val
-//                 .as_ref()
-//                 .expect("b port must have a value")
-//                 .id
-//                 .clone(),
-//             self.y
-//                 .val
-//                 .as_ref()
-//                 .expect("y port must have a value")
-//                 .id
-//                 .clone(),
-//         )
-//     }
-
-//     /// Convenience wrapper that returns the `GateKey`‑like tuple as a
-//     /// string for debug printing.
-//     pub fn key_debug(&self) -> String {
-//         let (a, b, y) = self.key();
-//         format!("GateKey({:?}, {:?}, {:?})", a, b, y)
-//     }
-// }
-
-/* -----------------------------------------------------------------
-   No other file needs to be aware of the removed `GateKey` –
-   all callers that previously used `GateKey` should now call
-   `And::<Match>::key()` (or `key_debug()` for debugging).
------------------------------------------------------------------ */
-
 impl<S> Netlist<S> for And<S>
 where
     S: State,

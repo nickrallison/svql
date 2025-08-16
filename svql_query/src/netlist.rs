@@ -1,6 +1,4 @@
 
-use std::sync::Arc;
-
 use svql_driver::read_input_to_design;
 use svql_driver::SubgraphMatch;
 
@@ -14,24 +12,6 @@ pub trait Netlist<S>: WithPath<S> where S: State {
     const YOSYS              : &'static str;
     const SVQL_DRIVER_PLUGIN : &'static str;
 
-    // --- Shared Functionality ---
-    // fn config() -> Config {
-    //     let mut cfg = Config::default();
-
-    //     let workspace_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        
-    //     let pat_filename = PathBuf::from(Self::FILE_PATH);
-
-    //     cfg.pat_filename = match pat_filename.is_absolute() {
-    //         true => pat_filename.display().to_string(),
-    //         false => workspace_path.join(pat_filename).display().to_string(),
-    //     };
-
-    //     cfg.pat_module_name = Self::MODULE_NAME.into();
-    //     cfg.verbose         = true;
-    //     cfg.max_fanout = 32;
-    //     cfg
-    // }
     fn design() -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
         read_input_to_design(None, Self::FILE_PATH.to_string())
     }

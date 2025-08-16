@@ -5,7 +5,7 @@ use crate::{config::Config, read_input_to_design, subgraph::SubgraphMatch};
 
 #[derive(Debug)]
 pub struct Driver {
-    design: prjunnamed_netlist::Design,
+    design: Arc<prjunnamed_netlist::Design>,
     module_name: String,
 }
 
@@ -65,12 +65,8 @@ impl Driver {
         let design = read_input_to_design(None, json_temp_file.path().to_string_lossy().to_string())
             .map_err(|e| format!("Failed to read input design from Yosys output: {}", e))?;
 
-
-        // drop the tempfile to delete it
-        let _ = json_temp_file;
-
         let driver = Driver {
-            design,
+            design: Arc::new(design),
             module_name,
         };
 
