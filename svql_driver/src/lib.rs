@@ -7,6 +7,7 @@ use prjunnamed_netlist::Target;
 pub mod driver;
 pub mod subgraph;
 pub mod config;
+pub mod cache;
 
 pub use driver::Driver;
 pub use subgraph::SubgraphMatch;
