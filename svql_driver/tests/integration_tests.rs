@@ -25,8 +25,36 @@ mod integration_tests {
 
    
     #[rstest]
+    // Comb D Needle
+    #[case(&COMB_D_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 2)]
+    #[case(&COMB_D_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 0)]
     #[case(&COMB_D_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 0)]
+    #[case(&COMB_D_DOUBLE_SDFFE, &SEQ_DOUBLE_SDFFE, 0)]
+    #[case(&COMB_D_DOUBLE_SDFFE, &SDFFE, 0)]
+    // And Q Needle
+    #[case(&AND_Q_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 0)]
+    #[case(&AND_Q_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 2)]
+    #[case(&AND_Q_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 0)]
+    #[case(&AND_Q_DOUBLE_SDFFE, &SEQ_DOUBLE_SDFFE, 0)]
+    #[case(&AND_Q_DOUBLE_SDFFE, &SDFFE, 0)]
+    // Par Double Needle
     #[case(&PAR_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 2)]
+    #[case(&PAR_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 2)]
+    #[case(&PAR_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 2)]
+    #[case(&PAR_DOUBLE_SDFFE, &SEQ_DOUBLE_SDFFE, 0)]
+    #[case(&PAR_DOUBLE_SDFFE, &SDFFE, 0)]
+    // Seq Double Needle
+    #[case(&SEQ_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 0)]
+    #[case(&SEQ_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 0)]
+    #[case(&SEQ_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 0)]
+    #[case(&SEQ_DOUBLE_SDFFE, &SEQ_DOUBLE_SDFFE, 2)]
+    #[case(&SEQ_DOUBLE_SDFFE, &SDFFE, 0)]
+    // SDFFE Needle
+    #[case(&SDFFE, &COMB_D_DOUBLE_SDFFE, 2)]
+    #[case(&SDFFE, &AND_Q_DOUBLE_SDFFE, 2)]
+    #[case(&SDFFE, &PAR_DOUBLE_SDFFE, 2)]
+    #[case(&SDFFE, &SEQ_DOUBLE_SDFFE, 2)]
+    #[case(&SDFFE, &SDFFE, 1)]
     fn test_subgraph_matches(
         #[case] needle_tuple: &'static (Driver, PathBuf),
         #[case] haystack_tuple: &'static (Driver, PathBuf),
