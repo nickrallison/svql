@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // println!("Found {} matches for needle '{}' against haystack '{}'", matches.len(), needle_name, haystack_name);
 
-    println!("Matches: {:?}", matches);
+    println!("Matches: {:#?}", matches);
 
     // for (i, match_map) in matches.iter().enumerate() {
     //     println!("Match {} ({} pairs):", i + 1, match_map.len());

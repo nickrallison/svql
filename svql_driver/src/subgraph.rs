@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::borrow::Cow;
 
 use prjunnamed_netlist::{Cell, CellRef, Design, Trit};
 
@@ -82,8 +83,8 @@ impl From<&Cell> for CellKind {
 #[derive(Clone, Default)]
 pub struct SubgraphMatch<'p, 'd> {
     pub cell_mapping: HashMap<CellRef<'p>, CellRef<'d>>,
-    pub pat_input_cells: HashMap<String, CellRef<'p>>,
-    pub pat_output_cells: HashMap<String, CellRef<'p>>,
+    pub pat_input_cells: Vec<InputCell<'p>>,
+    pub pat_output_cells: Vec<OutputCell<'p>>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
@@ -97,26 +98,15 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
 impl std::fmt::Debug for SubgraphMatch<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Render deterministic, stable identifiers using debug_index() for CellRef
-        let mut mapping: Vec<(usize, usize)> = self
+        let mut mapping: Vec<((usize, Cell), (usize, Cell))> = self
             .cell_mapping
             .iter()
-            .map(|(p, d)| (p.debug_index(), d.debug_index()))
+            .map(|(p, d)| ((p.debug_index(), p.get().as_ref().clone()), (d.debug_index(), d.get().as_ref().clone())))
             .collect();
-        mapping.sort_unstable();
+        mapping.sort_by(|a, b| a.0.0.cmp(&b.0.0));
 
-        let mut inputs: Vec<(&str, usize)> = self
-            .pat_input_cells
-            .iter()
-            .map(|(name, cref)| (name.as_str(), cref.debug_index()))
-            .collect();
-        inputs.sort_unstable_by(|a, b| a.0.cmp(b.0));
-
-        let mut outputs: Vec<(&str, usize)> = self
-            .pat_output_cells
-            .iter()
-            .map(|(name, cref)| (name.as_str(), cref.debug_index()))
-            .collect();
-        outputs.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        let mut inputs: Vec<InputCell> = self.pat_input_cells.clone();
+        let mut outputs: Vec<OutputCell> = self.pat_output_cells.clone();
 
         f.debug_struct("SubgraphMatch")
             .field("cell_mapping", &mapping)
@@ -126,30 +116,121 @@ impl std::fmt::Debug for SubgraphMatch<'_, '_> {
     }
 }
 
+#[derive(Clone)]
+pub struct InputCell<'p> {
+    pub cref: CellRef<'p>,
+}
+
+impl<'p> InputCell<'p> {
+    pub fn name(&self) -> Option<&'p str> {
+        match self.cref.get() {
+            Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn get_gates(&self) -> Vec<CellRef<'p>> {
+        if matches!(self.cref.get().as_ref(), Cell::Input(_, _)) {
+            let fanout = get_fanout(self.cref.design(), self.cref);
+            fanout
+        } else {
+            vec![]
+        }
+    }
+}
+
+impl std::fmt::Debug for InputCell<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("InputCell")
+            .field(&self.name().unwrap_or("<unnamed>"))
+            .field(&self.cref.debug_index())
+            .field(self.cref.get().as_ref())
+            .finish()
+    }
+}
+
+pub fn get_fanout<'a>(
+    design: &'a Design,
+    cell: CellRef<'a>,
+) -> Vec<CellRef<'a>> {
+    let mut fanout: Vec<CellRef<'a>> = Vec::new();
+
+    for dest in design.iter_cells() {
+        // Skip self to avoid self-loops in fanout
+        if dest == cell {
+            continue;
+        }
+
+        let mut driven_by_cell = false;
+        dest.visit(|net| {
+            if driven_by_cell {
+                return; // already found a connection from `cell` to `dest`
+            }
+            if let Ok((src, _bit)) = design.find_cell(net) {
+                if src == cell {
+                    driven_by_cell = true;
+                }
+            }
+        });
+
+        if driven_by_cell {
+            fanout.push(dest);
+        }
+    }
+
+    fanout
+}
+
 // Helpers: return names and CellRefs, not cloned Cells
-fn get_input_cells<'a>(design: &'a Design) -> Vec<(String, CellRef<'a>)> {
+fn get_input_cells<'a>(design: &'a Design) -> Vec<InputCell<'a>> {
     design
         .iter_cells()
-        .filter_map(|cell_ref| {
-            let cell = cell_ref.get();
-            match cell.as_ref() {
-                Cell::Input(name, _) => Some((name.clone(), cell_ref)),
-                _ => None,
-            }
-        })
+        .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
+        .map(|cref| InputCell { cref })
         .collect()
 }
 
-fn get_output_cells<'a>(design: &'a Design) -> Vec<(String, CellRef<'a>)> {
+#[derive(Clone)]
+pub struct OutputCell<'p> {
+    pub cref: CellRef<'p>,
+}
+
+impl<'p> OutputCell<'p> {
+    pub fn name(&self) -> Option<&'p str> {
+        match self.cref.get() {
+            Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn get_gate(&self) -> CellRef<'p> {
+        let mut source: Option<CellRef<'p>> = None;
+        if matches!(self.cref.get().as_ref(), Cell::Output(_, _)) {
+            self.cref.visit(|net| {
+                if let Ok((src, _bit)) = self.cref.design().find_cell(net) {
+                    source = Some(src);
+                }
+            });
+        }
+        source.expect("Output cell should have a driving source")
+    }
+}
+
+impl std::fmt::Debug for OutputCell<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("OutputCell")
+            .field(&self.name().unwrap_or("<unnamed>"))
+            .field(&self.cref.debug_index())
+            .field(self.cref.get().as_ref())
+            .finish()
+    }
+}
+
+fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
     design
         .iter_cells()
-        .filter_map(|cell_ref| {
-            let cell = cell_ref.get();
-            match cell.as_ref() {
-                Cell::Output(name, _) => Some((name.clone(), cell_ref)),
-                _ => None,
-            }
-        })
+        .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
+        .map(|cref| OutputCell { cref })
         .collect()
 }
 
@@ -229,17 +310,17 @@ fn collect_matchable_cells<'a>(design: &'a Design) -> (
 
 fn get_pattern_io_cells<'p>(
     pattern: &'p Design,
-) -> (HashMap<String, CellRef<'p>>, HashMap<String, CellRef<'p>>) {
-    let mut inputs = HashMap::new();
-    let mut outputs = HashMap::new();
+) -> (Vec<InputCell<'p>>, Vec<OutputCell<'p>>) {
+    let mut inputs = Vec::new();
+    let mut outputs = Vec::new();
 
     for cref in pattern.iter_cells() {
         match cref.get().as_ref() {
             Cell::Input(name, _) => {
-                inputs.insert(name.clone(), cref);
+                inputs.push(InputCell { cref });
             }
             Cell::Output(name, _) => {
-                outputs.insert(name.clone(), cref);
+                outputs.push(OutputCell { cref });
             }
             _ => {}
         }
