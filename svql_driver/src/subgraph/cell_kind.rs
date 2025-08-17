@@ -1,6 +1,6 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, cell, collections::HashMap, hash::Hash};
 
-use prjunnamed_netlist::{Cell, CellRef, Design};
+use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CellKind {
@@ -110,22 +110,94 @@ impl From<&Cell> for CellKind {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InputCell<'p> {
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CellWrapper<'p> {
     pub cref: CellRef<'p>,
+}
+
+impl<'p> CellWrapper<'p> {
+    pub fn new(cref: CellRef<'p>) -> Self {
+        CellWrapper { cref }
+    }
+    pub fn cref(&self) -> CellRef<'p> {
+        self.cref
+    }
+    pub fn debug_index(&self) -> usize {
+        self.cref.debug_index()
+    }
+    pub fn get(self) -> Cow<'p, Cell> {
+        self.cref.get()
+    }
+
+    pub fn metadata(&self) -> MetaItemRef<'p> {
+        self.cref.metadata()
+    }
+
+    pub fn output_len(&self) -> usize {
+        self.cref.output_len()
+    }
+
+    pub fn output(&self) -> Value {
+        self.cref.output()
+    }
+
+    pub fn visit(&self, f: impl FnMut(Net)) {
+        self.cref.visit(f)
+    }
+
+    pub fn replace(&self, to_cell: Cell) {
+        self.cref.replace(to_cell)
+    }
+
+    pub fn append_metadata(&self, metadata: MetaItemRef<'p>) {
+        self.cref.append_metadata(metadata)
+    }
+
+    pub fn unalive(&self) {
+        self.cref.unalive()
+    }
+
+    pub fn design(self) -> &'p Design {
+        self.cref.design()
+    }
+}
+
+impl std::fmt::Debug for CellWrapper<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let index: usize = self.cref.debug_index();
+        let metadata: MetaItemRef = self.cref.metadata();
+        // let cell: &Cell = self.cref.get().as_ref();
+
+        f.debug_struct("CellWrapper")
+            .field("index", &index)
+            .field("meta", &metadata)
+            .field("cell", self.cref.get().as_ref())
+            .finish()
+    }
+}
+
+impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
+    fn from(cref: CellRef<'a>) -> Self {
+        CellWrapper { cref }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct InputCell<'p> {
+    pub cref: CellWrapper<'p>,
 }
 
 impl<'p> InputCell<'p> {
     pub fn name(&self) -> Option<&'p str> {
-        match self.cref.get() {
+        match self.cref.cref().get() {
             Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
             _ => None,
         }
     }
 
     pub fn get_gates(&self) -> Vec<CellRef<'p>> {
-        if matches!(self.cref.get().as_ref(), Cell::Input(_, _)) {
-            let fanout = get_fanout(self.cref.design(), self.cref);
+        if matches!(self.cref.cref().get().as_ref(), Cell::Input(_, _)) {
+            let fanout = get_fanout(self.cref.cref().design(), self.cref.cref());
             fanout
         } else {
             vec![]
@@ -133,15 +205,6 @@ impl<'p> InputCell<'p> {
     }
 }
 
-impl std::fmt::Debug for InputCell<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("InputCell")
-            .field(&self.name().unwrap_or("<unnamed>"))
-            .field(&self.cref.debug_index())
-            .field(self.cref.get().as_ref())
-            .finish()
-    }
-}
 
 pub(crate) fn get_fanout<'a>(
     design: &'a Design,
@@ -180,18 +243,18 @@ pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<InputCell<'a>> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
-        .map(|cref| InputCell { cref })
+        .map(|cref| InputCell { cref: cref.into() })
         .collect()
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OutputCell<'p> {
-    pub cref: CellRef<'p>,
+    pub cref: CellWrapper<'p>,
 }
 
 impl<'p> OutputCell<'p> {
     pub fn name(&self) -> Option<&'p str> {
-        match self.cref.get() {
+        match self.cref.cref().get() {
             Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
             _ => None,
         }
@@ -199,9 +262,9 @@ impl<'p> OutputCell<'p> {
 
     pub fn get_gate(&self) -> CellRef<'p> {
         let mut source: Option<CellRef<'p>> = None;
-        if matches!(self.cref.get().as_ref(), Cell::Output(_, _)) {
-            self.cref.visit(|net| {
-                if let Ok((src, _bit)) = self.cref.design().find_cell(net) {
+        if matches!(self.cref.cref().get().as_ref(), Cell::Output(_, _)) {
+            self.cref.cref().visit(|net| {
+                if let Ok((src, _bit)) = self.cref.cref().design().find_cell(net) {
                     source = Some(src);
                 }
             });
@@ -210,21 +273,11 @@ impl<'p> OutputCell<'p> {
     }
 }
 
-impl std::fmt::Debug for OutputCell<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("OutputCell")
-            .field(&self.name().unwrap_or("<unnamed>"))
-            .field(&self.cref.debug_index())
-            .field(self.cref.get().as_ref())
-            .finish()
-    }
-}
-
 pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
-        .map(|cref| OutputCell { cref })
+        .map(|cref| OutputCell { cref: cref.into() })
         .collect()
 }
 
