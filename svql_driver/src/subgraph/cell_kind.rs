@@ -39,6 +39,37 @@ pub enum CellKind {
     Debug,
 }
 
+impl CellKind {
+    pub fn is_gate(&self) -> bool {
+        matches!(
+            self,
+            CellKind::Buf
+                | CellKind::Not
+                | CellKind::And
+                | CellKind::Or
+                | CellKind::Xor
+                | CellKind::Mux
+                | CellKind::Adc
+                | CellKind::Aig
+                | CellKind::Eq
+                | CellKind::ULt
+                | CellKind::SLt
+                | CellKind::Shl
+                | CellKind::UShr
+                | CellKind::SShr
+                | CellKind::XShr
+                | CellKind::Mul
+                | CellKind::UDiv
+                | CellKind::UMod
+                | CellKind::SDivTrunc
+                | CellKind::SDivFloor
+                | CellKind::SModTrunc
+                | CellKind::SModFloor
+                | CellKind::Dff
+        )
+    }
+}
+
 impl From<&Cell> for CellKind {
     fn from(c: &Cell) -> Self {
         match c {
@@ -197,47 +228,21 @@ pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
         .collect()
 }
 
-pub(crate) fn count_cells_by_kind(design: &Design) -> Vec<(CellKind, usize)> {
+pub(crate) fn count_cells_by_kind<'a>(design: &'a Design, filter: impl Fn(CellRef<'a>) -> bool) -> Vec<(CellKind, usize)> {
     let mut counts = HashMap::new();
-    for cell in design.iter_cells() {
-        let kind = cell_kind(&*cell.get());
+    for cell_ref in design.iter_cells().filter(|c| filter(*c)) {
+        let kind = CellKind::from(cell_ref.get().as_ref());
         *counts.entry(kind).or_insert(0) += 1;
     }
     counts.into_iter().collect::<Vec<_>>()
 }
 
-pub(crate) fn cell_kind(c: &Cell) -> CellKind { CellKind::from(c) }
+pub(crate) fn is_gate(c: &Cell) -> bool {
+    CellKind::from(c).is_gate()
+}
 
-pub(crate) fn is_gate_kind(kind: CellKind) -> bool {
-    matches!(
-        kind,
-        CellKind::Buf
-            | CellKind::Not
-            | CellKind::And
-            | CellKind::Or
-            | CellKind::Xor
-            | CellKind::Mux
-            | CellKind::Adc
-            | CellKind::Aig
-            | CellKind::Eq
-            | CellKind::ULt
-            | CellKind::SLt
-            | CellKind::Shl
-            | CellKind::UShr
-            | CellKind::SShr
-            | CellKind::XShr
-            | CellKind::Mul
-            | CellKind::UDiv
-            | CellKind::UMod
-            | CellKind::SDivTrunc
-            | CellKind::SDivFloor
-            | CellKind::SModTrunc
-            | CellKind::SModFloor
-            | CellKind::Dff
-            // | CellKind::Input
-            // | CellKind::Output
-            // | CellKind::IoBuf
-    )
+pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
+    CellKind::from(c.get().as_ref()).is_gate()
 }
 
 #[cfg(test)]
@@ -254,7 +259,7 @@ mod tests {
             CellKind::Mul, CellKind::UDiv, CellKind::UMod, CellKind::SDivTrunc, CellKind::SDivFloor,
             CellKind::SModTrunc, CellKind::SModFloor, CellKind::Dff,
         ] {
-            assert!(is_gate_kind(k), "kind {:?} must be considered a gate", k);
+            assert!(k.is_gate(), "kind {:?} must be considered a gate", k);
         }
 
         // Not gates
@@ -263,7 +268,7 @@ mod tests {
             CellKind::Match, CellKind::Target, CellKind::Other, CellKind::Name, CellKind::Debug,
             CellKind::Memory,
         ] {
-            assert!(!is_gate_kind(k), "kind {:?} must NOT be considered a gate", k);
+            assert!(!k.is_gate(), "kind {:?} must NOT be considered a gate", k);
         }
     }
 }

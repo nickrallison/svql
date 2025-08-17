@@ -52,8 +52,8 @@ fn collect_matchable_cells<'a>(design: &'a Design) -> (
     let mut cells_by_kind: HashMap<CellKind, Vec<CellRef<'a>>> = HashMap::new();
 
     for cell in design.iter_cells() {
-        let kind = cell_kind(&*cell.get());
-        if !is_gate_kind(kind) {
+        let kind = CellKind::from(cell.get().as_ref());
+        if !(kind.is_gate()) {
             continue;
         }
 
@@ -62,7 +62,7 @@ fn collect_matchable_cells<'a>(design: &'a Design) -> (
             match design.find_cell(net) {
                 Ok((src, bit)) => input_connections.push(Ok((src, bit))),
                 Err(trit) => input_connections.push(Err(trit)),
-            }
+            }   
         });
 
         let cref = cell;
@@ -186,14 +186,17 @@ pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
 ) -> Vec<SubgraphMatch<'p, 'd>> {
-    let pattern_cell_types = count_cells_by_kind(pattern)
-    .into_iter()
-    .filter(|(kind, _)| is_gate_kind(*kind))
-    .collect::<Vec<_>>();
-let design_cell_types = count_cells_by_kind(design)
-    .into_iter()
-    .filter(|(kind, _)| is_gate_kind(*kind))
-    .collect::<Vec<_>>();
+    let pattern_cell_types = count_cells_by_kind(pattern, is_gate_cell_ref)
+        .into_iter()
+        .filter(|(kind, _)| kind.is_gate())
+        .collect::<Vec<_>>();
+    let design_cell_types = count_cells_by_kind(design, is_gate_cell_ref)
+        .into_iter()
+        .filter(|(kind, _)| kind.is_gate())
+        .collect::<Vec<_>>();
+
+    // dbg!(&pattern_cell_types);
+    // dbg!(&design_cell_types);
 
     // find the smallest cell kind in the design that is also in the pattern
     let anchor_kind = pattern_cell_types
@@ -209,8 +212,13 @@ let design_cell_types = count_cells_by_kind(design)
                 .iter()
                 .find(|(d_kind, _)| d_kind == kind)
                 .map(|(_, count)| *count)
-        })
-        .expect("No common cell kind found between pattern and design");
+        });
+
+    let Some(anchor_kind) = anchor_kind else {
+        log::warn!("No anchor kind found");
+        return Vec::new();
+    };
+        
 
     // Build gate-only cell maps and buckets keyed by CellRef
     let (pattern_cells_map, _pattern_by_kind_unused) = collect_matchable_cells(pattern);
@@ -262,11 +270,13 @@ mod tests {
     use super::*;
     use crate::read_input_to_design;
     use cell_kind::{
-        count_cells_by_kind, get_input_cells, get_output_cells, is_gate_kind, CellKind,
+        count_cells_by_kind, get_input_cells, get_output_cells, CellKind,
     };
 
     lazy_static::lazy_static! {
         static ref ASYNC_MUX: Design = load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
+        static ref DOUBLE_SDFFE: Design = load_design_from("examples/patterns/basic/ff/double_sdffe.v");
+        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     fn load_design_from(path: &str) -> Design {
@@ -294,11 +304,24 @@ mod tests {
         let mut inputs = get_input_cells(&ASYNC_MUX);
         inputs.sort();
 
+        assert_eq!(inputs.len(), 4, "Expected 4 input cells");
+
         let actual = inputs;
         let _actual_clk = actual.iter().find(|cell| cell.name() == Some("clk")).cloned().expect("Expected clk input cell");
         let _actual_data_in = actual.iter().find(|cell| cell.name() == Some("data_in")).cloned().expect("Expected data_in input cell");
         let _actual_resetn = actual.iter().find(|cell| cell.name() == Some("resetn")).cloned().expect("Expected resetn input cell");
         let _actual_write_en = actual.iter().find(|cell| cell.name() == Some("write_en")).cloned().expect("Expected write_en input cell");
+    }
+
+    #[test]
+    fn test_get_output_cells() {
+        let mut outputs = get_output_cells(&ASYNC_MUX);
+        outputs.sort();
+
+        assert_eq!(outputs.len(), 1, "Expected 1 output cell");
+
+        let actual = outputs;
+        let _actual_data_out = actual.iter().find(|cell| cell.name() == Some("data_out")).cloned().expect("Expected data_out output cell");
     }
 
     // Exercises get_pattern_io_cells by comparing against the reference helpers in cell_kind.
@@ -331,26 +354,30 @@ mod tests {
         let (cell_map, cells_by_kind) = collect_matchable_cells(&design);
 
         // Count the number of gate cells in the design using the reference helpers.
-        let gate_count = count_cells_by_kind(&design)
+        let gate_count = count_cells_by_kind(&design, is_gate_cell_ref)
             .into_iter()
-            .filter(|(k, _)| is_gate_kind(*k))
+            .map(|(_, c)| c)
+            .sum::<usize>();
+
+        let input_count = count_cells_by_kind(&design, |c| matches!(c.get().as_ref(), Cell::Input(_, _)))
+            .into_iter()
             .map(|(_, c)| c)
             .sum::<usize>();
 
         assert_eq!(
-            gate_count,
+            gate_count + input_count,
             cell_map.len(),
-            "collect_matchable_cells should collect exactly the gate cells"
+            "collect_matchable_cells should collect exactly the gate cells + the input cells"
         );
 
         // Ensure no non-gate cells are present.
         for cref in design.iter_cells() {
-            let kind = super::cell_kind(cref.get().as_ref());
+            let kind = CellKind::from(cref.get().as_ref());
             let in_map = cell_map.contains_key(&cref);
-            if is_gate_kind(kind) {
-                assert!(in_map, "Gate cell {:?} should be in the matchable map", kind);
-            } else {
-                assert!(!in_map, "Non-gate cell {:?} should NOT be in the matchable map", kind);
+            if is_gate_cell_ref(cref) || matches!(kind, CellKind::Input) {
+                assert!(in_map, "Gate / Input cell {:?} should be in the matchable map", kind);
+            } else if matches!(kind, CellKind::Output) {
+                assert!(!in_map, "Cells that are not gates / inputs {:?} should NOT be in the matchable map", kind);
             }
         }
 

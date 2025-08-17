@@ -5,29 +5,28 @@ use svql_driver::{get_name, Driver};
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // env logger
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
 
     let mut cache = svql_driver::cache::Cache::new();
 
+    let sep_path = PathBuf::from("examples/patterns/basic/ff/par_sep_double_sdffe.v");
+    let sep_name = get_name(sep_path.to_str().unwrap());
+    let sep_driver = Driver::new(sep_path, sep_name.clone(), &mut cache)?;
 
-    let haystack_path = PathBuf::from("examples/larger_designs/otbn_core.json");
-    let haystack_name = get_name(haystack_path.to_str().unwrap());
-    let haystack_driver = Driver::new(haystack_path, haystack_name.clone(), &mut cache)?;
+    let comb_path = PathBuf::from("examples/patterns/basic/ff/par_combined_double_sdffe.v");
+    let comb_name = get_name(comb_path.to_str().unwrap());
+    let comb_driver = Driver::new(comb_path, comb_name.clone(), &mut cache)?;
 
-    let needle_path = PathBuf::from("examples/patterns/security/access_control/locked_reg/json/async_en.json");
-    let needle_name = get_name(needle_path.to_str().unwrap());
-    let needle_driver = Driver::new(needle_path, needle_name.clone(), &mut cache)?;
+    let comb_search_matches = svql_driver::subgraph::find_subgraphs(comb_driver.design_as_ref(), sep_driver.design_as_ref());
+    let sep_search_matches = svql_driver::subgraph::find_subgraphs(sep_driver.design_as_ref(), comb_driver.design_as_ref());
 
-    // Find subgraphs using the chosen anchor kind
-    let matches = svql_driver::subgraph::find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
-    assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, against haystack {}, got {}", needle_name, haystack_name, matches.len());
+    println!("Comb Matches: {}", comb_search_matches.len());
+    println!("Sep Matches: {}", sep_search_matches.len());
 
-    // println!("Found {} matches for needle '{}' against haystack '{}'", matches.len(), needle_name, haystack_name);
-
-    println!("Matches: {:#?}", matches);
+    assert_eq!(comb_search_matches.len(), 0, "Expected 0 matches for needle {}, against haystack {}, got {}", comb_name, sep_name, comb_search_matches.len());
+    assert_eq!(sep_search_matches.len(), 2, "Expected 2 matches for needle {}, against haystack {}, got {}", sep_name, comb_name, sep_search_matches.len());
 
     Ok(())
 }
