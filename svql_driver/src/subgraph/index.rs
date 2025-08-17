@@ -74,22 +74,21 @@ impl<'a> Index<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
+    use crate::{read_input_to_design, Driver};
     use prjunnamed_netlist::Design;
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn build_index_has_gates() {
         let d = &*SDFFE;
-        let idx = Index::build(d);
+        let idx = Index::build(d.0.design_as_ref());
         assert!(idx.gate_count() > 0);
         assert_eq!(idx.of_kind(CellKind::Dff).len() > 0, true);
         assert_eq!(idx.of_kind(CellKind::And).len() >= 0, true);

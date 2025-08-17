@@ -6,6 +6,7 @@ mod integration_tests {
     use super::*;
     use rstest::rstest;
     use svql_driver::Driver;
+    use svql_driver::util::load_driver_from;
 
     lazy_static::lazy_static! {
 
@@ -14,13 +15,6 @@ mod integration_tests {
         static ref PAR_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v");
         static ref SEQ_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
         static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_driver_from(path: &str) -> (Driver, PathBuf) {
-        let path = std::path::PathBuf::from(path);
-        let name = PathBuf::from(path.file_stem().expect("Failed to get file stem"));
-        let driver = Driver::new(path, name.display().to_string(), None).expect("Failed to create driver");
-        (driver, name)
     }
 
    

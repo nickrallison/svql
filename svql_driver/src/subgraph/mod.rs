@@ -18,8 +18,16 @@ mod search;
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
     pub matches: Vec<SubgraphMatch<'p, 'd>>,
-    pub p_index: index::Index<'p>,
-    pub d_index: index::Index<'d>,
+    pub _p_index: index::Index<'p>,
+    pub _d_index: index::Index<'d>,
+}
+
+impl<'p, 'd> AllSubgraphMatches<'p, 'd> {
+    pub fn len(&self) -> usize { self.matches.len() }
+    pub fn is_empty(&self) -> bool { self.matches.is_empty() }
+    pub fn iter(&self) -> std::slice::Iter<'_, SubgraphMatch<'p, 'd>> {
+        self.matches.iter()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -41,22 +49,22 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
 
 // Public API
 pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSubgraphMatches<'p, 'd> {
-    let p_index: index::Index<'p> = index::Index::build(pattern);
-    let d_index: index::Index<'d> = index::Index::build(design);
+    let p_index = index::Index::build(pattern);
+    let d_index = index::Index::build(design);
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
         return AllSubgraphMatches {
             matches: Vec::new(),
-            p_index,
-            d_index,
+            _p_index: p_index,
+            _d_index: d_index,
         };
     }
 
     let Some((_anchor_kind, p_anchors, d_anchors)) = anchor::choose_anchors(&p_index, &d_index) else {
         return AllSubgraphMatches {
             matches: Vec::new(),
-            p_index,
-            d_index,
+            _p_index: p_index,
+            _d_index: d_index,
         };
     };
 
@@ -66,6 +74,7 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
 
     for &p_a in &p_anchors {
         for &d_a in &d_anchors {
+        
             if p_index.kind(p_a) != d_index.kind(d_a) {
                 continue;
             }
@@ -86,13 +95,14 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
             // Backtrack anchor boundaries
             search::remove_boundaries(added, &mut st);
             st.unmap(p_a, d_a);
+            
         }
     }
-    
+
     AllSubgraphMatches {
         matches: results,
-        p_index,
-        d_index,
+        _p_index: p_index,
+        _d_index: d_index,
     }
 }
 
@@ -103,22 +113,23 @@ pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
+    use crate::{read_input_to_design, Driver};
+    use prjunnamed_netlist::Design;
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref ASYNC_MUX: Design = load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
-        static ref DOUBLE_SDFFE: Design = load_design_from("examples/patterns/basic/ff/double_sdffe.v");
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
+        static ref ASYNC_MUX: (Driver, PathBuf) = load_driver_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
+        static ref SEQ_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
-    }
 
     #[test]
     fn smoke_io_cells() {
-        let design = &*ASYNC_MUX;
+        let design = ASYNC_MUX.0.design_as_ref();
         let (ins, outs) = get_pattern_io_cells(design);
         assert!(!ins.is_empty());
         assert!(!outs.is_empty());
@@ -126,18 +137,18 @@ mod tests {
 
     #[test]
     fn smoke_find_subgraphs_self_sdffe() {
-        let design = &*SDFFE;
+        let design = SDFFE.0.design_as_ref();
         let matches = find_subgraphs(design, design);
         assert!(!matches.is_empty(), "Self-match sdffe should yield at least one mapping");
-        for m in matches {
+        for m in matches.iter() {
             assert!(!m.is_empty());
         }
     }
 
     #[test]
-    fn smoke_double_sdffe_has_at_least_one() {
-        let design = &*DOUBLE_SDFFE;
+    fn smoke_seq_double_sdffe_has_at_least_one() {
+        let design = SEQ_DOUBLE_SDFFE.0.design_as_ref();
         let matches = find_subgraphs(design, design);
-        assert!(!matches.is_empty(), "Self-match double_sdffe should yield mappings");
+        assert!(!matches.is_empty(), "Self-match seq_double_sdffe should yield mappings");
     }
 }

@@ -42,21 +42,19 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn choose_next_returns_some() {
-        let d = &*SDFFE;
+        let d = SDFFE.0.design_as_ref();
         let idx = Index::build(d);
         let st = State::new(idx.gate_count());
         assert!(choose_next(&idx, &st).is_some());

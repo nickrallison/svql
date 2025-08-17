@@ -4,8 +4,8 @@ use super::cell_kind::CellKind;
 use super::index::{Index, NodeId};
 
 pub(super) fn choose_anchors<'p, 'd>(
-    p_index: &'p Index<'p>,
-    d_index: &'d Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
 ) -> Option<(CellKind, Vec<NodeId>, Vec<NodeId>)> {
     // Count kinds in design
     let mut design_counts = Vec::new();
@@ -57,23 +57,23 @@ fn all_gate_kinds() -> &'static [CellKind] {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
+    use crate::{read_input_to_design, Driver};
     use prjunnamed_netlist::Design;
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
-    }
 
     #[test]
     fn choose_anchors_some() {
         let d = &*SDFFE;
-        let p_index = super::Index::build(d);
-        let d_index = super::Index::build(d);
+        let p_index = super::Index::build(d.0.design_as_ref());
+        let d_index = super::Index::build(d.0.design_as_ref());
         let chosen = choose_anchors(&p_index, &d_index);
         assert!(chosen.is_some());
     }

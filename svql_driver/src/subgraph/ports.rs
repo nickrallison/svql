@@ -61,21 +61,19 @@ fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn can_extract_some_pins() {
-        let d = &*SDFFE;
+        let d = SDFFE.0.design_as_ref() ;
         for c in d.iter_cells() {
             let _pins = extract_pins(c.into());
         }
@@ -83,7 +81,7 @@ mod tests {
 
     #[test]
     fn commutative_sort_is_stable() {
-        let d = &*SDFFE;
+        let d = SDFFE.0.design_as_ref();
         for c in d.iter_cells() {
             let mut pins1 = extract_pins(c.into()).inputs;
             let mut pins2 = extract_pins(c.into()).inputs;

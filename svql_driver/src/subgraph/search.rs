@@ -8,8 +8,8 @@ use super::state::State;
 use super::{SubgraphMatch, cell_kind::{InputCell, OutputCell}};
 
 pub(super) fn backtrack<'p, 'd>(
-    p_index: &'p Index<'p>,
-    d_index: &'d Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
     out: &mut Vec<SubgraphMatch<'p, 'd>>,
     pat_inputs: &[InputCell<'p>],
@@ -44,7 +44,7 @@ pub(super) fn backtrack<'p, 'd>(
     }
 }
 
-fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
+fn choose_next<'p, 'd>(p_index: &Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
     // Prefer resolvable nodes (all gate sources mapped, IO/Const allowed)
     for p in 0..(p_index.gate_count() as usize) {
         let p = p as NodeId;
@@ -78,8 +78,8 @@ fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<Nod
 pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &'p Index<'p>,
-    d_index: &'d Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
 ) -> Vec<(CellWrapper<'p>, usize)> {
     let mut added = Vec::new();
@@ -110,21 +110,19 @@ pub(super) fn remove_boundaries<'p, 'd>(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn backtrack_self_sdffe_produces_some() {
-        let d = &*SDFFE;
+        let d = SDFFE.0.design_as_ref();
         let p_index = Index::build(d);
         let d_index = Index::build(d);
 

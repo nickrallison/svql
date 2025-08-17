@@ -54,8 +54,8 @@ impl<'p, 'd> State<'p, 'd> {
 
     pub(super) fn to_subgraph_match(
         &self,
-        p_index: &Index<'p>,
-        d_index: &Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
         pat_input_cells: &[super::cell_kind::InputCell<'p>],
         pat_output_cells: &[super::cell_kind::OutputCell<'p>],
     ) -> super::SubgraphMatch<'p, 'd> {
@@ -82,21 +82,19 @@ impl<'p, 'd> State<'p, 'd> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn state_basic_map_unmap() {
-        let d = &*SDFFE;
+        let d = SDFFE.0.design_as_ref();
         let idx = Index::build(d);
 
         let mut st = State::new(idx.gate_count());

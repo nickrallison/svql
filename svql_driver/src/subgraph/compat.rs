@@ -6,8 +6,8 @@ use super::state::State;
 pub(super) fn cells_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &'p Index<'p>,
-    d_index: &'d Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
     state: &State<'p, 'd>,
 ) -> bool {
     let pk = p_index.kind(p_id);
@@ -36,8 +36,8 @@ pub(super) fn cells_compatible<'p, 'd>(
 fn pins_compatible_pairwise<'p, 'd>(
     p_pins: &[(super::ports::PinKind, Source<'p>)],
     d_pins: &[(super::ports::PinKind, Source<'d>)],
-    p_index: &'p Index<'p>,
-    d_index: &'d Index<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
     state: &State<'p, 'd>,
 ) -> bool {
     for ((_, p_src), (_, d_src)) in p_pins.iter().zip(d_pins.iter()) {
@@ -72,22 +72,21 @@ fn pins_compatible_pairwise<'p, 'd>(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::read_input_to_design;
+    use crate::{read_input_to_design, Driver};
     use prjunnamed_netlist::Design;
+    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
-
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+        static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
     }
 
     #[test]
     fn same_cell_kind_is_compatible_with_itself() {
         let d = &*SDFFE;
-        let idx = Index::build(d);
+        let idx = Index::build(d.0.design_as_ref());
         let st = State::< '_, '_>::new(idx.gate_count());
 
         for &n in idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff) {
