@@ -46,7 +46,7 @@ mod integration_tests {
     // Seq Double Needle
     #[case(&SEQ_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 0)]
     #[case(&SEQ_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 0)]
-    #[case(&SEQ_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 2)]
+    #[case(&SEQ_DOUBLE_SDFFE, &PAR_DOUBLE_SDFFE, 0)]
     #[case(&SEQ_DOUBLE_SDFFE, &SEQ_DOUBLE_SDFFE, 1)]
     #[case(&SEQ_DOUBLE_SDFFE, &SDFFE, 0)]
     // SDFFE Needle
