@@ -1,7 +1,8 @@
+use prjunnamed_netlist::Design;
 use svql_driver::SubgraphMatch;
 
 use crate::instance::Instance;
-use std::{hash::Hash};
+use std::{hash::Hash, sync::{Arc, RwLock, RwLockReadGuard}};
 
 pub mod composite;
 pub mod instance;
@@ -134,6 +135,13 @@ where
 {
     pub from: Wire<S>,
     pub to: Wire<S>,
+}
+
+#[derive(Debug)]
+pub struct QueryResults<'p, 'd, H> {
+    pub p: RwLockReadGuard<'p, Design>,
+    pub d: RwLockReadGuard<'d, Design>,
+    pub hits: Vec<H>,
 }
 
 #[cfg(test)]

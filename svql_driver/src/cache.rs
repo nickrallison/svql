@@ -1,11 +1,13 @@
 use std::{sync::{Arc, RwLock}};
 
+use prjunnamed_netlist::Design;
+
 use crate::driver::DesignPath;
 
 
 #[derive(Debug, Clone)]
 pub struct Cache {
-    pub cache: std::collections::HashMap<DesignPath, Arc<RwLock<prjunnamed_netlist::Design>>>,
+    pub cache: std::collections::HashMap<DesignPath, Arc<Design>>,
 }
 
 impl Cache {
@@ -17,12 +19,12 @@ impl Cache {
     }
 
     /// Insert a design into the cache for the given path
-    pub fn insert(&mut self, path: DesignPath, design: prjunnamed_netlist::Design) {
-        self.cache.insert(path, Arc::new(RwLock::new(design)));
+    pub fn insert(&mut self, path: DesignPath, design: Design) {
+        self.cache.insert(path, Arc::new(design));
     }
 
     /// Get a design from the cache for the given path
-    pub fn get(&self, path: &DesignPath) -> Option<Arc<RwLock<prjunnamed_netlist::Design>>> {
+    pub fn get(&self, path: &DesignPath) -> Option<Arc<Design>> {
         self.cache.get(path).cloned()
     }
 
@@ -32,7 +34,7 @@ impl Cache {
     }
 
     /// Remove a design from the cache for the given path
-    pub fn remove(&mut self, path: &DesignPath) -> Option<Arc<RwLock<prjunnamed_netlist::Design>>> {
+    pub fn remove(&mut self, path: &DesignPath) -> Option<Arc<Design>> {
         self.cache.remove(path)
     }
 

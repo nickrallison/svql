@@ -1,4 +1,5 @@
 use log::{error, trace};
+use prjunnamed_netlist::Design;
 use std::{path::{Path, PathBuf}, process::Stdio, sync::{Arc, RwLock}};
 
 use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::SubgraphMatch};
@@ -7,12 +8,12 @@ use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::Subgra
 pub struct Driver {
     module_name: String,
 
-    design: Arc<RwLock<prjunnamed_netlist::Design>>,
-    cache: crate::cache::Cache,
+    design: Arc<Design>,
+    cache: Cache,
 }
 
 impl Driver {
-    pub fn new(design: PathBuf, module_name: String, cache: crate::cache::Cache) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(design: PathBuf, module_name: String, cache: Cache) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = which::which("yosys")
             .map_err(|e| format!("Failed to find yosys binary: {}", e))?;
@@ -41,7 +42,7 @@ impl Driver {
         let design = if let Some(cached_design) = cache.get(&design_path) {
             cached_design.clone()
         } else {
-            Arc::new(RwLock::new(run_yosys_cmd(&yosys, &design_path, &module_name)?))
+            Arc::new(run_yosys_cmd(&yosys, &design_path, &module_name)?)
         };
 
 
@@ -61,9 +62,13 @@ impl Driver {
         todo!()
     }
 
-    pub fn design(&self) -> Arc<RwLock<prjunnamed_netlist::Design>> {
+    pub fn design(&self) -> Arc<Design> {
         self.design.clone()
     }
+    pub fn design_as_ref(&self) -> &Design {
+        self.design.as_ref()
+    }
+
 }
 
 
