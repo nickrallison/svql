@@ -1,9 +1,8 @@
 
-module par_sep_double_sdffe
+module comb_d_double_sdffe
 (
 input clk,
-input d1,
-input d2,
+input d,
 input reset,
 output wire q_w_1,
 output wire q_w_2,
@@ -14,12 +13,12 @@ reg q2;
 
 always @(posedge clk) begin
     if (reset) q1 <= 1'b0;
-    else q1 <= d1;
+    else q1 <= d;
 end
 
 always @(posedge clk) begin
     if (reset) q2 <= 1'b0;
-    else q2 <= d2;
+    else q2 <= d;
 end
 
 assign q_w_1 = q1;

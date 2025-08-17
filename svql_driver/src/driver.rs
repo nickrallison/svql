@@ -11,7 +11,7 @@ pub struct Driver {
 }
 
 impl Driver {
-    pub fn new(design: PathBuf, module_name: String, cache: &mut Cache) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(design: PathBuf, module_name: String, cache: Option<&mut Cache>) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = which::which("yosys")
             .map_err(|e| format!("Failed to find yosys binary: {}", e))?;
@@ -26,7 +26,7 @@ impl Driver {
         Self::new_yosys(design, module_name, cache, yosys)
     }
 
-    pub fn new_yosys(design_path: DesignPath, module_name: String, cache: &mut Cache, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new_yosys(design_path: DesignPath, module_name: String, cache: Option<&mut Cache>, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         trace!("new_yosys called with yosys: {:?}, design: {:?}, module_name: {}", yosys, design_path, module_name);
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()).into());
@@ -36,7 +36,13 @@ impl Driver {
             return Err(format!("Design file not found at: {}", design_path.path().display()).into());
         }
 
-        // if the design is contained in the cache, return it
+        let mut owned_cache = Cache::new();
+
+        let cache = match cache {
+            Some(c) => c,
+            None => &mut owned_cache
+        };
+
         if let None = cache.get(&design_path) {
             let design_new = run_yosys_cmd(&yosys, &design_path, &module_name)?;
             cache.insert(design_path.clone(), design_new);

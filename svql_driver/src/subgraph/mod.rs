@@ -11,6 +11,7 @@ pub struct SubgraphMatch<'p, 'd> {
     pub cell_mapping: HashMap<CellRef<'p>, CellRef<'d>>,
     pub pat_input_cells: Vec<InputCell<'p>>,
     pub pat_output_cells: Vec<OutputCell<'p>>,
+    pub boundary_src_map: HashMap<(CellRef<'p>, usize), (CellRef<'d>, usize)>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
@@ -34,10 +35,22 @@ impl std::fmt::Debug for SubgraphMatch<'_, '_> {
         let inputs: Vec<InputCell> = self.pat_input_cells.clone();
         let outputs: Vec<OutputCell> = self.pat_output_cells.clone();
 
+        let boundary_src_map: Vec<((usize, Cell), (usize, Cell))> = self
+            .boundary_src_map
+            .iter()
+            .map(|((p_src, p_bit), (d_src, d_bit))| {
+                (
+                    (p_src.debug_index(), p_src.get().as_ref().clone()),
+                    (d_src.debug_index(), d_src.get().as_ref().clone()),
+                )
+            })
+            .collect();
+
         f.debug_struct("SubgraphMatch")
             .field("cell_mapping", &mapping)
             .field("pat_input_cells", &inputs)
             .field("pat_output_cells", &outputs)
+            .field("boundary_src_map", &boundary_src_map)
             .finish()
     }
 }
@@ -97,17 +110,37 @@ fn get_pattern_io_cells<'p>(
 fn are_inputs_compatible<'p, 'd>(
     pattern_inputs: &[Result<(CellRef<'p>, usize), Trit>],
     design_inputs: &[Result<(CellRef<'d>, usize), Trit>],
-    mapping: &HashMap<CellRef<'p>, CellRef<'d>>,
+    mapping: &SubgraphMatch<'p, 'd>,
 ) -> bool {
+    use std::collections::HashMap;
+
     if pattern_inputs.len() != design_inputs.len() { return false; }
+
+    // Tracks duplicates within this single cell to ensure they map to the same design source
+    let mut local_seen: HashMap<(CellRef<'p>, usize), (CellRef<'d>, usize)> = HashMap::new();
+
     for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
         match (p_in, d_in) {
             (Err(a), Err(b)) => {
                 if a != b { return false; }
             }
             (Ok((p_src, p_bit)), Ok((d_src, d_bit))) => {
-                if let Some(mapped_d_src) = mapping.get(p_src) {
+                // If the pattern source is a mapped gate, enforce it maps to the same design gate.
+                if let Some(mapped_d_src) = mapping.cell_mapping.get(p_src) {
                     if mapped_d_src != d_src || p_bit != d_bit { return false; }
+                } else {
+                    // It's a boundary/non-gate source (e.g., primary input).
+                    let key = (*p_src, *p_bit);
+                    if let Some(&(exp_d_src, exp_d_bit)) = mapping.boundary_src_map.get(&key) {
+                        if exp_d_src != *d_src || exp_d_bit != *d_bit { return false; }
+                    }
+                    // Intra-cell duplication: if this pattern source appears multiple times on the same cell,
+                    // the design candidate must repeat the same design source.
+                    if let Some(&(prev_d_src, prev_d_bit)) = local_seen.get(&key) {
+                        if prev_d_src != *d_src || prev_d_bit != *d_bit { return false; }
+                    } else {
+                        local_seen.insert(key, (*d_src, *d_bit));
+                    }
                 }
             }
             _ => return false,
@@ -163,10 +196,27 @@ fn backtrack_mappings<'p, 'd>(
     for &design_cref in design_candidate_crefs.iter() {
         if used_design_cells.contains(&design_cref) { continue; }
         let (_d_kind, design_inputs) = &design_cells[&design_cref];
-        if !are_inputs_compatible(pattern_inputs, design_inputs, &mapping.cell_mapping) { continue; }
 
+        // Use the strengthened compatibility check
+        if !are_inputs_compatible(pattern_inputs, design_inputs, mapping) { continue; }
+
+        // Commit: map the gate itself
         mapping.cell_mapping.insert(next_pattern_cref, design_cref);
         used_design_cells.insert(design_cref);
+
+        // Commit: record boundary bindings implied by this pair (so future checks will enforce sameness)
+        let mut added_boundary: Vec<(CellRef<'p>, usize)> = Vec::new();
+        for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
+            if let (Ok((p_src, p_bit)), Ok((d_src, d_bit))) = (p_in, d_in) {
+                // Skip if the source is a mapped gate
+                if mapping.cell_mapping.contains_key(p_src) { continue; }
+                let key = (*p_src, *p_bit);
+                if !mapping.boundary_src_map.contains_key(&key) {
+                    mapping.boundary_src_map.insert(key, (*d_src, *d_bit));
+                    added_boundary.push(key);
+                }
+            }
+        }
 
         backtrack_mappings(
             pattern_cells,
@@ -177,6 +227,11 @@ fn backtrack_mappings<'p, 'd>(
             mappings_out,
         );
 
+        // Backtrack boundary bindings
+        for key in added_boundary {
+            mapping.boundary_src_map.remove(&key);
+        }
+        // Backtrack the gate mapping
         used_design_cells.remove(&design_cref);
         mapping.cell_mapping.remove(&next_pattern_cref);
     }
@@ -194,9 +249,6 @@ pub fn find_subgraphs<'p, 'd>(
         .into_iter()
         .filter(|(kind, _)| kind.is_gate())
         .collect::<Vec<_>>();
-
-    // dbg!(&pattern_cell_types);
-    // dbg!(&design_cell_types);
 
     // find the smallest cell kind in the design that is also in the pattern
     let anchor_kind = pattern_cell_types
@@ -247,6 +299,7 @@ pub fn find_subgraphs<'p, 'd>(
             cell_mapping: HashMap::from([(pattern_anchor_cref, design_anchor_cref)]),
             pat_input_cells: pat_input_cells_map.clone(),
             pat_output_cells: pat_output_cells_map.clone(),
+            ..Default::default()
         };
         let mut used_design: HashSet<CellRef<'d>> = HashSet::new();
         used_design.insert(design_anchor_cref);
@@ -395,16 +448,13 @@ mod tests {
 
     // Exercises are_inputs_compatible for the empty-inputs case (no CellRef construction required).
     #[test]
-    fn test_are_inputs_compatible_empty_inputs() {
-        let pattern_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
-        let design_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
-        let mapping: HashMap<CellRef, CellRef> = HashMap::new();
+fn test_are_inputs_compatible_empty_inputs() {
+    let pattern_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
+    let design_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
+    let mapping: SubgraphMatch = Default::default();
 
-        assert!(
-            are_inputs_compatible(&pattern_inputs, &design_inputs, &mapping),
-            "Empty input vectors should be compatible"
-        );
-    }
+    assert!(are_inputs_compatible(&pattern_inputs, &design_inputs, &mapping));
+}
 
     // Exercises choose_next_pattern_cell: smoke test that returns any unmapped pattern cell.
     #[test]
