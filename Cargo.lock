@@ -455,6 +455,7 @@ name = "svql_driver"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "lazy_static",
  "log",
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",

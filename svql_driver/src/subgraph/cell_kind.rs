@@ -79,7 +79,7 @@ impl From<&Cell> for CellKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InputCell<'p> {
     pub cref: CellRef<'p>,
 }
@@ -153,7 +153,7 @@ pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<InputCell<'a>> {
         .collect()
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OutputCell<'p> {
     pub cref: CellRef<'p>,
 }
