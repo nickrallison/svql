@@ -25,7 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = svql_driver::subgraph::find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
     // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, against haystack {}, got {}", needle_name, haystack_name, matches.len());
 
-    println!("Found {} matches for needle '{}' against haystack '{}'", matches.len(), needle_name, haystack_name);
+    // println!("Found {} matches for needle '{}' against haystack '{}'", matches.len(), needle_name, haystack_name);
+
+    println!("Matches: {:?}", matches);
 
     // for (i, match_map) in matches.iter().enumerate() {
     //     println!("Match {} ({} pairs):", i + 1, match_map.len());

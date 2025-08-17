@@ -96,8 +96,32 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
 
 impl std::fmt::Debug for SubgraphMatch<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_map()
-            .entries(self.cell_mapping.iter().map(|(p, d)| (p.debug_index(), d.debug_index())))
+        // Render deterministic, stable identifiers using debug_index() for CellRef
+        let mut mapping: Vec<(usize, usize)> = self
+            .cell_mapping
+            .iter()
+            .map(|(p, d)| (p.debug_index(), d.debug_index()))
+            .collect();
+        mapping.sort_unstable();
+
+        let mut inputs: Vec<(&str, usize)> = self
+            .pat_input_cells
+            .iter()
+            .map(|(name, cref)| (name.as_str(), cref.debug_index()))
+            .collect();
+        inputs.sort_unstable_by(|a, b| a.0.cmp(b.0));
+
+        let mut outputs: Vec<(&str, usize)> = self
+            .pat_output_cells
+            .iter()
+            .map(|(name, cref)| (name.as_str(), cref.debug_index()))
+            .collect();
+        outputs.sort_unstable_by(|a, b| a.0.cmp(b.0));
+
+        f.debug_struct("SubgraphMatch")
+            .field("cell_mapping", &mapping)
+            .field("pat_input_cells", &inputs)
+            .field("pat_output_cells", &outputs)
             .finish()
     }
 }
@@ -166,9 +190,9 @@ fn is_matchable_kind(kind: CellKind) -> bool {
             | CellKind::SModTrunc
             | CellKind::SModFloor
             | CellKind::Dff
-            | CellKind::Input
-            | CellKind::Output
-            | CellKind::IoBuf
+            // | CellKind::Input
+            // | CellKind::Output
+            // | CellKind::IoBuf
     )
 }
 
