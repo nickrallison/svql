@@ -1,5 +1,5 @@
 
-module sep_double_sdffe
+module par_double_sdffe
 (
 input clk,
 input d1,

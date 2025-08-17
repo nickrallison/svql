@@ -58,7 +58,7 @@ mod tests {
         // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
         // let otbn_design = read_input_to_design(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
 
-        let haystack_path = "examples/larger_designs/otbn.json";
+        let haystack_path = "examples/larger_designs/otbn_core.json";
         // let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
         let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
 

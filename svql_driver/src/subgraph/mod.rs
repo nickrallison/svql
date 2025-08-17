@@ -418,9 +418,9 @@ mod tests {
             .sum::<usize>();
 
         assert_eq!(
-            gate_count + input_count,
+            gate_count,
             cell_map.len(),
-            "collect_matchable_cells should collect exactly the gate cells + the input cells"
+            "collect_matchable_cells should collect exactly the gate cells"
         );
 
         // Ensure no non-gate cells are present.
