@@ -31,6 +31,7 @@ itertools = "0.14.0"
 openport = { version = "0.1.1", features = ["rand"] }
 tempfile = "3.20.0"
 which = "8.0.0"
+rstest = "0.26.1"
 
 # ---------------------
 # PRJUNNAMED
