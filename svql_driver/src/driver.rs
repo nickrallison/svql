@@ -7,13 +7,11 @@ use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::Subgra
 #[derive(Debug, Clone)]
 pub struct Driver {
     module_name: String,
-
     design: Arc<Design>,
-    cache: Cache,
 }
 
 impl Driver {
-    pub fn new(design: PathBuf, module_name: String, cache: Cache) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(design: PathBuf, module_name: String, cache: &mut Cache) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let yosys = which::which("yosys")
             .map_err(|e| format!("Failed to find yosys binary: {}", e))?;
@@ -28,7 +26,7 @@ impl Driver {
         Self::new_yosys(design, module_name, cache, yosys)
     }
 
-    pub fn new_yosys(design_path: DesignPath, module_name: String, cache: crate::cache::Cache, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new_yosys(design_path: DesignPath, module_name: String, cache: &mut Cache, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         trace!("new_yosys called with yosys: {:?}, design: {:?}, module_name: {}", yosys, design_path, module_name);
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()).into());
@@ -39,16 +37,16 @@ impl Driver {
         }
 
         // if the design is contained in the cache, return it
-        let design = if let Some(cached_design) = cache.get(&design_path) {
-            cached_design.clone()
-        } else {
-            Arc::new(run_yosys_cmd(&yosys, &design_path, &module_name)?)
-        };
+        if let None = cache.get(&design_path) {
+            let design_new = run_yosys_cmd(&yosys, &design_path, &module_name)?;
+            cache.insert(design_path.clone(), design_new);
+        }
+
+        let design = cache.get(&design_path).expect("Design should be in cache after running Yosys");
 
 
         let driver = Driver {
             design,
-            cache,
             module_name,
         };
 
