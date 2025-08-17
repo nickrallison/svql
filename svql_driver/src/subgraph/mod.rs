@@ -12,6 +12,7 @@ pub struct SubgraphMatch<'p, 'd> {
     pub pat_input_cells: Vec<InputCell<'p>>,
     pub pat_output_cells: Vec<OutputCell<'p>>,
     pub input_bindings: HashMap<(CellRef<'p>, usize), Result<(CellRef<'d>, usize), Trit>>,
+    pub input_index_map: HashMap<CellRef<'p>, Vec<usize>>,
 }
 
 
@@ -25,6 +26,7 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
 }
 
 impl std::fmt::Debug for SubgraphMatch<'_, '_> {
+
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut mapping: Vec<((usize, Cell), (usize, Cell))> = self
             .cell_mapping
@@ -49,6 +51,11 @@ impl std::fmt::Debug for SubgraphMatch<'_, '_> {
             })
             .collect();
         ib.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+
+        // let mut input_index_map: HashMap<CellRef<'_, _>, Vec<usize>> = HashMap::new();
+        // for (i, (p, _)) in ib.iter().enumerate() {
+        //     input_index_map.entry(*p).or_default().push(i);
+        // }
 
         f.debug_struct("SubgraphMatch")
             .field("cell_mapping", &mapping)
@@ -121,7 +128,7 @@ fn try_bind_inputs_with_perm<'p, 'd>(
     perm: &[usize],
     pattern_cells: &HashMap<CellRef<'p>, (CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>)>,
     mapping: &SubgraphMatch<'p, 'd>,
-) -> Option<Vec<((CellRef<'p>, usize), Result<(CellRef<'d>, usize), Trit>)>> {
+) -> Option<(Vec<((CellRef<'p>, usize), Result<(CellRef<'d>, usize), Trit>)>, Vec<usize>)> {
     if pattern_inputs.len() != design_inputs.len() || perm.len() != pattern_inputs.len() {
         return None;
     }
@@ -131,24 +138,27 @@ fn try_bind_inputs_with_perm<'p, 'd>(
     for (i, p_in) in pattern_inputs.iter().enumerate() {
         let d_in = &design_inputs[perm[i]];
         match (p_in, d_in) {
-            // Constant-to-constant must match
             (Err(a), Err(b)) => {
                 if a != b { return None; }
             }
-
-            // Pattern edge driven by a cell (gate or input), design edge driven by a cell
             (Ok((p_src, p_bit)), Ok((d_src, d_bit))) => {
                 if pattern_cells.contains_key(p_src) {
-                    // Gate predecessor: if already mapped, it must match this exact design source+bit.
-                    // If not yet mapped, defer the check; forward consistency will validate when p_src is mapped.
+                    // Pattern predecessor is a gate (already or will be mapped).
                     if let Some(mapped_d_src) = mapping.cell_mapping.get(p_src) {
-                        if mapped_d_src != d_src || *p_bit != *d_bit {
-                            return None;
+                        // Allow collapse to a design primary input; otherwise must match the mapped gate+bit.
+                        let is_design_pi = matches!(d_src.get().as_ref(), Cell::Input(_, _));
+                        if !is_design_pi {
+                            if mapped_d_src != d_src || *p_bit != *d_bit {
+                                return None;
+                            }
                         }
                     }
                 } else {
-                    // Pattern predecessor is a primary input: allow binding to ANY design source (input or internal).
-                    // Enforce consistency if the same pattern PI appears on multiple edges.
+                    // Pattern predecessor is a primary input: the design source MUST also be a primary input.
+                    if !matches!(d_src.get().as_ref(), Cell::Input(_, _)) {
+                        return None;
+                    }
+                    // Enforce consistency: the same pattern PI must bind to the same design source+bit.
                     let key = (*p_src, *p_bit);
                     if let Some(bound) = mapping.input_bindings.get(&key) {
                         if bound != d_in { return None; }
@@ -159,14 +169,10 @@ fn try_bind_inputs_with_perm<'p, 'd>(
                     }
                 }
             }
-
-            // Pattern edge driven by a cell, design edge is a constant:
-            // gates cannot drive constants => only valid if pattern predecessor is a PI
             (Ok((p_src, p_bit)), Err(b)) => {
                 if pattern_cells.contains_key(p_src) {
-                    return None; // a gate cannot map to a constant input
+                    return None;
                 }
-                // Pattern predecessor is a primary input, binding to a constant is allowed.
                 let key = (*p_src, *p_bit);
                 if let Some(bound) = mapping.input_bindings.get(&key) {
                     if bound != d_in { return None; }
@@ -176,13 +182,11 @@ fn try_bind_inputs_with_perm<'p, 'd>(
                     tentative.insert(key, Err(*b));
                 }
             }
-
-            // Any other combination is invalid
             _ => return None,
         }
     }
 
-    Some(tentative.into_iter().collect())
+    Some((tentative.into_iter().collect(), perm.to_vec()))
 }
 
 fn try_bind_inputs<'p, 'd>(
@@ -191,7 +195,7 @@ fn try_bind_inputs<'p, 'd>(
     design_inputs: &[Result<(CellRef<'d>, usize), Trit>],
     pattern_cells: &HashMap<CellRef<'p>, (CellKind, Vec<Result<(CellRef<'p>, usize), Trit>>)>,
     mapping: &SubgraphMatch<'p, 'd>,
-) -> Option<Vec<((CellRef<'p>, usize), Result<(CellRef<'d>, usize), Trit>)>> {
+) -> Option<(Vec<((CellRef<'p>, usize), Result<(CellRef<'d>, usize), Trit>)>, Vec<usize>)> {
     if pattern_inputs.len() != design_inputs.len() { return None; }
 
     let n = pattern_inputs.len();
@@ -201,7 +205,6 @@ fn try_bind_inputs<'p, 'd>(
         return try_bind_inputs_with_perm(pattern_inputs, design_inputs, &id, pattern_cells, mapping);
     }
 
-    // For small arities, try all permutations; tests use 2-input And
     let mut idx: Vec<usize> = id.clone();
     loop {
         if let Some(binds) = try_bind_inputs_with_perm(pattern_inputs, design_inputs, &idx, pattern_cells, mapping) {
@@ -239,18 +242,55 @@ fn check_forward_consistency<'p, 'd>(
     design_cells: &HashMap<CellRef<'d>, (CellKind, Vec<Result<(CellRef<'d>, usize), Trit>>)>,
     mapping: &SubgraphMatch<'p, 'd>,
 ) -> bool {
+    // Helper: given pat cell, get its pat->design input index map (identity if absent)
+    let get_perm = |p: &CellRef<'p>, len: usize| -> Vec<usize> {
+        mapping.input_index_map.get(p).cloned().unwrap_or_else(|| (0..len).collect())
+    };
+
     for (p_dst, d_dst) in mapping.cell_mapping.iter() {
         let (_, p_inputs) = &pattern_cells[p_dst];
         let (_, d_inputs) = &design_cells[d_dst];
+        if p_inputs.len() != d_inputs.len() { return false; }
 
-        // Inputs vectors must be same length by construction of both cell kinds
+        let perm = get_perm(p_dst, p_inputs.len());
+
+        // Build inverse permutation: design index -> pattern index
+        let mut inv_perm = vec![0usize; perm.len()];
+        for (i, &j) in perm.iter().enumerate() {
+            if j >= inv_perm.len() { return false; }
+            inv_perm[j] = i;
+        }
+
+        // 1) For every pattern edge newly_mapped_p -> p_dst at pat index i,
+        //    enforce the corresponding design edge newly_mapped_d -> d_dst at design index perm[i]
         for (i, p_in) in p_inputs.iter().enumerate() {
             if let Ok((p_src, p_bit)) = p_in {
                 if *p_src == newly_mapped_p {
-                    match d_inputs.get(i) {
+                    let j = perm[i];
+                    match d_inputs.get(j) {
                         Some(Ok((d_src, d_bit))) => {
-                            // Must be driven by the newly mapped design gate on the same bit
-                            if *d_src != newly_mapped_d || *d_bit != *p_bit {
+                            // Allow collapse to a design primary input; otherwise it must match newly_mapped_d and bit.
+                            let is_design_pi = matches!(d_src.get().as_ref(), Cell::Input(_, _));
+                            if !is_design_pi && (*d_src != newly_mapped_d || *d_bit != *p_bit) {
+                                return false;
+                            }
+                        }
+                        _ => return false,
+                    }
+                }
+            }
+        }
+
+        // 2) Induced-subgraph check in the other direction:
+        //    For every design edge newly_mapped_d -> d_dst at design index j,
+        //    the pattern must have newly_mapped_p -> p_dst at pat index inv_perm[j].
+        for (j, d_in) in d_inputs.iter().enumerate() {
+            if let Ok((d_src, d_bit)) = d_in {
+                if *d_src == newly_mapped_d {
+                    let i = inv_perm[j];
+                    match p_inputs.get(i) {
+                        Some(Ok((p_src, p_bit))) => {
+                            if *p_src != newly_mapped_p || *p_bit != *d_bit {
                                 return false;
                             }
                         }
@@ -301,11 +341,11 @@ fn backtrack_mappings<'p, 'd>(
 
     let Some(design_candidate_crefs) = design_cells_by_kind.get(pattern_kind) else { return; };
 
-    for &design_cref in design_candidate_crefs.iter() {
+        for &design_cref in design_candidate_crefs.iter() {
         if used_design_cells.contains(&design_cref) { continue; }
         let (_d_kind, design_inputs) = &design_cells[&design_cref];
 
-        let Some(new_pi_binds) = try_bind_inputs(
+        let Some((new_pi_binds, perm)) = try_bind_inputs(
             *pattern_kind,
             pattern_inputs,
             design_inputs,
@@ -314,6 +354,7 @@ fn backtrack_mappings<'p, 'd>(
         ) else { continue; };
 
         mapping.cell_mapping.insert(next_pattern_cref, design_cref);
+        // Track which PI bindings we add for cleanup
         let mut added_keys: Vec<(CellRef<'p>, usize)> = Vec::new();
         for (k, v) in new_pi_binds {
             if !mapping.input_bindings.contains_key(&k) {
@@ -321,6 +362,8 @@ fn backtrack_mappings<'p, 'd>(
                 added_keys.push(k);
             }
         }
+        // Store input permutation for this mapped pattern cell
+        mapping.input_index_map.insert(next_pattern_cref, perm);
 
         if check_forward_consistency(next_pattern_cref, design_cref, pattern_cells, design_cells, mapping) {
             used_design_cells.insert(design_cref);
@@ -336,6 +379,7 @@ fn backtrack_mappings<'p, 'd>(
         }
 
         mapping.cell_mapping.remove(&next_pattern_cref);
+        mapping.input_index_map.remove(&next_pattern_cref);
         for k in added_keys {
             mapping.input_bindings.remove(&k);
         }
@@ -425,12 +469,13 @@ pub fn find_subgraphs<'p, 'd>(
             pat_input_cells: pat_input_cells_map.clone(),
             pat_output_cells: pat_output_cells_map.clone(),
             input_bindings: HashMap::new(),
+            input_index_map: HashMap::new(),
         };
 
         // Bind anchor inputs immediately; skip this anchor if incompatible
         let (_pk, p_inputs) = &pattern_cells_map[&pattern_anchor_cref];
         let (_dk, d_inputs) = &design_cells_map[&design_anchor_cref];
-        if let Some(binds) = try_bind_inputs(
+        if let Some((binds, perm)) = try_bind_inputs(
             anchor_kind,
             p_inputs,
             d_inputs,
@@ -440,6 +485,8 @@ pub fn find_subgraphs<'p, 'd>(
             for (k, v) in binds {
                 mapping.input_bindings.entry(k).or_insert(v);
             }
+            // Store the permutation for the anchor cell
+            mapping.input_index_map.insert(pattern_anchor_cref, perm);
         } else {
             continue;
         }
