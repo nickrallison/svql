@@ -74,7 +74,7 @@ mod tests {
         let time_elapsed = time_start.elapsed();
         println!("Test completed in {:?}", time_elapsed);
 
-        // test should take less than 2 seconds (0.2 seconds on my machine in release and 1.4 seconds in debug)
+        // test should take less than 2 seconds (0.2 seconds on my machine (AMD 7950X3D) in release and 1.4 seconds in debug)
         // 2000 milis in release or 14000 milis in debug
         let time_expected = if cfg!(debug_assertions) {
             std::time::Duration::from_millis(14000)
