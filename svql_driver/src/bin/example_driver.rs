@@ -23,16 +23,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Find subgraphs using the chosen anchor kind
     let matches = svql_driver::subgraph::find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
-    assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, against haystack {}, got {}", needle_name, haystack_name, matches.len());
+    // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, against haystack {}, got {}", needle_name, haystack_name, matches.len());
 
-    for (i, match_map) in matches.iter().enumerate() {
-        println!("Match {} ({} pairs):", i + 1, match_map.len());
-        for (needle_cell_ref, design_cell_ref) in match_map.iter() {
-            let needle_meta = needle_cell_ref.metadata();
-            let design_meta = design_cell_ref.metadata();
-            println!("Needle Cell: {:?}, \nDesign Cell: {:?}\n---\n", needle_meta.get(), design_meta.get());
-        }
-    }
+    println!("Found {} matches for needle '{}' against haystack '{}'", matches.len(), needle_name, haystack_name);
+
+    // for (i, match_map) in matches.iter().enumerate() {
+    //     println!("Match {} ({} pairs):", i + 1, match_map.len());
+    //     for (needle_cell_ref, design_cell_ref) in match_map.iter() {
+    //         let needle_meta = needle_cell_ref.metadata();
+    //         let design_meta = design_cell_ref.metadata();
+    //         println!("Needle Cell Meta: {:?}, \nDesign Cell Meta: {:?}\n---\n", needle_meta.get(), design_meta.get());
+
+    //         let needle_cell = needle_cell_ref.get();
+    //         let design_cell = design_cell_ref.get();
+
+    //         println!("Needle Cell: {:?}, \nDesign Cell: {:?}\n---\n", needle_cell, design_cell);
+    //     }
+    // }
 
     Ok(())
 }

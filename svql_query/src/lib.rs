@@ -19,20 +19,35 @@ pub trait QueryableState: State {}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Match<'p, 'd> {
-    pub pat_meta: Option<prjunnamed_netlist::MetaItemRef<'p>>,
-    pub design_meta: Option<prjunnamed_netlist::MetaItemRef<'d>>,
+    pub pat_cell_ref: Option<prjunnamed_netlist::CellRef<'p>>,
+    pub design_cell_ref: Option<prjunnamed_netlist::CellRef<'d>>,
 }
 
-impl State for Search {}
-impl State for Match<'_, '_> {}
-impl QueryableState for Search {}
+impl std::fmt::Debug for Match<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Match")
+            .field(
+                "pat_cell_metadata",
+                &self.pat_cell_ref.as_ref().map(|pat| pat.metadata()),
+            )
+            .field(
+                "design_cell_metadata",
+                &self.design_cell_ref.as_ref().map(|design| design.metadata()),
+            )
+            .finish()
+    }
+}
+
+    impl State for Search {}
+    impl State for Match<'_, '_> {}
+    impl QueryableState for Search {}
 impl Default for Match<'_, '_> {
     fn default() -> Self {
         Self {
-            pat_meta: None,
-            design_meta: None,
+            pat_cell_ref: None,
+            design_cell_ref: None,
         }
     }
 }

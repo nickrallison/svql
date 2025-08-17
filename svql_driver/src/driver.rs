@@ -1,5 +1,5 @@
 use log::{error, trace};
-use prjunnamed_netlist::Design;
+use prjunnamed_netlist::{Cell, CellRef, Design};
 use std::{path::{Path, PathBuf}, process::Stdio, sync::{Arc, RwLock}};
 
 use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::SubgraphMatch};
@@ -66,6 +66,18 @@ impl Driver {
     pub fn design_as_ref(&self) -> &Design {
         self.design.as_ref()
     }
+
+    pub fn get_input_cells<'p>(&'p self) -> Vec<CellRef<'p>> {
+        self.design.iter_cells().filter(|cell| {
+            matches!(cell.get().as_ref(), Cell::Input(_, _))
+        }).collect()
+    }
+    pub fn get_output_cells<'p>(&'p self) -> Vec<CellRef<'p>> {
+        self.design.iter_cells().filter(|cell| {
+            matches!(cell.get().as_ref(), Cell::Output(_, _))
+        }).collect()
+    }
+
 
 }
 

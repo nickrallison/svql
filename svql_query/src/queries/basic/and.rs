@@ -58,6 +58,27 @@ impl SearchableNetlist for And<Search> {
     type Hit<'p, 'd> = And<Match<'p, 'd>>;
 
     fn from_query_match<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd> {
+        let pat_a_cell_ref = m.pat_input_cells
+            .get("a")
+            .expect("Expected 'a' input cell in match");
+        let pat_b_cell_ref = m.pat_input_cells
+            .get("b")
+            .expect("Expected 'b' input cell in match");
+        let pat_y_cell_ref = m.pat_output_cells
+            .get("y")
+            .expect("Expected 'y' output cell in match");
+
+        let design_a_cell_ref = m.cell_mapping
+            .get(pat_a_cell_ref)
+            .expect("Expected 'a' input cell mapping in match");
+
+        let design_b_cell_ref = m.cell_mapping
+            .get(pat_b_cell_ref)
+        .expect("Expected 'b' input cell mapping in match");        
+
+        let design_y_cell_ref = m.cell_mapping
+            .get(pat_y_cell_ref)
+            .expect("Expected 'y' output cell mapping in match");   
         // let a = Match {
         //     id: lookup(&m, "a").cloned().unwrap(),
         // };
