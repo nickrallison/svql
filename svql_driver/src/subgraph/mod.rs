@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, Design};
 
@@ -46,6 +46,14 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
+fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(usize, usize)> {
+    let mut v: Vec<_> = m
+        .iter()
+        .map(|(p, d)| (p.debug_index(), d.debug_index()))
+        .collect();
+    v.sort_unstable();
+    v
+}
 
 // Public API
 pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSubgraphMatches<'p, 'd> {
@@ -53,32 +61,25 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
     let d_index = index::Index::build(design);
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
-        return AllSubgraphMatches {
-            matches: Vec::new(),
-            _p_index: p_index,
-            _d_index: d_index,
-        };
+        return AllSubgraphMatches { matches: Vec::new(), _p_index: p_index, _d_index: d_index };
     }
 
     let Some((_anchor_kind, p_anchors, d_anchors)) = anchor::choose_anchors(&p_index, &d_index) else {
-        return AllSubgraphMatches {
-            matches: Vec::new(),
-            _p_index: p_index,
-            _d_index: d_index,
-        };
+        return AllSubgraphMatches { matches: Vec::new(), _p_index: p_index, _d_index: d_index };
     };
 
     let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
 
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
 
+    let p_anchor = *p_anchors.iter().min().unwrap();
+    let p_anchors = vec![p_anchor];
+
     for &p_a in &p_anchors {
         for &d_a in &d_anchors {
-        
             if p_index.kind(p_a) != d_index.kind(d_a) {
                 continue;
             }
-            // Quick compatibility check with empty state
             let empty_state = state::State::< 'p, 'd>::new(p_index.gate_count());
             if !compat::cells_compatible(p_a, d_a, &p_index, &d_index, &empty_state) {
                 continue;
@@ -87,43 +88,45 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
             let mut st = state::State::new(p_index.gate_count());
             st.map(p_a, d_a);
 
-            // Add IO boundaries implied by anchor mapping
             let added = search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st);
 
             search::backtrack(&p_index, &d_index, &mut st, &mut results, &pat_inputs, &pat_outputs);
 
-            // Backtrack anchor boundaries
             search::remove_boundaries(added, &mut st);
             st.unmap(p_a, d_a);
-            
         }
     }
 
-    AllSubgraphMatches {
-        matches: results,
-        _p_index: p_index,
-        _d_index: d_index,
-    }
+    let mut seen: HashSet<Vec<(usize, usize)>> = HashSet::new();
+    results.retain(|m| seen.insert(match_signature(m)));
+
+    AllSubgraphMatches { matches: results, _p_index: p_index, _d_index: d_index }
 }
+
+
 
 // Helper used by tests and callers
 pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec<OutputCell<'p>>) {
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{read_input_to_design, Driver};
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
         static ref ASYNC_MUX: (Driver, PathBuf) = load_driver_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
         static ref SEQ_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
         static ref SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
+        static ref COMB_D_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v");
+        static ref PAR_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v");
+
     }
 
 
@@ -150,5 +153,27 @@ mod tests {
         let design = SEQ_DOUBLE_SDFFE.0.design_as_ref();
         let matches = find_subgraphs(design, design);
         assert!(!matches.is_empty(), "Self-match seq_double_sdffe should yield mappings");
+    }
+
+    #[test]
+    fn exact_two_matches_comb_d_double_self() {
+        let design = COMB_D_DOUBLE_SDFFE.0.design_as_ref();
+        let matches = find_subgraphs(design, design);
+        assert_eq!(matches.len(), 2, "canonical anchor + dedupe should yield 2 mappings");
+    }
+
+    #[test]
+    fn exact_two_matches_sdffe_in_seq_double() {
+        let pat = SDFFE.0.design_as_ref();
+        let hay = SEQ_DOUBLE_SDFFE.0.design_as_ref();
+        let matches = find_subgraphs(pat, hay);
+        assert_eq!(matches.len(), 2, "pattern IO should bind to gate, yielding 2 matches");
+    }
+
+    #[test]
+    fn dedupe_eliminates_anchor_duplicates_par_double_self() {
+        let design = PAR_DOUBLE_SDFFE.0.design_as_ref();
+        let matches = find_subgraphs(design, design);
+        assert_eq!(matches.len(), 2);
     }
 }

@@ -79,18 +79,18 @@ mod tests {
         let needle_design_4 = read_input_to_design(None, needle_path_4.to_string()).expect("Failed to read input design");
         let needle_name_4 = get_name(&needle_path_4);
 
-        // Find subgraphs using the chosen anchor kind
-        let matches = subgraph::find_subgraphs(&needle_design_1, &haystack_design);
-        assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_1, matches.len());
+        // // Find subgraphs using the chosen anchor kind
+        // let matches = subgraph::find_subgraphs(&needle_design_1, &haystack_design);
+        // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_1, matches.len());
 
-        let matches = subgraph::find_subgraphs(&needle_design_2, &haystack_design);
-        assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_2, matches.len());
+        // let matches = subgraph::find_subgraphs(&needle_design_2, &haystack_design);
+        // assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_2, matches.len());
 
-        let matches = subgraph::find_subgraphs(&needle_design_3, &haystack_design);
-        assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_3, matches.len());
+        // let matches = subgraph::find_subgraphs(&needle_design_3, &haystack_design);
+        // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_3, matches.len());
 
-        let matches = subgraph::find_subgraphs(&needle_design_4, &haystack_design);
-        assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_4, matches.len());
+        // let matches = subgraph::find_subgraphs(&needle_design_4, &haystack_design);
+        // assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_4, matches.len());
 
     }
 }

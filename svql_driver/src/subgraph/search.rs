@@ -1,4 +1,3 @@
-
 use crate::subgraph::cell_kind::CellWrapper;
 
 use super::compat::cells_compatible;
@@ -6,6 +5,7 @@ use super::index::{Index, NodeId};
 use super::ports::Source;
 use super::state::State;
 use super::{SubgraphMatch, cell_kind::{InputCell, OutputCell}};
+use super::strategy::choose_next;
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
@@ -44,37 +44,6 @@ pub(super) fn backtrack<'p, 'd>(
     }
 }
 
-fn choose_next<'p, 'd>(p_index: &Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
-    // Prefer resolvable nodes (all gate sources mapped, IO/Const allowed)
-    for p in 0..(p_index.gate_count() as usize) {
-        let p = p as NodeId;
-        if st.is_mapped(p) { continue; }
-        let pins = &p_index.pins(p).inputs;
-        let mut all_resolvable = true;
-        for (_, src) in pins {
-            match src {
-                Source::Const(_) => {}
-                Source::Io(_, _) => {}
-                Source::Gate(gc, _) => {
-                    if let Some(p_src_node) = p_index.try_cell_to_node(*gc) {
-                        if !st.is_mapped(p_src_node) {
-                            all_resolvable = false;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if all_resolvable { return Some(p); }
-    }
-    // Fallback
-    for p in 0..(p_index.gate_count() as usize) {
-        let p = p as NodeId;
-        if !st.is_mapped(p) { return Some(p); }
-    }
-    None
-}
-
 pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -89,6 +58,12 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     for ((_, p_src), (_, d_src)) in p_pins.iter().zip(d_pins.iter()) {
         match (p_src, d_src) {
             (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
+                let key = (*p_cell, *p_bit);
+                if st.boundary_insert(key, (*d_cell, *d_bit)) {
+                    added.push(key);
+                }
+            }
+            (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 let key = (*p_cell, *p_bit);
                 if st.boundary_insert(key, (*d_cell, *d_bit)) {
                     added.push(key);
