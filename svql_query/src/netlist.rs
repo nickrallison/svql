@@ -12,9 +12,9 @@ pub trait Netlist<S>: WithPath<S> where S: State {
     fn driver(&self) -> &svql_driver::Driver;
 }
 
-pub trait SearchableNetlist: Netlist<Search> {
+pub trait SearchableNetlist<'p, 'd>: Netlist<Search> {
     type Hit;
-    fn from_query_match(match_: SubgraphMatch, path: Instance) -> Self::Hit;
+    fn from_query_match(match_: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit;
     fn query(&self, haystack: &Driver, path: Instance) -> Vec<Self::Hit> {
         svql_driver::subgraph::find_subgraphs(&self.driver().design().read().unwrap(), &haystack.design().read().unwrap())
             .into_iter()

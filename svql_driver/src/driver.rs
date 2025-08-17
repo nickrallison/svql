@@ -3,7 +3,7 @@ use std::{path::{Path, PathBuf}, process::Stdio, sync::{Arc, RwLock}};
 
 use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::SubgraphMatch};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Driver {
     module_name: String,
 

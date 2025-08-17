@@ -1,3 +1,5 @@
+use svql_driver::SubgraphMatch;
+
 use crate::instance::Instance;
 use std::{hash::Hash};
 
@@ -38,9 +40,10 @@ impl Default for Match<'_, '_> {
 // Helpers
 // ########################
 
-// pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a IdString> {
-//     m.get(&IdString::Named(pin.into()))
-// }
+pub fn lookup<'a>(m: SubgraphMatch, pin: &str) {
+    // m.get(&IdString::Named(pin.into()))
+    todo!()
+}
 
 #[macro_export]
 macro_rules! impl_find_port {
@@ -63,11 +66,10 @@ pub trait WithPath<S>: Sized
 where
     S: State,
 {
-    fn new(path: Instance) -> Self;
-
-    fn root(name: impl Into<String>) -> Self {
-        Self::new(Instance::root(name.into()))
-    }
+    // fn new(path: Instance, driver: svql_driver::Driver) -> Self;
+    // fn root(name: impl Into<String>, driver: svql_driver::Driver) -> Self {
+    //     Self::new(Instance::root(name.into()), driver)
+    // }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
     fn path(&self) -> Instance;
 }
@@ -97,9 +99,9 @@ impl<S> WithPath<S> for Wire<S>
 where
     S: State,
 {
-    fn new(path: Instance) -> Self {
-        Self { path, val: None }
-    }
+//     fn new(path: Instance) -> Self {
+//         Self { path, val: None }
+//     }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if p.height() < self.path.height() {
             return None;
