@@ -48,19 +48,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_otbn() {
-        
+    fn test_otbn_run_time() {
 
-        // env logger
-        env_logger::builder()
-            .filter_level(log::LevelFilter::Trace)
-            .init();
-
-        // let otbn_path = PathBuf::from("examples/larger_designs/otbn.json");
-        // let otbn_design = read_input_to_design(None, otbn_path.to_string_lossy().to_string()).expect("Failed to read input design");
+        let time_start = std::time::Instant::now();
 
         let haystack_path = "examples/larger_designs/otbn_core.json";
-        // let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
         let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
 
         let needle_path_1 = "examples/patterns/security/access_control/locked_reg/json/async_en.json";
@@ -79,18 +71,16 @@ mod tests {
         let needle_design_4 = read_input_to_design(None, needle_path_4.to_string()).expect("Failed to read input design");
         let needle_name_4 = get_name(&needle_path_4);
 
-        // // Find subgraphs using the chosen anchor kind
-        // let matches = subgraph::find_subgraphs(&needle_design_1, &haystack_design);
-        // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_1, matches.len());
+        let time_elapsed = time_start.elapsed();
+        println!("Test completed in {:?}", time_elapsed);
 
-        // let matches = subgraph::find_subgraphs(&needle_design_2, &haystack_design);
-        // assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_2, matches.len());
-
-        // let matches = subgraph::find_subgraphs(&needle_design_3, &haystack_design);
-        // assert_eq!(matches.len(), 207, "Expected 207 matches for needle {}, got {}", needle_name_3, matches.len());
-
-        // let matches = subgraph::find_subgraphs(&needle_design_4, &haystack_design);
-        // assert_eq!(matches.len(), 0, "Expected 0 matches for needle {}, got {}", needle_name_4, matches.len());
-
+        // test should take less than 2 seconds (0.2 seconds on my machine in release and 1.4 seconds in debug)
+        // 2000 milis in release or 14000 milis in debug
+        let time_expected = if cfg!(debug_assertions) {
+            std::time::Duration::from_millis(14000)
+        } else {
+            std::time::Duration::from_millis(2000)
+        };
+        assert!(time_elapsed < time_expected, "Test took too long to run, expected < {:?}, got {:?}", time_expected, time_elapsed);
     }
 }
