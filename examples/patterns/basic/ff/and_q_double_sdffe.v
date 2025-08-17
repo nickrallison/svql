@@ -13,12 +13,12 @@ reg q2;
 
 always @(posedge clk) begin
     if (reset) q1 <= 1'b0;
-    else q1 <= d;
+    else q1 <= d1;
 end
 
 always @(posedge clk) begin
     if (reset) q2 <= 1'b0;
-    else q2 <= d;
+    else q2 <= d2;
 end
 
 assign q = q1 & q2;
