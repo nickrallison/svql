@@ -46,13 +46,22 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(usize, usize)> {
-    let mut v: Vec<_> = m
-        .iter()
-        .map(|(p, d)| (p.debug_index(), d.debug_index()))
-        .collect();
-    v.sort_unstable();
-    v
+// NEW: a stronger, stable signature for deduplication, including boundary bindings.
+fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
+    let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
+
+    // Gate mapping: tag 0, (p_dbg, 0, d_dbg, 0)
+    for (p, d) in m.cell_mapping.iter() {
+        sig.push((0, p.debug_index(), 0, d.debug_index(), 0));
+    }
+
+    // Boundary mapping: tag 1, (p_io_dbg, p_bit, d_dbg, d_bit)
+    for ((p_cell, p_bit), (d_cell, d_bit)) in m.boundary_src_map.iter() {
+        sig.push((1, p_cell.debug_index(), *p_bit, d_cell.debug_index(), *d_bit));
+    }
+
+    sig.sort_unstable();
+    sig
 }
 
 // Public API
@@ -61,17 +70,25 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
     let d_index = index::Index::build(design);
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
-        return AllSubgraphMatches { matches: Vec::new(), _p_index: p_index, _d_index: d_index };
+        return AllSubgraphMatches {
+            matches: Vec::new(),
+            _p_index: p_index,
+            _d_index: d_index,
+        };
     }
 
     let Some((_anchor_kind, p_anchors, d_anchors)) = anchor::choose_anchors(&p_index, &d_index) else {
-        return AllSubgraphMatches { matches: Vec::new(), _p_index: p_index, _d_index: d_index };
+        return AllSubgraphMatches {
+            matches: Vec::new(),
+            _p_index: p_index,
+            _d_index: d_index,
+        };
     };
 
     let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
-
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
 
+    // Canonicalize pattern anchor to avoid multiplicity
     let p_anchor = *p_anchors.iter().min().unwrap();
     let p_anchors = vec![p_anchor];
 
@@ -88,19 +105,26 @@ pub fn find_subgraphs<'p, 'd>(pattern: &'p Design, design: &'d Design) -> AllSub
             let mut st = state::State::new(p_index.gate_count());
             st.map(p_a, d_a);
 
+            // Add IO boundaries implied by anchor mapping
             let added = search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st);
 
             search::backtrack(&p_index, &d_index, &mut st, &mut results, &pat_inputs, &pat_outputs);
 
+            // Backtrack anchor boundaries
             search::remove_boundaries(added, &mut st);
             st.unmap(p_a, d_a);
         }
     }
 
-    let mut seen: HashSet<Vec<(usize, usize)>> = HashSet::new();
+    // Dedupe by combined signature
+    let mut seen: HashSet<Vec<(u8, usize, usize, usize, usize)>> = HashSet::new();
     results.retain(|m| seen.insert(match_signature(m)));
 
-    AllSubgraphMatches { matches: results, _p_index: p_index, _d_index: d_index }
+    AllSubgraphMatches {
+        matches: results,
+        _p_index: p_index,
+        _d_index: d_index,
+    }
 }
 
 

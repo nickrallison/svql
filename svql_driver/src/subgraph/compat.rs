@@ -64,6 +64,11 @@ fn pins_compatible_pairwise<'p, 'd>(
                     if exp_d_cell != *d_cell || exp_d_bit != *d_bit { return false; }
                 }
             }
+            (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
+                if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit) {
+                    if exp_d_cell != *d_cell || exp_d_bit != *d_bit { return false; }
+                }
+            }
             _ => return false,
         }
     }
