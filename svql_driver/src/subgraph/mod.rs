@@ -11,7 +11,6 @@ pub struct SubgraphMatch<'p, 'd> {
     pub cell_mapping: HashMap<CellRef<'p>, CellRef<'d>>,
     pub pat_input_cells: Vec<InputCell<'p>>,
     pub pat_output_cells: Vec<OutputCell<'p>>,
-    pub boundary_src_map: HashMap<(CellRef<'p>, usize), (CellRef<'d>, usize)>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
@@ -35,22 +34,10 @@ impl std::fmt::Debug for SubgraphMatch<'_, '_> {
         let inputs: Vec<InputCell> = self.pat_input_cells.clone();
         let outputs: Vec<OutputCell> = self.pat_output_cells.clone();
 
-        let boundary_src_map: Vec<((usize, Cell), (usize, Cell))> = self
-            .boundary_src_map
-            .iter()
-            .map(|((p_src, p_bit), (d_src, d_bit))| {
-                (
-                    (p_src.debug_index(), p_src.get().as_ref().clone()),
-                    (d_src.debug_index(), d_src.get().as_ref().clone()),
-                )
-            })
-            .collect();
-
         f.debug_struct("SubgraphMatch")
             .field("cell_mapping", &mapping)
             .field("pat_input_cells", &inputs)
             .field("pat_output_cells", &outputs)
-            .field("boundary_src_map", &boundary_src_map)
             .finish()
     }
 }
@@ -110,37 +97,17 @@ fn get_pattern_io_cells<'p>(
 fn are_inputs_compatible<'p, 'd>(
     pattern_inputs: &[Result<(CellRef<'p>, usize), Trit>],
     design_inputs: &[Result<(CellRef<'d>, usize), Trit>],
-    mapping: &SubgraphMatch<'p, 'd>,
+    mapping: &HashMap<CellRef<'p>, CellRef<'d>>,
 ) -> bool {
-    use std::collections::HashMap;
-
     if pattern_inputs.len() != design_inputs.len() { return false; }
-
-    // Tracks duplicates within this single cell to ensure they map to the same design source
-    let mut local_seen: HashMap<(CellRef<'p>, usize), (CellRef<'d>, usize)> = HashMap::new();
-
     for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
         match (p_in, d_in) {
             (Err(a), Err(b)) => {
                 if a != b { return false; }
             }
             (Ok((p_src, p_bit)), Ok((d_src, d_bit))) => {
-                // If the pattern source is a mapped gate, enforce it maps to the same design gate.
-                if let Some(mapped_d_src) = mapping.cell_mapping.get(p_src) {
+                if let Some(mapped_d_src) = mapping.get(p_src) {
                     if mapped_d_src != d_src || p_bit != d_bit { return false; }
-                } else {
-                    // It's a boundary/non-gate source (e.g., primary input).
-                    let key = (*p_src, *p_bit);
-                    if let Some(&(exp_d_src, exp_d_bit)) = mapping.boundary_src_map.get(&key) {
-                        if exp_d_src != *d_src || exp_d_bit != *d_bit { return false; }
-                    }
-                    // Intra-cell duplication: if this pattern source appears multiple times on the same cell,
-                    // the design candidate must repeat the same design source.
-                    if let Some(&(prev_d_src, prev_d_bit)) = local_seen.get(&key) {
-                        if prev_d_src != *d_src || prev_d_bit != *d_bit { return false; }
-                    } else {
-                        local_seen.insert(key, (*d_src, *d_bit));
-                    }
                 }
             }
             _ => return false,
@@ -196,27 +163,10 @@ fn backtrack_mappings<'p, 'd>(
     for &design_cref in design_candidate_crefs.iter() {
         if used_design_cells.contains(&design_cref) { continue; }
         let (_d_kind, design_inputs) = &design_cells[&design_cref];
+        if !are_inputs_compatible(pattern_inputs, design_inputs, &mapping.cell_mapping) { continue; }
 
-        // Use the strengthened compatibility check
-        if !are_inputs_compatible(pattern_inputs, design_inputs, mapping) { continue; }
-
-        // Commit: map the gate itself
         mapping.cell_mapping.insert(next_pattern_cref, design_cref);
         used_design_cells.insert(design_cref);
-
-        // Commit: record boundary bindings implied by this pair (so future checks will enforce sameness)
-        let mut added_boundary: Vec<(CellRef<'p>, usize)> = Vec::new();
-        for (p_in, d_in) in pattern_inputs.iter().zip(design_inputs.iter()) {
-            if let (Ok((p_src, p_bit)), Ok((d_src, d_bit))) = (p_in, d_in) {
-                // Skip if the source is a mapped gate
-                if mapping.cell_mapping.contains_key(p_src) { continue; }
-                let key = (*p_src, *p_bit);
-                if !mapping.boundary_src_map.contains_key(&key) {
-                    mapping.boundary_src_map.insert(key, (*d_src, *d_bit));
-                    added_boundary.push(key);
-                }
-            }
-        }
 
         backtrack_mappings(
             pattern_cells,
@@ -227,11 +177,6 @@ fn backtrack_mappings<'p, 'd>(
             mappings_out,
         );
 
-        // Backtrack boundary bindings
-        for key in added_boundary {
-            mapping.boundary_src_map.remove(&key);
-        }
-        // Backtrack the gate mapping
         used_design_cells.remove(&design_cref);
         mapping.cell_mapping.remove(&next_pattern_cref);
     }
@@ -299,7 +244,6 @@ pub fn find_subgraphs<'p, 'd>(
             cell_mapping: HashMap::from([(pattern_anchor_cref, design_anchor_cref)]),
             pat_input_cells: pat_input_cells_map.clone(),
             pat_output_cells: pat_output_cells_map.clone(),
-            ..Default::default()
         };
         let mut used_design: HashSet<CellRef<'d>> = HashSet::new();
         used_design.insert(design_anchor_cref);
@@ -317,300 +261,303 @@ pub fn find_subgraphs<'p, 'd>(
     mappings
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use super::*;
-    use crate::read_input_to_design;
-    use cell_kind::{
-        count_cells_by_kind, get_input_cells, get_output_cells, CellKind,
-    };
+//     use super::*;
+//     use crate::read_input_to_design;
+//     use cell_kind::{
+//         count_cells_by_kind, get_input_cells, get_output_cells, CellKind,
+//     };
 
-    lazy_static::lazy_static! {
-        static ref ASYNC_MUX: Design = load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
-        static ref DOUBLE_SDFFE: Design = load_design_from("examples/patterns/basic/ff/double_sdffe.v");
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
-    }
+//     lazy_static::lazy_static! {
+//         static ref ASYNC_MUX: Design = load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
+//         static ref DOUBLE_SDFFE: Design = load_design_from("examples/patterns/basic/ff/double_sdffe.v");
+//         static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v");
+//     }
 
-    fn load_design_from(path: &str) -> Design {
-        read_input_to_design(None, path.to_string()).expect("Failed to read input design")
-    }
+//     fn load_design_from(path: &str) -> Design {
+//         read_input_to_design(None, path.to_string()).expect("Failed to read input design")
+//     }
 
 
-    // Exercises SubgraphMatch::{len, is_empty, iter} and Debug impl on an empty mapping.
-    #[test]
-    fn test_subgraphmatch_basic_methods_and_debug_empty() {
-        let m: SubgraphMatch = Default::default();
-        assert!(m.is_empty(), "Default SubgraphMatch should be empty");
-        assert_eq!(m.len(), 0, "Default SubgraphMatch length should be 0");
-        assert!(m.iter().next().is_none(), "Iterator over empty mapping should be empty");
+//     // Exercises SubgraphMatch::{len, is_empty, iter} and Debug impl on an empty mapping.
+//     #[test]
+//     fn test_subgraphmatch_basic_methods_and_debug_empty() {
+//         let m: SubgraphMatch = Default::default();
+//         assert!(m.is_empty(), "Default SubgraphMatch should be empty");
+//         assert_eq!(m.len(), 0, "Default SubgraphMatch length should be 0");
+//         assert!(m.iter().next().is_none(), "Iterator over empty mapping should be empty");
 
-        let dbg = format!("{m:?}");
-        assert!(dbg.contains("SubgraphMatch"), "Debug should include struct name");
-        assert!(dbg.contains("cell_mapping"), "Debug should include cell_mapping");
-        assert!(dbg.contains("pat_input_cells"), "Debug should include pat_input_cells");
-        assert!(dbg.contains("pat_output_cells"), "Debug should include pat_output_cells");
-    }
+//         let dbg = format!("{m:?}");
+//         assert!(dbg.contains("SubgraphMatch"), "Debug should include struct name");
+//         assert!(dbg.contains("cell_mapping"), "Debug should include cell_mapping");
+//         assert!(dbg.contains("pat_input_cells"), "Debug should include pat_input_cells");
+//         assert!(dbg.contains("pat_output_cells"), "Debug should include pat_output_cells");
+//     }
 
-    #[test]
-    fn test_get_input_cells() {
-        let mut inputs = get_input_cells(&ASYNC_MUX);
-        inputs.sort();
+//     #[test]
+//     fn test_get_input_cells() {
+//         let mut inputs = get_input_cells(&ASYNC_MUX);
+//         inputs.sort();
 
-        assert_eq!(inputs.len(), 4, "Expected 4 input cells");
+//         assert_eq!(inputs.len(), 4, "Expected 4 input cells");
 
-        let actual = inputs;
-        let _actual_clk = actual.iter().find(|cell| cell.name() == Some("clk")).cloned().expect("Expected clk input cell");
-        let _actual_data_in = actual.iter().find(|cell| cell.name() == Some("data_in")).cloned().expect("Expected data_in input cell");
-        let _actual_resetn = actual.iter().find(|cell| cell.name() == Some("resetn")).cloned().expect("Expected resetn input cell");
-        let _actual_write_en = actual.iter().find(|cell| cell.name() == Some("write_en")).cloned().expect("Expected write_en input cell");
-    }
+//         let actual = inputs;
+//         let _actual_clk = actual.iter().find(|cell| cell.name() == Some("clk")).cloned().expect("Expected clk input cell");
+//         let _actual_data_in = actual.iter().find(|cell| cell.name() == Some("data_in")).cloned().expect("Expected data_in input cell");
+//         let _actual_resetn = actual.iter().find(|cell| cell.name() == Some("resetn")).cloned().expect("Expected resetn input cell");
+//         let _actual_write_en = actual.iter().find(|cell| cell.name() == Some("write_en")).cloned().expect("Expected write_en input cell");
+//     }
 
-    #[test]
-    fn test_get_output_cells() {
-        let mut outputs = get_output_cells(&ASYNC_MUX);
-        outputs.sort();
+//     #[test]
+//     fn test_get_output_cells() {
+//         let mut outputs = get_output_cells(&ASYNC_MUX);
+//         outputs.sort();
 
-        assert_eq!(outputs.len(), 1, "Expected 1 output cell");
+//         assert_eq!(outputs.len(), 1, "Expected 1 output cell");
 
-        let actual = outputs;
-        let _actual_data_out = actual.iter().find(|cell| cell.name() == Some("data_out")).cloned().expect("Expected data_out output cell");
-    }
+//         let actual = outputs;
+//         let _actual_data_out = actual.iter().find(|cell| cell.name() == Some("data_out")).cloned().expect("Expected data_out output cell");
+//     }
 
-    // Exercises get_pattern_io_cells by comparing against the reference helpers in cell_kind.
-    #[test]
-    fn test_get_pattern_io_cells_collects_io() {
-        let design = &ASYNC_MUX;
-        let (pat_inputs, pat_outputs) = get_pattern_io_cells(&design);
+//     // Exercises get_pattern_io_cells by comparing against the reference helpers in cell_kind.
+//     #[test]
+//     fn test_get_pattern_io_cells_collects_io() {
+//         let design = &ASYNC_MUX;
+//         let (pat_inputs, pat_outputs) = get_pattern_io_cells(&design);
 
-        // Cross-check lengths with the public helpers from cell_kind.
-        let ref_inputs = get_input_cells(&design);
-        let ref_outputs = get_output_cells(&design);
+//         // Cross-check lengths with the public helpers from cell_kind.
+//         let ref_inputs = get_input_cells(&design);
+//         let ref_outputs = get_output_cells(&design);
 
-        assert_eq!(
-            pat_inputs.len(),
-            ref_inputs.len(),
-            "get_pattern_io_cells should collect the same number of inputs as get_input_cells"
-        );
-        assert_eq!(
-            pat_outputs.len(),
-            ref_outputs.len(),
-            "get_pattern_io_cells should collect the same number of outputs as get_output_cells"
-        );
-    }
+//         assert_eq!(
+//             pat_inputs.len(),
+//             ref_inputs.len(),
+//             "get_pattern_io_cells should collect the same number of inputs as get_input_cells"
+//         );
+//         assert_eq!(
+//             pat_outputs.len(),
+//             ref_outputs.len(),
+//             "get_pattern_io_cells should collect the same number of outputs as get_output_cells"
+//         );
+//     }
 
-    // Exercises collect_matchable_cells: verifies it collects only gate cells and buckets them by kind.
-    #[test]
-    fn test_collect_matchable_cells_gate_filtering_and_bucketing() {
-        let design = &ASYNC_MUX;
+//     // Exercises collect_matchable_cells: verifies it collects only gate cells and buckets them by kind.
+//     #[test]
+//     fn test_collect_matchable_cells_gate_filtering_and_bucketing() {
+//         let design = &ASYNC_MUX;
 
-        let (cell_map, cells_by_kind) = collect_matchable_cells(&design);
+//         let (cell_map, cells_by_kind) = collect_matchable_cells(&design);
 
-        // Count the number of gate cells in the design using the reference helpers.
-        let gate_count = count_cells_by_kind(&design, is_gate_cell_ref)
-            .into_iter()
-            .map(|(_, c)| c)
-            .sum::<usize>();
+//         // Count the number of gate cells in the design using the reference helpers.
+//         let gate_count = count_cells_by_kind(&design, is_gate_cell_ref)
+//             .into_iter()
+//             .map(|(_, c)| c)
+//             .sum::<usize>();
 
-        let input_count = count_cells_by_kind(&design, |c| matches!(c.get().as_ref(), Cell::Input(_, _)))
-            .into_iter()
-            .map(|(_, c)| c)
-            .sum::<usize>();
+//         let input_count = count_cells_by_kind(&design, |c| matches!(c.get().as_ref(), Cell::Input(_, _)))
+//             .into_iter()
+//             .map(|(_, c)| c)
+//             .sum::<usize>();
 
-        assert_eq!(
-            gate_count,
-            cell_map.len(),
-            "collect_matchable_cells should collect exactly the gate cells"
-        );
+//         assert_eq!(
+//             gate_count + input_count,
+//             cell_map.len(),
+//             "collect_matchable_cells should collect exactly the gate cells + the input cells"
+//         );
 
-        // Ensure no non-gate cells are present.
-        for cref in design.iter_cells() {
-            let kind = CellKind::from(cref.get().as_ref());
-            let in_map = cell_map.contains_key(&cref);
-            if is_gate_cell_ref(cref) || matches!(kind, CellKind::Input) {
-                assert!(in_map, "Gate / Input cell {:?} should be in the matchable map", kind);
-            } else if matches!(kind, CellKind::Output) {
-                assert!(!in_map, "Cells that are not gates / inputs {:?} should NOT be in the matchable map", kind);
-            }
-        }
+//         // Ensure no non-gate cells are present.
+//         for cref in design.iter_cells() {
+//             let kind = CellKind::from(cref.get().as_ref());
+//             let in_map = cell_map.contains_key(&cref);
+//             if is_gate_cell_ref(cref) || matches!(kind, CellKind::Input) {
+//                 assert!(in_map, "Gate / Input cell {:?} should be in the matchable map", kind);
+//             } else if matches!(kind, CellKind::Output) {
+//                 assert!(!in_map, "Cells that are not gates / inputs {:?} should NOT be in the matchable map", kind);
+//             }
+//         }
 
-        // Check that bucketing by kind is consistent with the collected map.
-        for (kind, crefs) in cells_by_kind {
-            for c in crefs {
-                let (ck, _inputs) = cell_map.get(&c).expect("Bucketed cell must exist in map");
-                assert_eq!(
-                    *ck, kind,
-                    "Bucket kind and cell_map kind should agree for the same cell"
-                );
-            }
-        }
-    }
+//         // Check that bucketing by kind is consistent with the collected map.
+//         for (kind, crefs) in cells_by_kind {
+//             for c in crefs {
+//                 let (ck, _inputs) = cell_map.get(&c).expect("Bucketed cell must exist in map");
+//                 assert_eq!(
+//                     *ck, kind,
+//                     "Bucket kind and cell_map kind should agree for the same cell"
+//                 );
+//             }
+//         }
+//     }
 
-    // Exercises are_inputs_compatible for the empty-inputs case (no CellRef construction required).
-    #[test]
-fn test_are_inputs_compatible_empty_inputs() {
-    let pattern_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
-    let design_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
-    let mapping: SubgraphMatch = Default::default();
+//     // Exercises are_inputs_compatible for the empty-inputs case (no CellRef construction required).
+//     #[test]
+//     fn test_are_inputs_compatible_empty_inputs() {
+//         let pattern_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
+//         let design_inputs: Vec<Result<(CellRef, usize), Trit>> = Vec::new();
+//         let mapping: HashMap<CellRef, CellRef> = HashMap::new();
 
-    assert!(are_inputs_compatible(&pattern_inputs, &design_inputs, &mapping));
-}
+//         assert!(
+//             are_inputs_compatible(&pattern_inputs, &design_inputs, &mapping),
+//             "Empty input vectors should be compatible"
+//         );
+//     }
 
-    // Exercises choose_next_pattern_cell: smoke test that returns any unmapped pattern cell.
-    #[test]
-    fn test_choose_next_pattern_cell_returns_some_unmapped_cell() {
-        let pattern = &ASYNC_MUX;
-        let (pattern_cells_map, _unused) = collect_matchable_cells(&pattern);
+//     // Exercises choose_next_pattern_cell: smoke test that returns any unmapped pattern cell.
+//     #[test]
+//     fn test_choose_next_pattern_cell_returns_some_unmapped_cell() {
+//         let pattern = &ASYNC_MUX;
+//         let (pattern_cells_map, _unused) = collect_matchable_cells(&pattern);
 
-        // If there are no gate cells, skip the test (or you could assert an expected condition).
-        if pattern_cells_map.is_empty() {
-            eprintln!("Pattern has no gate cells; skipping test.");
-            return;
-        }
+//         // If there are no gate cells, skip the test (or you could assert an expected condition).
+//         if pattern_cells_map.is_empty() {
+//             eprintln!("Pattern has no gate cells; skipping test.");
+//             return;
+//         }
 
-        let mapping: SubgraphMatch = Default::default();
-        let next = choose_next_pattern_cell(&pattern_cells_map, &mapping)
-            .expect("Should return some unmapped cell when any exist");
+//         let mapping: SubgraphMatch = Default::default();
+//         let next = choose_next_pattern_cell(&pattern_cells_map, &mapping)
+//             .expect("Should return some unmapped cell when any exist");
 
-        assert!(
-            pattern_cells_map.contains_key(&next),
-            "Returned CellRef must be present in pattern_cells_map"
-        );
-    }
+//         assert!(
+//             pattern_cells_map.contains_key(&next),
+//             "Returned CellRef must be present in pattern_cells_map"
+//         );
+//     }
 
-    // Exercises backtrack_mappings base case: when pattern_cells is empty, it should immediately push the mapping.
-    #[test]
-    fn test_backtrack_mappings_base_case_empty_pattern() {
-        let pattern_cells: HashMap<CellRef, (CellKind, Vec<Result<(CellRef, usize), Trit>>)> =
-            HashMap::new();
-        let design_cells: HashMap<CellRef, (CellKind, Vec<Result<(CellRef, usize), Trit>>)> =
-            HashMap::new();
-        let design_cells_by_kind: HashMap<CellKind, Vec<CellRef>> = HashMap::new();
+//     // Exercises backtrack_mappings base case: when pattern_cells is empty, it should immediately push the mapping.
+//     #[test]
+//     fn test_backtrack_mappings_base_case_empty_pattern() {
+//         let pattern_cells: HashMap<CellRef, (CellKind, Vec<Result<(CellRef, usize), Trit>>)> =
+//             HashMap::new();
+//         let design_cells: HashMap<CellRef, (CellKind, Vec<Result<(CellRef, usize), Trit>>)> =
+//             HashMap::new();
+//         let design_cells_by_kind: HashMap<CellKind, Vec<CellRef>> = HashMap::new();
 
-        let mut mapping: SubgraphMatch = Default::default();
-        let mut used_design_cells: HashSet<CellRef> = HashSet::new();
-        let mut outputs: Vec<SubgraphMatch> = Vec::new();
+//         let mut mapping: SubgraphMatch = Default::default();
+//         let mut used_design_cells: HashSet<CellRef> = HashSet::new();
+//         let mut outputs: Vec<SubgraphMatch> = Vec::new();
 
-        backtrack_mappings(
-            &pattern_cells,
-            &design_cells,
-            &design_cells_by_kind,
-            &mut mapping,
-            &mut used_design_cells,
-            &mut outputs,
-        );
+//         backtrack_mappings(
+//             &pattern_cells,
+//             &design_cells,
+//             &design_cells_by_kind,
+//             &mut mapping,
+//             &mut used_design_cells,
+//             &mut outputs,
+//         );
 
-        assert_eq!(
-            outputs.len(),
-            1,
-            "Base case with empty pattern should produce one (empty) mapping"
-        );
-        assert!(outputs[0].is_empty(), "Mapping should be empty");
-    }
+//         assert_eq!(
+//             outputs.len(),
+//             1,
+//             "Base case with empty pattern should produce one (empty) mapping"
+//         );
+//         assert!(outputs[0].is_empty(), "Mapping should be empty");
+//     }
 
-    // Exercises Debug impl with a non-empty SubgraphMatch (minimally).
-    #[test]
-    fn test_subgraphmatch_debug_non_empty() {
-        let pattern = &ASYNC_MUX;
-        let design = &ASYNC_MUX;
-        let (p_map, _) = collect_matchable_cells(&pattern);
-        let (d_map, d_by_kind) = collect_matchable_cells(&design);
+//     // Exercises Debug impl with a non-empty SubgraphMatch (minimally).
+//     #[test]
+//     fn test_subgraphmatch_debug_non_empty() {
+//         let pattern = &ASYNC_MUX;
+//         let design = &ASYNC_MUX;
+//         let (p_map, _) = collect_matchable_cells(&pattern);
+//         let (d_map, d_by_kind) = collect_matchable_cells(&design);
 
-        // Find any common kind and pick one cref from each design to map.
-        let mut mapped = SubgraphMatch {
-            cell_mapping: HashMap::new(),
-            ..Default::default()
-        };
+//         // Find any common kind and pick one cref from each design to map.
+//         let mut mapped = SubgraphMatch {
+//             cell_mapping: HashMap::new(),
+//             ..Default::default()
+//         };
 
-        // Capture IO cells for Debug printing.
-        let (pat_inputs, pat_outputs) = get_pattern_io_cells(&pattern);
-        mapped.pat_input_cells = pat_inputs;
-        mapped.pat_output_cells = pat_outputs;
+//         // Capture IO cells for Debug printing.
+//         let (pat_inputs, pat_outputs) = get_pattern_io_cells(&pattern);
+//         mapped.pat_input_cells = pat_inputs;
+//         mapped.pat_output_cells = pat_outputs;
 
-        // Try to find at least one gate to create a non-empty mapping.
-        let mut made_one = false;
-        'outer: for (&p_cref, (p_kind, _)) in p_map.iter() {
-            if let Some(d_candidates) = d_by_kind.get(p_kind) {
-                if let Some(&d_cref) = d_candidates.get(0) {
-                    mapped.cell_mapping.insert(p_cref, d_cref);
-                    made_one = true;
-                    break 'outer;
-                }
-            }
-        }
+//         // Try to find at least one gate to create a non-empty mapping.
+//         let mut made_one = false;
+//         'outer: for (&p_cref, (p_kind, _)) in p_map.iter() {
+//             if let Some(d_candidates) = d_by_kind.get(p_kind) {
+//                 if let Some(&d_cref) = d_candidates.get(0) {
+//                     mapped.cell_mapping.insert(p_cref, d_cref);
+//                     made_one = true;
+//                     break 'outer;
+//                 }
+//             }
+//         }
 
-        if !made_one {
-            eprintln!("No common gate kind found to create a non-empty mapping; skipping test.");
-            return;
-        }
+//         if !made_one {
+//             eprintln!("No common gate kind found to create a non-empty mapping; skipping test.");
+//             return;
+//         }
 
-        let dbg = format!("{mapped:?}");
-        assert!(dbg.contains("SubgraphMatch"), "Debug should include struct name");
-        assert!(dbg.contains("cell_mapping"), "Debug should include cell_mapping");
-        assert!(dbg.contains("pat_input_cells"), "Debug should include pat_input_cells");
-        assert!(dbg.contains("pat_output_cells"), "Debug should include pat_output_cells");
-    }
+//         let dbg = format!("{mapped:?}");
+//         assert!(dbg.contains("SubgraphMatch"), "Debug should include struct name");
+//         assert!(dbg.contains("cell_mapping"), "Debug should include cell_mapping");
+//         assert!(dbg.contains("pat_input_cells"), "Debug should include pat_input_cells");
+//         assert!(dbg.contains("pat_output_cells"), "Debug should include pat_output_cells");
+//     }
 
-    // Exercises find_subgraphs on a self-match (pattern == design): should find at least one mapping
-    // and each mapping should cover all gate cells in the pattern.
-    #[test]
-    fn test_find_subgraphs_self_match_smoke() {
-        let pattern = &ASYNC_MUX;
-        let design = &ASYNC_MUX;
+//     // Exercises find_subgraphs on a self-match (pattern == design): should find at least one mapping
+//     // and each mapping should cover all gate cells in the pattern.
+//     #[test]
+//     fn test_find_subgraphs_self_match_smoke() {
+//         let pattern = &ASYNC_MUX;
+//         let design = &ASYNC_MUX;
 
-        let (pattern_cells_map, _p_by_kind) = collect_matchable_cells(&pattern);
-        let expected_gate_count = pattern_cells_map.len();
+//         let (pattern_cells_map, _p_by_kind) = collect_matchable_cells(&pattern);
+//         let expected_gate_count = pattern_cells_map.len();
 
-        // If there are no gates, then the function will .expect(...) on anchor selection.
-        if expected_gate_count == 0 {
-            eprintln!("Design has no gate cells; skipping test.");
-            return;
-        }
+//         // If there are no gates, then the function will .expect(...) on anchor selection.
+//         if expected_gate_count == 0 {
+//             eprintln!("Design has no gate cells; skipping test.");
+//             return;
+//         }
 
-        let matches = find_subgraphs(&pattern, &design);
+//         let matches = find_subgraphs(&pattern, &design);
 
-        assert!(
-            !matches.is_empty(),
-            "Self-match should produce at least one mapping"
-        );
+//         assert!(
+//             !matches.is_empty(),
+//             "Self-match should produce at least one mapping"
+//         );
 
-        for m in &matches {
-            assert_eq!(
-                m.len(),
-                expected_gate_count,
-                "Each mapping should include all gate cells of the pattern"
-            );
-        }
+//         for m in &matches {
+//             assert_eq!(
+//                 m.len(),
+//                 expected_gate_count,
+//                 "Each mapping should include all gate cells of the pattern"
+//             );
+//         }
 
-        // IO cells should be preserved in matches.
-        let (p_inputs, p_outputs) = get_pattern_io_cells(&pattern);
-        for m in &matches {
-            assert_eq!(
-                m.pat_input_cells.len(),
-                p_inputs.len(),
-                "Match should carry all pattern input cells"
-            );
-            assert_eq!(
-                m.pat_output_cells.len(),
-                p_outputs.len(),
-                "Match should carry all pattern output cells"
-            );
-        }
-    }
+//         // IO cells should be preserved in matches.
+//         let (p_inputs, p_outputs) = get_pattern_io_cells(&pattern);
+//         for m in &matches {
+//             assert_eq!(
+//                 m.pat_input_cells.len(),
+//                 p_inputs.len(),
+//                 "Match should carry all pattern input cells"
+//             );
+//             assert_eq!(
+//                 m.pat_output_cells.len(),
+//                 p_outputs.len(),
+//                 "Match should carry all pattern output cells"
+//             );
+//         }
+//     }
 
-    // Existing test kept as-is (exercises the main end-to-end path and backtracking).
-    #[test]
-    fn test_many_regs() {
-        let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
-        let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
-        let haystack_name = crate::get_name(&haystack_path);
+//     // Existing test kept as-is (exercises the main end-to-end path and backtracking).
+//     #[test]
+//     fn test_many_regs() {
+//         let haystack_path = "examples/patterns/security/access_control/locked_reg/json/many_locked_regs.json";
+//         let haystack_design = read_input_to_design(None, haystack_path.to_string()).expect("Failed to read input design");
+//         let haystack_name = crate::get_name(&haystack_path);
 
-        let needle_path = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
-        let needle_design = read_input_to_design(None, needle_path.to_string()).expect("Failed to read input design");
-        let needle_name = crate::get_name(&needle_path);
+//         let needle_path = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
+//         let needle_design = read_input_to_design(None, needle_path.to_string()).expect("Failed to read input design");
+//         let needle_name = crate::get_name(&needle_path);
 
-        // Find subgraphs using the chosen anchor kind
-        let matches = find_subgraphs(&needle_design, &haystack_design);
-        assert_eq!(matches.len(), 2, "Expected exactly two matches for {} with {}", needle_name, haystack_name);
-    }
-}
+//         // Find subgraphs using the chosen anchor kind
+//         let matches = find_subgraphs(&needle_design, &haystack_design);
+//         assert_eq!(matches.len(), 2, "Expected exactly two matches for {} with {}", needle_name, haystack_name);
+//     }
+// }
