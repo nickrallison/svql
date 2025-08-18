@@ -1,4 +1,4 @@
-pub mod basic;
+pub mod netlist;
 // pub mod security;
 
 // pub mod examples;

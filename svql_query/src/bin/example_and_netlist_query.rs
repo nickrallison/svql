@@ -1,5 +1,5 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_query::{Search, instance::Instance, queries::basic::and::And};
+use svql_query::{Search, instance::Instance, queries::netlist::and::And};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // env logger
