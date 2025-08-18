@@ -36,7 +36,13 @@ pub struct SubgraphMatch<'p, 'd> {
     pub pat_input_cells: Vec<InputCell<'p>>,
     pub pat_output_cells: Vec<OutputCell<'p>>,
     pub boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
+
+    // lookup indices
+    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
 }
+
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
     pub fn len(&self) -> usize { self.cell_mapping.len() }
@@ -44,6 +50,17 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellWrapper<'p>, CellWrapper<'d>> {
         self.cell_mapping.iter()
     }
+
+    pub fn design_source_of_input_bit(&self, name: &str, bit: usize) -> Option<(CellWrapper<'d>, usize)> {
+        let p_in = *self.input_by_name.get(name)?;
+        self.boundary_src_map.get(&(p_in, bit)).copied()
+    }
+
+    pub fn design_driver_of_output_bit(&self, name: &str, bit: usize) -> Option<(CellWrapper<'d>, usize)> {
+        let p_out = *self.output_by_name.get(name)?;
+        self.out_driver_map.get(&(p_out, bit)).copied()
+    }
+
 }
 
 // NEW: a stronger, stable signature for deduplication, including boundary bindings.
@@ -199,5 +216,39 @@ mod tests {
         let design = PAR_DOUBLE_SDFFE.0.design_as_ref();
         let matches = find_subgraphs(design, design);
         assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn o1_lookup_by_port_name_and_bit_sdffe_in_seq_double() {
+        let pat = SDFFE.0.design_as_ref();
+        let hay = SEQ_DOUBLE_SDFFE.0.design_as_ref();
+        let all = find_subgraphs(pat, hay);
+        assert_eq!(all.len(), 2, "expected two sdffe matches in seq_double_sdffe");
+
+        // Every match should resolve both d (input) and q (output) via O(1) helpers
+        for m in all.iter() {
+            assert!(m.design_source_of_input_bit("d", 0).is_some(), "input d should have a bound design source");
+            assert!(m.design_driver_of_output_bit("q", 0).is_some(), "output q should have a resolved design driver");
+        }
+
+        // There should exist a pair of matches where q of one drives d of the other.
+        let mut found = false;
+        let ms: Vec<_> = all.iter().collect();
+        for m1 in &ms {
+            if let Some((dq_cell, dq_bit)) = m1.design_driver_of_output_bit("q", 0) {
+                let dq_net = dq_cell.output()[dq_bit];
+                for m2 in &ms {
+                    if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
+                        let sd_net = sd_cell.output()[sd_bit];
+                        if dq_net == sd_net {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if found { break; }
+        }
+        assert!(found, "expected to find at least one connection: q of one match drives d of another");
     }
 }
