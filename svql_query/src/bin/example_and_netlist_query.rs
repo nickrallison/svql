@@ -1,7 +1,5 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_query::{
-    Search, instance::Instance, netlist::SearchableNetlist, queries::basic::and::And,
-};
+use svql_query::{Search, instance::Instance, queries::basic::and::And};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // env logger
@@ -12,7 +10,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cache = Cache::new();
 
     let and_gate_driver = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)?;
-    // let and_tree_driver = load_driver_cached("examples/patterns/basic/and/and_tree.v", &mut cache)?;
     let and_seq_driver = load_driver_cached("examples/patterns/basic/and/and_seq.v", &mut cache)?;
 
     let hits = And::<Search>::query(
@@ -20,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &and_seq_driver,
         Instance::root("and".to_string()),
     );
+
     for hit in hits {
         println!("Found match: {:#?}", hit);
     }
