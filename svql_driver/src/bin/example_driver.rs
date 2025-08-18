@@ -1,9 +1,6 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
 
-use svql_driver::{Driver, cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
+
+use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()

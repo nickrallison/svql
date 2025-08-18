@@ -10,8 +10,6 @@ where
     // --- Constants ---
     const MODULE_NAME: &'static str;
     const FILE_PATH: &'static str;
-
-    fn driver(&self) -> &svql_driver::Driver;
 }
 
 pub trait SearchableNetlist: Netlist<Search> {

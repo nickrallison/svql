@@ -1,22 +1,18 @@
-// ########################
-// Examples
-// ########################
-
-use std::sync::{Arc, RwLock};
-
 use svql_driver::SubgraphMatch;
+use svql_driver::subgraph::cell_kind::CellWrapper;
 
 use crate::instance::Instance;
-use crate::lookup;
 use crate::netlist::{Netlist, SearchableNetlist};
 use crate::{Match, Search, State, Wire, WithPath};
+
+// Direction is implicit from which helper we call (input vs output),
+// so we don’t need a direction enum here. For multi-bit ports, iterate bits.
 
 #[derive(Debug, Clone)]
 pub struct And<S>
 where
     S: State,
 {
-    pub driver: svql_driver::Driver,
     pub path: Instance,
     pub a: Wire<S>,
     pub b: Wire<S>,
@@ -40,72 +36,47 @@ where
 {
     const MODULE_NAME: &'static str = "and_gate";
     const FILE_PATH: &'static str = "./examples/patterns/basic/and/and.v";
-
-    fn driver(&self) -> &svql_driver::Driver {
-        &self.driver
-    }
 }
 
 impl SearchableNetlist for And<Search> {
     type Hit<'p, 'd> = And<Match<'p, 'd>>;
 
     fn from_query_match<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd> {
-        // let pat_a_cell_ref = m.pat_input_cells
-        //     .get("a")
-        //     .expect("Expected 'a' input cell in match");
-        // let pat_b_cell_ref = m.pat_input_cells
-        //     .get("b")
-        //     .expect("Expected 'b' input cell in match");
-        // let pat_y_cell_ref = m.pat_output_cells
-        //     .get("y")
-        //     .expect("Expected 'y' output cell in match");
+        // Single-bit ports; for multi-bit, iterate 0..width
+        let a_match = bind_input(m, "a", 0);
+        let b_match = bind_input(m, "b", 0);
+        let y_match = bind_output(m, "y", 0);
 
-        // let design_a_cell_ref = m.cell_mapping
-        //     .get(pat_a_cell_ref)
-        //     .expect("Expected 'a' input cell mapping in match");
-
-        // let design_b_cell_ref = m.cell_mapping
-        //     .get(pat_b_cell_ref)
-        // .expect("Expected 'b' input cell mapping in match");
-
-        // let design_y_cell_ref = m.cell_mapping
-        //     .get(pat_y_cell_ref)
-        //     .expect("Expected 'y' output cell mapping in match");
-
-        todo!()
+        And {
+            path: path.clone(),
+            a: Wire::with_val(path.child("a".to_string()), a_match),
+            b: Wire::with_val(path.child("b".to_string()), b_match),
+            y: Wire::with_val(path.child("y".to_string()), y_match),
+        }
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+// Helpers: turn SubgraphMatch into our Match<'p,'d> for a single bit.
+// For wider ports, call with bit = 0..width and collect into Vec<Wire<_>>.
 
-//     use std::path::PathBuf;
-//     use svql_driver::Driver;
+fn bind_input<'p, 'd>(m: &SubgraphMatch<'p, 'd>, name: &str, bit: usize) -> Match<'p, 'd> {
+    let pat = m.input_by_name.get(name).copied();
+    let des = m
+        .design_source_of_input_bit(name, bit)
+        .map(|(c, _b)| c);
+    Match {
+        pat_cell_ref: pat,
+        design_cell_ref: des,
+    }
+}
 
-//     use super::*;
-
-//     // ###############
-//     // Netlist Tests
-//     // ###############
-//     #[test]
-//     fn test_and_netlist() {
-//         let design = PathBuf::from("examples/patterns/basic/and/and_tree.v");
-//         let module_name = "and_tree".to_string();
-
-//         let driver = Driver::new(design, module_name);
-
-//         let and = And::<Search>::root("and".to_string());
-//         assert_eq!(and.path().inst_path(), "and");
-//         assert_eq!(and.a.path.inst_path(), "and.a");
-//         assert_eq!(and.b.path.inst_path(), "and.b");
-//         assert_eq!(and.y.path.inst_path(), "and.y");
-
-//         let and_search_result = And::<Search>::query(&driver, and.path());
-//         assert_eq!(
-//             and_search_result.len(),
-//             4,
-//             "Expected 4 matches for And, got {}",
-//             and_search_result.len()
-//         );
-//     }
-// }
+fn bind_output<'p, 'd>(m: &SubgraphMatch<'p, 'd>, name: &str, bit: usize) -> Match<'p, 'd> {
+    let pat = m.output_by_name.get(name).copied();
+    let des = m
+        .design_driver_of_output_bit(name, bit)
+        .map(|(c, _b)| c);
+    Match {
+        pat_cell_ref: pat,
+        design_cell_ref: des,
+    }
+}

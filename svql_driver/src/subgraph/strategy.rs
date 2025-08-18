@@ -3,10 +3,7 @@ use super::index::NodeId;
 use super::ports::Source;
 use super::state::State;
 
-// Choose the next unmapped pattern node to extend, preferring nodes whose inputs
-// are constants, IO, or mapped gate sources (i.e., “resolvable”).
 pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
-    // Prefer nodes with all inputs “resolvable”
     for p in 0..(p_index.gate_count() as usize) {
         let p = p as NodeId;
         if st.is_mapped(p) {
@@ -34,7 +31,6 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
         }
     }
 
-    // Fallback: any unmapped
     for p in 0..(p_index.gate_count() as usize) {
         let p = p as NodeId;
         if !st.is_mapped(p) {
