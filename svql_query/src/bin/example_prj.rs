@@ -1,13 +1,8 @@
 
 
-use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::{load_driver_cached, load_driver_from}, Driver};
+use svql_driver::{cache::Cache, util::{load_driver_cached}};
 use svql_query::{instance::Instance, netlist::SearchableNetlist, queries::basic::and::And, Search};
 
-lazy_static::lazy_static! {
-    static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/and_gate.v").unwrap();
-    static ref AND_TREE: Driver = load_driver_from("examples/patterns/basic/and/and_tree.v").unwrap();
-    static ref AND_SEQ:  Driver = load_driver_from("examples/patterns/basic/and/and_seq.v").unwrap();
-}
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +11,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let hits = And::<Search>::query(&*AND_GATE, &*AND_SEQ, Instance::root("and".to_string()));
+
+    let mut cache = Cache::new();
+
+    let and_gate_driver = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)?;
+    // let and_tree_driver = load_driver_cached("examples/patterns/basic/and/and_tree.v", &mut cache)?;
+    let and_seq_driver = load_driver_cached("examples/patterns/basic/and/and_seq.v", &mut cache)?;
+
+    let hits = And::<Search>::query(&and_gate_driver, &and_seq_driver, Instance::root("and".to_string()));
     for hit in hits {
         println!("Found match: {:#?}", hit);
     }
