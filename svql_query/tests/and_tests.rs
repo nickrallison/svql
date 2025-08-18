@@ -1,10 +1,10 @@
 use svql_driver::Driver;
 use svql_driver::util::load_driver_from;
 
+use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::netlist::SearchableNetlist;
 use svql_query::queries::basic::and::And;
-use svql_query::Search;
 
 lazy_static::lazy_static! {
     static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/and_gate.v").unwrap();
@@ -70,13 +70,31 @@ fn and_bindings_present_and_gate_vs_and_tree() {
         let b = h.b.val.as_ref().expect("missing b");
         let y = h.y.val.as_ref().expect("missing y");
 
-        assert!(a.pat_cell_ref.is_some(), "pattern cell for a should be present");
-        assert!(b.pat_cell_ref.is_some(), "pattern cell for b should be present");
-        assert!(y.pat_cell_ref.is_some(), "pattern cell for y should be present");
+        assert!(
+            a.pat_cell_ref.is_some(),
+            "pattern cell for a should be present"
+        );
+        assert!(
+            b.pat_cell_ref.is_some(),
+            "pattern cell for b should be present"
+        );
+        assert!(
+            y.pat_cell_ref.is_some(),
+            "pattern cell for y should be present"
+        );
 
-        assert!(a.design_cell_ref.is_some(), "design source for a should be bound");
-        assert!(b.design_cell_ref.is_some(), "design source for b should be bound");
-        assert!(y.design_cell_ref.is_some(), "design driver for y should be bound");
+        assert!(
+            a.design_cell_ref.is_some(),
+            "design source for a should be bound"
+        );
+        assert!(
+            b.design_cell_ref.is_some(),
+            "design source for b should be bound"
+        );
+        assert!(
+            y.design_cell_ref.is_some(),
+            "design driver for y should be bound"
+        );
     }
 }
 
@@ -107,7 +125,10 @@ fn and_connectivity_exists_in_and_tree() {
     assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
     let connected = any_connection_exists(&hits);
-    assert!(connected, "expected at least one connection y->(a|b) among matches in and_tree");
+    assert!(
+        connected,
+        "expected at least one connection y->(a|b) among matches in and_tree"
+    );
 }
 
 #[test]
@@ -116,5 +137,8 @@ fn and_connectivity_exists_in_and_seq() {
     assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
     let connected = any_connection_exists(&hits);
-    assert!(connected, "expected at least one connection y->(a|b) among matches in and_seq");
+    assert!(
+        connected,
+        "expected at least one connection y->(a|b) among matches in and_seq"
+    );
 }

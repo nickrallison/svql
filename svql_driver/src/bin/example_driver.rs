@@ -1,5 +1,3 @@
-
-
 use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

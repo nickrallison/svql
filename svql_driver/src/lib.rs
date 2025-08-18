@@ -105,10 +105,12 @@ mod tests {
         let mut cache = Cache::new();
 
         let haystack_path = "examples/patterns/basic/ff/seq_8_sdffe.v";
-        let haystack_driver = load_driver_cached(&haystack_path, &mut cache).expect("Failed to read haystack design");
+        let haystack_driver =
+            load_driver_cached(&haystack_path, &mut cache).expect("Failed to read haystack design");
 
         let needle_path = "examples/patterns/basic/ff/sdffe.v";
-        let needle_driver = load_driver_cached(&needle_path, &mut cache).expect("Failed to read needle design");
+        let needle_driver =
+            load_driver_cached(&needle_path, &mut cache).expect("Failed to read needle design");
 
         let search_results = find_subgraphs(
             needle_driver.design_as_ref(),
@@ -141,7 +143,11 @@ mod tests {
                 }
             }
         }
-    
-        assert_eq!(matches, 7, "Expected 7 connections between d and q across matches, found {}", matches);
+
+        assert_eq!(
+            matches, 7,
+            "Expected 7 connections between d and q across matches, found {}",
+            matches
+        );
     }
 }

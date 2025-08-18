@@ -218,7 +218,6 @@ fn run_yosys_cmd(
         "can only convert single-module Yosys JSON to Unnamed IR"
     );
     let design = designs.into_values().next().unwrap();
-    
 
     Ok(design)
 }
@@ -244,13 +243,18 @@ mod tests {
     fn test_run_yosys_cmd() {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let design_file = workspace.join("examples/patterns/basic/ff/sdffe.v");
-        let yosys =
-            which::which("yosys").map_err(|e| format!("Failed to find yosys binary: {}", e)).expect("Yosys binary not found");
+        let yosys = which::which("yosys")
+            .map_err(|e| format!("Failed to find yosys binary: {}", e))
+            .expect("Yosys binary not found");
         let design_path = DesignPath::new(design_file).unwrap();
         let module_name = "sdffe";
 
         let result = run_yosys_cmd(&yosys, &design_path, module_name);
-        assert!(result.is_ok(), "expected Ok but got Err: {}", result.err().unwrap());
+        assert!(
+            result.is_ok(),
+            "expected Ok but got Err: {}",
+            result.err().unwrap()
+        );
     }
 
     #[test]
@@ -262,6 +266,3 @@ mod tests {
         assert_eq!(driver.module_name(), "sdffe");
     }
 }
-
-
-

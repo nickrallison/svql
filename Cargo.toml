@@ -12,6 +12,10 @@ members = [
     "prjunnamed/siliconblue",
     "prjunnamed/graphviz",
 ]
+default-members = [
+    "svql_driver",
+    "svql_query",
+]
 resolver = "3"
 
 [workspace.dependencies]
