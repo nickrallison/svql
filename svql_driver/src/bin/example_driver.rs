@@ -25,19 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let matches1 = search_results.matches.clone();
     let matches2 = search_results.matches.clone();
-
-    let mut connection_count = 0;
     
     for (i, match1) in matches1.iter().enumerate() {
         for (j, match2) in matches2.iter().enumerate() {
-            if i == j {
-                continue; // Skip self-comparison
-            }
-            
-            // Check if match1's "q" output connects to match2's "d" input
             if is_connected(match1, "q", match2, "d", haystack_driver.design_as_ref()) {
                 println!("Found connection: match {} 'q' -> match {} 'd'", i, j);
-                connection_count += 1;
             }
         }
     }
