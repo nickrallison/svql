@@ -1,4 +1,5 @@
 use itertools::iproduct;
+use log::trace;
 use svql_driver::cache::Cache;
 use svql_driver::prelude::Driver;
 
@@ -79,6 +80,62 @@ impl<'p, 'd> MatchedComposite<'p, 'd> for DffThenAnd<Match<'p, 'd>> {
         // No extra user filters for the demo
         vec![]
     }
+
+    /// OVERRIDE: Compare only the design endpoints (drivers/sources).
+    /// The default equality on Match would compare both pattern and design cells,
+    /// which cannot succeed across different sub-netlists inside a composite.
+    fn validate_connection(&self, connection: Connection<Match<'p, 'd>>) -> bool {
+        let from_wire = self.find_port(&connection.from.path);
+        let to_wire = self.find_port(&connection.to.path);
+
+        match (from_wire, to_wire) {
+            (Some(from), Some(to)) => {
+                let from_m = from.val.as_ref();
+                let to_m = to.val.as_ref();
+
+                match (from_m, to_m) {
+                    (Some(fm), Some(tm)) => {
+                        let from_cell = fm.design_cell_ref;
+                        let to_cell = tm.design_cell_ref;
+
+                        trace!(
+                            "validate_connection: from={} to={} => from_cell={:?} to_cell={:?}",
+                            connection.from.path.inst_path(),
+                            connection.to.path.inst_path(),
+                            from_cell.as_ref().map(|c| c.debug_index()),
+                            to_cell.as_ref().map(|c| c.debug_index())
+                        );
+
+                        let ok = from_cell.is_some() && to_cell.is_some() && from_cell == to_cell;
+                        if !ok {
+                            trace!(
+                                "validate_connection: REJECT: design endpoints do not match (or missing)"
+                            );
+                        } else {
+                            trace!("validate_connection: ACCEPT");
+                        }
+                        ok
+                    }
+                    _ => {
+                        trace!(
+                            "validate_connection: REJECT: missing Match values: from_val_present={} to_val_present={}",
+                            from_m.is_some(),
+                            to_m.is_some()
+                        );
+                        false
+                    }
+                }
+            }
+            (f, t) => {
+                trace!(
+                    "validate_connection: REJECT: could not resolve ports: from_found={} to_found={}",
+                    f.is_some(),
+                    t.is_some()
+                );
+                false
+            }
+        }
+    }
 }
 
 impl DffThenAnd<Search> {
@@ -104,19 +161,60 @@ impl DffThenAnd<Search> {
                 path.child("andg".to_string()),
             );
 
-        // Cartesian product + map to composite + filter by connectivity and user filters
-        iproduct!(sdffe_hits, and_hits)
-            .map(|(sdffe, andg)| DffThenAnd::<Match> {
-                path: path.clone(),
-                sdffe,
-                andg,
-            })
-            .filter(|hit| {
-                let conn_ok = hit.validate_connections(hit.connections());
-                let other_ok = hit.other_filters().iter().all(|f| f(hit));
-                conn_ok && other_ok
-            })
-            .collect()
+        trace!(
+            "DffThenAnd.query: sdffe_hits={}, and_hits={}",
+            sdffe_hits.len(),
+            and_hits.len()
+        );
+
+        // Instead of a purely functional pipeline, use loops so we can add detailed traces.
+        let mut out: Vec<DffThenAnd<Match<'p, 'd>>> = Vec::new();
+
+        for (i, s) in sdffe_hits.into_iter().enumerate() {
+            // Extract the sdffe.q design endpoint (if any) for logging
+            let s_q = s.q.val.as_ref().and_then(|m| m.design_cell_ref);
+            trace!(
+                "  sdffe[{}]: q.design_cell_ref={:?}",
+                i,
+                s_q.as_ref().map(|c| c.debug_index())
+            );
+
+            for (j, a) in and_hits.clone().into_iter().enumerate() {
+                let a_a = a.a.val.as_ref().and_then(|m| m.design_cell_ref);
+                let a_b = a.b.val.as_ref().and_then(|m| m.design_cell_ref);
+
+                trace!(
+                    "    and[{}]: a.design_cell_ref={:?} b.design_cell_ref={:?}",
+                    j,
+                    a_a.as_ref().map(|c| c.debug_index()),
+                    a_b.as_ref().map(|c| c.debug_index())
+                );
+
+                let cand = DffThenAnd::<Match> {
+                    path: path.clone(),
+                    sdffe: s.clone(),
+                    andg: a.clone(),
+                };
+
+                let conn_ok = cand.validate_connections(cand.connections());
+                let other_ok = cand.other_filters().iter().all(|f| f(&cand));
+
+                trace!(
+                    "    candidate(sdffe={}, and={}): conn_ok={} other_ok={}",
+                    i, j, conn_ok, other_ok
+                );
+
+                if conn_ok && other_ok {
+                    trace!("    => ACCEPT candidate");
+                    out.push(cand);
+                } else {
+                    trace!("    => REJECT candidate");
+                }
+            }
+        }
+
+        trace!("DffThenAnd.query: total accepted matches={}", out.len());
+        out
     }
 }
 
@@ -141,11 +239,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // run composite query
     let hits = DffThenAnd::<Search>::query(&sdffe_driver, &and_gate_driver, &haystack, root);
 
+    trace!("main: DffThenAnd matches={}", hits.len());
+
     // There are two DFFs whose Q each feed the AND inputs; we expect 2 matches.
     assert_eq!(hits.len(), 2, "expected 2 DffThenAnd matches");
 
     // Sanity: validate bindings exist on each hit
-    for h in &hits {
+    for (k, h) in hits.iter().enumerate() {
         let q = h
             .sdffe
             .q
@@ -155,7 +255,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .design_cell_ref
             .expect("sdffe.q should have a design driver");
 
-        // One of these must be driven by the same q source cell
         let a_src = h
             .andg
             .a
@@ -173,10 +272,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .design_cell_ref
             .expect("andg.b should have a design source");
 
+        trace!(
+            "hit[{}]: q={:?} a_src={:?} b_src={:?}",
+            k,
+            q.debug_index(),
+            a_src.debug_index(),
+            b_src.debug_index()
+        );
+
         assert!(
             q == a_src || q == b_src,
             "expected sdffe.q to drive either andg.a or andg.b"
         );
+
+        // println entire match
+
+        println!("hit[{}]: {:#?}", k, h);
     }
 
     Ok(())
