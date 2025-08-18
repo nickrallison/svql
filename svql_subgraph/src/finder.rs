@@ -49,7 +49,7 @@ impl<'p, 'd> Finder<'p, 'd> {
 
     /// Find the first subgraph match from `pattern` into `design`, if any.
     pub fn find_first(&self) -> Option<SubgraphMatch<'p, 'd>> {
-        let mut all = self.find_all();
+        let all = self.find_all();
         all.matches.into_iter().next()
     }
 }

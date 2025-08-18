@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, hash::Hash};
+use std::{borrow::Cow, hash::Hash};
 
 use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Value};
 
