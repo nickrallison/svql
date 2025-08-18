@@ -79,8 +79,6 @@ fn pins_compatible_pairwise<'p, 'd>(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
     use crate::Driver;
     use crate::util::load_driver_from;

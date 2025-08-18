@@ -166,7 +166,6 @@ impl std::fmt::Debug for CellWrapper<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let index: usize = self.cref.debug_index();
         let metadata: MetaItemRef = self.cref.metadata();
-        // let cell: &Cell = self.cref.get().as_ref();
 
         f.debug_struct("CellWrapper")
             .field("index", &index)
@@ -197,7 +196,6 @@ impl<'p> InputCell<'p> {
 
     pub fn get_gates(&self) -> Vec<CellRef<'p>> {
         if matches!(self.cref.cref().get().as_ref(), Cell::Input(_, _)) {
-            
             get_fanout(self.cref.cref().design(), self.cref.cref())
         } else {
             vec![]
@@ -209,7 +207,6 @@ pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellR
     let mut fanout: Vec<CellRef<'a>> = Vec::new();
 
     for dest in design.iter_cells() {
-        // Skip self to avoid self-loops in fanout
         if dest == cell {
             continue;
         }
@@ -217,7 +214,7 @@ pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellR
         let mut driven_by_cell = false;
         dest.visit(|net| {
             if driven_by_cell {
-                return; // already found a connection from `cell` to `dest`
+                return;
             }
             if let Ok((src, _bit)) = design.find_cell(net)
                 && src == cell {
@@ -233,7 +230,6 @@ pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellR
     fanout
 }
 
-// Helpers: return names and CellRefs, not cloned Cells
 pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<InputCell<'a>> {
     design
         .iter_cells()

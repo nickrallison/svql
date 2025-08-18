@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{cache::Cache, config::Config, subgraph::SubgraphMatch};
+use crate::{cache::Cache};
 
 #[derive(Debug, Clone)]
 pub struct Driver {
@@ -78,11 +78,6 @@ impl Driver {
         };
 
         Ok(driver)
-    }
-
-    pub fn query<'p>(&self, cfg: &Config) -> Vec<SubgraphMatch> {
-        trace!("ProcDriver::query called with config: {:?}", cfg);
-        todo!()
     }
 
     pub fn design(&self) -> Arc<Design> {

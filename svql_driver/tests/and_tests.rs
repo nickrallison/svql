@@ -1,6 +1,6 @@
 mod integration_tests {
     #[cfg(test)]
-    mod dff {
+    mod and {
         use std::path::{Path, PathBuf};
 
         use rstest::rstest;

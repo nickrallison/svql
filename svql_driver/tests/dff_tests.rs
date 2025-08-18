@@ -1,8 +1,6 @@
 mod integration_tests {
     #[cfg(test)]
     mod dff {
-        use std::path::{Path, PathBuf};
-
         use rstest::rstest;
         use svql_driver::Driver;
         use svql_driver::util::load_driver_from;

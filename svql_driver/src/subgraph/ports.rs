@@ -64,8 +64,6 @@ fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
     use crate::Driver;
     use crate::util::load_driver_from;

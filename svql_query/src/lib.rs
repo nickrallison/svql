@@ -32,11 +32,6 @@ impl QueryableState for Search {}
 // Helpers
 // ########################
 
-pub fn lookup<'a>(m: SubgraphMatch, pin: &str) {
-    // m.get(&IdString::Named(pin.into()))
-    todo!()
-}
-
 #[macro_export]
 macro_rules! impl_find_port {
     ($ty:ident, $($field:ident),+) => {

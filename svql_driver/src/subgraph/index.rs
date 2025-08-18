@@ -99,6 +99,5 @@ mod tests {
         let idx = Index::build(d.design_as_ref());
         assert!(idx.gate_count() > 0);
         assert_eq!(idx.of_kind(CellKind::Dff).len() > 0, true);
-        assert_eq!(idx.of_kind(CellKind::And).len() >= 0, true);
     }
 }
