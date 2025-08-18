@@ -5,10 +5,10 @@ pub(super) fn choose_anchors<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
 ) -> Option<(CellKind, Vec<NodeId>, Vec<NodeId>)> {
-    // Count kinds present in the design using the index itself
+    // Count kinds in design
     let mut design_counts = Vec::new();
-    for (kind, nodes) in d_index.by_kind_iter() {
-        design_counts.push((*kind, nodes.len()));
+    for (&kind, nodes) in d_index_kind_iter(d_index) {
+        design_counts.push((kind, nodes.len()));
     }
 
     // Candidate kinds: present in both pattern and design
@@ -61,15 +61,17 @@ fn all_gate_kinds() -> &'static [CellKind] {
 mod tests {
     use prjunnamed_netlist::Design;
 
+    use crate::util::load_design_from;
+
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn choose_anchors_some() {
-        let d = &*SDFFE;
+        let d = &SDFFE;
         let p_index = super::Index::build(d);
         let d_index = super::Index::build(d);
         let chosen = choose_anchors(&p_index, &d_index);

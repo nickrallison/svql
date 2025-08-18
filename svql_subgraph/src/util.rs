@@ -7,6 +7,7 @@ use std::{
 use log::error;
 use prjunnamed_netlist::Design;
 
+#[allow(dead_code)]
 pub(crate) fn load_design_from(design: &str) -> Result<Design, Box<dyn std::error::Error>> {
     let json_temp_file = tempfile::Builder::new()
         .prefix("svql_prjunnamed_")
@@ -14,7 +15,13 @@ pub(crate) fn load_design_from(design: &str) -> Result<Design, Box<dyn std::erro
         .rand_bytes(4)
         .tempfile()?;
 
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let design = PathBuf::from(design);
+    let design = if design.is_absolute() {
+        design
+    } else {
+        workspace.join(design)
+    };
 
     let design_path = DesignPath::new(design.to_path_buf()).unwrap();
     let yosys = which::which("yosys").map_err(|e| format!("Failed to find yosys binary: {}", e))?;

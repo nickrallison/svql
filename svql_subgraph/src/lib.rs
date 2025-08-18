@@ -180,6 +180,8 @@ pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec
 
 #[cfg(test)]
 mod tests {
+    use crate::util::load_design_from;
+
     use super::*;
 
     lazy_static::lazy_static! {
@@ -253,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn o1_lookup_by_port_name_and_bit_sdffe_in_seq_double() {
+    fn lookup_by_port_name_and_bit_sdffe_in_seq_double() {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
         let all = find_subgraphs(pat, hay);
@@ -298,6 +300,51 @@ mod tests {
         assert!(
             found,
             "expected to find at least one connection: q of one match drives d of another"
+        );
+    }
+
+    #[test]
+    fn connectivity_test() {
+        let haystack_path = "examples/patterns/basic/ff/seq_8_sdffe.v";
+        let haystack_design =
+            load_design_from(&haystack_path).expect("Failed to read haystack design");
+
+        let needle_path = "examples/patterns/basic/ff/sdffe.v";
+        let needle_design = load_design_from(&needle_path).expect("Failed to read needle design");
+
+        let search_results = find_subgraphs(&needle_design, &haystack_design);
+
+        for m in search_results.iter() {
+            assert!(
+                m.design_source_of_input_bit("d", 0).is_some(),
+                "input d should have a bound design source"
+            );
+            assert!(
+                m.design_driver_of_output_bit("q", 0).is_some(),
+                "output q should have a resolved design driver"
+            );
+        }
+
+        let ms: Vec<_> = search_results.iter().collect();
+        let mut matches = 0;
+        for m1 in &ms {
+            if let Some((dq_cell, dq_bit)) = m1.design_driver_of_output_bit("q", 0) {
+                let dq_net = dq_cell.output()[dq_bit];
+                for m2 in &ms {
+                    if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
+                        let sd_net = sd_cell.output()[sd_bit];
+                        if dq_net == sd_net {
+                            matches += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        assert_eq!(
+            matches, 7,
+            "Expected 7 connections between d and q across matches, found {}",
+            matches
         );
     }
 }
