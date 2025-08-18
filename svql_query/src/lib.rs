@@ -77,6 +77,10 @@ where
             val: Some(val),
         }
     }
+
+    pub fn new(path: Instance) -> Self {
+        Self { path, val: None }
+    }
 }
 
 impl<S> WithPath<S> for Wire<S>

@@ -16,6 +16,21 @@ where
     pub y: Wire<S>,
 }
 
+impl<S> And<S>
+where
+    S: State,
+{
+    /// Uniform constructor so composites can assemble a Search-only shape.
+    pub fn new(path: Instance) -> Self {
+        And {
+            path: path.clone(),
+            a: crate::Wire::new(path.child("a".to_string())),
+            b: crate::Wire::new(path.child("b".to_string())),
+            y: crate::Wire::new(path.child("y".to_string())),
+        }
+    }
+}
+
 impl<S> WithPath<S> for And<S>
 where
     S: State,

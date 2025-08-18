@@ -17,6 +17,22 @@ where
     pub q: Wire<S>,
 }
 
+impl<S> Sdffe<S>
+where
+    S: State,
+{
+    /// Uniform constructor so composites can assemble a Search-only shape.
+    pub fn new(path: Instance) -> Self {
+        Sdffe {
+            path: path.clone(),
+            clk: crate::Wire::new(path.child("clk".to_string())),
+            d: crate::Wire::new(path.child("d".to_string())),
+            reset: crate::Wire::new(path.child("reset".to_string())),
+            q: crate::Wire::new(path.child("q".to_string())),
+        }
+    }
+}
+
 impl<S> WithPath<S> for Sdffe<S>
 where
     S: State,
