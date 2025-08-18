@@ -5,6 +5,7 @@ use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::queries::basic::and::And;
 
+// Reuse the same drivers across tests
 lazy_static::lazy_static! {
     static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/and_gate.v").unwrap();
     static ref AND_TREE: Driver = load_driver_from("examples/patterns/basic/and/and_tree.v").unwrap();
@@ -60,7 +61,7 @@ fn and_counts_and_seq_vs_and_gate_is_zero() {
 
 #[test]
 fn and_bindings_present_and_gate_vs_and_tree() {
-    // For each match, confirm a, b, y have bound design cells (like the example_driver pattern)
+    // For each match, confirm a, b, y have bound design cells
     let hits = And::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
     assert!(!hits.is_empty());
 
@@ -126,7 +127,7 @@ fn and_connectivity_exists_in_and_tree() {
     let connected = any_connection_exists(&hits);
     assert!(
         connected,
-        "expected at least one connection y->(a|b) among matches in and_tree"
+        "expected at least one y->(a|b) connection among matches"
     );
 }
 
@@ -138,6 +139,6 @@ fn and_connectivity_exists_in_and_seq() {
     let connected = any_connection_exists(&hits);
     assert!(
         connected,
-        "expected at least one connection y->(a|b) among matches in and_seq"
+        "expected at least one y->(a|b) connection among matches"
     );
 }

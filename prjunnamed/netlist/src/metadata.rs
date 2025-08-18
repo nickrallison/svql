@@ -4,6 +4,7 @@
 //! expose indices. The exported APIs are based on [`MetaStringRef`] and [`MetaItemRef`], which parallel [`CellRef`].
 //!
 //! [`CellRef`]: crate::CellRef
+use indexmap::IndexSet;
 use std::{
     borrow::Cow,
     cell::Ref,
@@ -11,7 +12,6 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
 };
-use indexmap::IndexSet;
 
 use crate::{Design, ParamValue};
 
@@ -151,10 +151,16 @@ impl MetaItem<'_> {
         match self {
             MetaItem::None => (),
             MetaItem::Set(items) => {
-                assert!(items.len() > 1, "MetaItem::Set must contain more than one element");
+                assert!(
+                    items.len() > 1,
+                    "MetaItem::Set must contain more than one element"
+                );
                 for item in items {
                     assert!(
-                        !matches!(&*item.get_repr(), MetaItemRepr::None | MetaItemRepr::Set(..)),
+                        !matches!(
+                            &*item.get_repr(),
+                            MetaItemRepr::None | MetaItemRepr::Set(..)
+                        ),
                         "MetaItem::Set item must not be MetaItem::None or another MetaItem::Set"
                     )
                 }
@@ -166,12 +172,27 @@ impl MetaItem<'_> {
                     "MetaItem::Source must specify a range in non-descending order"
                 );
             }
-            MetaItem::NamedScope { name: _, source, parent } | MetaItem::IndexedScope { index: _, source, parent } => {
+            MetaItem::NamedScope {
+                name: _,
+                source,
+                parent,
+            }
+            | MetaItem::IndexedScope {
+                index: _,
+                source,
+                parent,
+            } => {
                 if let MetaItem::NamedScope { name, .. } = self {
-                    assert!(!name.get().is_empty(), "MetaItem::NamedScope must have a name");
+                    assert!(
+                        !name.get().is_empty(),
+                        "MetaItem::NamedScope must have a name"
+                    );
                 }
                 assert!(
-                    matches!(&*source.get_repr(), MetaItemRepr::None | MetaItemRepr::Source { .. }),
+                    matches!(
+                        &*source.get_repr(),
+                        MetaItemRepr::None | MetaItemRepr::Source { .. }
+                    ),
                     concat!(
                         "source of a MetaItem::NamedScope or MetaItem::IndexedScope must be ",
                         "MetaItem::None or MetaItem::Source"
@@ -180,7 +201,9 @@ impl MetaItem<'_> {
                 assert!(
                     matches!(
                         &*parent.get_repr(),
-                        MetaItemRepr::None | MetaItemRepr::NamedScope { .. } | MetaItemRepr::IndexedScope { .. }
+                        MetaItemRepr::None
+                            | MetaItemRepr::NamedScope { .. }
+                            | MetaItemRepr::IndexedScope { .. }
                     ),
                     concat!(
                         "parent of a MetaItem::NamedScope or MetaItem::IndexedScope must be ",
@@ -191,7 +214,10 @@ impl MetaItem<'_> {
             MetaItem::Ident { name, scope } => {
                 assert!(!name.get().is_empty(), "MetaItem::Ident must have a name");
                 assert!(
-                    matches!(&*scope.get_repr(), MetaItemRepr::NamedScope { .. } | MetaItemRepr::IndexedScope { .. }),
+                    matches!(
+                        &*scope.get_repr(),
+                        MetaItemRepr::NamedScope { .. } | MetaItemRepr::IndexedScope { .. }
+                    ),
                     "scope of a MetaItem::Ident must be MetaItem::NamedScope or MetaItem::IndexedScope"
                 );
             }
@@ -212,7 +238,10 @@ impl MetaItemIndex {
 
 impl MetadataStore {
     pub(crate) fn new() -> Self {
-        Self { strings: IndexSet::from(["".to_owned()]), items: IndexSet::from([MetaItemRepr::None]) }
+        Self {
+            strings: IndexSet::from(["".to_owned()]),
+            items: IndexSet::from([MetaItemRepr::None]),
+        }
     }
 
     pub(crate) fn add_string<'a>(&mut self, string: impl Into<Cow<'a, str>>) -> MetaStringIndex {
@@ -223,7 +252,11 @@ impl MetadataStore {
         }
     }
 
-    pub(crate) fn ref_string<'a>(&self, design: &'a Design, index: MetaStringIndex) -> MetaStringRef<'a> {
+    pub(crate) fn ref_string<'a>(
+        &self,
+        design: &'a Design,
+        index: MetaStringIndex,
+    ) -> MetaStringRef<'a> {
         MetaStringRef { design, index }
     }
 
@@ -232,18 +265,40 @@ impl MetadataStore {
         // to reborrow the store.
         let repr = match item {
             MetaItem::None => MetaItemRepr::None,
-            MetaItem::Set(items) => MetaItemRepr::Set(items.iter().map(|item| item.index).collect()),
-            MetaItem::Source { file, start, end } => {
-                MetaItemRepr::Source { file: file.index, start: *start, end: *end }
+            MetaItem::Set(items) => {
+                MetaItemRepr::Set(items.iter().map(|item| item.index).collect())
             }
-            MetaItem::NamedScope { name, source, parent } => {
-                MetaItemRepr::NamedScope { parent: parent.index, source: source.index, name: name.index }
-            }
-            MetaItem::IndexedScope { index, source, parent } => {
-                MetaItemRepr::IndexedScope { parent: parent.index, source: source.index, index: *index }
-            }
-            MetaItem::Ident { name, scope } => MetaItemRepr::Ident { scope: scope.index, name: name.index },
-            MetaItem::Attr { name, value } => MetaItemRepr::Attr { name: name.index, value: value.clone() },
+            MetaItem::Source { file, start, end } => MetaItemRepr::Source {
+                file: file.index,
+                start: *start,
+                end: *end,
+            },
+            MetaItem::NamedScope {
+                name,
+                source,
+                parent,
+            } => MetaItemRepr::NamedScope {
+                parent: parent.index,
+                source: source.index,
+                name: name.index,
+            },
+            MetaItem::IndexedScope {
+                index,
+                source,
+                parent,
+            } => MetaItemRepr::IndexedScope {
+                parent: parent.index,
+                source: source.index,
+                index: *index,
+            },
+            MetaItem::Ident { name, scope } => MetaItemRepr::Ident {
+                scope: scope.index,
+                name: name.index,
+            },
+            MetaItem::Attr { name, value } => MetaItemRepr::Attr {
+                name: name.index,
+                value: value.clone(),
+            },
         };
         MetaItemIndex(self.items.insert_full(repr).0)
     }
@@ -252,8 +307,14 @@ impl MetadataStore {
         MetaItemRef { design, index }
     }
 
-    pub(crate) fn iter_items<'a>(&self, design: &'a Design) -> impl Iterator<Item = MetaItemRef<'a>> + use<'a> {
-        (0..self.items.len()).map(|index| MetaItemRef { design, index: MetaItemIndex(index) })
+    pub(crate) fn iter_items<'a>(
+        &self,
+        design: &'a Design,
+    ) -> impl Iterator<Item = MetaItemRef<'a>> + use<'a> {
+        (0..self.items.len()).map(|index| MetaItemRef {
+            design,
+            index: MetaItemIndex(index),
+        })
     }
 }
 
@@ -268,7 +329,10 @@ impl<'a> MetaStringRef<'a> {
 
     pub fn get(&self) -> Cow<'a, str> {
         let store = self.design.metadata();
-        let s = store.strings.get_index(self.index.0).expect("invalid metadata string reference");
+        let s = store
+            .strings
+            .get_index(self.index.0)
+            .expect("invalid metadata string reference");
         Cow::Owned(s.clone())
     }
 }
@@ -284,7 +348,10 @@ impl<'a> MetaItemRef<'a> {
 
     fn get_repr(&self) -> Cow<'a, MetaItemRepr> {
         let store = self.design.metadata();
-        let meta = store.items.get_index(self.index.0).expect("invalid metadata item reference");
+        let meta = store
+            .items
+            .get_index(self.index.0)
+            .expect("invalid metadata item reference");
         Cow::Owned(meta.clone())
     }
 
@@ -292,57 +359,113 @@ impl<'a> MetaItemRef<'a> {
         let design = self.design;
         match &*self.get_repr() {
             MetaItemRepr::None => MetaItem::None,
-            MetaItemRepr::Set(items) => {
-                MetaItem::Set(items.iter().map(|&index| MetaItemRef { index, design }).collect())
-            }
-            MetaItemRepr::Source { file: filename, start, end } => {
-                MetaItem::Source { file: MetaStringRef { index: *filename, design }, start: *start, end: *end }
-            }
-            MetaItemRepr::NamedScope { name, source, parent } => MetaItem::NamedScope {
-                name: MetaStringRef { index: *name, design },
-                source: MetaItemRef { index: *source, design },
-                parent: MetaItemRef { index: *parent, design },
+            MetaItemRepr::Set(items) => MetaItem::Set(
+                items
+                    .iter()
+                    .map(|&index| MetaItemRef { index, design })
+                    .collect(),
+            ),
+            MetaItemRepr::Source {
+                file: filename,
+                start,
+                end,
+            } => MetaItem::Source {
+                file: MetaStringRef {
+                    index: *filename,
+                    design,
+                },
+                start: *start,
+                end: *end,
             },
-            MetaItemRepr::IndexedScope { index, source, parent } => MetaItem::IndexedScope {
+            MetaItemRepr::NamedScope {
+                name,
+                source,
+                parent,
+            } => MetaItem::NamedScope {
+                name: MetaStringRef {
+                    index: *name,
+                    design,
+                },
+                source: MetaItemRef {
+                    index: *source,
+                    design,
+                },
+                parent: MetaItemRef {
+                    index: *parent,
+                    design,
+                },
+            },
+            MetaItemRepr::IndexedScope {
+                index,
+                source,
+                parent,
+            } => MetaItem::IndexedScope {
                 index: *index,
-                source: MetaItemRef { index: *source, design },
-                parent: MetaItemRef { index: *parent, design },
+                source: MetaItemRef {
+                    index: *source,
+                    design,
+                },
+                parent: MetaItemRef {
+                    index: *parent,
+                    design,
+                },
             },
             MetaItemRepr::Ident { name, scope } => MetaItem::Ident {
-                name: MetaStringRef { index: *name, design },
-                scope: MetaItemRef { index: *scope, design },
+                name: MetaStringRef {
+                    index: *name,
+                    design,
+                },
+                scope: MetaItemRef {
+                    index: *scope,
+                    design,
+                },
             },
-            MetaItemRepr::Attr { name, value } => {
-                MetaItem::Attr { name: MetaStringRef { index: *name, design }, value: value.clone() }
-            }
+            MetaItemRepr::Attr { name, value } => MetaItem::Attr {
+                name: MetaStringRef {
+                    index: *name,
+                    design,
+                },
+                value: value.clone(),
+            },
         }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = MetaItemRef<'a>> + use<'a> {
-        MetaItemIterator { item: *self, offset: 0 }
+        MetaItemIterator {
+            item: *self,
+            offset: 0,
+        }
     }
 
     pub fn from_iter(design: &'a Design, iter: impl IntoIterator<Item = MetaItemRef<'a>>) -> Self {
         let items = BTreeSet::from_iter(iter);
         if items.len() == 0 {
-            MetaItemRef { design, index: MetaItemIndex::NONE }
+            MetaItemRef {
+                design,
+                index: MetaItemIndex::NONE,
+            }
         } else if items.len() == 1 {
             *items.first().unwrap()
         } else {
-            MetaItemRef { design, index: design.add_metadata_item(&MetaItem::Set(items)).index() }
+            MetaItemRef {
+                design,
+                index: design.add_metadata_item(&MetaItem::Set(items)).index(),
+            }
         }
     }
 
     pub fn from_merge(design: &'a Design, iter: impl IntoIterator<Item = MetaItemRef<'a>>) -> Self {
         Self::from_iter(
             design,
-            iter.into_iter().flat_map(|item| item.iter()).filter(|item| match &*item.get_repr() {
-                MetaItemRepr::Source { .. }
-                | MetaItemRepr::NamedScope { .. }
-                | MetaItemRepr::IndexedScope { .. }
-                | MetaItemRepr::Ident { .. } => true,
-                _ => false,
-            }),
+            iter.into_iter()
+                .flat_map(|item| item.iter())
+                .filter(|item| match &*item.get_repr() {
+                    MetaItemRepr::Source { .. }
+                    | MetaItemRepr::NamedScope { .. }
+                    | MetaItemRepr::IndexedScope { .. }
+                    | MetaItemRepr::Ident { .. } => true,
+                    _ => false,
+                }),
         )
     }
 
@@ -362,7 +485,10 @@ impl<'a> Iterator for MetaItemIterator<'a> {
             _ => std::slice::from_ref(&self.item.index),
         };
         if self.offset < slice.len() {
-            let item = MetaItemRef { design: self.item.design, index: slice[self.offset] };
+            let item = MetaItemRef {
+                design: self.item.design,
+                index: slice[self.offset],
+            };
             self.offset += 1;
             Some(item)
         } else {
