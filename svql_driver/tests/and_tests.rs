@@ -10,10 +10,10 @@ mod integration_tests {
 
         lazy_static::lazy_static! {
 
-            static ref AND_Q_DOUBLE_SDFFE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v");
-            static ref AND_GATE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/and/and_gate.v");
-            static ref AND_TREE: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/and/and_tree.v");
-            static ref AND_SEQ: (Driver, PathBuf) = load_driver_from("examples/patterns/basic/and/and_seq.v");
+            static ref AND_Q_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v");
+            static ref AND_GATE: (Driver, String) = load_driver_from("examples/patterns/basic/and/and_gate.v");
+            static ref AND_TREE: (Driver, String) = load_driver_from("examples/patterns/basic/and/and_tree.v");
+            static ref AND_SEQ: (Driver, String) = load_driver_from("examples/patterns/basic/and/and_seq.v");
         }
 
     
@@ -39,14 +39,14 @@ mod integration_tests {
         #[case(&AND_SEQ, &AND_TREE, 0)]
         #[case(&AND_SEQ, &AND_SEQ, 1)]
         fn test_subgraph_matches(
-            #[case] needle_tuple: &'static (Driver, PathBuf),
-            #[case] haystack_tuple: &'static (Driver, PathBuf),
+            #[case] needle_tuple: &'static (Driver, String),
+            #[case] haystack_tuple: &'static (Driver, String),
             #[case] expected: usize,
         ) {
-            let (needle, needle_path) = needle_tuple;
-            let (haystack, haystack_path) = haystack_tuple;
+            let (needle, needle_name) = needle_tuple;
+            let (haystack, haystack_name) = haystack_tuple;
             let matches = svql_driver::subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref());
-            assert_eq!(matches.len(), expected, "Expected {} matches for needle {}, against haystack {}, got {}", expected, needle_path.display(), haystack_path.display(), matches.len());
+            assert_eq!(matches.len(), expected, "Expected {} matches for needle {}, against haystack {}, got {}", expected, &needle_name, &haystack_name, matches.len());
         }
     }
 }
