@@ -115,7 +115,6 @@ mod tests {
             haystack_driver.design_as_ref(),
         );
 
-        // Every match should resolve both d (input) and q (output) via O(1) helpers
         for m in search_results.iter() {
             assert!(
                 m.design_source_of_input_bit("d", 0).is_some(),
@@ -127,7 +126,6 @@ mod tests {
             );
         }
 
-        // There should exist a pair of matches where q of one drives d of the other.
         let ms: Vec<_> = search_results.iter().collect();
         let mut matches = 0;
         for m1 in &ms {
@@ -137,7 +135,6 @@ mod tests {
                     if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
                         let sd_net = sd_cell.output()[sd_bit];
                         if dq_net == sd_net {
-                            // println!("Found connection at cell: {:#?}", dq_cell.metadata());
                             matches += 1;
                         }
                     }
@@ -145,7 +142,6 @@ mod tests {
             }
         }
     
-
         assert_eq!(matches, 7, "Expected 7 connections between d and q across matches, found {}", matches);
     }
 }
