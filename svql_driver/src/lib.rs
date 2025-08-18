@@ -92,5 +92,4 @@ mod tests {
             time_elapsed
         );
     }
-
 }

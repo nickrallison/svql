@@ -6,7 +6,11 @@ use crate::cache::{Cache, DesignKey};
 use crate::driver::{DesignPath, Driver};
 
 pub trait Importer {
-    fn import(&self, design: &DesignPath, top: &str) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>>;
+    fn import(
+        &self,
+        design: &DesignPath,
+        top: &str,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>>;
 }
 
 pub struct YosysImporter {
@@ -24,7 +28,11 @@ impl YosysImporter {
 }
 
 impl Importer for YosysImporter {
-    fn import(&self, design: &DesignPath, top: &str) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    fn import(
+        &self,
+        design: &DesignPath,
+        top: &str,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
         if !self.yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", self.yosys.display()).into());
         }
@@ -81,8 +89,7 @@ impl Importer for YosysImporter {
             .into());
         }
 
-        let designs =
-            prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
+        let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
         if designs.len() != 1 {
             return Err("can only convert single-module Yosys JSON to Unnamed IR".into());
         }
@@ -98,7 +105,10 @@ pub struct DriverBuilder<I: Importer> {
 
 impl<I: Importer> DriverBuilder<I> {
     pub fn new(importer: I) -> Self {
-        Self { importer, cache: None }
+        Self {
+            importer,
+            cache: None,
+        }
     }
 
     pub fn with_cache(mut self, cache: Cache) -> Self {
@@ -122,7 +132,9 @@ impl<I: Importer> DriverBuilder<I> {
         } else {
             let d = self.importer.import(&path, &top)?;
             cache.insert(key.clone(), d);
-            cache.get(&key).expect("design must be present after insert")
+            cache
+                .get(&key)
+                .expect("design must be present after insert")
         };
 
         Ok(Driver {
