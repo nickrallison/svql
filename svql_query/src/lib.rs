@@ -1,4 +1,3 @@
-use prjunnamed_netlist::Design;
 use svql_driver::{SubgraphMatch, subgraph::cell_kind::CellWrapper};
 
 use crate::instance::Instance;

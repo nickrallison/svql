@@ -1,4 +1,4 @@
-use prjunnamed_netlist::{CellRef, Trit};
+use prjunnamed_netlist::Trit;
 
 use crate::subgraph::cell_kind::CellWrapper;
 

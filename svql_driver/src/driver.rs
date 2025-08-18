@@ -63,7 +63,7 @@ impl Driver {
             None => &mut owned_cache,
         };
 
-        if let None = cache.get(&design_path) {
+        if cache.get(&design_path).is_none() {
             let design_new = run_yosys_cmd(&yosys, &design_path, &module_name)?;
             cache.insert(design_path.clone(), design_new);
         }
@@ -174,11 +174,11 @@ fn run_yosys_cmd(
         .rand_bytes(4)
         .tempfile()?;
 
-    let mut cmd = std::process::Command::new(&yosys);
+    let mut cmd = std::process::Command::new(yosys);
     cmd.args(get_command_args_slice(
-        &design,
-        &module_name,
-        &json_temp_file.path(),
+        design,
+        module_name,
+        json_temp_file.path(),
     ));
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())

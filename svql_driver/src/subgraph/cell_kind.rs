@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell, collections::HashMap, hash::Hash};
+use std::{borrow::Cow, collections::HashMap, hash::Hash};
 
 use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Value};
 
@@ -197,8 +197,8 @@ impl<'p> InputCell<'p> {
 
     pub fn get_gates(&self) -> Vec<CellRef<'p>> {
         if matches!(self.cref.cref().get().as_ref(), Cell::Input(_, _)) {
-            let fanout = get_fanout(self.cref.cref().design(), self.cref.cref());
-            fanout
+            
+            get_fanout(self.cref.cref().design(), self.cref.cref())
         } else {
             vec![]
         }
@@ -219,11 +219,10 @@ pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellR
             if driven_by_cell {
                 return; // already found a connection from `cell` to `dest`
             }
-            if let Ok((src, _bit)) = design.find_cell(net) {
-                if src == cell {
+            if let Ok((src, _bit)) = design.find_cell(net)
+                && src == cell {
                     driven_by_cell = true;
                 }
-            }
         });
 
         if driven_by_cell {

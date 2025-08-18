@@ -8,10 +8,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cache = Cache::new();
 
     let haystack_path = "examples/patterns/basic/ff/seq_sdffe.v";
-    let haystack_driver = load_driver_cached(&haystack_path, &mut cache)?;
+    let haystack_driver = load_driver_cached(haystack_path, &mut cache)?;
 
     let needle_path = "examples/patterns/basic/ff/sdffe.v";
-    let needle_driver = load_driver_cached(&needle_path, &mut cache)?;
+    let needle_driver = load_driver_cached(needle_path, &mut cache)?;
 
     let search_results = find_subgraphs(
         needle_driver.design_as_ref(),

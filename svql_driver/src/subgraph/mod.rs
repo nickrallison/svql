@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use prjunnamed_netlist::{Cell, Design};
+use prjunnamed_netlist::Design;
 
 pub mod cell_kind;
 use cell_kind::{InputCell, OutputCell, get_input_cells, get_output_cells};

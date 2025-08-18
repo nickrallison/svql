@@ -29,7 +29,7 @@ impl<'a> Index<'a> {
         let mut cell_to_id: HashMap<CellWrapper<'a>, NodeId> = HashMap::new();
         let mut gate_count = 0usize;
 
-        for cell in design.iter_cells().map(|c| CellWrapper::new(c)) {
+        for cell in design.iter_cells().map(CellWrapper::new) {
             let k = CellKind::from(cell.get().as_ref());
             if !(k.is_gate()) {
                 continue;

@@ -1,5 +1,4 @@
 use svql_driver::SubgraphMatch;
-use svql_driver::subgraph::cell_kind::CellWrapper;
 
 use crate::instance::Instance;
 use crate::netlist::{Netlist, SearchableNetlist};

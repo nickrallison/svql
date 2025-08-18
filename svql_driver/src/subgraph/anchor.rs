@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 
 use super::cell_kind::CellKind;
 use super::index::{Index, NodeId};
