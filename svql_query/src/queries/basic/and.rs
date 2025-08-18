@@ -1,11 +1,9 @@
-use svql_driver::SubgraphMatch;
+use svql_driver::prelude::Driver;
 
+use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
-use crate::netlist::{Netlist, SearchableNetlist};
+use crate::netlist::{NetlistMeta, PortDir, PortSpec, SearchableNetlist};
 use crate::{Match, Search, State, Wire, WithPath};
-
-// Direction is implicit from which helper we call (input vs output),
-// so we don’t need a direction enum here. For multi-bit ports, iterate bits.
 
 #[derive(Debug, Clone)]
 pub struct And<S>
@@ -29,19 +27,38 @@ where
     }
 }
 
-impl<S> Netlist<S> for And<S>
-where
-    S: State,
-{
+// Static metadata for codegen/introspection.
+// A define_netlist! macro would generate this from the declarative input.
+impl NetlistMeta for And<Search> {
     const MODULE_NAME: &'static str = "and_gate";
-    const FILE_PATH: &'static str = "./examples/patterns/basic/and/and.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/and/and_gate.v";
+
+    const PORTS: &'static [PortSpec] = &[
+        PortSpec {
+            name: "a",
+            dir: PortDir::In,
+        },
+        PortSpec {
+            name: "b",
+            dir: PortDir::In,
+        },
+        PortSpec {
+            name: "y",
+            dir: PortDir::Out,
+        },
+    ];
 }
 
+// The query surface. A macro can generate this impl (and the inherent
+// wrapper below) for any netlist with the same shape.
 impl SearchableNetlist for And<Search> {
     type Hit<'p, 'd> = And<Match<'p, 'd>>;
 
-    fn from_query_match<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd> {
-        // Single-bit ports; for multi-bit, iterate 0..width
+    fn from_subgraph<'p, 'd>(
+        m: &svql_subgraph::SubgraphMatch<'p, 'd>,
+        path: Instance,
+    ) -> Self::Hit<'p, 'd> {
+        // Single‑bit ports in this example; multi‑bit support would iterate 0..width.
         let a_match = bind_input(m, "a", 0);
         let b_match = bind_input(m, "b", 0);
         let y_match = bind_output(m, "y", 0);
@@ -55,23 +72,14 @@ impl SearchableNetlist for And<Search> {
     }
 }
 
-// Helpers: turn SubgraphMatch into our Match<'p,'d> for a single bit.
-// For wider ports, call with bit = 0..width and collect into Vec<Wire<_>>.
-
-fn bind_input<'p, 'd>(m: &SubgraphMatch<'p, 'd>, name: &str, bit: usize) -> Match<'p, 'd> {
-    let pat = m.input_by_name.get(name).copied();
-    let des = m.design_source_of_input_bit(name, bit).map(|(c, _b)| c);
-    Match {
-        pat_cell_ref: pat,
-        design_cell_ref: des,
-    }
-}
-
-fn bind_output<'p, 'd>(m: &SubgraphMatch<'p, 'd>, name: &str, bit: usize) -> Match<'p, 'd> {
-    let pat = m.output_by_name.get(name).copied();
-    let des = m.design_driver_of_output_bit(name, bit).map(|(c, _b)| c);
-    Match {
-        pat_cell_ref: pat,
-        design_cell_ref: des,
+// Inherent shim so callers can write And::<Search>::query(...) without UFCS.
+// A macro can also emit this block verbatim for each netlist type.
+impl And<Search> {
+    pub fn query<'p, 'd>(
+        pattern: &'p Driver,
+        haystack: &'d Driver,
+        path: Instance,
+    ) -> Vec<And<Match<'p, 'd>>> {
+        <Self as SearchableNetlist>::query(pattern, haystack, path)
     }
 }

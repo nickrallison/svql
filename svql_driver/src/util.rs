@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{Driver, cache::Cache};
+use crate::{cache::Cache, driver::Driver};
 
 pub fn load_driver_from(path: &str) -> Result<Driver, Box<dyn std::error::Error>> {
     let mut cache: Cache = Cache::new();

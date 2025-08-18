@@ -132,7 +132,4 @@ impl DesignPath {
             DesignPath::Json(p) => p,
         }
     }
-    fn exists(&self) -> bool {
-        self.path().exists()
-    }
 }

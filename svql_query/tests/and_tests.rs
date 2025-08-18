@@ -1,9 +1,8 @@
-use svql_driver::Driver;
+use svql_driver::prelude::Driver;
 use svql_driver::util::load_driver_from;
 
 use svql_query::Search;
 use svql_query::instance::Instance;
-use svql_query::netlist::SearchableNetlist;
 use svql_query::queries::basic::and::And;
 
 lazy_static::lazy_static! {

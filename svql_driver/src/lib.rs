@@ -1,11 +1,12 @@
 pub mod api;
 pub mod cache;
 pub mod driver;
-pub mod importer;
 pub mod util;
 
-pub use driver::Driver;
-pub use svql_subgraph::SubgraphMatch;
+pub mod prelude {
+    pub use crate::driver::Driver;
+    pub use svql_subgraph::SubgraphMatch;
+}
 
 #[cfg(test)]
 mod tests {
@@ -13,8 +14,6 @@ mod tests {
     use svql_subgraph::find_subgraphs;
 
     use crate::{cache::Cache, util::load_driver_cached};
-
-    use super::*;
 
     #[test]
     fn test_otbn_run_time() {

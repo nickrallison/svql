@@ -2,7 +2,7 @@ mod integration_tests {
     #[cfg(test)]
     mod dff {
         use rstest::rstest;
-        use svql_driver::Driver;
+        use svql_driver::prelude::Driver;
         use svql_driver::util::load_driver_from;
 
         lazy_static::lazy_static! {
