@@ -8,6 +8,7 @@ pub mod driver;
 pub mod subgraph;
 pub mod config;
 pub mod cache;
+pub mod connectivity;
 pub mod util;
 
 pub use driver::Driver;

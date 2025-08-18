@@ -1,37 +1,47 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::{Arc, Mutex}};
 
-use svql_driver::{get_name, Driver};
+use svql_driver::{cache::Cache, connectivity::is_connected, get_name, subgraph::find_subgraphs, util::load_driver_cached, Driver};
 
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // env logger
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let mut cache = svql_driver::cache::Cache::new();
+    let cache = Arc::new(Mutex::new(Cache::new()));
 
+    let haystack_path = "examples/patterns/basic/ff/seq_sdffe.v";
+    let (haystack_driver, _) = load_driver_cached(&haystack_path, cache.clone());
 
-    let par_path = PathBuf::from("examples/patterns/basic/ff/par_double_sdffe.v");
-    let par_name = get_name(par_path.to_str().unwrap());
-    let par_driver = Driver::new(par_path, par_name.clone(), Some(&mut cache))?;
+    let needle_path = "examples/patterns/basic/ff/sdffe.v";
+    let (needle_driver, _) = load_driver_cached(&needle_path, cache.clone());
 
-    let comb_path = PathBuf::from("examples/patterns/basic/ff/comb_d_double_sdffe.v");
-    let comb_name = get_name(comb_path.to_str().unwrap());
-    let comb_driver = Driver::new(comb_path, comb_name.clone(), Some(&mut cache))?;
+    let search_results = find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
 
+    // for res in search_results.iter() {
+    //     println!("Found subgraph match: {:#?}", res);
+    // }
 
+    let matches1 = search_results.matches.clone();
+    let matches2 = search_results.matches.clone();
 
+    let mut connection_count = 0;
+    
+    for (i, match1) in matches1.iter().enumerate() {
+        for (j, match2) in matches2.iter().enumerate() {
+            if i == j {
+                continue; // Skip self-comparison
+            }
+            
+            // Check if match1's "q" output connects to match2's "d" input
+            if is_connected(match1, "q", match2, "d", haystack_driver.design_as_ref()) {
+                println!("Found connection: match {} 'q' -> match {} 'd'", i, j);
+                connection_count += 1;
+            }
+        }
+    }
 
-    let comb_search_matches = svql_driver::subgraph::find_subgraphs(comb_driver.design_as_ref(), par_driver.design_as_ref());
-    let par_search_matches = svql_driver::subgraph::find_subgraphs(par_driver.design_as_ref(), comb_driver.design_as_ref());
-
-    println!("Comb Matches: {}", comb_search_matches.len());
-    println!("Par Matches: {}", par_search_matches.len());
-
-    assert_eq!(comb_search_matches.len(), 0, "Expected 0 matches for needle {}, against haystack {}, got {}", comb_name, par_name, comb_search_matches.len());
-    assert_eq!(par_search_matches.len(), 2, "Expected 2 matches for needle {}, against haystack {}, got {}", par_name, comb_name, par_search_matches.len());
 
     Ok(())
 }
