@@ -50,10 +50,8 @@ mod integration_tests {
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            let matches = svql_driver::subgraph::find_subgraphs(
-                needle.design_as_ref(),
-                haystack.design_as_ref(),
-            );
+            let matches =
+                svql_subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref());
             assert_eq!(
                 matches.len(),
                 expected,

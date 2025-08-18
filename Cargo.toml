@@ -2,6 +2,7 @@
 members = [
     "svql_driver",
     "svql_query",
+    "svql_subgraph",
     ######
     "prjunnamed/netlist",
     "prjunnamed/pattern",
@@ -15,12 +16,14 @@ members = [
 default-members = [
     "svql_driver",
     "svql_query",
+    "svql_subgraph",
 ]
 resolver = "3"
 
 [workspace.dependencies]
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
+svql_subgraph = { path = "svql_subgraph" }
 
 # ---------------------
 
@@ -32,7 +35,6 @@ thiserror = "2.0"
 log = "0.4.27"
 env_logger = "0.11.5"
 itertools = "0.14.0"
-openport = { version = "0.1.1", features = ["rand"] }
 tempfile = "3.20.0"
 which = "8.0.0"
 rstest = "0.26.1"

@@ -43,17 +43,17 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
 #[cfg(test)]
 mod tests {
 
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn choose_next_returns_some() {
-        let d = SDFFE.design_as_ref();
+        let d = &SDFFE;
         let idx = Index::build(d);
         let st = State::new(idx.gate_count());
         assert!(choose_next(&idx, &st).is_some());

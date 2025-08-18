@@ -4,9 +4,15 @@ use prjunnamed_netlist::Design;
 
 use crate::driver::DesignPath;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DesignKey {
+    pub path: DesignPath,
+    pub top: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Cache {
-    pub cache: std::collections::HashMap<DesignPath, Arc<Design>>,
+    pub cache: std::collections::HashMap<DesignKey, Arc<Design>>,
 }
 
 impl Cache {
@@ -17,24 +23,24 @@ impl Cache {
         }
     }
 
-    /// Insert a design into the cache for the given path
-    pub fn insert(&mut self, path: DesignPath, design: Design) {
-        self.cache.insert(path, Arc::new(design));
+    /// Insert a design into the cache for the given key
+    pub fn insert(&mut self, key: DesignKey, design: Design) {
+        self.cache.insert(key, Arc::new(design));
     }
 
-    /// Get a design from the cache for the given path
-    pub fn get(&self, path: &DesignPath) -> Option<Arc<Design>> {
-        self.cache.get(path).cloned()
+    /// Get a design from the cache for the given key
+    pub fn get(&self, key: &DesignKey) -> Option<Arc<Design>> {
+        self.cache.get(key).cloned()
     }
 
-    /// Check if the cache contains a design for the given path
-    pub fn contains(&self, path: &DesignPath) -> bool {
-        self.cache.contains_key(path)
+    /// Check if the cache contains a design for the given key
+    pub fn contains(&self, key: &DesignKey) -> bool {
+        self.cache.contains_key(key)
     }
 
-    /// Remove a design from the cache for the given path
-    pub fn remove(&mut self, path: &DesignPath) -> Option<Arc<Design>> {
-        self.cache.remove(path)
+    /// Remove a design from the cache for the given key
+    pub fn remove(&mut self, key: &DesignKey) -> Option<Arc<Design>> {
+        self.cache.remove(key)
     }
 
     /// Clear all entries from the cache

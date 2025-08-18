@@ -1,4 +1,5 @@
-use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
+use svql_driver::{cache::Cache, util::load_driver_cached};
+use svql_subgraph::find_subgraphs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()

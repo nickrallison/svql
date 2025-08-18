@@ -1,4 +1,4 @@
-use crate::subgraph::cell_kind::CellWrapper;
+use crate::cell_kind::CellWrapper;
 
 use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
@@ -89,17 +89,17 @@ pub(super) fn remove_boundaries<'p, 'd>(
 #[cfg(test)]
 mod tests {
 
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn backtrack_self_sdffe_produces_some() {
-        let d = SDFFE.design_as_ref();
+        let d = &SDFFE;
         let p_index = Index::build(d);
         let d_index = Index::build(d);
 

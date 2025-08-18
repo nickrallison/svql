@@ -1,14 +1,17 @@
 [package]
-name = "svql_driver"
-version = "0.1.0"
-edition = "2024"
+name = "svql_subgraph"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
 
 [dev-dependencies]
 lazy_static.workspace = true
 rstest.workspace = true
 
 [dependencies]
-svql_subgraph.workspace = true
 
 thiserror.workspace = true
 log.workspace = true
@@ -18,4 +21,3 @@ which.workspace = true
 
 prjunnamed-netlist.workspace = true
 prjunnamed-yosys_json.workspace = true
-

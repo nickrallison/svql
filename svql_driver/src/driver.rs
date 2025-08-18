@@ -7,12 +7,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::cache::Cache;
+use crate::cache::{Cache, DesignKey};
 
 #[derive(Debug, Clone)]
 pub struct Driver {
-    module_name: String,
-    design: Arc<Design>,
+    pub(crate) module_name: String,
+    pub(crate) design: Arc<Design>,
 }
 
 impl Driver {
@@ -57,19 +57,23 @@ impl Driver {
         }
 
         let mut owned_cache = Cache::new();
-
         let cache = match cache {
             Some(c) => c,
             None => &mut owned_cache,
         };
 
-        if cache.get(&design_path).is_none() {
+        let key = DesignKey {
+            path: design_path.clone(),
+            top: module_name.clone(),
+        };
+
+        if cache.get(&key).is_none() {
             let design_new = run_yosys_cmd(&yosys, &design_path, &module_name)?;
-            cache.insert(design_path.clone(), design_new);
+            cache.insert(key.clone(), design_new);
         }
 
         let design = cache
-            .get(&design_path)
+            .get(&key)
             .expect("Design should be in cache after running Yosys");
 
         let driver = Driver {

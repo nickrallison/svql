@@ -586,6 +586,7 @@ dependencies = [
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
  "rstest",
+ "svql_subgraph",
  "tempfile",
  "thiserror",
  "which",
@@ -604,7 +605,23 @@ dependencies = [
  "serde",
  "serde_json",
  "svql_driver",
+ "svql_subgraph",
  "thiserror",
+]
+
+[[package]]
+name = "svql_subgraph"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "lazy_static",
+ "log",
+ "prjunnamed-netlist",
+ "prjunnamed-yosys_json",
+ "rstest",
+ "tempfile",
+ "thiserror",
+ "which",
 ]
 
 [[package]]

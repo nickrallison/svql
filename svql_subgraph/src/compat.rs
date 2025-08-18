@@ -82,37 +82,37 @@ fn pins_compatible_pairwise<'p, 'd>(
 
 #[cfg(test)]
 mod tests {
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
     }
 
     #[test]
     fn same_cell_kind_is_compatible_with_itself() {
         let d = &*SDFFE;
-        let idx = Index::build(d.design_as_ref());
+        let idx = Index::build(d);
         let st = State::<'_, '_>::new(idx.gate_count());
 
-        for &n in idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff) {
+        for &n in idx.of_kind(crate::cell_kind::CellKind::Dff) {
             assert!(cells_compatible(n, n, &idx, &idx, &st));
         }
     }
 
     #[test]
     fn pattern_io_can_bind_to_design_gate() {
-        let d_p = SDFFE.design_as_ref();
-        let d_d = SEQ_DOUBLE_SDFFE.design_as_ref();
+        let d_p = &SDFFE;
+        let d_d = &SEQ_DOUBLE_SDFFE;
 
         let p_idx = Index::build(d_p);
         let d_idx = Index::build(d_d);
         let st = State::new(p_idx.gate_count());
 
-        let p = p_idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff)[0];
-        for &d in d_idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff) {
+        let p = p_idx.of_kind(crate::cell_kind::CellKind::Dff)[0];
+        for &d in d_idx.of_kind(crate::cell_kind::CellKind::Dff) {
             assert!(
                 cells_compatible(p, d, &p_idx, &d_idx, &st),
                 "pattern IO D should be compatible with design DFF regardless of external driver kind"

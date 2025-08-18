@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use prjunnamed_netlist::Cell;
 
 use super::index::{Index, NodeId};
-use crate::subgraph::cell_kind::CellWrapper;
+use crate::cell_kind::CellWrapper;
 
 pub(super) struct State<'p, 'd> {
     mapping: HashMap<NodeId, NodeId>,
@@ -144,21 +144,21 @@ impl<'p, 'd> State<'p, 'd> {
 
 #[cfg(test)]
 mod tests {
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn state_basic_map_unmap() {
-        let d = SDFFE.design_as_ref();
+        let d = &SDFFE;
         let idx = Index::build(d);
 
         let mut st = State::new(idx.gate_count());
-        let n = idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff)[0];
+        let n = idx.of_kind(crate::cell_kind::CellKind::Dff)[0];
         st.map(n, n);
         assert!(st.is_mapped(n));
         assert!(st.is_used_design(n));

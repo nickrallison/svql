@@ -5,7 +5,7 @@ use prjunnamed_netlist::Design;
 pub mod cell_kind;
 use cell_kind::{InputCell, OutputCell, get_input_cells, get_output_cells};
 
-use crate::subgraph::cell_kind::CellWrapper;
+use crate::cell_kind::CellWrapper;
 
 mod anchor;
 mod compat;
@@ -14,6 +14,7 @@ mod ports;
 mod search;
 mod state;
 mod strategy;
+pub(crate) mod util;
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -77,16 +78,13 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-// NEW: a stronger, stable signature for deduplication, including boundary bindings.
 fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
     let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
 
-    // Gate mapping: tag 0, (p_dbg, 0, d_dbg, 0)
     for (p, d) in m.cell_mapping.iter() {
         sig.push((0, p.debug_index(), 0, d.debug_index(), 0));
     }
 
-    // Boundary mapping: tag 1, (p_io_dbg, p_bit, d_dbg, d_bit)
     for ((p_cell, p_bit), (d_cell, d_bit)) in m.boundary_src_map.iter() {
         sig.push((
             1,
@@ -183,29 +181,27 @@ pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref ASYNC_MUX: Driver = load_driver_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
-        static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
-        static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
+        static ref ASYNC_MUX: Design = crate::util::load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref COMB_D_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
+        static ref PAR_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
 
     }
 
     #[test]
     fn smoke_io_cells() {
-        let design = ASYNC_MUX.design_as_ref();
-        let (ins, outs) = get_pattern_io_cells(design);
+        let design = &ASYNC_MUX;
+        let (ins, outs) = get_pattern_io_cells(&design);
         assert!(!ins.is_empty());
         assert!(!outs.is_empty());
     }
 
     #[test]
     fn smoke_find_subgraphs_self_sdffe() {
-        let design = SDFFE.design_as_ref();
+        let design = &SDFFE;
         let matches = find_subgraphs(design, design);
         assert!(
             !matches.is_empty(),
@@ -218,7 +214,7 @@ mod tests {
 
     #[test]
     fn smoke_seq_double_sdffe_has_at_least_one() {
-        let design = SEQ_DOUBLE_SDFFE.design_as_ref();
+        let design = &SEQ_DOUBLE_SDFFE;
         let matches = find_subgraphs(design, design);
         assert!(
             !matches.is_empty(),
@@ -228,7 +224,7 @@ mod tests {
 
     #[test]
     fn exact_two_matches_comb_d_double_self() {
-        let design = COMB_D_DOUBLE_SDFFE.design_as_ref();
+        let design = &COMB_D_DOUBLE_SDFFE;
         let matches = find_subgraphs(design, design);
         assert_eq!(
             matches.len(),
@@ -239,8 +235,8 @@ mod tests {
 
     #[test]
     fn exact_two_matches_sdffe_in_seq_double() {
-        let pat = SDFFE.design_as_ref();
-        let hay = SEQ_DOUBLE_SDFFE.design_as_ref();
+        let pat = &SDFFE;
+        let hay = &SEQ_DOUBLE_SDFFE;
         let matches = find_subgraphs(pat, hay);
         assert_eq!(
             matches.len(),
@@ -251,15 +247,15 @@ mod tests {
 
     #[test]
     fn dedupe_eliminates_anchor_duplicates_par_double_self() {
-        let design = PAR_DOUBLE_SDFFE.design_as_ref();
+        let design = &PAR_DOUBLE_SDFFE;
         let matches = find_subgraphs(design, design);
         assert_eq!(matches.len(), 2);
     }
 
     #[test]
     fn o1_lookup_by_port_name_and_bit_sdffe_in_seq_double() {
-        let pat = SDFFE.design_as_ref();
-        let hay = SEQ_DOUBLE_SDFFE.design_as_ref();
+        let pat = &SDFFE;
+        let hay = &SEQ_DOUBLE_SDFFE;
         let all = find_subgraphs(pat, hay);
         assert_eq!(
             all.len(),

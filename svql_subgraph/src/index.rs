@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-use crate::subgraph::cell_kind::CellWrapper;
+use crate::cell_kind::CellWrapper;
 
 use super::cell_kind::CellKind;
 use super::ports::{CellPins, extract_pins};
@@ -80,23 +80,28 @@ impl<'a> Index<'a> {
     pub(super) fn try_cell_to_node(&self, c: CellWrapper<'a>) -> Option<NodeId> {
         self.cell_to_id.get(&c).copied()
     }
+
+    pub(super) fn by_kind_iter(&self) -> Vec<(&CellKind, &[NodeId])> {
+        self.by_kind
+            .iter()
+            .map(|(k, v)| (k, v.as_slice()))
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn build_index_has_gates() {
         let d = &*SDFFE;
-        let idx = Index::build(d.design_as_ref());
+        let idx = Index::build(d);
         assert!(idx.gate_count() > 0);
         assert_eq!(idx.of_kind(CellKind::Dff).len() > 0, true);
     }

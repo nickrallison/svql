@@ -1,6 +1,6 @@
 use prjunnamed_netlist::Trit;
 
-use crate::subgraph::cell_kind::CellWrapper;
+use crate::cell_kind::CellWrapper;
 
 use super::cell_kind::{CellKind, is_gate_cell_ref};
 
@@ -64,17 +64,17 @@ fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
 
 #[cfg(test)]
 mod tests {
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn can_extract_some_pins() {
-        let d = SDFFE.design_as_ref();
+        let d = &SDFFE;
         for c in d.iter_cells() {
             let _pins = extract_pins(c.into());
         }
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn commutative_sort_is_stable() {
-        let d = SDFFE.design_as_ref();
+        let d = &SDFFE;
         for c in d.iter_cells() {
             let mut pins1 = extract_pins(c.into()).inputs;
             let mut pins2 = extract_pins(c.into()).inputs;

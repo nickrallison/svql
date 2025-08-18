@@ -23,7 +23,7 @@ pub trait SearchableNetlist: Netlist<Search> {
         haystack: &'d Driver,
         path: Instance,
     ) -> Vec<Self::Hit<'p, 'd>> {
-        svql_driver::subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref())
+        svql_subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref())
             .iter()
             .map(|m| Self::from_query_match(m, path.clone()))
             .collect()

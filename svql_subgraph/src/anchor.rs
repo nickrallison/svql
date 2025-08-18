@@ -5,10 +5,10 @@ pub(super) fn choose_anchors<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
 ) -> Option<(CellKind, Vec<NodeId>, Vec<NodeId>)> {
-    // Count kinds in design
+    // Count kinds present in the design using the index itself
     let mut design_counts = Vec::new();
-    for (&kind, nodes) in d_index_kind_iter(d_index) {
-        design_counts.push((kind, nodes.len()));
+    for (kind, nodes) in d_index.by_kind_iter() {
+        design_counts.push((*kind, nodes.len()));
     }
 
     // Candidate kinds: present in both pattern and design
@@ -59,19 +59,19 @@ fn all_gate_kinds() -> &'static [CellKind] {
 
 #[cfg(test)]
 mod tests {
+    use prjunnamed_netlist::Design;
+
     use super::*;
-    use crate::Driver;
-    use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn choose_anchors_some() {
         let d = &*SDFFE;
-        let p_index = super::Index::build(d.design_as_ref());
-        let d_index = super::Index::build(d.design_as_ref());
+        let p_index = super::Index::build(d);
+        let d_index = super::Index::build(d);
         let chosen = choose_anchors(&p_index, &d_index);
         assert!(chosen.is_some());
     }

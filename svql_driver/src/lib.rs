@@ -1,15 +1,18 @@
+pub mod api;
 pub mod cache;
 pub mod driver;
-pub mod subgraph;
+pub mod importer;
 pub mod util;
 
 pub use driver::Driver;
-pub use subgraph::SubgraphMatch;
+pub use svql_subgraph::SubgraphMatch;
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
+    use svql_subgraph::find_subgraphs;
+
+    use crate::{cache::Cache, util::load_driver_cached};
 
     use super::*;
 
@@ -46,25 +49,25 @@ mod tests {
 
         let time_start = std::time::Instant::now();
 
-        let results_1 = subgraph::find_subgraphs(
+        let results_1 = find_subgraphs(
             needle_design_1.design_as_ref(),
             haystack_design.design_as_ref(),
         );
-        let results_2 = subgraph::find_subgraphs(
+        let results_2 = find_subgraphs(
             needle_design_2.design_as_ref(),
             haystack_design.design_as_ref(),
         );
-        let results_3 = subgraph::find_subgraphs(
+        let results_3 = find_subgraphs(
             needle_design_3.design_as_ref(),
             haystack_design.design_as_ref(),
         );
-        let results_4 = subgraph::find_subgraphs(
+        let results_4 = find_subgraphs(
             needle_design_4.design_as_ref(),
             haystack_design.design_as_ref(),
         );
 
         let results_and =
-            subgraph::find_subgraphs(and_design.design_as_ref(), haystack_design.design_as_ref());
+            find_subgraphs(and_design.design_as_ref(), haystack_design.design_as_ref());
 
         println!("Found {} matches for needle 1", results_1.matches.len());
         println!("Found {} matches for needle 2", results_2.matches.len());
@@ -126,8 +129,13 @@ mod tests {
                 for m2 in &ms {
                     if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
                         let sd_net = sd_cell.output()[sd_bit];
-                        if dq_net == sd_net {
+
+                        if dq_net == sd_net && dq_cell != sd_cell {
                             matches += 1;
+                            println!(
+                                "Found connection between \"q\" of {:#?} and \"d\" of {:#?}",
+                                dq_cell, sd_cell
+                            );
                         }
                     }
                 }
