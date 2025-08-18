@@ -49,27 +49,30 @@ fn pins_compatible_pairwise<'p, 'd>(
             (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 // If the source gate in pattern is already mapped, enforce it matches.
                 if let Some(p_node) = p_index.try_cell_to_node(*p_cell)
-                    && let Some(mapped_d_node) = state.mapped_to(p_node) {
-                        if let Some(d_node) = d_index.try_cell_to_node(*d_cell) {
-                            if mapped_d_node != d_node || p_bit != d_bit {
-                                return false;
-                            }
-                        } else {
+                    && let Some(mapped_d_node) = state.mapped_to(p_node)
+                {
+                    if let Some(d_node) = d_index.try_cell_to_node(*d_cell) {
+                        if mapped_d_node != d_node || p_bit != d_bit {
                             return false;
                         }
+                    } else {
+                        return false;
                     }
+                }
             }
             (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
                 if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit)
-                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit) {
-                        return false;
-                    }
+                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit)
+                {
+                    return false;
+                }
             }
             (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit)
-                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit) {
-                        return false;
-                    }
+                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit)
+                {
+                    return false;
+                }
             }
             _ => return false,
         }

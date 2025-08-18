@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{cache::Cache};
+use crate::cache::Cache;
 
 #[derive(Debug, Clone)]
 pub struct Driver {

@@ -1,4 +1,4 @@
-use svql_driver::{SubgraphMatch, subgraph::cell_kind::CellWrapper};
+use svql_driver::subgraph::cell_kind::CellWrapper;
 
 use crate::instance::Instance;
 

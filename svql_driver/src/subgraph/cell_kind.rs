@@ -217,9 +217,10 @@ pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellR
                 return;
             }
             if let Ok((src, _bit)) = design.find_cell(net)
-                && src == cell {
-                    driven_by_cell = true;
-                }
+                && src == cell
+            {
+                driven_by_cell = true;
+            }
         });
 
         if driven_by_cell {

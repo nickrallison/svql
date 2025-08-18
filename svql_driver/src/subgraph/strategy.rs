@@ -18,10 +18,11 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
                 Source::Io(_, _) => {}
                 Source::Gate(gc, _) => {
                     if let Some(g) = p_index.try_cell_to_node(*gc)
-                        && !st.is_mapped(g) {
-                            all_resolvable = false;
-                            break;
-                        }
+                        && !st.is_mapped(g)
+                    {
+                        all_resolvable = false;
+                        break;
+                    }
                 }
             }
         }
