@@ -19,8 +19,6 @@ pub(crate) mod util;
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
     pub matches: Vec<SubgraphMatch<'p, 'd>>,
-    pub _p_index: index::Index<'p>,
-    pub _d_index: index::Index<'d>,
 }
 
 impl<'p, 'd> AllSubgraphMatches<'p, 'd> {
@@ -78,27 +76,6 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
-    let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
-
-    for (p, d) in m.cell_mapping.iter() {
-        sig.push((0, p.debug_index(), 0, d.debug_index(), 0));
-    }
-
-    for ((p_cell, p_bit), (d_cell, d_bit)) in m.boundary_src_map.iter() {
-        sig.push((
-            1,
-            p_cell.debug_index(),
-            *p_bit,
-            d_cell.debug_index(),
-            *d_bit,
-        ));
-    }
-
-    sig.sort_unstable();
-    sig
-}
-
 // Public API
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
@@ -110,8 +87,6 @@ pub fn find_subgraphs<'p, 'd>(
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
         return AllSubgraphMatches {
             matches: Vec::new(),
-            _p_index: p_index,
-            _d_index: d_index,
         };
     }
 
@@ -119,8 +94,6 @@ pub fn find_subgraphs<'p, 'd>(
     else {
         return AllSubgraphMatches {
             matches: Vec::new(),
-            _p_index: p_index,
-            _d_index: d_index,
         };
     };
 
@@ -166,16 +139,33 @@ pub fn find_subgraphs<'p, 'd>(
     let mut seen: HashSet<Vec<(u8, usize, usize, usize, usize)>> = HashSet::new();
     results.retain(|m| seen.insert(match_signature(m)));
 
-    AllSubgraphMatches {
-        matches: results,
-        _p_index: p_index,
-        _d_index: d_index,
-    }
+    AllSubgraphMatches { matches: results }
 }
 
 // Helper used by tests and callers
 pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec<OutputCell<'p>>) {
     (get_input_cells(pattern), get_output_cells(pattern))
+}
+
+fn match_signature<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
+    let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
+
+    for (p, d) in m.cell_mapping.iter() {
+        sig.push((0, p.debug_index(), 0, d.debug_index(), 0));
+    }
+
+    for ((p_cell, p_bit), (d_cell, d_bit)) in m.boundary_src_map.iter() {
+        sig.push((
+            1,
+            p_cell.debug_index(),
+            *p_bit,
+            d_cell.debug_index(),
+            *d_bit,
+        ));
+    }
+
+    sig.sort_unstable();
+    sig
 }
 
 #[cfg(test)]
