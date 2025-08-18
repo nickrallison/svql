@@ -68,7 +68,7 @@ mod tests {
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
+        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]

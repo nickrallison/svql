@@ -162,11 +162,11 @@ mod tests {
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref ASYNC_MUX: (Driver, String) = load_driver_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json");
-        static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
-        static ref COMB_D_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v");
-        static ref PAR_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v");
+        static ref ASYNC_MUX: (Driver, String) = load_driver_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref COMB_D_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
+        static ref PAR_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
 
     }
 

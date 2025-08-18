@@ -42,14 +42,13 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
 
     use super::*;
     use crate::{Driver};
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
+        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]

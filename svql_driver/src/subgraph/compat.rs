@@ -80,13 +80,12 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{read_input_to_design, Driver};
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
-        static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
+        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
     }
 
     #[test]

@@ -77,12 +77,11 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{read_input_to_design, Driver};
-    use prjunnamed_netlist::Design;
+    use crate::{Driver};
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
+        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]

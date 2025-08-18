@@ -1,8 +1,8 @@
 use log::{error, trace};
 use prjunnamed_netlist::{Cell, CellRef, Design};
-use std::{path::{Path, PathBuf}, process::Stdio, sync::{Arc, RwLock}};
+use std::{path::{Path, PathBuf}, process::Stdio, sync::Arc};
 
-use crate::{cache::Cache, config::Config, read_input_to_design, subgraph::SubgraphMatch};
+use crate::{cache::Cache, config::Config, subgraph::SubgraphMatch};
 
 #[derive(Debug, Clone)]
 pub struct Driver {
@@ -149,6 +149,29 @@ fn get_command(yosys: &Path, design: &DesignPath, module_name: &str, json_out: &
     ).collect::<Vec<_>>();
     let args = args.join(" ");
     format!("{} {}", yosys.display(), args)
+}
+
+pub fn read_input_to_design(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let path = Path::new(&name);
+    let abs_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        workspace.join(path)
+    };
+
+    if name.ends_with(".uir") {
+        let design = prjunnamed_netlist::parse(target, &std::fs::read_to_string(abs_path)?)?;
+        Ok(design)
+    } else if name.ends_with(".json") {
+        let designs = prjunnamed_yosys_json::import(target, &mut File::open(abs_path)?)?;
+        assert_eq!(designs.len(), 1, "can only convert single-module Yosys JSON to Unnamed IR");
+        Ok(designs.into_values().next().unwrap())
+    } else if name.is_empty() {
+        return Err("No input file provided".into());
+    } else {
+        return Err(format!("Don't know what to do with input {name:?}").into());
+    }
 }
 
 fn run_yosys_cmd(yosys: &Path, design: &DesignPath, module_name: &str) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
