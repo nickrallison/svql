@@ -100,7 +100,7 @@ fn value_width(v: &Value) -> usize {
     v.iter().count()
 }
 
-pub fn find_bindings<'p, 'd>(pattern: &'p Design, design: &'d Design) -> Vec<SimpleMatchBinding> {
+pub fn find_bindings(pattern: &Design, design: &Design) -> Vec<SimpleMatchBinding> {
     let all = svql_subgraph::find_subgraphs(pattern, design);
     all.iter().map(binding_from_subgraph).collect()
 }

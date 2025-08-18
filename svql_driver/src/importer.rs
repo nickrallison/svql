@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 
 use crate::cache::{Cache, DesignKey};
@@ -121,7 +121,7 @@ impl<I: Importer> DriverBuilder<I> {
         path: DesignPath,
         top: String,
     ) -> Result<Driver, Box<dyn std::error::Error>> {
-        let mut cache = self.cache.take().unwrap_or_else(Cache::new);
+        let mut cache = self.cache.take().unwrap_or_default();
         let key = DesignKey {
             path: path.clone(),
             top: top.clone(),
