@@ -1,8 +1,6 @@
-
 use std::sync::{Arc, Mutex};
 
-use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::{load_driver_cached}};
-
+use svql_driver::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // env logger
@@ -10,15 +8,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let cache = Arc::new(Mutex::new(Cache::new()));
+    let mut cache = Cache::new();
 
     let haystack_path = "examples/patterns/basic/ff/seq_double_sdffe.v";
-    let (haystack_driver, _) = load_driver_cached(&haystack_path, cache.clone());
+    let haystack_driver = load_driver_cached(&haystack_path, &mut cache)?;
 
     let needle_path = "examples/patterns/basic/ff/sdffe.v";
-    let (needle_driver, _) = load_driver_cached(&needle_path, cache.clone());
+    let needle_driver = load_driver_cached(&needle_path, &mut cache)?;
 
-    let search_results = find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
+    let search_results = find_subgraphs(
+        needle_driver.design_as_ref(),
+        haystack_driver.design_as_ref(),
+    );
     for res in search_results.iter() {
         println!("Found subgraph match: {:#?}", res);
     }

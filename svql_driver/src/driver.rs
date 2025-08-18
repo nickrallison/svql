@@ -1,6 +1,11 @@
 use log::{error, trace};
 use prjunnamed_netlist::{Cell, CellRef, Design};
-use std::{path::{Path, PathBuf}, process::Stdio, sync::Arc};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    process::Stdio,
+    sync::Arc,
+};
 
 use crate::{cache::Cache, config::Config, subgraph::SubgraphMatch};
 
@@ -11,36 +16,51 @@ pub struct Driver {
 }
 
 impl Driver {
-    pub fn new(design: PathBuf, module_name: String, cache: Option<&mut Cache>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        design: PathBuf,
+        module_name: String,
+        cache: Option<&mut Cache>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let yosys = which::which("yosys")
-            .map_err(|e| format!("Failed to find yosys binary: {}", e))?;
+        let yosys =
+            which::which("yosys").map_err(|e| format!("Failed to find yosys binary: {}", e))?;
         let design = if design.is_absolute() {
             design
         } else {
             workspace.join(design)
         };
 
-        let design = DesignPath::new(design).map_err(|e| format!("Failed to create design: {}", e))?;
+        let design =
+            DesignPath::new(design).map_err(|e| format!("Failed to create design: {}", e))?;
 
         Self::new_yosys(design, module_name, cache, yosys)
     }
 
-    pub fn new_yosys(design_path: DesignPath, module_name: String, cache: Option<&mut Cache>, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        trace!("new_yosys called with yosys: {:?}, design: {:?}, module_name: {}", yosys, design_path, module_name);
+    pub fn new_yosys(
+        design_path: DesignPath,
+        module_name: String,
+        cache: Option<&mut Cache>,
+        yosys: PathBuf,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        trace!(
+            "new_yosys called with yosys: {:?}, design: {:?}, module_name: {}",
+            yosys, design_path, module_name
+        );
         if !yosys.exists() {
             return Err(format!("Yosys binary not found at: {}", yosys.display()).into());
         }
 
         if !design_path.exists() {
-            return Err(format!("Design file not found at: {}", design_path.path().display()).into());
+            return Err(
+                format!("Design file not found at: {}", design_path.path().display()).into(),
+            );
         }
 
         let mut owned_cache = Cache::new();
 
         let cache = match cache {
             Some(c) => c,
-            None => &mut owned_cache
+            None => &mut owned_cache,
         };
 
         if let None = cache.get(&design_path) {
@@ -48,8 +68,9 @@ impl Driver {
             cache.insert(design_path.clone(), design_new);
         }
 
-        let design = cache.get(&design_path).expect("Design should be in cache after running Yosys");
-
+        let design = cache
+            .get(&design_path)
+            .expect("Design should be in cache after running Yosys");
 
         let driver = Driver {
             design,
@@ -58,8 +79,6 @@ impl Driver {
 
         Ok(driver)
     }
-
-    
 
     pub fn query<'p>(&self, cfg: &Config) -> Vec<SubgraphMatch> {
         trace!("ProcDriver::query called with config: {:?}", cfg);
@@ -73,20 +92,23 @@ impl Driver {
         self.design.as_ref()
     }
 
+    pub fn module_name(&self) -> &str {
+        &self.module_name
+    }
+
     pub fn get_input_cells<'p>(&'p self) -> Vec<CellRef<'p>> {
-        self.design.iter_cells().filter(|cell| {
-            matches!(cell.get().as_ref(), Cell::Input(_, _))
-        }).collect()
+        self.design
+            .iter_cells()
+            .filter(|cell| matches!(cell.get().as_ref(), Cell::Input(_, _)))
+            .collect()
     }
     pub fn get_output_cells<'p>(&'p self) -> Vec<CellRef<'p>> {
-        self.design.iter_cells().filter(|cell| {
-            matches!(cell.get().as_ref(), Cell::Output(_, _))
-        }).collect()
+        self.design
+            .iter_cells()
+            .filter(|cell| matches!(cell.get().as_ref(), Cell::Output(_, _)))
+            .collect()
     }
-
-
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DesignPath {
@@ -104,7 +126,10 @@ impl DesignPath {
         } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
             Ok(DesignPath::Json(path))
         } else {
-            Err(format!("Unsupported design file extension: {:?}", path.extension()))
+            Err(format!(
+                "Unsupported design file extension: {:?}",
+                path.extension()
+            ))
         }
     }
     pub fn path(&self) -> &Path {
@@ -120,7 +145,6 @@ impl DesignPath {
 }
 
 fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Path) -> Vec<String> {
-
     let read_cmd = match design {
         DesignPath::Verilog(_) => "read_verilog",
         DesignPath::Rtlil(_) => "read_rtlil",
@@ -139,70 +163,105 @@ fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Pat
     ]
 }
 
-fn get_command(yosys: &Path, design: &DesignPath, module_name: &str, json_out: &Path) -> String {
-    let args = get_command_args_slice(design, module_name, json_out);
-    let args = args.into_iter().map(|s| 
-        match s.contains(" ") {
-            true => format!("\"{}\"", s),
-            false => s,
-        }
-    ).collect::<Vec<_>>();
-    let args = args.join(" ");
-    format!("{} {}", yosys.display(), args)
-}
-
-pub fn read_input_to_design(target: Option<Arc<dyn Target>>, name: String) -> Result<prjunnamed_netlist::Design, Box<dyn Error>> {
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let path = Path::new(&name);
-    let abs_path = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        workspace.join(path)
-    };
-
-    if name.ends_with(".uir") {
-        let design = prjunnamed_netlist::parse(target, &std::fs::read_to_string(abs_path)?)?;
-        Ok(design)
-    } else if name.ends_with(".json") {
-        let designs = prjunnamed_yosys_json::import(target, &mut File::open(abs_path)?)?;
-        assert_eq!(designs.len(), 1, "can only convert single-module Yosys JSON to Unnamed IR");
-        Ok(designs.into_values().next().unwrap())
-    } else if name.is_empty() {
-        return Err("No input file provided".into());
-    } else {
-        return Err(format!("Don't know what to do with input {name:?}").into());
-    }
-}
-
-fn run_yosys_cmd(yosys: &Path, design: &DesignPath, module_name: &str) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+fn run_yosys_cmd(
+    yosys: &Path,
+    design: &DesignPath,
+    module_name: &str,
+) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
     let json_temp_file = tempfile::Builder::new()
-            .prefix("svql_prjunnamed_")
-            .suffix(".json")
-            .rand_bytes(4)
-            .tempfile()?;
+        .prefix("svql_prjunnamed_")
+        .suffix(".json")
+        .rand_bytes(4)
+        .tempfile()?;
 
     let mut cmd = std::process::Command::new(&yosys);
-    cmd.args(get_command_args_slice(&design, &module_name, &json_temp_file.path()));
+    cmd.args(get_command_args_slice(
+        &design,
+        &module_name,
+        &json_temp_file.path(),
+    ));
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null());
 
-
     let mut yosys_process = cmd.spawn().expect("Failed to start yosys process");
-    let exit_status = yosys_process.wait().expect("Failed to wait for yosys process");
+    let exit_status = yosys_process
+        .wait()
+        .expect("Failed to wait for yosys process");
 
     if !exit_status.success() {
-        let mut stderr = yosys_process.stderr.take().expect("Failed to capture stderr");
+        let mut stderr = yosys_process
+            .stderr
+            .take()
+            .expect("Failed to capture stderr");
         let mut stderr_buf = Vec::new();
         use std::io::Read;
-        stderr.read_to_end(&mut stderr_buf).expect("Failed to read stderr");
+        stderr
+            .read_to_end(&mut stderr_buf)
+            .expect("Failed to read stderr");
         let stderr_str = String::from_utf8_lossy(&stderr_buf);
-        error!("Yosys process failed with status: {:?}\nStderr: {}", exit_status, stderr_str);
-        return Err(format!("Yosys process failed with status: {:?}\nStderr: {}", exit_status, stderr_str).into());
+        error!(
+            "Yosys process failed with status: {:?}\nStderr: {}",
+            exit_status, stderr_str
+        );
+        return Err(format!(
+            "Yosys process failed with status: {:?}\nStderr: {}",
+            exit_status, stderr_str
+        )
+        .into());
     }
 
-    let design = read_input_to_design(None, json_temp_file.path().to_string_lossy().to_string())
-        .map_err(|e| format!("Failed to read input design from Yosys output: {}", e))?;
+    let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
+    assert_eq!(
+        designs.len(),
+        1,
+        "can only convert single-module Yosys JSON to Unnamed IR"
+    );
+    let design = designs.into_values().next().unwrap();
+    
 
     Ok(design)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_design_path_new() {
+        let verilog_path = PathBuf::from("examples/patterns/basic/ff/sdffe.v");
+        let rtlil_path = PathBuf::from("examples/patterns/basic/ff/sdffe.il");
+        let json_path = PathBuf::from("examples/patterns/basic/ff/sdffe.json");
+        let unsupported_path = PathBuf::from("examples/patterns/basic/ff/sdffe.txt");
+
+        assert!(DesignPath::new(verilog_path).is_ok());
+        assert!(DesignPath::new(rtlil_path).is_ok());
+        assert!(DesignPath::new(json_path).is_ok());
+        assert!(DesignPath::new(unsupported_path).is_err());
+    }
+
+    #[test]
+    fn test_run_yosys_cmd() {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let design_file = workspace.join("examples/patterns/basic/ff/sdffe.v");
+        let yosys =
+            which::which("yosys").map_err(|e| format!("Failed to find yosys binary: {}", e)).expect("Yosys binary not found");
+        let design_path = DesignPath::new(design_file).unwrap();
+        let module_name = "sdffe";
+
+        let result = run_yosys_cmd(&yosys, &design_path, module_name);
+        assert!(result.is_ok(), "expected Ok but got Err: {}", result.err().unwrap());
+    }
+
+    #[test]
+    fn test_driver_new() {
+        let design_path = PathBuf::from("examples/patterns/basic/ff/sdffe.v");
+        let driver = Driver::new(design_path, "sdffe".into(), None);
+        assert!(driver.is_ok());
+        let driver = driver.unwrap();
+        assert_eq!(driver.module_name(), "sdffe");
+    }
+}
+
+
+

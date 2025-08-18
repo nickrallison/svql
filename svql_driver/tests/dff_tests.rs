@@ -1,4 +1,3 @@
-
 mod integration_tests {
     #[cfg(test)]
     mod dff {
@@ -10,14 +9,13 @@ mod integration_tests {
 
         lazy_static::lazy_static! {
 
-            static ref COMB_D_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v");
-            static ref AND_Q_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v");
-            static ref PAR_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v");
-            static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v");
-            static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v");
+            static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
+            static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v").unwrap();
+            static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
+            static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+            static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
         }
 
-    
         #[rstest]
         // Comb D Needle
         #[case(&COMB_D_DOUBLE_SDFFE, &COMB_D_DOUBLE_SDFFE, 2)]
@@ -50,14 +48,23 @@ mod integration_tests {
         #[case(&SDFFE, &SEQ_DOUBLE_SDFFE, 2)]
         #[case(&SDFFE, &SDFFE, 1)]
         fn test_subgraph_matches(
-            #[case] needle_tuple: &'static (Driver, String),
-            #[case] haystack_tuple: &'static (Driver, String),
+            #[case] needle: &'static Driver,
+            #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            let (needle, needle_name) = needle_tuple;
-            let (haystack, haystack_name) = haystack_tuple;
-            let matches = svql_driver::subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref());
-            assert_eq!(matches.len(), expected, "Expected {} matches for needle {}, against haystack {}, got {}", expected, needle_name, haystack_name, matches.len());
+            let matches = svql_driver::subgraph::find_subgraphs(
+                needle.design_as_ref(),
+                haystack.design_as_ref(),
+            );
+            assert_eq!(
+                matches.len(),
+                expected,
+                "Expected {} matches for needle {}, against haystack {}, got {}",
+                expected,
+                needle.module_name(),
+                haystack.module_name(),
+                matches.len()
+            );
         }
     }
 }

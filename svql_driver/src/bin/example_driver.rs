@@ -1,29 +1,38 @@
-use std::{path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use svql_driver::{cache::Cache, get_name, subgraph::find_subgraphs, util::load_driver_cached, Driver};
-
-
+use svql_driver::{Driver, cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let cache = Arc::new(Mutex::new(Cache::new()));
+    let mut cache = Cache::new();
 
     let haystack_path = "examples/patterns/basic/ff/seq_sdffe.v";
-    let (haystack_driver, _) = load_driver_cached(&haystack_path, cache.clone());
+    let haystack_driver = load_driver_cached(&haystack_path, &mut cache)?;
 
     let needle_path = "examples/patterns/basic/ff/sdffe.v";
-    let (needle_driver, _) = load_driver_cached(&needle_path, cache.clone());
+    let needle_driver = load_driver_cached(&needle_path, &mut cache)?;
 
-    let search_results = find_subgraphs(needle_driver.design_as_ref(), haystack_driver.design_as_ref());
+    let search_results = find_subgraphs(
+        needle_driver.design_as_ref(),
+        haystack_driver.design_as_ref(),
+    );
 
-    
     // Every match should resolve both d (input) and q (output) via O(1) helpers
     for m in search_results.iter() {
-        assert!(m.design_source_of_input_bit("d", 0).is_some(), "input d should have a bound design source");
-        assert!(m.design_driver_of_output_bit("q", 0).is_some(), "output q should have a resolved design driver");
+        assert!(
+            m.design_source_of_input_bit("d", 0).is_some(),
+            "input d should have a bound design source"
+        );
+        assert!(
+            m.design_driver_of_output_bit("q", 0).is_some(),
+            "output q should have a resolved design driver"
+        );
     }
 
     // There should exist a pair of matches where q of one drives d of the other.
@@ -46,7 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !found {
         println!("No connections found between matches.");
     }
-
 
     Ok(())
 }

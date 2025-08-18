@@ -19,7 +19,9 @@ pub(super) fn choose_anchors<'p, 'd>(
         .filter(|(k, _)| !p_index.of_kind(*k).is_empty())
         .collect();
 
-    if candidates.is_empty() { return None; }
+    if candidates.is_empty() {
+        return None;
+    }
 
     // Pick the rarest kind in the design
     candidates.sort_by(|a, b| a.1.cmp(&b.1));
@@ -35,7 +37,9 @@ pub(super) fn choose_anchors<'p, 'd>(
     Some((anchor_kind, p_anchors, d_anchors))
 }
 
-fn d_index_kind_iter<'a>(d_index: &'a Index<'a>) -> impl Iterator<Item = (&'a CellKind, &'a [super::index::NodeId])> {
+fn d_index_kind_iter<'a>(
+    d_index: &'a Index<'a>,
+) -> impl Iterator<Item = (&'a CellKind, &'a [super::index::NodeId])> {
     // Build a slice of tuples for iteration
     let mut kinds = Vec::new();
     for k in all_gate_kinds() {
@@ -50,30 +54,26 @@ fn d_index_kind_iter<'a>(d_index: &'a Index<'a>) -> impl Iterator<Item = (&'a Ce
 fn all_gate_kinds() -> &'static [CellKind] {
     use CellKind::*;
     &[
-        Buf, Not, And, Or, Xor, Mux, Adc, Aig, Eq, ULt, SLt, Shl, UShr, SShr, XShr,
-        Mul, UDiv, UMod, SDivTrunc, SDivFloor, SModTrunc, SModFloor, Dff,
+        Buf, Not, And, Or, Xor, Mux, Adc, Aig, Eq, ULt, SLt, Shl, UShr, SShr, XShr, Mul, UDiv,
+        UMod, SDivTrunc, SDivFloor, SModTrunc, SModFloor, Dff,
     ]
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
-    use crate::{util::load_driver_cached, Driver};
-    use prjunnamed_netlist::Design;
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
-
 
     #[test]
     fn choose_anchors_some() {
         let d = &*SDFFE;
-        let p_index = super::Index::build(d.0.design_as_ref());
-        let d_index = super::Index::build(d.0.design_as_ref());
+        let p_index = super::Index::build(d.design_as_ref());
+        let d_index = super::Index::build(d.design_as_ref());
         let chosen = choose_anchors(&p_index, &d_index);
         assert!(chosen.is_some());
     }

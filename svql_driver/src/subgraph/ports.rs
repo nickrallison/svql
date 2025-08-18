@@ -2,7 +2,7 @@ use prjunnamed_netlist::{CellRef, Trit};
 
 use crate::subgraph::cell_kind::CellWrapper;
 
-use super::cell_kind::{is_gate_cell_ref, CellKind};
+use super::cell_kind::{CellKind, is_gate_cell_ref};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum PinKind {
@@ -23,7 +23,10 @@ pub(super) struct CellPins<'a> {
 }
 
 pub(super) fn is_commutative(kind: CellKind) -> bool {
-    matches!(kind, CellKind::And | CellKind::Or | CellKind::Xor | CellKind::Eq)
+    matches!(
+        kind,
+        CellKind::And | CellKind::Or | CellKind::Xor | CellKind::Eq
+    )
 }
 
 pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
@@ -64,16 +67,16 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{Driver};
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn can_extract_some_pins() {
-        let d = SDFFE.0.design_as_ref() ;
+        let d = SDFFE.design_as_ref();
         for c in d.iter_cells() {
             let _pins = extract_pins(c.into());
         }
@@ -81,7 +84,7 @@ mod tests {
 
     #[test]
     fn commutative_sort_is_stable() {
-        let d = SDFFE.0.design_as_ref();
+        let d = SDFFE.design_as_ref();
         for c in d.iter_cells() {
             let mut pins1 = extract_pins(c.into()).inputs;
             let mut pins2 = extract_pins(c.into()).inputs;

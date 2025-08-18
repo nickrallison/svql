@@ -205,11 +205,7 @@ impl<'p> InputCell<'p> {
     }
 }
 
-
-pub(crate) fn get_fanout<'a>(
-    design: &'a Design,
-    cell: CellRef<'a>,
-) -> Vec<CellRef<'a>> {
+pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellRef<'a>> {
     let mut fanout: Vec<CellRef<'a>> = Vec::new();
 
     for dest in design.iter_cells() {
@@ -281,7 +277,10 @@ pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
         .collect()
 }
 
-pub(crate) fn count_cells_by_kind<'a>(design: &'a Design, filter: impl Fn(CellRef<'a>) -> bool) -> Vec<(CellKind, usize)> {
+pub(crate) fn count_cells_by_kind<'a>(
+    design: &'a Design,
+    filter: impl Fn(CellRef<'a>) -> bool,
+) -> Vec<(CellKind, usize)> {
     let mut counts = HashMap::new();
     for cell_ref in design.iter_cells().filter(|c| filter(*c)) {
         let kind = CellKind::from(cell_ref.get().as_ref());
@@ -306,19 +305,44 @@ mod tests {
     fn test_is_gate_kind() {
         // Gates
         for k in [
-            CellKind::Buf, CellKind::Not, CellKind::And, CellKind::Or, CellKind::Xor,
-            CellKind::Mux, CellKind::Adc, CellKind::Aig, CellKind::Eq, CellKind::ULt,
-            CellKind::SLt, CellKind::Shl, CellKind::UShr, CellKind::SShr, CellKind::XShr,
-            CellKind::Mul, CellKind::UDiv, CellKind::UMod, CellKind::SDivTrunc, CellKind::SDivFloor,
-            CellKind::SModTrunc, CellKind::SModFloor, CellKind::Dff,
+            CellKind::Buf,
+            CellKind::Not,
+            CellKind::And,
+            CellKind::Or,
+            CellKind::Xor,
+            CellKind::Mux,
+            CellKind::Adc,
+            CellKind::Aig,
+            CellKind::Eq,
+            CellKind::ULt,
+            CellKind::SLt,
+            CellKind::Shl,
+            CellKind::UShr,
+            CellKind::SShr,
+            CellKind::XShr,
+            CellKind::Mul,
+            CellKind::UDiv,
+            CellKind::UMod,
+            CellKind::SDivTrunc,
+            CellKind::SDivFloor,
+            CellKind::SModTrunc,
+            CellKind::SModFloor,
+            CellKind::Dff,
         ] {
             assert!(k.is_gate(), "kind {:?} must be considered a gate", k);
         }
 
         // Not gates
         for k in [
-            CellKind::Input, CellKind::Output, CellKind::IoBuf, CellKind::Assign,
-            CellKind::Match, CellKind::Target, CellKind::Other, CellKind::Name, CellKind::Debug,
+            CellKind::Input,
+            CellKind::Output,
+            CellKind::IoBuf,
+            CellKind::Assign,
+            CellKind::Match,
+            CellKind::Target,
+            CellKind::Other,
+            CellKind::Name,
+            CellKind::Debug,
             CellKind::Memory,
         ] {
             assert!(!k.is_gate(), "kind {:?} must NOT be considered a gate", k);

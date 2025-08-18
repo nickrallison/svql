@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub struct Config {
     needle: prjunnamed_netlist::Design,
@@ -46,8 +45,6 @@ pub struct Config {
 //     pub param_name: String,
 //     pub param_value: String,
 // }
-
-
 
 // impl Default for Config {
 //     fn default() -> Self {

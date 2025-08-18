@@ -1,58 +1,80 @@
-
-use std::{error::Error, fs::File, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    error::Error,
+    fs::File,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use prjunnamed_netlist::Target;
 
+pub mod cache;
+pub mod config;
 pub mod driver;
 pub mod subgraph;
-pub mod config;
-pub mod cache;
 pub mod util;
 
 pub use driver::Driver;
 pub use subgraph::SubgraphMatch;
 
-
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
 
-    use crate::{cache::Cache, util::{load_driver_cached, load_driver_from}};
+    use crate::{cache::Cache, util::load_driver_cached};
 
     use super::*;
 
     #[test]
     fn test_otbn_run_time() {
-
-        let cache = Arc::new(Mutex::new(Cache::new()));
-
+        let mut cache = Cache::new();
 
         let haystack_path = "examples/larger_designs/otbn_core.json";
-        let haystack_design = load_driver_cached("examples/larger_designs/otbn_core.json", cache.clone())
+        let haystack_design =
+            load_driver_cached(haystack_path, &mut cache).expect("Failed to read input design");
+
+        let and_design = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)
             .expect("Failed to read input design");
 
-        let (and_design, _) = load_driver_cached("examples/patterns/basic/and/and_gate.v", cache.clone()).expect("Failed to read input design");
+        let needle_path_1 =
+            "examples/patterns/security/access_control/locked_reg/json/async_en.json";
+        let needle_design_1 =
+            load_driver_cached(needle_path_1, &mut cache).expect("Failed to read input design");
 
-        let needle_path_1 = "examples/patterns/security/access_control/locked_reg/json/async_en.json";
-        let needle_design_1 = load_driver_cached(needle_path_1, cache.clone()).expect("Failed to read input design");
+        let needle_path_2 =
+            "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
+        let needle_design_2 =
+            load_driver_cached(needle_path_2, &mut cache).expect("Failed to read input design");
 
-        let needle_path_2 = "examples/patterns/security/access_control/locked_reg/json/async_mux.json";
-        let needle_design_2 = load_driver_cached(needle_path_2, cache.clone()).expect("Failed to read input design");
+        let needle_path_3 =
+            "examples/patterns/security/access_control/locked_reg/json/sync_en.json";
+        let needle_design_3 =
+            load_driver_cached(needle_path_3, &mut cache).expect("Failed to read input design");
 
-        let needle_path_3 = "examples/patterns/security/access_control/locked_reg/json/sync_en.json";
-        let needle_design_3 = load_driver_cached(needle_path_3, cache.clone()).expect("Failed to read input design");
-
-        let needle_path_4 = "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
-        let needle_design_4 = load_driver_cached(needle_path_4, cache.clone()).expect("Failed to read input design");
+        let needle_path_4 =
+            "examples/patterns/security/access_control/locked_reg/json/sync_mux.json";
+        let needle_design_4 =
+            load_driver_cached(needle_path_4, &mut cache).expect("Failed to read input design");
 
         let time_start = std::time::Instant::now();
 
-        let results_1 = subgraph::find_subgraphs(&needle_design_1, &haystack_design);
-        let results_2 = subgraph::find_subgraphs(&needle_design_2, &haystack_design);
-        let results_3 = subgraph::find_subgraphs(&needle_design_3, &haystack_design);
-        let results_4 = subgraph::find_subgraphs(&needle_design_4, &haystack_design);
+        let results_1 = subgraph::find_subgraphs(
+            needle_design_1.design_as_ref(),
+            haystack_design.design_as_ref(),
+        );
+        let results_2 = subgraph::find_subgraphs(
+            needle_design_2.design_as_ref(),
+            haystack_design.design_as_ref(),
+        );
+        let results_3 = subgraph::find_subgraphs(
+            needle_design_3.design_as_ref(),
+            haystack_design.design_as_ref(),
+        );
+        let results_4 = subgraph::find_subgraphs(
+            needle_design_4.design_as_ref(),
+            haystack_design.design_as_ref(),
+        );
 
-        let results_and = subgraph::find_subgraphs(&and_design, &haystack_design);
+        let results_and =
+            subgraph::find_subgraphs(and_design.design_as_ref(), haystack_design.design_as_ref());
 
         println!("Found {} matches for needle 1", results_1.matches.len());
         println!("Found {} matches for needle 2", results_2.matches.len());
@@ -70,6 +92,11 @@ mod tests {
         } else {
             std::time::Duration::from_millis(2000)
         };
-        assert!(time_elapsed < time_expected, "Test took too long to run, expected < {:?}, got {:?}", time_expected, time_elapsed);
+        assert!(
+            time_elapsed < time_expected,
+            "Test took too long to run, expected < {:?}, got {:?}",
+            time_expected,
+            time_elapsed
+        );
     }
 }

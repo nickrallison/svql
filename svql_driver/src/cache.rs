@@ -1,9 +1,8 @@
-use std::{sync::{Arc}};
+use std::sync::Arc;
 
 use prjunnamed_netlist::Design;
 
 use crate::driver::DesignPath;
-
 
 #[derive(Debug, Clone)]
 pub struct Cache {
@@ -59,4 +58,3 @@ impl Default for Cache {
         Self::new()
     }
 }
-

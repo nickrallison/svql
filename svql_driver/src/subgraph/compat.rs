@@ -1,6 +1,5 @@
-
 use super::index::{Index, NodeId};
-use super::ports::{is_commutative, normalize_commutative, Source};
+use super::ports::{Source, is_commutative, normalize_commutative};
 use super::state::State;
 
 pub(super) fn cells_compatible<'p, 'd>(
@@ -43,7 +42,9 @@ fn pins_compatible_pairwise<'p, 'd>(
     for ((_, p_src), (_, d_src)) in p_pins.iter().zip(d_pins.iter()) {
         match (p_src, d_src) {
             (Source::Const(pc), Source::Const(dc)) => {
-                if pc != dc { return false; }
+                if pc != dc {
+                    return false;
+                }
             }
             (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 // If the source gate in pattern is already mapped, enforce it matches.
@@ -61,12 +62,16 @@ fn pins_compatible_pairwise<'p, 'd>(
             }
             (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
                 if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit) {
-                    if exp_d_cell != *d_cell || exp_d_bit != *d_bit { return false; }
+                    if exp_d_cell != *d_cell || exp_d_bit != *d_bit {
+                        return false;
+                    }
                 }
             }
             (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit) {
-                    if exp_d_cell != *d_cell || exp_d_bit != *d_bit { return false; }
+                    if exp_d_cell != *d_cell || exp_d_bit != *d_bit {
+                        return false;
+                    }
                 }
             }
             _ => return false,
@@ -80,19 +85,19 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{Driver};
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
     }
 
     #[test]
     fn same_cell_kind_is_compatible_with_itself() {
         let d = &*SDFFE;
-        let idx = Index::build(d.0.design_as_ref());
-        let st = State::< '_, '_>::new(idx.gate_count());
+        let idx = Index::build(d.design_as_ref());
+        let st = State::<'_, '_>::new(idx.gate_count());
 
         for &n in idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff) {
             assert!(cells_compatible(n, n, &idx, &idx, &st));
@@ -101,8 +106,8 @@ mod tests {
 
     #[test]
     fn pattern_io_can_bind_to_design_gate() {
-        let d_p = SDFFE.0.design_as_ref();
-        let d_d = SEQ_DOUBLE_SDFFE.0.design_as_ref();
+        let d_p = SDFFE.design_as_ref();
+        let d_d = SEQ_DOUBLE_SDFFE.design_as_ref();
 
         let p_idx = Index::build(d_p);
         let d_idx = Index::build(d_d);
@@ -110,8 +115,10 @@ mod tests {
 
         let p = p_idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff)[0];
         for &d in d_idx.of_kind(crate::subgraph::cell_kind::CellKind::Dff) {
-            assert!(cells_compatible(p, d, &p_idx, &d_idx, &st),
-                "pattern IO D should be compatible with design DFF regardless of external driver kind");
+            assert!(
+                cells_compatible(p, d, &p_idx, &d_idx, &st),
+                "pattern IO D should be compatible with design DFF regardless of external driver kind"
+            );
         }
     }
 }

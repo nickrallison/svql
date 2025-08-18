@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {
@@ -20,19 +20,33 @@ impl Instance {
         // Debug assertions
         let actual = new.get_item(new.height);
         let expected = Some(inst.clone());
-        debug_assert!(actual == expected, "Expected {:?}, but got {:?}", expected, actual);
+        debug_assert!(
+            actual == expected,
+            "Expected {:?}, but got {:?}",
+            expected,
+            actual
+        );
         new
     }
     pub fn child(&self, child: String) -> Self {
         let child: Arc<str> = Arc::from(child);
         let mut new_path = self.path.clone();
         new_path.push(child.clone());
-        let new = Self { inst: child.clone(), path: new_path, height: self.height + 1 };
+        let new = Self {
+            inst: child.clone(),
+            path: new_path,
+            height: self.height + 1,
+        };
 
         // Debug assertions
         let actual = new.get_item(new.height);
         let expected = Some(child.clone());
-        debug_assert!(actual == expected, "Expected {:?}, but got {:?}", expected, actual);
+        debug_assert!(
+            actual == expected,
+            "Expected {:?}, but got {:?}",
+            expected,
+            actual
+        );
         new
     }
 
@@ -49,5 +63,4 @@ impl Instance {
     pub fn height(&self) -> usize {
         self.height
     }
-
 }

@@ -4,8 +4,11 @@ use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
 use super::ports::Source;
 use super::state::State;
-use super::{SubgraphMatch, cell_kind::{InputCell, OutputCell}};
 use super::strategy::choose_next;
+use super::{
+    SubgraphMatch,
+    cell_kind::{InputCell, OutputCell},
+};
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
@@ -87,16 +90,16 @@ pub(super) fn remove_boundaries<'p, 'd>(
 mod tests {
 
     use super::*;
-    use crate::{Driver};
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn backtrack_self_sdffe_produces_some() {
-        let d = SDFFE.0.design_as_ref();
+        let d = SDFFE.design_as_ref();
         let p_index = Index::build(d);
         let d_index = Index::build(d);
 

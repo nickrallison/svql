@@ -22,9 +22,15 @@ impl<'p, 'd> State<'p, 'd> {
         }
     }
 
-    pub(super) fn is_mapped(&self, p: NodeId) -> bool { self.mapping.contains_key(&p) }
-    pub(super) fn mapped_to(&self, p: NodeId) -> Option<NodeId> { self.mapping.get(&p).copied() }
-    pub(super) fn is_used_design(&self, d: NodeId) -> bool { self.used_d.contains(&d) }
+    pub(super) fn is_mapped(&self, p: NodeId) -> bool {
+        self.mapping.contains_key(&p)
+    }
+    pub(super) fn mapped_to(&self, p: NodeId) -> Option<NodeId> {
+        self.mapping.get(&p).copied()
+    }
+    pub(super) fn is_used_design(&self, d: NodeId) -> bool {
+        self.used_d.contains(&d)
+    }
 
     pub(super) fn map(&mut self, p: NodeId, d: NodeId) {
         self.mapping.insert(p, d);
@@ -36,11 +42,21 @@ impl<'p, 'd> State<'p, 'd> {
         self.used_d.remove(&d);
     }
 
-    pub(super) fn boundary_get(&self, p_cell: CellWrapper<'p>, p_bit: usize) -> Option<(CellWrapper<'d>, usize)> {
+    pub(super) fn boundary_get(
+        &self,
+        p_cell: CellWrapper<'p>,
+        p_bit: usize,
+    ) -> Option<(CellWrapper<'d>, usize)> {
         self.boundary.get(&(p_cell, p_bit)).copied()
     }
-    pub(super) fn boundary_insert(&mut self, key: (CellWrapper<'p>, usize), val: (CellWrapper<'d>, usize)) -> bool {
-        if self.boundary.contains_key(&key) { return false; }
+    pub(super) fn boundary_insert(
+        &mut self,
+        key: (CellWrapper<'p>, usize),
+        val: (CellWrapper<'d>, usize),
+    ) -> bool {
+        if self.boundary.contains_key(&key) {
+            return false;
+        }
         self.boundary.insert(key, val);
         true
     }
@@ -54,7 +70,7 @@ impl<'p, 'd> State<'p, 'd> {
         self.mapping.len() == self.target_gate_count
     }
 
-        pub(super) fn to_subgraph_match(
+    pub(super) fn to_subgraph_match(
         &self,
         p_index: &Index<'p>,
         d_index: &Index<'d>,
@@ -88,7 +104,8 @@ impl<'p, 'd> State<'p, 'd> {
         }
 
         // NEW: build (pattern Output bit) -> (design cell, bit) drivers
-        let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> = HashMap::new();
+        let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
+            HashMap::new();
         for oc in pat_output_cells {
             // Safely match the Output cell and pull its input Value
             if let Cell::Output(_, value) = oc.cref.cref().get().as_ref() {
@@ -118,12 +135,11 @@ impl<'p, 'd> State<'p, 'd> {
             pat_input_cells: pat_input_cells.to_vec(),
             pat_output_cells: pat_output_cells.to_vec(),
             boundary_src_map,
-            input_by_name,          // NEW
-            output_by_name,         // NEW
-            out_driver_map,         // NEW
+            input_by_name,  // NEW
+            output_by_name, // NEW
+            out_driver_map, // NEW
         }
     }
-
 }
 
 #[cfg(test)]
@@ -131,16 +147,16 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{Driver};
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn state_basic_map_unmap() {
-        let d = SDFFE.0.design_as_ref();
+        let d = SDFFE.design_as_ref();
         let idx = Index::build(d);
 
         let mut st = State::new(idx.gate_count());

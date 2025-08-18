@@ -9,7 +9,9 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
     // Prefer nodes with all inputs “resolvable”
     for p in 0..(p_index.gate_count() as usize) {
         let p = p as NodeId;
-        if st.is_mapped(p) { continue; }
+        if st.is_mapped(p) {
+            continue;
+        }
 
         let pins = &p_index.pins(p).inputs;
         let mut all_resolvable = true;
@@ -27,7 +29,9 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
                 }
             }
         }
-        if all_resolvable { return Some(p); }
+        if all_resolvable {
+            return Some(p);
+        }
     }
 
     // Fallback: any unmapped
@@ -44,16 +48,16 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
 mod tests {
 
     use super::*;
-    use crate::{Driver};
+    use crate::Driver;
     use crate::util::load_driver_from;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: (Driver, String) = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
     }
 
     #[test]
     fn choose_next_returns_some() {
-        let d = SDFFE.0.design_as_ref();
+        let d = SDFFE.design_as_ref();
         let idx = Index::build(d);
         let st = State::new(idx.gate_count());
         assert!(choose_next(&idx, &st).is_some());

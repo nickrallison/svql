@@ -22,7 +22,6 @@
 //     static ref B_RE: Regex = Regex::new(r"^b$").unwrap();
 // }
 
-
 // #[derive(Debug, Clone, PartialEq, Eq)]
 // pub struct AndAB<S>
 // where
@@ -73,7 +72,7 @@
 //                 conn_ok && other_ok
 //             })
 //             .collect::<Vec<_>>();
-        
+
 //         results
 //     }
 // }
@@ -104,9 +103,7 @@
 //     }
 // }
 
-
 fn main() {
-        
     // let design = PathBuf::from("examples/patterns/basic/and/many_ands_2.v");
     // let module_name = "many_ands".to_string();
 

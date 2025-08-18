@@ -1,13 +1,13 @@
 use prjunnamed_netlist::Design;
-use svql_driver::{subgraph::cell_kind::CellWrapper, SubgraphMatch};
+use svql_driver::{SubgraphMatch, subgraph::cell_kind::CellWrapper};
 
 use crate::instance::Instance;
 
 pub mod composite;
+pub mod connect;
 pub mod instance;
 pub mod netlist;
 pub mod queries;
-pub mod connect;
 
 // ########################
 // Type State Tags

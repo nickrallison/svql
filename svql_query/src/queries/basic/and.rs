@@ -7,9 +7,9 @@ use std::sync::{Arc, RwLock};
 use svql_driver::SubgraphMatch;
 
 use crate::instance::Instance;
+use crate::lookup;
 use crate::netlist::{Netlist, SearchableNetlist};
 use crate::{Match, Search, State, Wire, WithPath};
-use crate::lookup;
 
 #[derive(Debug, Clone)]
 pub struct And<S>
@@ -22,7 +22,6 @@ where
     pub b: Wire<S>,
     pub y: Wire<S>,
 }
-
 
 impl<S> WithPath<S> for And<S>
 where
@@ -67,12 +66,12 @@ impl SearchableNetlist for And<Search> {
 
         // let design_b_cell_ref = m.cell_mapping
         //     .get(pat_b_cell_ref)
-        // .expect("Expected 'b' input cell mapping in match");        
+        // .expect("Expected 'b' input cell mapping in match");
 
         // let design_y_cell_ref = m.cell_mapping
         //     .get(pat_y_cell_ref)
-        //     .expect("Expected 'y' output cell mapping in match");   
-       
+        //     .expect("Expected 'y' output cell mapping in match");
+
         todo!()
     }
 }
