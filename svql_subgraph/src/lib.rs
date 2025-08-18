@@ -1,3 +1,30 @@
+//! Subgraph search for Unnamed IR designs.
+//!
+//! This crate finds subgraph isomorphisms between a “pattern” design and a
+//! “design” (haystack) design. It works at the gate level with a focus on
+//! deterministic behavior, security patterns, and composability.
+//!
+//! The primary entry points are:
+//! - [`find_subgraphs`]: functional API returning [`AllSubgraphMatches`]
+//! - [`Finder`]: ergonomic, discoverable wrapper with `find_all`/`find_first`
+//!
+//! Example (no_run):
+//! ```no_run
+//! use svql_subgraph::{Finder, AllSubgraphMatches};
+//! use prjunnamed_netlist::Design;
+//!
+//! fn use_finder(pattern: &Design, design: &Design) {
+//!     let finder = Finder::new(pattern, design);
+//!     let results: AllSubgraphMatches = finder.find_all();
+//!     if let Some(first) = finder.find_first() {
+//!         // Ask for a driver of an output bit by name
+//!         if let Some((d_cell, d_bit)) = first.design_driver_of_output_bit("q", 0) {
+//!             let _ = (d_cell.debug_index(), d_bit);
+//!         }
+//!     }
+//! }
+//! ```
+
 use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::Design;
@@ -16,28 +43,74 @@ mod state;
 mod strategy;
 pub(crate) mod util;
 
+// NEW: ergonomic wrapper module
+pub mod finder;
+pub use finder::Finder;
+
+// NEW: re-export common types for consumers
+pub use cell_kind::{InputCell as PatternInputCell, OutputCell as PatternOutputCell};
+
+/// A collection of all subgraph matches found for a given `(pattern, design)` pair.
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
+    /// The underlying matches.
     pub matches: Vec<SubgraphMatch<'p, 'd>>,
 }
 
 impl<'p, 'd> AllSubgraphMatches<'p, 'd> {
+    /// Number of matches found.
     pub fn len(&self) -> usize {
         self.matches.len()
     }
+
+    /// True when no matches were found.
     pub fn is_empty(&self) -> bool {
         self.matches.is_empty()
     }
+
+    /// Borrowed iterator over matches.
     pub fn iter(&self) -> std::slice::Iter<'_, SubgraphMatch<'p, 'd>> {
+        self.matches.iter()
+    }
+
+    /// Borrow the first match, if any.
+    pub fn first(&self) -> Option<&SubgraphMatch<'p, 'd>> {
+        self.matches.first()
+    }
+}
+
+// NEW: ergonomic iteration
+impl<'p, 'd> IntoIterator for AllSubgraphMatches<'p, 'd> {
+    type Item = SubgraphMatch<'p, 'd>;
+    type IntoIter = std::vec::IntoIter<SubgraphMatch<'p, 'd>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.matches.into_iter()
+    }
+}
+
+impl<'p, 'd, 'a> IntoIterator for &'a AllSubgraphMatches<'p, 'd> {
+    type Item = &'a SubgraphMatch<'p, 'd>;
+    type IntoIter = std::slice::Iter<'a, SubgraphMatch<'p, 'd>>;
+    fn into_iter(self) -> Self::IntoIter {
         self.matches.iter()
     }
 }
 
+/// A mapping between pattern cells and design cells, along with handy boundary and lookup helpers.
+///
+/// Use helper methods to:
+/// - resolve the design source of a named pattern input bit
+/// - resolve the design driver of a named pattern output bit
+/// - iterate cell mappings
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
+    /// Mapping of pattern cells to design cells.
     pub cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
+    /// All pattern input cells in the pattern design.
     pub pat_input_cells: Vec<InputCell<'p>>,
+    /// All pattern output cells in the pattern design.
     pub pat_output_cells: Vec<OutputCell<'p>>,
+    /// The boundary bindings for pattern IO sources to design (gate or IO) endpoints.
     pub boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
 
     // lookup indices
@@ -47,16 +120,24 @@ pub struct SubgraphMatch<'p, 'd> {
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
+    /// Number of mapped gates.
     pub fn len(&self) -> usize {
         self.cell_mapping.len()
     }
+
+    /// True if the mapping is empty.
     pub fn is_empty(&self) -> bool {
         self.cell_mapping.is_empty()
     }
+
+    /// Iterate over pattern->design cell mappings.
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellWrapper<'p>, CellWrapper<'d>> {
         self.cell_mapping.iter()
     }
 
+    /// Resolve the (design cell, design bit) that drives a named pattern input bit.
+    ///
+    /// Returns `None` if the input name or bit is not bound in this match.
     pub fn design_source_of_input_bit(
         &self,
         name: &str,
@@ -66,6 +147,9 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         self.boundary_src_map.get(&(p_in, bit)).copied()
     }
 
+    /// Resolve the (design cell, design bit) driving a named pattern output bit.
+    ///
+    /// Returns `None` if the output name or bit has no driver resolved.
     pub fn design_driver_of_output_bit(
         &self,
         name: &str,
@@ -76,7 +160,13 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-// Public API
+/// Search for all subgraph matches between a `pattern` design and a `design` (haystack) design.
+///
+/// This uses an anchor-based backtracking search that respects gate kinds and input compatibility.
+/// It also records boundary information that makes it easy to resolve IO drivers/sources for
+/// consumer code.
+///
+/// For a more ergonomic experience, consider using [`Finder`].
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
@@ -142,7 +232,9 @@ pub fn find_subgraphs<'p, 'd>(
     AllSubgraphMatches { matches: results }
 }
 
-// Helper used by tests and callers
+/// Return all pattern IO cells for a design in a single call.
+///
+/// This is helpful in consumer code that needs direct access to the IO list.
 pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec<OutputCell<'p>>) {
     (get_input_cells(pattern), get_output_cells(pattern))
 }
@@ -336,5 +428,20 @@ mod tests {
             "Expected 7 connections between d and q across matches, found {}",
             matches
         );
+    }
+
+    // NEW: Smoke-test the Finder wrapper inside unit tests (uses internal loader).
+    #[test]
+    fn finder_wrapper_smoke_test() {
+        let pat = &SDFFE;
+        let hay = &SEQ_DOUBLE_SDFFE;
+
+        let finder = super::Finder::new(pat, hay);
+        let all_via_finder = finder.find_all();
+        let all_via_fn = find_subgraphs(pat, hay);
+
+        assert_eq!(all_via_finder.len(), all_via_fn.len());
+        assert_eq!(all_via_finder.is_empty(), all_via_fn.is_empty());
+        assert!(finder.find_first().is_some());
     }
 }

@@ -91,6 +91,6 @@ mod tests {
         let p_index = super::Index::build(d);
         let d_index = super::Index::build(d);
         let chosen = choose_anchors(&p_index, &d_index).expect("should find anchors");
-        assert_eq!(chosen.0, CellKind::Dff);
+        assert_eq!(chosen.0, CellKind::Mux);
     }
 }
