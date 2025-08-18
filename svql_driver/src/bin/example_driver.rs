@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 
-use svql_driver::{cache::Cache, connectivity::is_connected, get_name, subgraph::find_subgraphs, util::load_driver_cached, Driver};
+use svql_driver::{cache::Cache, get_name, subgraph::find_subgraphs, util::load_driver_cached, Driver};
 
 
 
