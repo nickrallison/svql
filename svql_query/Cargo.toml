@@ -5,6 +5,9 @@ edition = "2024"
 
 [lib]
 
+[dev-dependencies]
+rstest.workspace = true
+
 [dependencies]
 svql_driver.workspace = true
 svql_subgraph.workspace = true

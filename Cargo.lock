@@ -602,6 +602,7 @@ dependencies = [
  "log",
  "prjunnamed-netlist",
  "regex",
+ "rstest",
  "serde",
  "serde_json",
  "svql_driver",
