@@ -81,11 +81,11 @@ impl<'a> Index<'a> {
         self.cell_to_id.get(&c).copied()
     }
 
+    // Deterministic iteration over kinds: sort by CellKind (which derives Ord).
     pub(super) fn by_kind_iter(&self) -> Vec<(&CellKind, &[NodeId])> {
-        self.by_kind
-            .iter()
-            .map(|(k, v)| (k, v.as_slice()))
-            .collect()
+        let mut items: Vec<(&CellKind, &Vec<NodeId>)> = self.by_kind.iter().collect();
+        items.sort_by_key(|(k, _)| **k);
+        items.into_iter().map(|(k, v)| (k, v.as_slice())).collect()
     }
 }
 

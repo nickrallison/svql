@@ -273,22 +273,6 @@ pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
         .collect()
 }
 
-pub(crate) fn count_cells_by_kind<'a>(
-    design: &'a Design,
-    filter: impl Fn(CellRef<'a>) -> bool,
-) -> Vec<(CellKind, usize)> {
-    let mut counts = HashMap::new();
-    for cell_ref in design.iter_cells().filter(|c| filter(*c)) {
-        let kind = CellKind::from(cell_ref.get().as_ref());
-        *counts.entry(kind).or_insert(0) += 1;
-    }
-    counts.into_iter().collect::<Vec<_>>()
-}
-
-pub(crate) fn is_gate(c: &Cell) -> bool {
-    CellKind::from(c).is_gate()
-}
-
 pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
     CellKind::from(c.get().as_ref()).is_gate()
 }
