@@ -7,4 +7,5 @@ build
 /.env
 *.dot
 *.pdf
+out.md
 ##
