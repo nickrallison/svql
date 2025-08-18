@@ -19,7 +19,7 @@ pub use subgraph::SubgraphMatch;
 #[cfg(test)]
 mod tests {
 
-    use crate::{cache::Cache, util::load_driver_cached};
+    use crate::{cache::Cache, subgraph::find_subgraphs, util::load_driver_cached};
 
     use super::*;
 
@@ -98,5 +98,54 @@ mod tests {
             time_expected,
             time_elapsed
         );
+    }
+
+    #[test]
+    fn connectivity_test() {
+        let mut cache = Cache::new();
+
+        let haystack_path = "examples/patterns/basic/ff/seq_8_sdffe.v";
+        let haystack_driver = load_driver_cached(&haystack_path, &mut cache).expect("Failed to read haystack design");
+
+        let needle_path = "examples/patterns/basic/ff/sdffe.v";
+        let needle_driver = load_driver_cached(&needle_path, &mut cache).expect("Failed to read needle design");
+
+        let search_results = find_subgraphs(
+            needle_driver.design_as_ref(),
+            haystack_driver.design_as_ref(),
+        );
+
+        // Every match should resolve both d (input) and q (output) via O(1) helpers
+        for m in search_results.iter() {
+            assert!(
+                m.design_source_of_input_bit("d", 0).is_some(),
+                "input d should have a bound design source"
+            );
+            assert!(
+                m.design_driver_of_output_bit("q", 0).is_some(),
+                "output q should have a resolved design driver"
+            );
+        }
+
+        // There should exist a pair of matches where q of one drives d of the other.
+        let ms: Vec<_> = search_results.iter().collect();
+        let mut matches = 0;
+        for m1 in &ms {
+            if let Some((dq_cell, dq_bit)) = m1.design_driver_of_output_bit("q", 0) {
+                let dq_net = dq_cell.output()[dq_bit];
+                for m2 in &ms {
+                    if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
+                        let sd_net = sd_cell.output()[sd_bit];
+                        if dq_net == sd_net {
+                            // println!("Found connection at cell: {:#?}", dq_cell.metadata());
+                            matches += 1;
+                        }
+                    }
+                }
+            }
+        }
+    
+
+        assert_eq!(matches, 7, "Expected 7 connections between d and q across matches, found {}", matches);
     }
 }
