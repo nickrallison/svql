@@ -28,13 +28,6 @@ impl<S> WithPath<S> for And<S>
 where
     S: State,
 {
-    // fn new(path: Instance, driver: svql_driver::Driver) -> Self {
-    //     let a = Wire::new(path.child("a".to_string()));
-    //     let b = Wire::new(path.child("b".to_string()));
-    //     let y = Wire::new(path.child("y".to_string()));
-    //     Self { driver, path, a, b, y }
-    // }
-
     crate::impl_find_port!(And, a, b, y);
 
     fn path(&self) -> Instance {
@@ -97,8 +90,8 @@ impl SearchableNetlist for And<Search> {
 //     // ###############
 //     #[test]
 //     fn test_and_netlist() {
-//         let design = PathBuf::from("examples/patterns/basic/and/many_ands.v");
-//         let module_name = "many_ands".to_string();
+//         let design = PathBuf::from("examples/patterns/basic/and/and_tree.v");
+//         let module_name = "and_tree".to_string();
 
 //         let driver = Driver::new(design, module_name);
 

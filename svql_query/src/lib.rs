@@ -1,13 +1,13 @@
 use prjunnamed_netlist::Design;
-use svql_driver::SubgraphMatch;
+use svql_driver::{subgraph::cell_kind::CellWrapper, SubgraphMatch};
 
 use crate::instance::Instance;
-use std::{hash::Hash, sync::{Arc, RwLock, RwLockReadGuard}};
 
 pub mod composite;
 pub mod instance;
 pub mod netlist;
 pub mod queries;
+pub mod connect;
 
 // ########################
 // Type State Tags
@@ -19,38 +19,15 @@ pub trait QueryableState: State {}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Match<'p, 'd> {
-    pub pat_cell_ref: Option<prjunnamed_netlist::CellRef<'p>>,
-    pub design_cell_ref: Option<prjunnamed_netlist::CellRef<'d>>,
+    pub pat_cell_ref: Option<CellWrapper<'p>>,
+    pub design_cell_ref: Option<CellWrapper<'d>>,
 }
 
-impl std::fmt::Debug for Match<'_, '_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Match")
-            .field(
-                "pat_cell_metadata",
-                &self.pat_cell_ref.as_ref().map(|pat| pat.metadata()),
-            )
-            .field(
-                "design_cell_metadata",
-                &self.design_cell_ref.as_ref().map(|design| design.metadata()),
-            )
-            .finish()
-    }
-}
-
-    impl State for Search {}
-    impl State for Match<'_, '_> {}
-    impl QueryableState for Search {}
-impl Default for Match<'_, '_> {
-    fn default() -> Self {
-        Self {
-            pat_cell_ref: None,
-            design_cell_ref: None,
-        }
-    }
-}
+impl State for Search {}
+impl State for Match<'_, '_> {}
+impl QueryableState for Search {}
 
 // ########################
 // Helpers
@@ -82,10 +59,6 @@ pub trait WithPath<S>: Sized
 where
     S: State,
 {
-    // fn new(path: Instance, driver: svql_driver::Driver) -> Self;
-    // fn root(name: impl Into<String>, driver: svql_driver::Driver) -> Self {
-    //     Self::new(Instance::root(name.into()), driver)
-    // }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
     fn path(&self) -> Instance;
 }
@@ -115,9 +88,6 @@ impl<S> WithPath<S> for Wire<S>
 where
     S: State,
 {
-//     fn new(path: Instance) -> Self {
-//         Self { path, val: None }
-//     }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if p.height() < self.path.height() {
             return None;
@@ -150,13 +120,6 @@ where
 {
     pub from: Wire<S>,
     pub to: Wire<S>,
-}
-
-#[derive(Debug)]
-pub struct QueryResults<'p, 'd, H> {
-    pub p: RwLockReadGuard<'p, Design>,
-    pub d: RwLockReadGuard<'d, Design>,
-    pub hits: Vec<H>,
 }
 
 #[cfg(test)]

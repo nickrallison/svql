@@ -1,10 +1,7 @@
 
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use prjunnamed_netlist::Design;
 use svql_driver::{Driver, SubgraphMatch};
 
-use crate::{QueryResults, Search, State, WithPath};
+use crate::{Search, State, WithPath};
 use crate::instance::Instance;
 
 pub trait Netlist<S>: WithPath<S> where S: State {
