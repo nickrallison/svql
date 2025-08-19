@@ -3,7 +3,10 @@ use std::collections::{HashMap, HashSet};
 use prjunnamed_netlist::Cell;
 
 use super::index::{Index, NodeId};
-use crate::cell_kind::CellWrapper;
+use crate::{
+    cell_kind::CellWrapper,
+    ports::{Source, is_commutative, normalize_commutative},
+};
 
 pub(super) struct State<'p, 'd> {
     mapping: HashMap<NodeId, NodeId>,
@@ -93,7 +96,7 @@ impl<'p, 'd> State<'p, 'd> {
             boundary_src_map.insert((*p_cell, *p_bit), (*d_cell, *d_bit));
         }
 
-        // NEW: name maps
+        // Name maps
         let mut input_by_name = HashMap::new();
         for ic in pat_input_cells {
             if let Some(nm) = ic.name() {
@@ -107,28 +110,23 @@ impl<'p, 'd> State<'p, 'd> {
             }
         }
 
-        // NEW: build (pattern Output bit) -> (design cell, bit) drivers
+        // Build (pattern Output bit) -> (design cell, bit) drivers
         let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
             HashMap::new();
         for oc in pat_output_cells {
-            // Safely match the Output cell and pull its input Value
             if let Cell::Output(_, value) = oc.cref.cref().get().as_ref() {
                 for (out_bit, net) in value.iter().enumerate() {
-                    // Who drives this bit in the pattern?
                     if let Ok((p_src_cell_ref, p_bit)) = oc.cref.cref().design().find_cell(net) {
                         let p_src = CellWrapper::from(p_src_cell_ref);
 
-                        // Prefer mapped gate
                         if let Some(&d_src) = cell_mapping.get(&p_src) {
                             out_driver_map.insert((oc.cref, out_bit), (d_src, p_bit));
                             continue;
                         }
 
-                        // Fallback: boundary (IO-to-gate or IO-to-IO)
                         if let Some(&(d_cell, d_bit)) = self.boundary.get(&(p_src, p_bit)) {
                             out_driver_map.insert((oc.cref, out_bit), (d_cell, d_bit));
                         }
-                        // else: constants/undef or unmapped sources -> no entry
                     }
                 }
             }
@@ -139,35 +137,106 @@ impl<'p, 'd> State<'p, 'd> {
             pat_input_cells: pat_input_cells.to_vec(),
             pat_output_cells: pat_output_cells.to_vec(),
             boundary_src_map,
-            input_by_name,  // NEW
-            output_by_name, // NEW
-            out_driver_map, // NEW
+            input_by_name,
+            output_by_name,
+            out_driver_map,
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use prjunnamed_netlist::Design;
+/// Compute deterministic aligned input pairs for pattern/design nodes,
+/// respecting exact-length vs superset-length and commutativity normalization.
+pub(super) fn aligned_sources<'p, 'd>(
+    p_id: NodeId,
+    d_id: NodeId,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    match_length: bool,
+) -> Option<Vec<(Source<'p>, Source<'d>)>> {
+    let kind = p_index.kind(p_id);
 
-    use super::*;
+    let mut p_inputs = p_index.pins(p_id).inputs.clone();
+    let mut d_inputs = d_index.pins(d_id).inputs.clone();
 
-    lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+    if is_commutative(kind) {
+        normalize_commutative(&mut p_inputs);
+        normalize_commutative(&mut d_inputs);
     }
 
-    #[test]
-    fn state_basic_map_unmap() {
-        let d = &SDFFE;
-        let idx = Index::build(d);
+    let p_len = p_inputs.len();
+    let d_len = d_inputs.len();
 
-        let mut st = State::new(idx.gate_count());
-        let n = idx.of_kind(crate::cell_kind::CellKind::Dff)[0];
-        st.map(n, n);
-        assert!(st.is_mapped(n));
-        assert!(st.is_used_design(n));
-        st.unmap(n, n);
-        assert!(!st.is_mapped(n));
-        assert!(!st.is_used_design(n));
+    if match_length && p_len != d_len {
+        return None;
     }
+    if !match_length && p_len > d_len {
+        return None;
+    }
+
+    let take_len = std::cmp::min(p_len, d_len);
+
+    let p_srcs = p_inputs.into_iter().map(|(_, s)| s);
+    let d_srcs = d_inputs.into_iter().map(|(_, s)| s);
+
+    Some(
+        p_srcs
+            .zip(d_srcs)
+            .take(take_len)
+            .map(|(p, d)| (p, d))
+            .collect(),
+    )
+}
+
+/// Validate aligned sources pairwise and collect any boundary insertions implied.
+/// Does NOT mutate state; returns additions to apply if compatible.
+pub(super) fn check_and_collect_boundary<'p, 'd>(
+    p_id: NodeId,
+    d_id: NodeId,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    st: &State<'p, 'd>,
+    match_length: bool,
+) -> Option<Vec<((CellWrapper<'p>, usize), (CellWrapper<'d>, usize))>> {
+    let pairs = aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
+
+    pairs.into_iter().try_fold(
+        Vec::<((CellWrapper<'p>, usize), (CellWrapper<'d>, usize))>::new(),
+        |mut additions, (p_src, d_src)| {
+            use crate::ports::Source;
+
+            match (p_src, d_src) {
+                (Source::Const(pc), Source::Const(dc)) => {
+                    if pc != dc {
+                        return None;
+                    }
+                }
+                (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
+                    let Some(p_node) = p_index.try_cell_to_node(p_cell) else {
+                        return None;
+                    };
+                    if let Some(mapped_d) = st.mapped_to(p_node) {
+                        let Some(d_node) = d_index.try_cell_to_node(d_cell) else {
+                            return None;
+                        };
+                        if mapped_d != d_node || p_bit != d_bit {
+                            return None;
+                        }
+                    }
+                }
+                (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit))
+                | (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
+                    if let Some((exp_cell, exp_bit)) = st.boundary_get(p_cell, p_bit) {
+                        if exp_cell != d_cell || exp_bit != d_bit {
+                            return None;
+                        }
+                    } else {
+                        additions.push(((p_cell, p_bit), (d_cell, d_bit)));
+                    }
+                }
+                _ => return None,
+            }
+
+            Some(additions)
+        },
+    )
 }

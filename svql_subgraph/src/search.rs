@@ -1,10 +1,9 @@
 use crate::cell_kind::CellWrapper;
 use crate::config;
-use crate::ports::{is_commutative, normalize_commutative};
+use crate::state::check_and_collect_boundary;
 
 use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
-use super::ports::Source;
 use super::state::State;
 use super::strategy::choose_next;
 use super::{
@@ -60,38 +59,13 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
 ) -> Vec<(CellWrapper<'p>, usize)> {
     let mut added = Vec::new();
 
-    let kind = p_index.kind(p_id);
-    let mut p_inputs = p_index.pins(p_id).inputs.clone();
-    let mut d_inputs = d_index.pins(d_id).inputs.clone();
-
-    if is_commutative(kind) {
-        normalize_commutative(&mut p_inputs);
-        normalize_commutative(&mut d_inputs);
-    }
-
-    let p_len = p_inputs.len();
-    let d_len = d_inputs.len();
-
-    let take_len = std::cmp::min(p_len, d_len);
-
-    for i in 0..take_len {
-        let (_, p_src) = p_inputs[i];
-        let (_, d_src) = d_inputs[i];
-
-        match (p_src, d_src) {
-            (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
-                let key = (p_cell, p_bit);
-                if st.boundary_insert(key, (d_cell, d_bit)) {
-                    added.push(key);
-                }
+    if let Some(pending) =
+        check_and_collect_boundary(p_id, d_id, p_index, d_index, st, config.match_length)
+    {
+        for ((p_cell, p_bit), (d_cell, d_bit)) in pending {
+            if st.boundary_insert((p_cell, p_bit), (d_cell, d_bit)) {
+                added.push((p_cell, p_bit));
             }
-            (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
-                let key = (p_cell, p_bit);
-                if st.boundary_insert(key, (d_cell, d_bit)) {
-                    added.push(key);
-                }
-            }
-            _ => {}
         }
     }
 

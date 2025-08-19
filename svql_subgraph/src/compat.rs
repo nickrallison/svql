@@ -1,7 +1,9 @@
+use crate::state::check_and_collect_boundary;
+
 use super::index::{Index, NodeId};
-use super::ports::{Source, is_commutative, normalize_commutative};
 use super::state::State;
 
+/// Check if two cells (pattern/design) are compatible under the current state and config.
 pub(super) fn cells_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -10,112 +12,66 @@ pub(super) fn cells_compatible<'p, 'd>(
     state: &State<'p, 'd>,
     match_length: bool,
 ) -> bool {
-    let pk = p_index.kind(p_id);
-    let dk = d_index.kind(d_id);
-    if pk != dk {
+    if p_index.kind(p_id) != d_index.kind(d_id) {
         return false;
     }
 
-    let p_pins = &p_index.pins(p_id).inputs;
-    let d_pins = &d_index.pins(d_id).inputs;
-
-    let inputs_ok = if match_length {
-        if p_pins.len() != d_pins.len() {
-            return false;
-        }
-
-        if is_commutative(pk) {
-            let mut p_sorted = p_pins.clone();
-            let mut d_sorted = d_pins.clone();
-            normalize_commutative(&mut p_sorted);
-            normalize_commutative(&mut d_sorted);
-            pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
-        } else {
-            pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
-        }
-    } else {
-        // Superset-length mode (allow design to have extra inputs)
-        let p_len = p_pins.len();
-        let d_len = d_pins.len();
-        if p_len > d_len {
-            return false;
-        }
-
-        if is_commutative(pk) {
-            let mut p_sorted = p_pins.clone();
-            let mut d_sorted = d_pins.clone();
-            normalize_commutative(&mut p_sorted);
-            normalize_commutative(&mut d_sorted);
-
-            let p_slice = &p_sorted[..p_len];
-            let d_slice = &d_sorted[..p_len];
-            pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state)
-        } else {
-            let p_slice = &p_pins[..p_len];
-            let d_slice = &d_pins[..p_len];
-            pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state)
-        }
+    // Pairwise pin checks + (side-effect-free) collection of boundary insertions
+    let Some(_pending_boundary) =
+        check_and_collect_boundary(p_id, d_id, p_index, d_index, state, match_length)
+    else {
+        return false;
     };
 
-    if !inputs_ok {
-        return false;
-    }
-
-    if !downstream_consumers_compatible(p_id, d_id, p_index, d_index, state) {
-        return false;
-    }
-
-    true
+    downstream_consumers_compatible(p_id, d_id, p_index, d_index, state)
 }
 
-fn pins_compatible_pairwise<'p, 'd>(
-    p_pins: &[(super::ports::PinKind, Source<'p>)],
-    d_pins: &[(super::ports::PinKind, Source<'d>)],
-    p_index: &Index<'p>,
+/// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.
+fn pattern_consumption_bits<'p>(p_index: &Index<'p>, q_p: NodeId, p_id: NodeId) -> Vec<usize> {
+    use super::ports::Source;
+
+    p_index
+        .pins(q_p)
+        .inputs
+        .iter()
+        .filter_map(|(_, p_src)| {
+            let Source::Gate(p_src_cell, p_bit) = p_src else {
+                return None;
+            };
+            let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) else {
+                return None;
+            };
+            (p_src_node == p_id).then_some(*p_bit)
+        })
+        .collect()
+}
+
+/// Does the mapped design consumer q_d have an input from d_id at the given bit?
+fn design_has_input_from_bit<'d>(
     d_index: &Index<'d>,
-    state: &State<'p, 'd>,
+    q_d: NodeId,
+    d_id: NodeId,
+    bit: usize,
 ) -> bool {
-    for ((_, p_src), (_, d_src)) in p_pins.iter().zip(d_pins.iter()) {
-        match (p_src, d_src) {
-            (Source::Const(pc), Source::Const(dc)) => {
-                if pc != dc {
-                    return false;
-                }
-            }
-            (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
-                // If the source gate in pattern is already mapped, enforce it matches.
-                if let Some(p_node) = p_index.try_cell_to_node(*p_cell)
-                    && let Some(mapped_d_node) = state.mapped_to(p_node)
-                {
-                    if let Some(d_node) = d_index.try_cell_to_node(*d_cell) {
-                        if mapped_d_node != d_node || p_bit != d_bit {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-            }
-            (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
-                if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit)
-                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit)
-                {
-                    return false;
-                }
-            }
-            (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
-                if let Some((exp_d_cell, exp_d_bit)) = state.boundary_get(*p_cell, *p_bit)
-                    && (exp_d_cell != *d_cell || exp_d_bit != *d_bit)
-                {
-                    return false;
-                }
-            }
-            _ => return false,
-        }
-    }
-    true
+    use super::ports::Source;
+
+    d_index
+        .pins(q_d)
+        .inputs
+        .iter()
+        .any(|(_, d_src)| match d_src {
+            Source::Gate(d_src_cell, d_bit) => d_index
+                .try_cell_to_node(*d_src_cell)
+                .is_some_and(|d_src_node| d_src_node == d_id && *d_bit == bit),
+            _ => false,
+        })
 }
 
+/// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
+/// as a source in q_p is mirrored by a usage of d_id in q_d at the same bit index.
+///
+/// This enforces that mapping (p_id -> d_id) remains consistent with the portion
+/// of the mapping already built, regardless of mapping order.
 fn downstream_consumers_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -123,31 +79,12 @@ fn downstream_consumers_compatible<'p, 'd>(
     d_index: &Index<'d>,
     state: &State<'p, 'd>,
 ) -> bool {
-    for (&q_p, &q_d) in state.mappings().iter() {
-        for (_, p_src) in p_index.pins(q_p).inputs.iter() {
-            if let Source::Gate(p_src_cell, p_src_bit) = p_src {
-                if let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) {
-                    if p_src_node == p_id {
-                        let mut ok = false;
-                        for (_, d_src) in d_index.pins(q_d).inputs.iter() {
-                            if let Source::Gate(d_src_cell, d_src_bit) = d_src {
-                                if let Some(d_src_node) = d_index.try_cell_to_node(*d_src_cell) {
-                                    if d_src_node == d_id && *d_src_bit == *p_src_bit {
-                                        ok = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if !ok {
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    true
+    state.mappings().iter().all(|(&q_p, &q_d)| {
+        let required_bits = pattern_consumption_bits(p_index, q_p, p_id);
+        required_bits
+            .iter()
+            .all(|&bit| design_has_input_from_bit(d_index, q_d, d_id, bit))
+    })
 }
 
 #[cfg(test)]

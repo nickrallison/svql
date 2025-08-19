@@ -51,21 +51,6 @@
 //!     .build();
 //! ```
 
-/// Global search configuration.
-///
-/// - match_length:
-///     - true  => enforce that the number of inputs (pins) on matched gates
-///       is exactly equal between the pattern and the design.
-///     - false => allow the design gate to have a superset of inputs. In this
-///       mode, the algorithm compares the first N inputs after a deterministic
-///       alignment rule (commutative gates are normalized), where N is the
-///       number of pattern inputs. This retains determinism while avoiding
-///       combinatorial explosion from trying all subsets.
-/// - dedupe (`DedupeMode`):
-///     - Controls how matches are deduplicated after search:
-///         - None: include boundary (IO) bindings in the dedupe signature
-///         - AutoMorph: collapse permutations/automorphisms by deduping on the
-///           set of matched design gates (ignoring boundary bindings).
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Whether to require exact pin-count (true) or allow superset arity in the design (false).
@@ -81,14 +66,6 @@ impl Config {
     ///     - true  => exact-length mode (pattern inputs count must equal design).
     ///     - false => superset-length mode (design may have extra inputs).
     /// - dedupe (`DedupeMode`): how to deduplicate results after the search completes.
-    ///
-    /// Examples:
-    /// - Original behavior:
-    ///   `Config::new(true, DedupeMode::None)`
-    /// - Collapse automorphisms (permutations of pattern mapping):
-    ///   `Config::new(true, DedupeMode::AutoMorph)`
-    /// - Allow extra inputs in design and dedupe by gates only (ignore boundary bindings):
-    ///   `Config::new(false, DedupeMode::AutoMorph)`
     pub fn new(match_length: bool, dedupe: DedupeMode) -> Self {
         Self {
             match_length,
@@ -97,9 +74,6 @@ impl Config {
     }
 
     /// Start building a configuration using the builder pattern.
-    ///
-    /// This is the recommended way to construct a Config to avoid future breaking
-    /// changes if additional fields/options are added later.
     ///
     /// Defaults mirror historical behavior:
     /// - exact-length matching
@@ -123,24 +97,14 @@ impl Default for Config {
     /// Default configuration mirrors the historical behavior:
     /// exact-length matching and None dedupe.
     fn default() -> Self {
-        Self::new(false, DedupeMode::None)
+        Self::new(true, DedupeMode::None)
     }
 }
 
 /// Control how matches are deduplicated.
-///
-/// - None:
-///     Include boundary IO bindings alongside gate mappings. Two matches are
-///     considered distinct if they differ in any gate mapping OR any boundary
-///     binding. This is the most precise (and original) behavior.
-/// - AutoMorph:
-///     Ignore boundary IO bindings entirely. Two matches are considered the
-///     same if they map to the same SET of design gates, regardless of which
-///     pattern gates map to which design gates (collapses permutations and
-///     automorphisms).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DedupeMode {
-    /// Original behavior: include boundary bindings in the dedupe signature.
+    /// Include boundary IO bindings alongside gate mappings (maximally precise).
     None,
     /// Collapse matches that share the same mapped gate SET, ignoring boundary bindings.
     AutoMorph,
@@ -151,16 +115,6 @@ pub enum DedupeMode {
 /// Defaults:
 /// - exact-length matching (match_length = true)
 /// - None dedupe (dedupe = DedupeMode::None)
-///
-/// Example:
-/// ```ignore
-/// use svql_subgraph::{Config, DedupeMode};
-///
-/// let cfg = Config::builder()
-///     .superset_length()
-///     .auto_morph()
-///     .build();
-/// ```
 #[derive(Clone, Debug)]
 pub struct ConfigBuilder {
     match_length: bool,

@@ -120,14 +120,10 @@ pub fn find_subgraphs<'p, 'd>(
     let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
 
-    let p_anchor = *p_anchors.iter().min().unwrap();
-    let p_anchors = vec![p_anchor];
-    let p_a = *p_anchors.first().expect("No pattern anchors found");
+    // Deterministically pick a single pattern anchor (the minimum NodeId).
+    let p_a = *p_anchors.iter().min().expect("No pattern anchors found");
 
     for &d_a in &d_anchors {
-        if p_index.kind(p_a) != d_index.kind(d_a) {
-            continue;
-        }
         let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
         if !compat::cells_compatible(
             p_a,
@@ -163,11 +159,11 @@ pub fn find_subgraphs<'p, 'd>(
         DedupeMode::None => {
             let mut seen: std::collections::HashSet<Vec<(u8, usize, usize, usize, usize)>> =
                 std::collections::HashSet::new();
-            results.retain(|m| seen.insert(signature_none(m)));
+            results.retain(|m| seen.insert(signature_with_boundary(m)));
         }
         DedupeMode::AutoMorph => {
             let mut seen: std::collections::HashSet<Vec<usize>> = std::collections::HashSet::new();
-            results.retain(|m| seen.insert(signature_auto_morph(m)));
+            results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
         }
     }
 
@@ -178,7 +174,9 @@ pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 
-fn signature_none<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
+fn signature_with_boundary<'p, 'd>(
+    m: &SubgraphMatch<'p, 'd>,
+) -> Vec<(u8, usize, usize, usize, usize)> {
     let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
 
     for (p, d) in m.cell_mapping.iter() {
@@ -197,12 +195,13 @@ fn signature_none<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, u
     sig
 }
 
-fn signature_auto_morph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
+fn signature_mapped_gate_set<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
     let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
     sig.sort_unstable();
     sig.dedup();
     sig
 }
+
 #[cfg(test)]
 mod tests {
     use crate::config::ConfigBuilder;
