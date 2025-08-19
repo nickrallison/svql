@@ -28,6 +28,10 @@ impl<'p, 'd> State<'p, 'd> {
     pub(super) fn mapped_to(&self, p: NodeId) -> Option<NodeId> {
         self.mapping.get(&p).copied()
     }
+    pub(super) fn mappings(&self) -> &std::collections::HashMap<NodeId, NodeId> {
+        &self.mapping
+    }
+
     pub(super) fn is_used_design(&self, d: NodeId) -> bool {
         self.used_d.contains(&d)
     }

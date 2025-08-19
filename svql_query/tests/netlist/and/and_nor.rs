@@ -46,8 +46,8 @@ mod integration_tests {
             );
             assert_eq!(
                 hits.len(),
-                40,
-                "expected 40 and_nor matches in mixed_and_tree"
+                4,
+                "expected 4 and_nor matches in mixed_and_tree"
             );
         }
     }

@@ -11,10 +11,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
 
-    use svql_subgraph::{
-        config::{self, Config},
-        find_subgraphs,
-    };
+    use svql_subgraph::{config::Config, find_subgraphs};
 
     use crate::{cache::Cache, util::load_driver_cached};
 

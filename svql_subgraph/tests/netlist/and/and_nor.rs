@@ -7,7 +7,7 @@ mod integration_tests {
 
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Design = load_design_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
-            static ref AND_NOR: Design = load_design_from("examples/patterns/basic/and/verilog/and_nor.v").unwrap();
+            static ref AND_NOR: Design = load_design_from("examples/patterns/basic/and/json/and_nor.json").unwrap();
             static ref CONFIG_DEDUPE_FULL: Config = Config::builder().exact_length().full().build();
             static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::builder().exact_length().gates_only().build();
         }
@@ -29,8 +29,8 @@ mod integration_tests {
             let hits = find_subgraphs(&*AND_NOR, &*MIXED_AND_TREE, &CONFIG_DEDUPE_FULL);
             assert_eq!(
                 hits.len(),
-                40,
-                "expected 40 and_nor matches in mixed_and_tree"
+                4,
+                "expected 4 and_nor matches in mixed_and_tree"
             );
         }
     }

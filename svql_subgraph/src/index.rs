@@ -11,7 +11,6 @@ pub(super) type NodeId = u32;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
-    design: &'a Design,
     nodes: Vec<CellWrapper<'a>>,
     kinds: Vec<CellKind>,
     pins: Vec<CellPins<'a>>,
@@ -45,7 +44,6 @@ impl<'a> Index<'a> {
         }
 
         Index {
-            design,
             nodes,
             kinds,
             pins,
@@ -53,10 +51,6 @@ impl<'a> Index<'a> {
             cell_to_id,
             gate_count,
         }
-    }
-
-    pub(super) fn design(&self) -> &'a Design {
-        self.design
     }
 
     pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper<'a> {

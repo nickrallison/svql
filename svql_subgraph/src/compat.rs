@@ -19,8 +19,7 @@ pub(super) fn cells_compatible<'p, 'd>(
     let p_pins = &p_index.pins(p_id).inputs;
     let d_pins = &d_index.pins(d_id).inputs;
 
-    // Exact-length mode (original behavior)
-    if match_length {
+    let inputs_ok = if match_length {
         if p_pins.len() != d_pins.len() {
             return false;
         }
@@ -30,36 +29,43 @@ pub(super) fn cells_compatible<'p, 'd>(
             let mut d_sorted = d_pins.clone();
             normalize_commutative(&mut p_sorted);
             normalize_commutative(&mut d_sorted);
-            return pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state);
+            pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
         } else {
-            return pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state);
+            pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
         }
-    }
+    } else {
+        // Superset-length mode (allow design to have extra inputs)
+        let p_len = p_pins.len();
+        let d_len = d_pins.len();
+        if p_len > d_len {
+            return false;
+        }
 
-    // Superset-length mode (allow design to have extra inputs)
-    // Deterministic, non-explosive: compare the first p_len pins after an alignment rule.
-    let p_len = p_pins.len();
-    let d_len = d_pins.len();
-    if p_len > d_len {
+        if is_commutative(pk) {
+            let mut p_sorted = p_pins.clone();
+            let mut d_sorted = d_pins.clone();
+            normalize_commutative(&mut p_sorted);
+            normalize_commutative(&mut d_sorted);
+
+            let p_slice = &p_sorted[..p_len];
+            let d_slice = &d_sorted[..p_len];
+            pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state)
+        } else {
+            let p_slice = &p_pins[..p_len];
+            let d_slice = &d_pins[..p_len];
+            pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state)
+        }
+    };
+
+    if !inputs_ok {
         return false;
     }
 
-    if is_commutative(pk) {
-        // Normalize both sides and compare the first p_len pins
-        let mut p_sorted = p_pins.clone();
-        let mut d_sorted = d_pins.clone();
-        normalize_commutative(&mut p_sorted);
-        normalize_commutative(&mut d_sorted);
-
-        let p_slice = &p_sorted[..p_len];
-        let d_slice = &d_sorted[..p_len];
-        return pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state);
-    } else {
-        // Non-commutative: keep original order, compare first p_len pins
-        let p_slice = &p_pins[..p_len];
-        let d_slice = &d_pins[..p_len];
-        return pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state);
+    if !downstream_consumers_compatible(p_id, d_id, p_index, d_index, state) {
+        return false;
     }
+
+    true
 }
 
 fn pins_compatible_pairwise<'p, 'd>(
@@ -105,6 +111,40 @@ fn pins_compatible_pairwise<'p, 'd>(
                 }
             }
             _ => return false,
+        }
+    }
+    true
+}
+
+fn downstream_consumers_compatible<'p, 'd>(
+    p_id: NodeId,
+    d_id: NodeId,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    state: &State<'p, 'd>,
+) -> bool {
+    for (&q_p, &q_d) in state.mappings().iter() {
+        for (_, p_src) in p_index.pins(q_p).inputs.iter() {
+            if let Source::Gate(p_src_cell, p_src_bit) = p_src {
+                if let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) {
+                    if p_src_node == p_id {
+                        let mut ok = false;
+                        for (_, d_src) in d_index.pins(q_d).inputs.iter() {
+                            if let Source::Gate(d_src_cell, d_src_bit) = d_src {
+                                if let Some(d_src_node) = d_index.try_cell_to_node(*d_src_cell) {
+                                    if d_src_node == d_id && *d_src_bit == *p_src_bit {
+                                        ok = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if !ok {
+                            return false;
+                        }
+                    }
+                }
+            }
         }
     }
     true
