@@ -1,4 +1,5 @@
 use crate::cell_kind::CellWrapper;
+use crate::config;
 
 use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
@@ -17,6 +18,7 @@ pub(super) fn backtrack<'p, 'd>(
     out: &mut Vec<SubgraphMatch<'p, 'd>>,
     pat_inputs: &[InputCell<'p>],
     pat_outputs: &[OutputCell<'p>],
+    config: &config::Config,
 ) {
     if st.done() {
         out.push(st.to_subgraph_match(p_index, d_index, pat_inputs, pat_outputs));
@@ -33,14 +35,14 @@ pub(super) fn backtrack<'p, 'd>(
         if st.is_used_design(d_cand) {
             continue;
         }
-        if !cells_compatible(next_p, d_cand, p_index, d_index, st) {
+        if !cells_compatible(next_p, d_cand, p_index, d_index, st, config.match_length) {
             continue;
         }
 
         st.map(next_p, d_cand);
         let added = add_io_boundaries_from_pair(next_p, d_cand, p_index, d_index, st);
 
-        backtrack(p_index, d_index, st, out, pat_inputs, pat_outputs);
+        backtrack(p_index, d_index, st, out, pat_inputs, pat_outputs, config);
 
         remove_boundaries(added, st);
         st.unmap(next_p, d_cand);
@@ -108,7 +110,11 @@ mod tests {
         let inputs = super::super::cell_kind::get_input_cells(d);
         let outputs = super::super::cell_kind::get_output_cells(d);
 
-        backtrack(&p_index, &d_index, &mut st, &mut out, &inputs, &outputs);
+        let config = config::Config { match_length: true };
+
+        backtrack(
+            &p_index, &d_index, &mut st, &mut out, &inputs, &outputs, &config,
+        );
         if !out.is_empty() {
             assert!(!out[0].is_empty());
         }

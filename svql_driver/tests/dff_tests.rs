@@ -12,6 +12,9 @@ mod integration_tests {
             static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
             static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
             static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+
+            //
+            static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::new(false);
         }
 
         #[rstest]
@@ -50,8 +53,11 @@ mod integration_tests {
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            let matches =
-                svql_subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref());
+            let matches = svql_subgraph::find_subgraphs(
+                needle.design_as_ref(),
+                haystack.design_as_ref(),
+                &CONFIG,
+            );
             assert_eq!(
                 matches.len(),
                 expected,

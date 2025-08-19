@@ -11,7 +11,10 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
 
-    use svql_subgraph::find_subgraphs;
+    use svql_subgraph::{
+        config::{self, Config},
+        find_subgraphs,
+    };
 
     use crate::{cache::Cache, util::load_driver_cached};
 
@@ -46,27 +49,37 @@ mod tests {
         let needle_design_4 =
             load_driver_cached(needle_path_4, &mut cache).expect("Failed to read input design");
 
+        let match_length = false;
+        let config = Config::new(match_length);
+
         let time_start = std::time::Instant::now();
 
         let results_1 = find_subgraphs(
             needle_design_1.design_as_ref(),
             haystack_design.design_as_ref(),
+            &config,
         );
         let results_2 = find_subgraphs(
             needle_design_2.design_as_ref(),
             haystack_design.design_as_ref(),
+            &config,
         );
         let results_3 = find_subgraphs(
             needle_design_3.design_as_ref(),
             haystack_design.design_as_ref(),
+            &config,
         );
         let results_4 = find_subgraphs(
             needle_design_4.design_as_ref(),
             haystack_design.design_as_ref(),
+            &config,
         );
 
-        let results_and =
-            find_subgraphs(and_design.design_as_ref(), haystack_design.design_as_ref());
+        let results_and = find_subgraphs(
+            and_design.design_as_ref(),
+            haystack_design.design_as_ref(),
+            &config,
+        );
 
         println!("Found {} matches for needle 1", results_1.matches.len());
         println!("Found {} matches for needle 2", results_2.matches.len());

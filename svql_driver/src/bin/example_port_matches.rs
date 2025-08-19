@@ -1,5 +1,5 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_subgraph::find_subgraphs;
+use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
@@ -14,9 +14,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle_path = "examples/patterns/basic/ff/sdffe.v";
     let needle_driver = load_driver_cached(needle_path, &mut cache)?;
 
+    let config = Config::new(true);
+
     let search_results = find_subgraphs(
         needle_driver.design_as_ref(),
         haystack_driver.design_as_ref(),
+        &config,
     );
 
     // Every match should resolve both d (input) and q (output) via O(1) helpers

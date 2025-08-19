@@ -12,6 +12,9 @@ mod integration_tests {
             static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/and_gate.v").unwrap();
             static ref AND_TREE: Driver = load_driver_from("examples/patterns/basic/and/and_tree.v").unwrap();
             static ref AND_SEQ: Driver = load_driver_from("examples/patterns/basic/and/and_seq.v").unwrap();
+
+            //
+            static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::new(false);
         }
 
         #[rstest]
@@ -40,8 +43,11 @@ mod integration_tests {
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            let matches =
-                svql_subgraph::find_subgraphs(needle.design_as_ref(), haystack.design_as_ref());
+            let matches = svql_subgraph::find_subgraphs(
+                needle.design_as_ref(),
+                haystack.design_as_ref(),
+                &CONFIG,
+            );
             assert_eq!(
                 matches.len(),
                 expected,

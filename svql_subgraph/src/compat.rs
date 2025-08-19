@@ -8,6 +8,7 @@ pub(super) fn cells_compatible<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     state: &State<'p, 'd>,
+    match_length: bool,
 ) -> bool {
     let pk = p_index.kind(p_id);
     let dk = d_index.kind(d_id);
@@ -15,24 +16,25 @@ pub(super) fn cells_compatible<'p, 'd>(
         return false;
     }
 
-    // for now just match based on cell type
-    return true;
-
-    // let p_pins = &p_index.pins(p_id).inputs;
-    // let d_pins = &d_index.pins(d_id).inputs;
-    // if p_pins.len() != d_pins.len() {
-    //     return false;
+    // if !match_length {
+    //     return true;
     // }
 
-    // if is_commutative(pk) {
-    //     let mut p_sorted = p_pins.clone();
-    //     let mut d_sorted = d_pins.clone();
-    //     normalize_commutative(&mut p_sorted);
-    //     normalize_commutative(&mut d_sorted);
-    //     pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
-    // } else {
-    //     pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
-    // }
+    let p_pins = &p_index.pins(p_id).inputs;
+    let d_pins = &d_index.pins(d_id).inputs;
+    if p_pins.len() != d_pins.len() {
+        return false;
+    }
+
+    if is_commutative(pk) {
+        let mut p_sorted = p_pins.clone();
+        let mut d_sorted = d_pins.clone();
+        normalize_commutative(&mut p_sorted);
+        normalize_commutative(&mut d_sorted);
+        pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
+    } else {
+        pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
+    }
 }
 
 fn pins_compatible_pairwise<'p, 'd>(
@@ -99,9 +101,10 @@ mod tests {
         let d = &*SDFFE;
         let idx = Index::build(d);
         let st = State::<'_, '_>::new(idx.gate_count());
+        let match_length = true;
 
         for &n in idx.of_kind(crate::cell_kind::CellKind::Dff) {
-            assert!(cells_compatible(n, n, &idx, &idx, &st));
+            assert!(cells_compatible(n, n, &idx, &idx, &st, match_length));
         }
     }
 
@@ -114,10 +117,12 @@ mod tests {
         let d_idx = Index::build(d_d);
         let st = State::new(p_idx.gate_count());
 
+        let match_length = true;
+
         let p = p_idx.of_kind(crate::cell_kind::CellKind::Dff)[0];
         for &d in d_idx.of_kind(crate::cell_kind::CellKind::Dff) {
             assert!(
-                cells_compatible(p, d, &p_idx, &d_idx, &st),
+                cells_compatible(p, d, &p_idx, &d_idx, &st, match_length),
                 "pattern IO D should be compatible with design DFF regardless of external driver kind"
             );
         }

@@ -11,10 +11,13 @@
 //! Example (no_run):
 //! ```no_run
 //! use svql_subgraph::{Finder, AllSubgraphMatches};
+//! use svql_subgraph::config::Config;
 //! use prjunnamed_netlist::Design;
 //!
 //! fn use_finder(pattern: &Design, design: &Design) {
-//!     let finder = Finder::new(pattern, design);
+//!     let match_length = true;
+//!     let config = Config::new(match_length);
+//!     let finder = Finder::new(pattern, design, config);
 //!     let results: AllSubgraphMatches = finder.find_all();
 //!     if let Some(first) = finder.find_first() {
 //!         // Ask for a driver of an output bit by name
@@ -32,10 +35,12 @@ use prjunnamed_netlist::Design;
 pub mod cell_kind;
 use cell_kind::{InputCell, OutputCell, get_input_cells, get_output_cells};
 
-use crate::cell_kind::CellWrapper;
+use crate::{cell_kind::CellWrapper, config::Config};
 
 mod anchor;
 mod compat;
+pub mod config;
+pub mod finder;
 mod index;
 mod ports;
 mod search;
@@ -43,12 +48,8 @@ mod state;
 mod strategy;
 pub(crate) mod util;
 
-// NEW: ergonomic wrapper module
-pub mod finder;
-pub use finder::Finder;
-
-// NEW: re-export common types for consumers
 pub use cell_kind::{InputCell as PatternInputCell, OutputCell as PatternOutputCell};
+pub use finder::Finder;
 
 /// A collection of all subgraph matches found for a given `(pattern, design)` pair.
 #[derive(Clone, Debug)]
@@ -170,6 +171,7 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
+    config: &Config,
 ) -> AllSubgraphMatches<'p, 'd> {
     let p_index = index::Index::build(pattern);
     let d_index = index::Index::build(design);
@@ -202,7 +204,14 @@ pub fn find_subgraphs<'p, 'd>(
             continue;
         }
         let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
-        if !compat::cells_compatible(p_a, d_a, &p_index, &d_index, &empty_state) {
+        if !compat::cells_compatible(
+            p_a,
+            d_a,
+            &p_index,
+            &d_index,
+            &empty_state,
+            config.match_length,
+        ) {
             continue;
         }
 
@@ -219,6 +228,7 @@ pub fn find_subgraphs<'p, 'd>(
             &mut results,
             &pat_inputs,
             &pat_outputs,
+            &config,
         );
 
         // Backtrack anchor boundaries
@@ -287,7 +297,8 @@ mod tests {
     #[test]
     fn smoke_find_subgraphs_self_sdffe() {
         let design = &SDFFE;
-        let matches = find_subgraphs(design, design);
+        let config = config::Config { match_length: true };
+        let matches = find_subgraphs(design, design, &config);
         assert!(
             !matches.is_empty(),
             "Self-match sdffe should yield at least one mapping"
@@ -300,7 +311,8 @@ mod tests {
     #[test]
     fn smoke_seq_double_sdffe_has_at_least_one() {
         let design = &SEQ_DOUBLE_SDFFE;
-        let matches = find_subgraphs(design, design);
+        let config = config::Config { match_length: true };
+        let matches = find_subgraphs(design, design, &config);
         assert!(
             !matches.is_empty(),
             "Self-match seq_double_sdffe should yield mappings"
@@ -310,7 +322,8 @@ mod tests {
     #[test]
     fn exact_two_matches_comb_d_double_self() {
         let design = &COMB_D_DOUBLE_SDFFE;
-        let matches = find_subgraphs(design, design);
+        let config = config::Config { match_length: true };
+        let matches = find_subgraphs(design, design, &config);
         assert_eq!(
             matches.len(),
             2,
@@ -322,7 +335,8 @@ mod tests {
     fn exact_two_matches_sdffe_in_seq_double() {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
-        let matches = find_subgraphs(pat, hay);
+        let config = config::Config { match_length: true };
+        let matches = find_subgraphs(pat, hay, &config);
         assert_eq!(
             matches.len(),
             2,
@@ -333,7 +347,8 @@ mod tests {
     #[test]
     fn dedupe_eliminates_anchor_duplicates_par_double_self() {
         let design = &PAR_DOUBLE_SDFFE;
-        let matches = find_subgraphs(design, design);
+        let config = config::Config { match_length: true };
+        let matches = find_subgraphs(design, design, &config);
         assert_eq!(matches.len(), 2);
     }
 
@@ -341,7 +356,8 @@ mod tests {
     fn lookup_by_port_name_and_bit_sdffe_in_seq_double() {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
-        let all = find_subgraphs(pat, hay);
+        let config = config::Config { match_length: true };
+        let all = find_subgraphs(pat, hay, &config);
         assert_eq!(
             all.len(),
             2,
@@ -395,7 +411,9 @@ mod tests {
         let needle_path = "examples/patterns/basic/ff/sdffe.v";
         let needle_design = load_design_from(&needle_path).expect("Failed to read needle design");
 
-        let search_results = find_subgraphs(&needle_design, &haystack_design);
+        let config = config::Config { match_length: true };
+
+        let search_results = find_subgraphs(&needle_design, &haystack_design, &config);
 
         for m in search_results.iter() {
             assert!(
@@ -436,10 +454,11 @@ mod tests {
     fn finder_wrapper_smoke_test() {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
+        let config = config::Config { match_length: true };
 
-        let finder = super::Finder::new(pat, hay);
+        let finder = super::Finder::new(pat, hay, config.clone());
         let all_via_finder = finder.find_all();
-        let all_via_fn = find_subgraphs(pat, hay);
+        let all_via_fn = find_subgraphs(pat, hay, &config);
 
         assert_eq!(all_via_finder.len(), all_via_fn.len());
         assert_eq!(all_via_finder.is_empty(), all_via_fn.is_empty());
