@@ -26,8 +26,9 @@ mod tests {
         let haystack_design =
             load_driver_cached(haystack_path, &mut cache).expect("Failed to read input design");
 
-        let and_design = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)
-            .expect("Failed to read input design");
+        let and_design =
+            load_driver_cached("examples/patterns/basic/and/verilog/and_gate.v", &mut cache)
+                .expect("Failed to read input design");
 
         let needle_path_1 =
             "examples/patterns/security/access_control/locked_reg/json/async_en.json";

@@ -117,8 +117,8 @@ mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
     }
 
     #[test]

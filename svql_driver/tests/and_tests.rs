@@ -8,10 +8,10 @@ mod integration_tests {
 
         lazy_static::lazy_static! {
 
-            static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v").unwrap();
-            static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/and_gate.v").unwrap();
-            static ref AND_TREE: Driver = load_driver_from("examples/patterns/basic/and/and_tree.v").unwrap();
-            static ref AND_SEQ: Driver = load_driver_from("examples/patterns/basic/and/and_seq.v").unwrap();
+            static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
+            static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_gate.v").unwrap();
+            static ref AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
+            static ref AND_SEQ: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
 
             //
             static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::new(false);

@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_design_path_new() {
-        let verilog_path = PathBuf::from("examples/patterns/basic/ff/sdffe.v");
+        let verilog_path = PathBuf::from("examples/patterns/basic/ff/verilog/sdffe.v");
         let rtlil_path = PathBuf::from("examples/patterns/basic/ff/sdffe.il");
         let json_path = PathBuf::from("examples/patterns/basic/ff/sdffe.json");
         let unsupported_path = PathBuf::from("examples/patterns/basic/ff/sdffe.txt");
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_run_yosys_cmd() {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let design_file = workspace.join("examples/patterns/basic/ff/sdffe.v");
+        let design_file = workspace.join("examples/patterns/basic/ff/verilog/sdffe.v");
         let yosys = which::which("yosys")
             .map_err(|e| format!("Failed to find yosys binary: {}", e))
             .expect("Yosys binary not found");
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_driver_new() {
-        let design_path = PathBuf::from("examples/patterns/basic/ff/sdffe.v");
+        let design_path = PathBuf::from("examples/patterns/basic/ff/verilog/sdffe.v");
         let driver = Driver::new(design_path, "sdffe".into(), None);
         assert!(driver.is_ok());
         let driver = driver.unwrap();

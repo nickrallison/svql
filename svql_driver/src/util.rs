@@ -26,6 +26,6 @@ mod tests {
 
     #[test]
     fn can_load_driver() {
-        let _driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        let _driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
     }
 }

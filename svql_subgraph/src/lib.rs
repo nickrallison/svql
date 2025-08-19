@@ -4,29 +4,8 @@
 //! “design” (haystack) design. It works at the gate level with a focus on
 //! deterministic behavior, security patterns, and composability.
 //!
-//! The primary entry points are:
+//! The primary entry point is:
 //! - [`find_subgraphs`]: functional API returning [`AllSubgraphMatches`]
-//! - [`Finder`]: ergonomic, discoverable wrapper with `find_all`/`find_first`
-//!
-//! Example (no_run):
-//! ```no_run
-//! use svql_subgraph::{Finder, AllSubgraphMatches};
-//! use svql_subgraph::config::Config;
-//! use prjunnamed_netlist::Design;
-//!
-//! fn use_finder(pattern: &Design, design: &Design) {
-//!     let match_length = true;
-//!     let config = Config::new(match_length);
-//!     let finder = Finder::new(pattern, design, config);
-//!     let results: AllSubgraphMatches = finder.find_all();
-//!     if let Some(first) = finder.find_first() {
-//!         // Ask for a driver of an output bit by name
-//!         if let Some((d_cell, d_bit)) = first.design_driver_of_output_bit("q", 0) {
-//!             let _ = (d_cell.debug_index(), d_bit);
-//!         }
-//!     }
-//! }
-//! ```
 
 use std::collections::{HashMap, HashSet};
 
@@ -40,7 +19,6 @@ use crate::{cell_kind::CellWrapper, config::Config};
 mod anchor;
 mod compat;
 pub mod config;
-pub mod finder;
 mod index;
 mod ports;
 mod search;
@@ -49,7 +27,6 @@ mod strategy;
 pub(crate) mod util;
 
 pub use cell_kind::{InputCell as PatternInputCell, OutputCell as PatternOutputCell};
-pub use finder::Finder;
 
 /// A collection of all subgraph matches found for a given `(pattern, design)` pair.
 #[derive(Clone, Debug)]
@@ -279,10 +256,10 @@ mod tests {
 
     lazy_static::lazy_static! {
         static ref ASYNC_MUX: Design = crate::util::load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
-        static ref COMB_D_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
-        static ref PAR_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref COMB_D_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
+        static ref PAR_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
 
     }
 
@@ -404,11 +381,11 @@ mod tests {
 
     #[test]
     fn connectivity_test() {
-        let haystack_path = "examples/patterns/basic/ff/seq_8_sdffe.v";
+        let haystack_path = "examples/fixtures/basic/ff/verilog/seq_8_sdffe.v";
         let haystack_design =
             load_design_from(&haystack_path).expect("Failed to read haystack design");
 
-        let needle_path = "examples/patterns/basic/ff/sdffe.v";
+        let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
         let needle_design = load_design_from(&needle_path).expect("Failed to read needle design");
 
         let config = config::Config { match_length: true };
@@ -447,21 +424,5 @@ mod tests {
             "Expected 7 connections between d and q across matches, found {}",
             matches
         );
-    }
-
-    // NEW: Smoke-test the Finder wrapper inside unit tests (uses internal loader).
-    #[test]
-    fn finder_wrapper_smoke_test() {
-        let pat = &SDFFE;
-        let hay = &SEQ_DOUBLE_SDFFE;
-        let config = config::Config { match_length: true };
-
-        let finder = super::Finder::new(pat, hay, config.clone());
-        let all_via_finder = finder.find_all();
-        let all_via_fn = find_subgraphs(pat, hay, &config);
-
-        assert_eq!(all_via_finder.len(), all_via_fn.len());
-        assert_eq!(all_via_finder.is_empty(), all_via_fn.is_empty());
-        assert!(finder.find_first().is_some());
     }
 }

@@ -7,11 +7,11 @@ mod integration_tests {
 
         lazy_static::lazy_static! {
 
-            static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
-            static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/and_q_double_sdffe.v").unwrap();
-            static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/par_double_sdffe.v").unwrap();
-            static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/seq_double_sdffe.v").unwrap();
-            static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+            static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
+            static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
+            static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
+            static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
+            static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
 
             //
             static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::new(false);

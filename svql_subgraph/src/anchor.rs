@@ -82,7 +82,7 @@ mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/sdffe.v").unwrap();
+        static ref SDFFE: Design = load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
     }
 
     #[test]
