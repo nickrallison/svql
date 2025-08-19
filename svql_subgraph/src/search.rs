@@ -1,5 +1,6 @@
 use crate::cell_kind::CellWrapper;
 use crate::config;
+use crate::ports::{is_commutative, normalize_commutative};
 
 use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
@@ -40,7 +41,7 @@ pub(super) fn backtrack<'p, 'd>(
         }
 
         st.map(next_p, d_cand);
-        let added = add_io_boundaries_from_pair(next_p, d_cand, p_index, d_index, st);
+        let added = add_io_boundaries_from_pair(next_p, d_cand, p_index, d_index, st, config);
 
         backtrack(p_index, d_index, st, out, pat_inputs, pat_outputs, config);
 
@@ -55,22 +56,46 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
+    config: &config::Config,
 ) -> Vec<(CellWrapper<'p>, usize)> {
     let mut added = Vec::new();
-    let p_pins = &p_index.pins(p_id).inputs;
-    let d_pins = &d_index.pins(d_id).inputs;
 
-    for ((_, p_src), (_, d_src)) in p_pins.iter().zip(d_pins.iter()) {
+    let kind = p_index.kind(p_id);
+    let mut p_inputs = p_index.pins(p_id).inputs.clone();
+    let mut d_inputs = d_index.pins(d_id).inputs.clone();
+
+    // Align inputs deterministically to match cells_compatible
+    if is_commutative(kind) {
+        normalize_commutative(&mut p_inputs);
+        normalize_commutative(&mut d_inputs);
+    }
+
+    let p_len = p_inputs.len();
+    let d_len = d_inputs.len();
+
+    // Determine how many pins to consider for boundary binding
+    let take_len = if config.match_length {
+        // By construction p_len == d_len in this mode
+        std::cmp::min(p_len, d_len)
+    } else {
+        // Superset mode: bind only the first p_len after alignment
+        std::cmp::min(p_len, d_len)
+    };
+
+    for i in 0..take_len {
+        let (_, p_src) = p_inputs[i];
+        let (_, d_src) = d_inputs[i];
+
         match (p_src, d_src) {
             (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
-                let key = (*p_cell, *p_bit);
-                if st.boundary_insert(key, (*d_cell, *d_bit)) {
+                let key = (p_cell, p_bit);
+                if st.boundary_insert(key, (d_cell, d_bit)) {
                     added.push(key);
                 }
             }
             (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
-                let key = (*p_cell, *p_bit);
-                if st.boundary_insert(key, (*d_cell, *d_bit)) {
+                let key = (p_cell, p_bit);
+                if st.boundary_insert(key, (d_cell, d_bit)) {
                     added.push(key);
                 }
             }

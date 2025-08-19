@@ -16,24 +16,49 @@ pub(super) fn cells_compatible<'p, 'd>(
         return false;
     }
 
-    // if !match_length {
-    //     return true;
-    // }
-
     let p_pins = &p_index.pins(p_id).inputs;
     let d_pins = &d_index.pins(d_id).inputs;
-    if p_pins.len() != d_pins.len() {
+
+    // Exact-length mode (original behavior)
+    if match_length {
+        if p_pins.len() != d_pins.len() {
+            return false;
+        }
+
+        if is_commutative(pk) {
+            let mut p_sorted = p_pins.clone();
+            let mut d_sorted = d_pins.clone();
+            normalize_commutative(&mut p_sorted);
+            normalize_commutative(&mut d_sorted);
+            return pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state);
+        } else {
+            return pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state);
+        }
+    }
+
+    // Superset-length mode (allow design to have extra inputs)
+    // Deterministic, non-explosive: compare the first p_len pins after an alignment rule.
+    let p_len = p_pins.len();
+    let d_len = d_pins.len();
+    if p_len > d_len {
         return false;
     }
 
     if is_commutative(pk) {
+        // Normalize both sides and compare the first p_len pins
         let mut p_sorted = p_pins.clone();
         let mut d_sorted = d_pins.clone();
         normalize_commutative(&mut p_sorted);
         normalize_commutative(&mut d_sorted);
-        pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
+
+        let p_slice = &p_sorted[..p_len];
+        let d_slice = &d_sorted[..p_len];
+        return pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state);
     } else {
-        pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
+        // Non-commutative: keep original order, compare first p_len pins
+        let p_slice = &p_pins[..p_len];
+        let d_slice = &d_pins[..p_len];
+        return pins_compatible_pairwise(p_slice, d_slice, p_index, d_index, state);
     }
 }
 

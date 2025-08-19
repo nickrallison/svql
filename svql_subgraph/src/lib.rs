@@ -196,7 +196,6 @@ pub fn find_subgraphs<'p, 'd>(
     let p_anchor = *p_anchors.iter().min().unwrap();
     let p_anchors = vec![p_anchor];
 
-    // it should not matter (for correctness) which of the pattern anchors are chosen, all will have to find a match anyways
     let p_a = *p_anchors.first().expect("No pattern anchors found");
 
     for &d_a in &d_anchors {
@@ -218,8 +217,9 @@ pub fn find_subgraphs<'p, 'd>(
         let mut st = state::State::new(p_index.gate_count());
         st.map(p_a, d_a);
 
-        // Add IO boundaries implied by anchor mapping
-        let added = search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st);
+        // Add IO boundaries implied by anchor mapping (aligned with arity mode)
+        let added =
+            search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
 
         search::backtrack(
             &p_index,
