@@ -182,7 +182,6 @@ pub(super) fn aligned_sources<'p, 'd>(
         p_srcs
             .zip(d_srcs)
             .take(take_len)
-            .map(|(p, d)| (p, d))
             .collect(),
     )
 }

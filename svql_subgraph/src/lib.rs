@@ -148,7 +148,7 @@ pub fn find_subgraphs<'p, 'd>(
             &mut results,
             &pat_inputs,
             &pat_outputs,
-            &config,
+            config,
         );
 
         search::remove_boundaries(added, &mut st);

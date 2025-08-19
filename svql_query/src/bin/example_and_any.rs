@@ -51,13 +51,13 @@ impl AndAny<Search> {
     ) -> Vec<AndAny<Match<'p, 'd>>> {
         let mut out: Vec<AndAny<Match<'p, 'd>>> = Vec::new();
 
-        let gate_hits = AndGate::<Search>::query(and_gate_pattern, haystack, path.clone(), &config);
+        let gate_hits = AndGate::<Search>::query(and_gate_pattern, haystack, path.clone(), config);
         out.extend(gate_hits.into_iter().map(AndAny::Gate));
 
-        let mux_hits = AndMux::<Search>::query(and_mux_pattern, haystack, path.clone(), &config);
+        let mux_hits = AndMux::<Search>::query(and_mux_pattern, haystack, path.clone(), config);
         out.extend(mux_hits.into_iter().map(AndAny::Mux));
 
-        let nor_hits = AndNor::<Search>::query(and_nor_pattern, haystack, path.clone(), &config);
+        let nor_hits = AndNor::<Search>::query(and_nor_pattern, haystack, path.clone(), config);
         out.extend(nor_hits.into_iter().map(AndAny::Nor));
 
         out

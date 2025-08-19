@@ -33,7 +33,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
-        Self::query_with_config(pattern, haystack, path, &config)
+        Self::query_with_config(pattern, haystack, path, config)
     }
 
     /// New helper to allow callers to select arity and dedupe policy.
