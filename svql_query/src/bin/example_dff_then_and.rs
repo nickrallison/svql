@@ -8,8 +8,8 @@ use svql_query::impl_find_port;
 use svql_query::instance::Instance;
 use svql_query::{Connection, Match, Search, State, WithPath};
 
-use svql_query::queries::netlist::and::And;
-use svql_query::queries::netlist::dff::Sdffe;
+use svql_query::queries::netlist::basic::and::And;
+use svql_query::queries::netlist::basic::dff::Sdffe;
 
 /// DFF -> AND composite:
 /// - Require that sdffe.q drives either and.a or and.b (one must hold).
@@ -148,13 +148,13 @@ impl DffThenAnd<Search> {
     ) -> Vec<DffThenAnd<Match<'p, 'd>>> {
         // Sub-queries at stable locations in the instance tree
         let sdffe_hits: Vec<Sdffe<Match<'p, 'd>>> =
-            svql_query::queries::netlist::dff::Sdffe::<Search>::query(
+            svql_query::queries::netlist::basic::dff::Sdffe::<Search>::query(
                 sdffe_pattern,
                 haystack,
                 path.child("sdffe".to_string()),
             );
         let and_hits: Vec<And<Match<'p, 'd>>> =
-            svql_query::queries::netlist::and::And::<Search>::query(
+            svql_query::queries::netlist::basic::and::And::<Search>::query(
                 and_pattern,
                 haystack,
                 path.child("andg".to_string()),

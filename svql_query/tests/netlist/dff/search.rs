@@ -6,7 +6,7 @@ mod integration_tests {
         use svql_driver::util::load_driver_from;
         use svql_query::Search;
         use svql_query::instance::Instance;
-        use svql_query::queries::netlist::dff::Sdffe;
+        use svql_query::queries::netlist::basic::dff::Sdffe;
 
         lazy_static::lazy_static! {
             static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/comb_d_double_sdffe.v").unwrap();
@@ -121,7 +121,7 @@ mod integration_tests {
         }
 
         fn any_q_to_d_connection(
-            hits: &[svql_query::queries::netlist::dff::Sdffe<svql_query::Match>],
+            hits: &[svql_query::queries::netlist::basic::dff::Sdffe<svql_query::Match>],
         ) -> bool {
             // Compare the Q net of one hit to the D source net of another.
             // Our Match only carries the design cell, but these are 1-bit nets

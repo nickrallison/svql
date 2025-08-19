@@ -15,21 +15,24 @@ pub(super) fn cells_compatible<'p, 'd>(
         return false;
     }
 
-    let p_pins = &p_index.pins(p_id).inputs;
-    let d_pins = &d_index.pins(d_id).inputs;
-    if p_pins.len() != d_pins.len() {
-        return false;
-    }
+    // for now just match based on cell type
+    return true;
 
-    if is_commutative(pk) {
-        let mut p_sorted = p_pins.clone();
-        let mut d_sorted = d_pins.clone();
-        normalize_commutative(&mut p_sorted);
-        normalize_commutative(&mut d_sorted);
-        pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
-    } else {
-        pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
-    }
+    // let p_pins = &p_index.pins(p_id).inputs;
+    // let d_pins = &d_index.pins(d_id).inputs;
+    // if p_pins.len() != d_pins.len() {
+    //     return false;
+    // }
+
+    // if is_commutative(pk) {
+    //     let mut p_sorted = p_pins.clone();
+    //     let mut d_sorted = d_pins.clone();
+    //     normalize_commutative(&mut p_sorted);
+    //     normalize_commutative(&mut d_sorted);
+    //     pins_compatible_pairwise(&p_sorted, &d_sorted, p_index, d_index, state)
+    // } else {
+    //     pins_compatible_pairwise(p_pins, d_pins, p_index, d_index, state)
+    // }
 }
 
 fn pins_compatible_pairwise<'p, 'd>(

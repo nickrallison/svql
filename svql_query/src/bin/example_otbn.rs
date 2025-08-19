@@ -1,9 +1,5 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_query::{
-    Search,
-    instance::Instance,
-    queries::netlist::{and::And, dff::Sdffe},
-};
+use svql_query::{Search, instance::Instance, queries::netlist::basic::dff::Sdffe};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()

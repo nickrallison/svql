@@ -1,6 +1,6 @@
 use svql_query::Search;
 use svql_query::netlist::{NetlistMeta, PortDir, PortSpec};
-use svql_query::queries::netlist::dff::Sdffe;
+use svql_query::queries::netlist::basic::dff::Sdffe;
 
 #[test]
 fn sdffe_netlist_meta_is_correct() {

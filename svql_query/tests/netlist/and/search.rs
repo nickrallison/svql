@@ -1,10 +1,3 @@
-use svql_driver::prelude::Driver;
-use svql_driver::util::load_driver_from;
-
-use svql_query::Search;
-use svql_query::instance::Instance;
-use svql_query::queries::netlist::and::And;
-
 mod integration_tests {
     #[cfg(test)]
     mod and {
@@ -14,7 +7,7 @@ mod integration_tests {
         use svql_driver::util::load_driver_from;
         use svql_query::Search;
         use svql_query::instance::Instance;
-        use svql_query::queries::netlist::and::And;
+        use svql_query::queries::netlist::basic::and::And;
 
         lazy_static::lazy_static! {
 
@@ -54,7 +47,7 @@ mod integration_tests {
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            use svql_query::{Search, queries::netlist::and::And};
+            use svql_query::{Search, queries::netlist::basic::and::And};
 
             let hits = And::<Search>::query(needle, haystack, root_instance());
 
@@ -109,7 +102,7 @@ mod integration_tests {
         }
 
         fn any_connection_exists(
-            hits: &[svql_query::queries::netlist::and::And<svql_query::Match>],
+            hits: &[svql_query::queries::netlist::basic::and::And<svql_query::Match>],
         ) -> bool {
             for left in hits {
                 if let Some(lhs_y_cell) = left.y.val.as_ref().and_then(|m| m.design_cell_ref) {
