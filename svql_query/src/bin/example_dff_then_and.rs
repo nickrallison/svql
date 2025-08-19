@@ -10,7 +10,7 @@ use svql_query::{Connection, Match, Search, State, WithPath};
 
 use svql_query::queries::netlist::basic::and::and_gate::AndGate;
 use svql_query::queries::netlist::basic::dff::Sdffe;
-use svql_subgraph::config::{self, Config, DedupeMode};
+use svql_subgraph::config::Config;
 
 /// DFF -> AND composite:
 /// - Require that sdffe.q drives either and.a or and.b (one must hold).
@@ -168,11 +168,9 @@ impl DffThenAnd<Search> {
             and_hits.len()
         );
 
-        // Instead of a purely functional pipeline, use loops so we can add detailed traces.
         let mut out: Vec<DffThenAnd<Match<'p, 'd>>> = Vec::new();
 
         for (i, s) in sdffe_hits.into_iter().enumerate() {
-            // Extract the sdffe.q design endpoint (if any) for logging
             let s_q = s.q.val.as_ref().and_then(|m| m.design_cell_ref);
             trace!(
                 "  sdffe[{}]: q.design_cell_ref={:?}",
@@ -239,7 +237,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // root path for the composite
     let root = Instance::root("dff_then_and".to_string());
 
-    let config = Config::new(true, DedupeMode::Full);
+    let config = Config::builder().exact_length().full().build();
 
     // run composite query
     let hits =
@@ -247,10 +245,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     trace!("main: DffThenAnd matches={}", hits.len());
 
-    // There are two DFFs whose Q each feed the AND inputs; we expect 2 matches.
     assert_eq!(hits.len(), 2, "expected 2 DffThenAnd matches");
 
-    // Sanity: validate bindings exist on each hit
     for (k, h) in hits.iter().enumerate() {
         let q = h
             .sdffe
@@ -290,8 +286,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             q == a_src || q == b_src,
             "expected sdffe.q to drive either andg.a or andg.b"
         );
-
-        // println entire match
 
         println!("hit[{}]: {:#?}", k, h);
     }

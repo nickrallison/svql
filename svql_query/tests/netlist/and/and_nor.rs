@@ -6,13 +6,13 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::queries::netlist::basic::and::and_nor::AndNor;
-        use svql_subgraph::config::{Config, DedupeMode};
+        use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_NOR: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_nor.v").unwrap();
-            static ref CONFIG_DEDUPE_FULL: Config = Config::new(true, DedupeMode::Full);
-            static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::new(true, DedupeMode::GatesOnly);
+            static ref CONFIG_DEDUPE_FULL: Config = Config::builder().exact_length().full().build();
+            static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::builder().exact_length().gates_only().build();
         }
 
         fn root_instance() -> Instance {

@@ -7,7 +7,7 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::queries::netlist::basic::dff::Sdffe;
-        use svql_subgraph::config::{Config, DedupeMode};
+        use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {
             static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
@@ -15,7 +15,7 @@ mod integration_tests {
             static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
             static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
             static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-            static ref CONFIG: Config = Config::new(true, DedupeMode::Full);
+            static ref CONFIG: Config = Config::builder().exact_length().full().build();
         }
 
         fn root_instance() -> Instance {

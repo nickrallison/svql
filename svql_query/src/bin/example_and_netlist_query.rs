@@ -1,6 +1,6 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
 use svql_query::{Search, instance::Instance, queries::netlist::basic::and::and_gate::AndGate};
-use svql_subgraph::config::{Config, DedupeMode};
+use svql_subgraph::config::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // env logger
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let and_seq_driver =
         load_driver_cached("examples/fixtures/basic/and/verilog/and_seq.v", &mut cache)?;
 
-    let config = Config::new(true, DedupeMode::Full);
+    let config = Config::builder().exact_length().full().build();
 
     let hits = AndGate::<Search>::query(
         &and_gate_driver,

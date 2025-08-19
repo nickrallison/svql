@@ -118,7 +118,7 @@ mod tests {
 
     use prjunnamed_netlist::Design;
 
-    use crate::config::{Config, DedupeMode};
+    use crate::config::Config;
 
     use super::*;
 
@@ -137,7 +137,7 @@ mod tests {
         let inputs = super::super::cell_kind::get_input_cells(d);
         let outputs = super::super::cell_kind::get_output_cells(d);
 
-        let config = Config::new(true, DedupeMode::Full);
+        let config = Config::default();
 
         backtrack(
             &p_index, &d_index, &mut st, &mut out, &inputs, &outputs, &config,

@@ -214,7 +214,7 @@ fn signature_gates_only<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::load_design_from;
+    use crate::{config::ConfigBuilder, util::load_design_from};
 
     use super::*;
 
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn smoke_find_subgraphs_self_sdffe() {
         let design = &SDFFE;
-        let config = config::Config::new(true, DedupeMode::Full);
+        let config = Config::default();
         let matches = find_subgraphs(design, design, &config);
         assert!(!matches.is_empty());
         for m in matches.iter() {
@@ -250,10 +250,12 @@ mod tests {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
 
-        let full = config::Config::new(true, DedupeMode::Full);
+        let full = Config::default();
         let _ = find_subgraphs(pat, hay, &full);
 
-        let gates_only = config::Config::new(true, DedupeMode::GatesOnly);
+        let gates_only = ConfigBuilder::default()
+            .dedupe(DedupeMode::GatesOnly)
+            .build();
         let _ = find_subgraphs(pat, hay, &gates_only);
     }
 }

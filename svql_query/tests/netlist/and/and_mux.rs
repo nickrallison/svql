@@ -6,12 +6,12 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::queries::netlist::basic::and::and_mux::AndMux;
-        use svql_subgraph::config::{Config, DedupeMode};
+        use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_MUX: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_mux.v").unwrap();
-            static ref CONFIG: Config = Config::new(true, DedupeMode::Full);
+            static ref CONFIG: Config = Config::builder().exact_length().full().build();
         }
 
         fn root_instance() -> Instance {

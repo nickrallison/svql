@@ -5,7 +5,7 @@ use svql_query::{
     instance::Instance,
     queries::netlist::basic::and::{and_gate::AndGate, and_mux::AndMux, and_nor::AndNor},
 };
-use svql_subgraph::{Config, DedupeMode};
+use svql_subgraph::{DedupeMode, config::Config};
 
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
@@ -83,7 +83,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut cache,
     )?;
 
-    let config = Config::new(true, DedupeMode::Full);
+    let config = Config::builder()
+        .exact_length()
+        .dedupe(DedupeMode::GatesOnly)
+        .build();
 
     // root path for the composite
     let root = Instance::root("dff_then_and".to_string());

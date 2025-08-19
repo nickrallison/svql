@@ -123,7 +123,7 @@ impl Default for Config {
     /// Default configuration mirrors the historical behavior:
     /// exact-length matching and Full dedupe.
     fn default() -> Self {
-        Self::new(true, DedupeMode::Full)
+        Self::new(false, DedupeMode::Full)
     }
 }
 
