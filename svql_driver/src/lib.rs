@@ -12,7 +12,7 @@ pub mod prelude {
 mod tests {
 
     use svql_subgraph::{
-        config::{self, Config},
+        config::{self, Config, DedupeMode},
         find_subgraphs,
     };
 
@@ -51,7 +51,7 @@ mod tests {
             load_driver_cached(needle_path_4, &mut cache).expect("Failed to read input design");
 
         let match_length = false;
-        let config = Config::new(match_length);
+        let config = Config::new(match_length, DedupeMode::Full);
 
         let time_start = std::time::Instant::now();
 

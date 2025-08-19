@@ -4,6 +4,7 @@ mod integration_tests {
         use rstest::rstest;
         use svql_driver::prelude::Driver;
         use svql_driver::util::load_driver_from;
+        use svql_subgraph::config::{Config, DedupeMode};
 
         lazy_static::lazy_static! {
 
@@ -14,7 +15,7 @@ mod integration_tests {
             static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
 
             //
-            static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::new(false);
+            static ref CONFIG: Config = Config::new(false, DedupeMode::Full);
         }
 
         #[rstest]
