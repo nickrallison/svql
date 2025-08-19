@@ -14,7 +14,7 @@
 #     > out.md
 
 md_tree.py --root . \
-    --include 'svql_*/**.rs' \
+    --include 'svql_query/**.rs' \
     --include 'examples/**.v' \
     --include 'Cargo.toml' \
     --include 'README.md' \

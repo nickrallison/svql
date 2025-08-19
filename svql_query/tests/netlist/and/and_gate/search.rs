@@ -7,13 +7,14 @@ mod integration_tests {
         use svql_driver::util::load_driver_from;
         use svql_query::Search;
         use svql_query::instance::Instance;
-        use svql_query::queries::netlist::basic::and::And;
+        use svql_query::queries::netlist::basic::and::and_gate::AndGate;
 
         lazy_static::lazy_static! {
 
             static ref AND_Q_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
             static ref AND_GATE: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_gate.v").unwrap();
             static ref AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
+            static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_SEQ: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
         }
 
@@ -42,14 +43,16 @@ mod integration_tests {
         #[case(&AND_SEQ, &AND_GATE, 0)]
         #[case(&AND_SEQ, &AND_TREE, 0)]
         #[case(&AND_SEQ, &AND_SEQ, 1)]
+        // Mixed And Tree Tests
+        #[case(&AND_GATE, &MIXED_AND_TREE, 3)]
         fn test_subgraph_matches(
             #[case] needle: &'static Driver,
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            use svql_query::{Search, queries::netlist::basic::and::And};
+            use svql_query::{Search, queries::netlist::basic::and::and_gate::AndGate};
 
-            let hits = And::<Search>::query(needle, haystack, root_instance());
+            let hits = AndGate::<Search>::query(needle, haystack, root_instance());
 
             assert_eq!(
                 hits.len(),
@@ -65,7 +68,7 @@ mod integration_tests {
         #[test]
         fn and_bindings_present_and_gate_vs_and_tree() {
             // For each match, confirm a, b, y have bound design cells
-            let hits = And::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
             assert!(!hits.is_empty());
 
             for h in &hits {
@@ -102,7 +105,9 @@ mod integration_tests {
         }
 
         fn any_connection_exists(
-            hits: &[svql_query::queries::netlist::basic::and::And<svql_query::Match>],
+            hits: &[svql_query::queries::netlist::basic::and::and_gate::AndGate<
+                svql_query::Match,
+            >],
         ) -> bool {
             for left in hits {
                 if let Some(lhs_y_cell) = left.y.val.as_ref().and_then(|m| m.design_cell_ref) {
@@ -130,7 +135,7 @@ mod integration_tests {
 
         #[test]
         fn and_connectivity_exists_in_and_tree() {
-            let hits = And::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
             assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
             let connected = any_connection_exists(&hits);
@@ -142,7 +147,7 @@ mod integration_tests {
 
         #[test]
         fn and_connectivity_exists_in_and_seq() {
-            let hits = And::<Search>::query(&*AND_GATE, &*AND_SEQ, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_SEQ, root_instance());
             assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
             let connected = any_connection_exists(&hits);

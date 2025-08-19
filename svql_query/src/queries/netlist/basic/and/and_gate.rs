@@ -6,7 +6,7 @@ use crate::netlist::{NetlistMeta, PortDir, PortSpec, SearchableNetlist};
 use crate::{Match, Search, State, Wire, WithPath};
 
 #[derive(Debug, Clone)]
-pub struct And<S>
+pub struct AndGate<S>
 where
     S: State,
 {
@@ -16,13 +16,13 @@ where
     pub y: Wire<S>,
 }
 
-impl<S> And<S>
+impl<S> AndGate<S>
 where
     S: State,
 {
     /// Uniform constructor so composites can assemble a Search-only shape.
     pub fn new(path: Instance) -> Self {
-        And {
+        AndGate {
             path: path.clone(),
             a: crate::Wire::new(path.child("a".to_string())),
             b: crate::Wire::new(path.child("b".to_string())),
@@ -31,11 +31,11 @@ where
     }
 }
 
-impl<S> WithPath<S> for And<S>
+impl<S> WithPath<S> for AndGate<S>
 where
     S: State,
 {
-    crate::impl_find_port!(And, a, b, y);
+    crate::impl_find_port!(AndGate, a, b, y);
 
     fn path(&self) -> Instance {
         self.path.clone()
@@ -44,7 +44,7 @@ where
 
 // Static metadata for codegen/introspection.
 // A define_netlist! macro would generate this from the declarative input.
-impl NetlistMeta for And<Search> {
+impl NetlistMeta for AndGate<Search> {
     const MODULE_NAME: &'static str = "and_gate";
     const FILE_PATH: &'static str = "examples/patterns/basic/and/and_gate.v";
 
@@ -66,8 +66,8 @@ impl NetlistMeta for And<Search> {
 
 // The query surface. A macro can generate this impl (and the inherent
 // wrapper below) for any netlist with the same shape.
-impl SearchableNetlist for And<Search> {
-    type Hit<'p, 'd> = And<Match<'p, 'd>>;
+impl SearchableNetlist for AndGate<Search> {
+    type Hit<'p, 'd> = AndGate<Match<'p, 'd>>;
 
     fn from_subgraph<'p, 'd>(
         m: &svql_subgraph::SubgraphMatch<'p, 'd>,
@@ -78,7 +78,7 @@ impl SearchableNetlist for And<Search> {
         let b_match = bind_input(m, "b", 0);
         let y_match = bind_output(m, "y", 0);
 
-        And {
+        AndGate {
             path: path.clone(),
             a: Wire::with_val(path.child("a".to_string()), a_match),
             b: Wire::with_val(path.child("b".to_string()), b_match),
@@ -89,12 +89,12 @@ impl SearchableNetlist for And<Search> {
 
 // Inherent shim so callers can write And::<Search>::query(...) without UFCS.
 // A macro can also emit this block verbatim for each netlist type.
-impl And<Search> {
+impl AndGate<Search> {
     pub fn query<'p, 'd>(
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
-    ) -> Vec<And<Match<'p, 'd>>> {
+    ) -> Vec<AndGate<Match<'p, 'd>>> {
         <Self as SearchableNetlist>::query(pattern, haystack, path)
     }
 }

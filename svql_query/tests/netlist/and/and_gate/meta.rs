@@ -1,19 +1,20 @@
 use svql_query::Search;
 use svql_query::netlist::{NetlistMeta, PortDir, PortSpec};
-use svql_query::queries::netlist::basic::and::And;
+use svql_query::queries::netlist::basic::and::and_gate::AndGate;
 
 #[test]
 fn and_netlist_meta_is_correct() {
     // Check module name and file path
-    assert_eq!(<And<Search> as NetlistMeta>::MODULE_NAME, "and_gate");
+    assert_eq!(<AndGate<Search> as NetlistMeta>::MODULE_NAME, "and_gate");
     assert!(
-        <And<Search> as NetlistMeta>::FILE_PATH.ends_with("examples/patterns/basic/and/and_gate.v"),
+        <AndGate<Search> as NetlistMeta>::FILE_PATH
+            .ends_with("examples/patterns/basic/and/and_gate.v"),
         "FILE_PATH should point to examples/patterns/basic/and/and_gate.v, got {}",
-        <And<Search> as NetlistMeta>::FILE_PATH
+        <AndGate<Search> as NetlistMeta>::FILE_PATH
     );
 
     // Check ports
-    let ports: &'static [PortSpec] = <And<Search> as NetlistMeta>::PORTS;
+    let ports: &'static [PortSpec] = <AndGate<Search> as NetlistMeta>::PORTS;
     assert_eq!(ports.len(), 3, "and_gate has two inputs and one output");
 
     // Validate directions by name for readability
