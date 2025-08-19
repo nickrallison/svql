@@ -1,8 +1,5 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_subgraph::{
-    config::{Config, DedupeMode},
-    find_subgraphs,
-};
+use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
@@ -17,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
     let needle_driver = load_driver_cached(needle_path, &mut cache)?;
 
-    let config = Config::new(true, DedupeMode::Full);
+    let config = Config::builder().exact_length().full().build();
 
     let search_results = find_subgraphs(
         needle_driver.design_as_ref(),

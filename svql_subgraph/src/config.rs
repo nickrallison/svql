@@ -28,6 +28,26 @@
 //! use svql_subgraph::{Config, DedupeMode};
 //! let cfg = Config::new(false, DedupeMode::GatesOnly);
 //! ```
+//!
+//! Builder usage (recommended for future-proofing):
+//! ```ignore
+//! use svql_subgraph::{Config, DedupeMode};
+//!
+//! // Equivalent to Config::new(true, DedupeMode::Full)
+//! let cfg_default = Config::builder().exact_length().full().build();
+//!
+//! // Superset-length and gates-only dedupe
+//! let cfg_superset = Config::builder()
+//!     .superset_length()
+//!     .gates_only()
+//!     .build();
+//!
+//! // Or mix and match explicitly
+//! let cfg_explicit = Config::builder()
+//!     .match_length(false)
+//!     .dedupe(DedupeMode::GatesOnly)
+//!     .build();
+//! ```
 
 /// Global search configuration.
 ///
@@ -76,6 +96,18 @@ impl Config {
         }
     }
 
+    /// Start building a configuration using the builder pattern.
+    ///
+    /// This is the recommended way to construct a Config to avoid future breaking
+    /// changes if additional fields/options are added later.
+    ///
+    /// Defaults mirror historical behavior:
+    /// - exact-length matching
+    /// - Full dedupe
+    pub fn builder() -> ConfigBuilder {
+        ConfigBuilder::default()
+    }
+
     /// Convenience: exact-length matching with the provided dedupe mode.
     pub fn exact_length(dedupe: DedupeMode) -> Self {
         Self::new(true, dedupe)
@@ -108,8 +140,85 @@ impl Default for Config {
 ///     automorphisms).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DedupeMode {
-    /// Include boundary bindings in the dedupe signature.
+    /// Original behavior: include boundary bindings in the dedupe signature.
     Full,
-    /// Collapse matches that share the same mapped gate Set, ignoring boundary bindings.
+    /// Collapse matches that share the same mapped gate SET, ignoring boundary bindings.
     GatesOnly,
+}
+
+/// Builder for Config, providing a fluent API with sensible defaults.
+///
+/// Defaults:
+/// - exact-length matching (match_length = true)
+/// - Full dedupe (dedupe = DedupeMode::Full)
+///
+/// Example:
+/// ```ignore
+/// use svql_subgraph::{Config, DedupeMode};
+///
+/// let cfg = Config::builder()
+///     .superset_length()
+///     .gates_only()
+///     .build();
+/// ```
+#[derive(Clone, Debug)]
+pub struct ConfigBuilder {
+    match_length: bool,
+    dedupe: DedupeMode,
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self {
+            match_length: true,
+            dedupe: DedupeMode::Full,
+        }
+    }
+}
+
+impl ConfigBuilder {
+    /// Set whether pattern/design arity must match exactly (true) or if the design
+    /// may have a superset of inputs (false).
+    pub fn match_length(mut self, value: bool) -> Self {
+        self.match_length = value;
+        self
+    }
+
+    /// Convenience: request exact-length matching.
+    pub fn exact_length(mut self) -> Self {
+        self.match_length = true;
+        self
+    }
+
+    /// Convenience: request superset-length matching.
+    pub fn superset_length(mut self) -> Self {
+        self.match_length = false;
+        self
+    }
+
+    /// Set the dedupe mode explicitly.
+    pub fn dedupe(mut self, mode: DedupeMode) -> Self {
+        self.dedupe = mode;
+        self
+    }
+
+    /// Convenience: request GatesOnly dedupe.
+    pub fn gates_only(mut self) -> Self {
+        self.dedupe = DedupeMode::GatesOnly;
+        self
+    }
+
+    /// Convenience: request Full dedupe.
+    pub fn full(mut self) -> Self {
+        self.dedupe = DedupeMode::Full;
+        self
+    }
+
+    /// Finalize and construct the Config.
+    pub fn build(self) -> Config {
+        Config {
+            match_length: self.match_length,
+            dedupe: self.dedupe,
+        }
+    }
 }
