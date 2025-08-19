@@ -3,12 +3,7 @@ use std::collections::{HashMap, HashSet};
 use prjunnamed_netlist::Design;
 
 pub mod cell_kind;
-use cell_kind::{InputCell, OutputCell, get_input_cells, get_output_cells};
-
-use crate::{
-    cell_kind::CellWrapper,
-    config::{Config, DedupeMode},
-};
+use cell_kind::{get_input_cells, get_output_cells};
 
 mod anchor;
 mod compat;
@@ -20,7 +15,12 @@ mod state;
 mod strategy;
 pub(crate) mod util;
 
-pub use cell_kind::{InputCell as PatternInputCell, OutputCell as PatternOutputCell};
+// Public re-exports for a minimal, stable external API.
+pub use cell_kind::{CellWrapper, InputCell, OutputCell};
+pub use config::{Config, DedupeMode};
+
+// Also re-export under their original short names for ergonomic use in dependents.
+// pub use config::{Config, DedupeMode};
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -170,7 +170,9 @@ pub fn find_subgraphs<'p, 'd>(
             results.retain(|m| seen.insert(signature_full(m)));
         }
         DedupeMode::GatesOnly => {
-            let mut seen: HashSet<Vec<(usize, usize)>> = HashSet::new();
+            // Collapse matches that select the same set of design gates, regardless of
+            // which pattern gates they map to (ignores boundary bindings and automorphisms).
+            let mut seen: HashSet<Vec<usize>> = HashSet::new();
             results.retain(|m| seen.insert(signature_gates_only(m)));
         }
     }
@@ -201,13 +203,12 @@ fn signature_full<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, u
     sig
 }
 
-fn signature_gates_only<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(usize, usize)> {
-    let mut sig: Vec<(usize, usize)> = m
-        .cell_mapping
-        .iter()
-        .map(|(p, d)| (p.debug_index(), d.debug_index()))
-        .collect();
+fn signature_gates_only<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
+    // Only the set of design gate IDs matter; ignore which pattern gates map to them
+    // and ignore any boundary bindings. This collapses automorphisms/permutations.
+    let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
     sig.sort_unstable();
+    sig.dedup();
     sig
 }
 
