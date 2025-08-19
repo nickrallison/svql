@@ -9,8 +9,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut cache = Cache::new();
 
-    let and_gate_driver = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)?;
-    let and_seq_driver = load_driver_cached("examples/patterns/basic/and/and_seq.v", &mut cache)?;
+    let and_gate_driver =
+        load_driver_cached("examples/patterns/basic/and/verilog/and_gate.v", &mut cache)?;
+    let and_seq_driver =
+        load_driver_cached("examples/fixtures/basic/and/verilog/and_seq.v", &mut cache)?;
 
     let hits = And::<Search>::query(
         &and_gate_driver,

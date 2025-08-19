@@ -22,7 +22,7 @@ mod tests {
     fn test_otbn_run_time() {
         let mut cache = Cache::new();
 
-        let haystack_path = "examples/larger_designs/otbn_core.json";
+        let haystack_path = "examples/fixtures/larger_designs/json/otbn_core.json";
         let haystack_design =
             load_driver_cached(haystack_path, &mut cache).expect("Failed to read input design");
 

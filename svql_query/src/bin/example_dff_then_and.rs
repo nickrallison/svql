@@ -224,11 +224,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut cache = Cache::new();
 
-    let and_gate_driver = load_driver_cached("examples/patterns/basic/and/and_gate.v", &mut cache)?;
-    let sdffe_driver = load_driver_cached("examples/patterns/basic/ff/sdffe.v", &mut cache)?;
+    let and_gate_driver =
+        load_driver_cached("examples/patterns/basic/and/verilog/and_gate.v", &mut cache)?;
+    let sdffe_driver =
+        load_driver_cached("examples/patterns/basic/ff/verilog/sdffe.v", &mut cache)?;
     // haystack
     let haystack = load_driver_cached(
-        "examples/patterns/basic/ff/and_q_double_sdffe.v",
+        "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
         &mut cache,
     )?;
 

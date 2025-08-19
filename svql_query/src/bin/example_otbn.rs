@@ -8,7 +8,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut cache = Cache::new();
 
-    let otbn_driver = load_driver_cached("examples/larger_designs/otbn_core.json", &mut cache)?;
+    let otbn_driver = load_driver_cached(
+        "examples/fixtures/larger_designs/json/otbn_core.json",
+        &mut cache,
+    )?;
     let sdffe_driver = load_driver_cached(
         "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
         &mut cache,
