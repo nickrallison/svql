@@ -1,5 +1,5 @@
 use svql_driver::prelude::Driver;
-use svql_subgraph::{SubgraphMatch, config, find_subgraphs};
+use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
 
 use crate::instance::Instance;
 
@@ -31,7 +31,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
-        config: &config::Config,
+        config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
         Self::query_with_config(pattern, haystack, path, &config)
     }
@@ -41,7 +41,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
-        config: &config::Config,
+        config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
         find_subgraphs(pattern.design_as_ref(), haystack.design_as_ref(), config)
             .iter()

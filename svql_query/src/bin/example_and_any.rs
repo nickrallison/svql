@@ -5,7 +5,7 @@ use svql_query::{
     instance::Instance,
     queries::netlist::basic::and::{and_gate::AndGate, and_mux::AndMux, and_nor::AndNor},
 };
-use svql_subgraph::config::{Config, DedupeMode};
+use svql_subgraph::{Config, DedupeMode};
 
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
@@ -98,17 +98,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    // trace!("main: AndAny matches={}", hits.len());
-
     for h in &hits {
         trace!("Found match: {:#?}", h);
     }
-
-    // assert_eq!(
-    //     hits.len(),
-    //     7,
-    //     "expected 7 total and matches in mixed_and_tree"
-    // );
 
     let mut gate_cnt = 0usize;
     let mut mux_cnt = 0usize;

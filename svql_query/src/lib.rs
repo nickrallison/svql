@@ -1,4 +1,4 @@
-use svql_subgraph::cell_kind::CellWrapper;
+use svql_subgraph::CellWrapper;
 
 use crate::instance::Instance;
 

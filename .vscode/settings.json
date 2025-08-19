@@ -1,0 +1,14 @@
+{
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true
+    },
+    "files.associations": {
+        "prjunnamed": "prjunnamed"
+    },
+    "github.copilot.enable": {
+        "*": true,
+        "prjunnamed": false,
+    }
+
+}
