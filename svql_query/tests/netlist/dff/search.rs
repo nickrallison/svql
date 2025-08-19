@@ -15,7 +15,7 @@ mod integration_tests {
             static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
             static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
             static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-            static ref CONFIG: Config = Config::builder().exact_length().full().build();
+            static ref CONFIG: Config = Config::builder().exact_length().none().build();
         }
 
         fn root_instance() -> Instance {

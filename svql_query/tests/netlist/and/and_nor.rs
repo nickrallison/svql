@@ -11,8 +11,8 @@ mod integration_tests {
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_NOR: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_nor.v").unwrap();
-            static ref CONFIG_DEDUPE_FULL: Config = Config::builder().exact_length().full().build();
-            static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::builder().exact_length().gates_only().build();
+            static ref CONFIG_DEDUPE_NONE: Config = Config::builder().exact_length().none().build();
+            static ref CONFIG_DEDUPE_AUTO_MORPH: Config = Config::builder().exact_length().auto_morph().build();
         }
 
         fn root_instance() -> Instance {
@@ -20,7 +20,7 @@ mod integration_tests {
         }
 
         #[test]
-        fn and_nor_matches_in_mixed_tree_gates_only() {
+        fn and_nor_matches_in_mixed_tree_auto_morph() {
             // mixed_and_tree has 2 and_nor instances
             let hits = AndNor::<Search>::query(
                 &*AND_NOR,
@@ -36,7 +36,7 @@ mod integration_tests {
         }
 
         #[test]
-        fn and_nor_matches_in_mixed_tree_full() {
+        fn and_nor_matches_in_mixed_tree_none() {
             // mixed_and_tree has 2 and_nor instances
             let hits = AndNor::<Search>::query(
                 &*AND_NOR,

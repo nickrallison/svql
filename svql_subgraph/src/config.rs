@@ -6,46 +6,46 @@
 //! The two main concepts are:
 //! - match_length: whether input arity must match exactly, or whether the
 //!   design can have a superset of inputs (deterministically aligned).
-//! - dedupe: how to deduplicate matches after search (by full boundary
+//! - dedupe: how to deduplicate matches after search (by none boundary
 //!   bindings, or by the set of matched design gates only).
 //!
 //! Quick examples
 //!
-//! Exact-length, full dedupe (original/default behavior):
+//! Exact-length, none dedupe (original/default behavior):
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(true, DedupeMode::Full);
+//! let cfg = Config::new(true, DedupeMode::None);
 //! ```
 //!
 //! Gates-only dedupe (collapse permutations/automorphisms) with exact-length:
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(true, DedupeMode::GatesOnly);
+//! let cfg = Config::new(true, DedupeMode::AutoMorph);
 //! ```
 //!
 //! Superset-length (allow design gates to have extra inputs) with gates-only dedupe:
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(false, DedupeMode::GatesOnly);
+//! let cfg = Config::new(false, DedupeMode::AutoMorph);
 //! ```
 //!
 //! Builder usage (recommended for future-proofing):
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
 //!
-//! // Equivalent to Config::new(true, DedupeMode::Full)
-//! let cfg_default = Config::builder().exact_length().full().build();
+//! // Equivalent to Config::new(true, DedupeMode::None)
+//! let cfg_default = Config::builder().exact_length().none().build();
 //!
 //! // Superset-length and gates-only dedupe
 //! let cfg_superset = Config::builder()
 //!     .superset_length()
-//!     .gates_only()
+//!     .auto_morph()
 //!     .build();
 //!
 //! // Or mix and match explicitly
 //! let cfg_explicit = Config::builder()
 //!     .match_length(false)
-//!     .dedupe(DedupeMode::GatesOnly)
+//!     .dedupe(DedupeMode::AutoMorph)
 //!     .build();
 //! ```
 
@@ -61,11 +61,8 @@
 ///       combinatorial explosion from trying all subsets.
 /// - dedupe:
 ///     - Controls how matches are deduplicated after search:
-///         - Full: include boundary (IO) bindings in the dedupe signature
-///                 (original behavior).
-///         - GatesOnly: ignore IO/boundary bindings and collapse matches that
-///                 map to the same SET of design gates (i.e., collapse
-///                 permutations/automorphisms).
+///         - None: include boundary (IO) bindings in the dedupe signature
+///         - AutoMorph: collapse permutations/automorphisms.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Whether to require exact pin-count (true) or allow superset arity in the design (false).
@@ -84,11 +81,11 @@ impl Config {
     ///
     /// Examples:
     /// - Original behavior:
-    ///   `Config::new(true, DedupeMode::Full)`
+    ///   `Config::new(true, DedupeMode::None)`
     /// - Collapse automorphisms (permutations of pattern mapping):
-    ///   `Config::new(true, DedupeMode::GatesOnly)`
+    ///   `Config::new(true, DedupeMode::AutoMorph)`
     /// - Allow extra inputs in design and dedupe by gates only:
-    ///   `Config::new(false, DedupeMode::GatesOnly)`
+    ///   `Config::new(false, DedupeMode::AutoMorph)`
     pub fn new(match_length: bool, dedupe: DedupeMode) -> Self {
         Self {
             match_length,
@@ -103,7 +100,7 @@ impl Config {
     ///
     /// Defaults mirror historical behavior:
     /// - exact-length matching
-    /// - Full dedupe
+    /// - None dedupe
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
@@ -121,19 +118,19 @@ impl Config {
 
 impl Default for Config {
     /// Default configuration mirrors the historical behavior:
-    /// exact-length matching and Full dedupe.
+    /// exact-length matching and None dedupe.
     fn default() -> Self {
-        Self::new(false, DedupeMode::Full)
+        Self::new(false, DedupeMode::None)
     }
 }
 
 /// Control how matches are deduplicated.
 ///
-/// - Full:
+/// - None:
 ///     Include boundary IO bindings alongside gate mappings. Two matches are
 ///     considered distinct if they differ in any gate mapping OR any boundary
 ///     binding. This is the most precise (and original) behavior.
-/// - GatesOnly:
+/// - AutoMorph:
 ///     Ignore boundary IO bindings entirely. Two matches are considered the
 ///     same if they map to the same SET of design gates, regardless of which
 ///     pattern gates map to which design gates (collapses permutations and
@@ -141,16 +138,16 @@ impl Default for Config {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DedupeMode {
     /// Original behavior: include boundary bindings in the dedupe signature.
-    Full,
+    None,
     /// Collapse matches that share the same mapped gate SET, ignoring boundary bindings.
-    GatesOnly,
+    AutoMorph,
 }
 
 /// Builder for Config, providing a fluent API with sensible defaults.
 ///
 /// Defaults:
 /// - exact-length matching (match_length = true)
-/// - Full dedupe (dedupe = DedupeMode::Full)
+/// - None dedupe (dedupe = DedupeMode::None)
 ///
 /// Example:
 /// ```ignore
@@ -158,7 +155,7 @@ pub enum DedupeMode {
 ///
 /// let cfg = Config::builder()
 ///     .superset_length()
-///     .gates_only()
+///     .auto_morph()
 ///     .build();
 /// ```
 #[derive(Clone, Debug)]
@@ -171,7 +168,7 @@ impl Default for ConfigBuilder {
     fn default() -> Self {
         Self {
             match_length: true,
-            dedupe: DedupeMode::Full,
+            dedupe: DedupeMode::None,
         }
     }
 }
@@ -202,15 +199,15 @@ impl ConfigBuilder {
         self
     }
 
-    /// Convenience: request GatesOnly dedupe.
-    pub fn gates_only(mut self) -> Self {
-        self.dedupe = DedupeMode::GatesOnly;
+    /// Convenience: request AutoMorph dedupe.
+    pub fn auto_morph(mut self) -> Self {
+        self.dedupe = DedupeMode::AutoMorph;
         self
     }
 
-    /// Convenience: request Full dedupe.
-    pub fn full(mut self) -> Self {
-        self.dedupe = DedupeMode::Full;
+    /// Convenience: request None dedupe.
+    pub fn none(mut self) -> Self {
+        self.dedupe = DedupeMode::None;
         self
     }
 

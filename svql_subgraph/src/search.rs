@@ -64,7 +64,6 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     let mut p_inputs = p_index.pins(p_id).inputs.clone();
     let mut d_inputs = d_index.pins(d_id).inputs.clone();
 
-    // Align inputs deterministically to match cells_compatible
     if is_commutative(kind) {
         normalize_commutative(&mut p_inputs);
         normalize_commutative(&mut d_inputs);
@@ -73,14 +72,7 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     let p_len = p_inputs.len();
     let d_len = d_inputs.len();
 
-    // Determine how many pins to consider for boundary binding
-    let take_len = if config.match_length {
-        // By construction p_len == d_len in this mode
-        std::cmp::min(p_len, d_len)
-    } else {
-        // Superset mode: bind only the first p_len after alignment
-        std::cmp::min(p_len, d_len)
-    };
+    let take_len = std::cmp::min(p_len, d_len);
 
     for i in 0..take_len {
         let (_, p_src) = p_inputs[i];

@@ -48,7 +48,7 @@ mod tests {
             load_driver_cached(needle_path_4, &mut cache).expect("Failed to read input design");
 
         let match_length = false;
-        let config = Config::builder().match_length(match_length).full().build();
+        let config = Config::builder().match_length(match_length).none().build();
 
         let time_start = std::time::Instant::now();
 

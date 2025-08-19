@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::builder()
         .exact_length()
-        .dedupe(DedupeMode::GatesOnly)
+        .dedupe(DedupeMode::AutoMorph)
         .build();
 
     // root path for the composite

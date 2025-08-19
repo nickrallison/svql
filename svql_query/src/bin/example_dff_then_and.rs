@@ -237,7 +237,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // root path for the composite
     let root = Instance::root("dff_then_and".to_string());
 
-    let config = Config::builder().exact_length().full().build();
+    let config = Config::builder().exact_length().none().build();
 
     // run composite query
     let hits =

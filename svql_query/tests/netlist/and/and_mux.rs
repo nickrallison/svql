@@ -11,7 +11,7 @@ mod integration_tests {
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_MUX: Driver = load_driver_from("examples/patterns/basic/and/verilog/and_mux.v").unwrap();
-            static ref CONFIG: Config = Config::builder().exact_length().full().build();
+            static ref CONFIG: Config = Config::builder().exact_length().none().build();
         }
 
         fn root_instance() -> Instance {

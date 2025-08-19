@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut cache,
     )?;
 
-    let config = Config::builder().exact_length().full().build();
+    let config = Config::builder().exact_length().none().build();
 
     let hits = Sdffe::<Search>::query(
         &sdffe_driver,

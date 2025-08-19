@@ -8,12 +8,12 @@ mod integration_tests {
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Design = load_design_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_NOR: Design = load_design_from("examples/patterns/basic/and/json/and_nor.json").unwrap();
-            static ref CONFIG_DEDUPE_FULL: Config = Config::builder().exact_length().full().build();
-            static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::builder().exact_length().gates_only().build();
+            static ref CONFIG_DEDUPE_FULL: Config = Config::builder().exact_length().none().build();
+            static ref CONFIG_DEDUPE_GATES_ONLY: Config = Config::builder().exact_length().auto_morph().build();
         }
 
         #[test]
-        fn and_nor_matches_in_mixed_tree_gates_only() {
+        fn and_nor_matches_in_mixed_tree_auto_morph() {
             // mixed_and_tree has 2 and_nor instances
             let hits = find_subgraphs(&*AND_NOR, &*MIXED_AND_TREE, &CONFIG_DEDUPE_GATES_ONLY);
             assert_eq!(
@@ -24,7 +24,7 @@ mod integration_tests {
         }
 
         #[test]
-        fn and_nor_matches_in_mixed_tree_full() {
+        fn and_nor_matches_in_mixed_tree_none() {
             // mixed_and_tree has 2 and_nor instances
             let hits = find_subgraphs(&*AND_NOR, &*MIXED_AND_TREE, &CONFIG_DEDUPE_FULL);
             assert_eq!(

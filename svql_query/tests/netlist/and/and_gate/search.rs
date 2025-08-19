@@ -17,7 +17,7 @@ mod integration_tests {
             static ref AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_SEQ: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
-            static ref CONFIG: Config = Config::builder().exact_length().full().build();
+            static ref CONFIG: Config = Config::builder().exact_length().none().build();
         }
 
         fn root_instance() -> Instance {

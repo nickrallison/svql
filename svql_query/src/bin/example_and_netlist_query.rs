@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let and_seq_driver =
         load_driver_cached("examples/fixtures/basic/and/verilog/and_seq.v", &mut cache)?;
 
-    let config = Config::builder().exact_length().full().build();
+    let config = Config::builder().exact_length().none().build();
 
     let hits = AndGate::<Search>::query(
         &and_gate_driver,

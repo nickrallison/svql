@@ -160,14 +160,14 @@ pub fn find_subgraphs<'p, 'd>(
     }
 
     match config.dedupe {
-        DedupeMode::Full => {
+        DedupeMode::None => {
             let mut seen: std::collections::HashSet<Vec<(u8, usize, usize, usize, usize)>> =
                 std::collections::HashSet::new();
-            results.retain(|m| seen.insert(signature_full(m)));
+            results.retain(|m| seen.insert(signature_none(m)));
         }
-        DedupeMode::GatesOnly => {
+        DedupeMode::AutoMorph => {
             let mut seen: std::collections::HashSet<Vec<usize>> = std::collections::HashSet::new();
-            results.retain(|m| seen.insert(signature_gates_only(m)));
+            results.retain(|m| seen.insert(signature_auto_morph(m)));
         }
     }
 
@@ -178,7 +178,7 @@ pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 
-fn signature_full<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
+fn signature_none<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, usize, usize)> {
     let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
 
     for (p, d) in m.cell_mapping.iter() {
@@ -197,7 +197,7 @@ fn signature_full<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, u
     sig
 }
 
-fn signature_gates_only<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
+fn signature_auto_morph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
     let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
     sig.sort_unstable();
     sig.dedup();
@@ -241,12 +241,12 @@ mod tests {
         let pat = &SDFFE;
         let hay = &SEQ_DOUBLE_SDFFE;
 
-        let full = Config::default();
-        let _ = find_subgraphs(pat, hay, &full);
+        let none = Config::default();
+        let _ = find_subgraphs(pat, hay, &none);
 
-        let gates_only = ConfigBuilder::default()
-            .dedupe(DedupeMode::GatesOnly)
+        let auto_morph = ConfigBuilder::default()
+            .dedupe(DedupeMode::AutoMorph)
             .build();
-        let _ = find_subgraphs(pat, hay, &gates_only);
+        let _ = find_subgraphs(pat, hay, &auto_morph);
     }
 }

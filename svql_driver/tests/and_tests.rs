@@ -16,7 +16,7 @@ mod integration_tests {
             //
             static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::builder()
                 .match_length(false)
-                .full()
+                .none()
                 .build();
         }
 
