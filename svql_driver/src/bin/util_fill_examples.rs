@@ -9,6 +9,20 @@ use std::{
 
 use which::which;
 
+enum YosysOutput {
+    RTLIL(PathBuf),
+    JSON(PathBuf),
+}
+
+impl YosysOutput {
+    fn path(&self) -> &PathBuf {
+        match self {
+            YosysOutput::RTLIL(path) => path,
+            YosysOutput::JSON(path) => path,
+        }
+    }
+}
+
 /// Walk a directory tree and return every file whose extension matches `ext`.
 fn collect_files_with_ext(root: &Path, ext: &str) -> io::Result<Vec<PathBuf>> {
     let mut out = Vec::new();
@@ -32,33 +46,40 @@ fn collect_files_with_ext(root: &Path, ext: &str) -> io::Result<Vec<PathBuf>> {
 
 /// Build the argument list for a Yosys invocation that reads a Verilog file and
 /// writes an RTLIL file.
-fn get_rtlil_args(verilog: &Path, module_name: &str, rtlil_out: &Path) -> Vec<String> {
+fn get_args(verilog: &Path, module_name: &str, file_out: YosysOutput) -> Vec<String> {
+    let write_cmd = match file_out {
+        YosysOutput::RTLIL(path) => format!("write_rtlil {}", path.display()),
+        YosysOutput::JSON(path) => format!("write_json {}", path.display()),
+    };
+
     vec![
         "-p".to_string(),
         format!("read_verilog {}", verilog.display()),
         "-p".to_string(),
         format!("hierarchy -top {}", module_name),
         "-p".to_string(),
-        "proc".to_string(),
+        "proc; flatten; opt_clean".to_string(),
         "-p".to_string(),
-        format!("write_rtlil {}", rtlil_out.display()),
+        write_cmd,
     ]
 }
 
 /// Run Yosys on a single Verilog file and produce the corresponding RTLIL file.
-fn run_yosys_to_rtlil(
+fn run_yosys(
     yosys: &Path,
     verilog: &Path,
     module_name: &str,
-    rtlil_out: &Path,
+    file_out: YosysOutput,
 ) -> Result<(), Box<dyn std::error::Error>> {
     trace!(
         "Running Yosys: {:?} on {:?} → {:?}",
-        yosys, verilog, rtlil_out
+        yosys,
+        verilog,
+        file_out.path()
     );
 
     let mut cmd = std::process::Command::new(yosys);
-    cmd.args(get_rtlil_args(verilog, module_name, rtlil_out));
+    cmd.args(get_args(verilog, module_name, file_out));
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null());
@@ -127,6 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Verify the expected sub‑directories exist.
     let verilog_dir = examples_root.join("verilog");
     let rtlil_dir = examples_root.join("rtlil");
+    let json_dir = examples_root.join("json");
 
     if !verilog_dir.is_dir() {
         return Err(format!(
@@ -140,6 +162,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!(
             "Failed to create rtlil output directory {}: {}",
             rtlil_dir.display(),
+            e
+        )
+    })?;
+
+    fs::create_dir_all(&json_dir).map_err(|e| {
+        format!(
+            "Failed to create json output directory {}: {}",
+            json_dir.display(),
             e
         )
     })?;
@@ -182,6 +212,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .replace(".v", ".il"),
         );
 
+        let json_path = json_dir.join(
+            verilog_path
+                .file_name()
+                .ok_or("Verilog path has no file name")?
+                .to_string_lossy()
+                .replace(".v", ".json"),
+        );
+
         // Skip if the RTLIL file already exists (optional – remove this block to
         // force regeneration).
         if rtlil_path.exists() {
@@ -190,20 +228,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 verilog_path.display(),
                 rtlil_path.display()
             );
-            continue;
+        } else {
+            let rtlil_out = YosysOutput::RTLIL(rtlil_path.clone());
+            match run_yosys(&yosys_path, &verilog_path, module_name, rtlil_out) {
+                Ok(_) => {
+                    println!(
+                        "Generated RTLIL: {} → {}",
+                        verilog_path.display(),
+                        rtlil_path.display()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("Error processing {}: {}", verilog_path.display(), e);
+                }
+            }
         }
 
-        // Run Yosys.
-        match run_yosys_to_rtlil(&yosys_path, &verilog_path, module_name, &rtlil_path) {
-            Ok(_) => {
-                println!(
-                    "Generated RTLIL: {} → {}",
-                    verilog_path.display(),
-                    rtlil_path.display()
-                );
-            }
-            Err(e) => {
-                eprintln!("Error processing {}: {}", verilog_path.display(), e);
+        if json_path.exists() {
+            trace!(
+                "Skipping {} – JSON already present at {}",
+                verilog_path.display(),
+                json_path.display()
+            );
+        } else {
+            let json_out = YosysOutput::JSON(json_path.clone());
+            match run_yosys(&yosys_path, &verilog_path, module_name, json_out) {
+                Ok(_) => {
+                    println!(
+                        "Generated JSON: {} → {}",
+                        verilog_path.display(),
+                        json_path.display()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("Error processing {}: {}", verilog_path.display(), e);
+                }
             }
         }
     }

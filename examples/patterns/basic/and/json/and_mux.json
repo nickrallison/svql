@@ -1,0 +1,72 @@
+{
+  "creator": "Yosys 0.33 (git sha1 2584903a060)",
+  "modules": {
+    "and_mux": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "examples/patterns/basic/and/verilog/and_mux.v:1.1-13.10"
+      },
+      "ports": {
+        "a": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "b": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "y": {
+          "direction": "output",
+          "bits": [ 4 ]
+        }
+      },
+      "cells": {
+        "$ternary$examples/patterns/basic/and/verilog/and_mux.v:11$1": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_mux.v:11.16-11.28"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ 3 ],
+            "S": [ 2 ],
+            "Y": [ 4 ]
+          }
+        }
+      },
+      "netnames": {
+        "a": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_mux.v:3.12-3.13"
+          }
+        },
+        "b": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_mux.v:4.12-4.13"
+          }
+        },
+        "y": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_mux.v:5.12-5.13"
+          }
+        }
+      }
+    }
+  }
+}
