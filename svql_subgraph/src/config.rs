@@ -6,24 +6,26 @@
 //! The two main concepts are:
 //! - match_length: whether input arity must match exactly, or whether the
 //!   design can have a superset of inputs (deterministically aligned).
-//! - dedupe: how to deduplicate matches after search (by none boundary
-//!   bindings, or by the set of matched design gates only).
+//! - dedupe: how to deduplicate matches after search, controlled by `DedupeMode`:
+//!     - `None`: include boundary (IO) bindings when deduplicating.
+//!     - `AutoMorph`: collapse permutations/automorphisms by deduping on the
+//!       set of matched design gates only (ignoring boundary bindings).
 //!
 //! Quick examples
 //!
-//! Exact-length, none dedupe (original/default behavior):
+//! Exact-length, None dedupe (original/default behavior):
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
 //! let cfg = Config::new(true, DedupeMode::None);
 //! ```
 //!
-//! Gates-only dedupe (collapse permutations/automorphisms) with exact-length:
+//! AutoMorph dedupe (collapse permutations/automorphisms) with exact-length:
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
 //! let cfg = Config::new(true, DedupeMode::AutoMorph);
 //! ```
 //!
-//! Superset-length (allow design gates to have extra inputs) with gates-only dedupe:
+//! Superset-length (allow design gates to have extra inputs) with AutoMorph dedupe:
 //! ```ignore
 //! use svql_subgraph::{Config, DedupeMode};
 //! let cfg = Config::new(false, DedupeMode::AutoMorph);
@@ -36,7 +38,7 @@
 //! // Equivalent to Config::new(true, DedupeMode::None)
 //! let cfg_default = Config::builder().exact_length().none().build();
 //!
-//! // Superset-length and gates-only dedupe
+//! // Superset-length and AutoMorph dedupe
 //! let cfg_superset = Config::builder()
 //!     .superset_length()
 //!     .auto_morph()
@@ -59,10 +61,11 @@
 ///       alignment rule (commutative gates are normalized), where N is the
 ///       number of pattern inputs. This retains determinism while avoiding
 ///       combinatorial explosion from trying all subsets.
-/// - dedupe:
+/// - dedupe (`DedupeMode`):
 ///     - Controls how matches are deduplicated after search:
 ///         - None: include boundary (IO) bindings in the dedupe signature
-///         - AutoMorph: collapse permutations/automorphisms.
+///         - AutoMorph: collapse permutations/automorphisms by deduping on the
+///           set of matched design gates (ignoring boundary bindings).
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Whether to require exact pin-count (true) or allow superset arity in the design (false).
@@ -77,14 +80,14 @@ impl Config {
     /// - match_length:
     ///     - true  => exact-length mode (pattern inputs count must equal design).
     ///     - false => superset-length mode (design may have extra inputs).
-    /// - dedupe: how to deduplicate results after the search completes.
+    /// - dedupe (`DedupeMode`): how to deduplicate results after the search completes.
     ///
     /// Examples:
     /// - Original behavior:
     ///   `Config::new(true, DedupeMode::None)`
     /// - Collapse automorphisms (permutations of pattern mapping):
     ///   `Config::new(true, DedupeMode::AutoMorph)`
-    /// - Allow extra inputs in design and dedupe by gates only:
+    /// - Allow extra inputs in design and dedupe by gates only (ignore boundary bindings):
     ///   `Config::new(false, DedupeMode::AutoMorph)`
     pub fn new(match_length: bool, dedupe: DedupeMode) -> Self {
         Self {

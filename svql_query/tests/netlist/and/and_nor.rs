@@ -26,7 +26,7 @@ mod integration_tests {
                 &*AND_NOR,
                 &*MIXED_AND_TREE,
                 root_instance(),
-                &CONFIG_DEDUPE_GATES_ONLY,
+                &CONFIG_DEDUPE_AUTO_MORPH,
             );
             assert_eq!(
                 hits.len(),
@@ -42,7 +42,7 @@ mod integration_tests {
                 &*AND_NOR,
                 &*MIXED_AND_TREE,
                 root_instance(),
-                &CONFIG_DEDUPE_FULL,
+                &CONFIG_DEDUPE_NONE,
             );
             assert_eq!(
                 hits.len(),
