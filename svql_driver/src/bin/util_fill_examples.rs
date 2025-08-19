@@ -39,7 +39,7 @@ fn get_rtlil_args(verilog: &Path, module_name: &str, rtlil_out: &Path) -> Vec<St
         "-p".to_string(),
         format!("hierarchy -top {}", module_name),
         "-p".to_string(),
-        "proc; flatten; opt_clean".to_string(),
+        "proc".to_string(),
         "-p".to_string(),
         format!("write_rtlil {}", rtlil_out.display()),
     ]
