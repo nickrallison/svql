@@ -1,0 +1,32 @@
+use svql_driver::{cache::Cache, util::load_driver_cached};
+use svql_query::{
+    Search,
+    instance::Instance,
+    queries::netlist::{and::And, dff::Sdffe},
+};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Trace)
+        .init();
+
+    let mut cache = Cache::new();
+
+    let otbn_driver = load_driver_cached("examples/larger_designs/otbn_core.json", &mut cache)?;
+    let sdffe_driver = load_driver_cached(
+        "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
+        &mut cache,
+    )?;
+
+    let hits = Sdffe::<Search>::query(
+        &sdffe_driver,
+        &otbn_driver,
+        Instance::root("sdffe".to_string()),
+    );
+
+    for hit in hits {
+        println!("Found match: {:#?}", hit);
+    }
+
+    Ok(())
+}

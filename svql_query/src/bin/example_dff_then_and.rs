@@ -1,13 +1,12 @@
-use itertools::iproduct;
 use log::trace;
 use svql_driver::cache::Cache;
 use svql_driver::prelude::Driver;
 
 use svql_driver::util::load_driver_cached;
 use svql_query::composite::{Composite, MatchedComposite, SearchableComposite};
+use svql_query::impl_find_port;
 use svql_query::instance::Instance;
 use svql_query::{Connection, Match, Search, State, WithPath};
-use svql_query::{Wire, impl_find_port};
 
 use svql_query::queries::netlist::and::And;
 use svql_query::queries::netlist::dff::Sdffe;

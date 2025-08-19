@@ -194,35 +194,36 @@ pub fn find_subgraphs<'p, 'd>(
     let p_anchor = *p_anchors.iter().min().unwrap();
     let p_anchors = vec![p_anchor];
 
-    for &p_a in &p_anchors {
-        for &d_a in &d_anchors {
-            if p_index.kind(p_a) != d_index.kind(d_a) {
-                continue;
-            }
-            let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
-            if !compat::cells_compatible(p_a, d_a, &p_index, &d_index, &empty_state) {
-                continue;
-            }
+    // it should not matter (for correctness) which of the pattern anchors are chosen, all will have to find a match anyways
+    let p_a = *p_anchors.first().expect("No pattern anchors found");
 
-            let mut st = state::State::new(p_index.gate_count());
-            st.map(p_a, d_a);
-
-            // Add IO boundaries implied by anchor mapping
-            let added = search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st);
-
-            search::backtrack(
-                &p_index,
-                &d_index,
-                &mut st,
-                &mut results,
-                &pat_inputs,
-                &pat_outputs,
-            );
-
-            // Backtrack anchor boundaries
-            search::remove_boundaries(added, &mut st);
-            st.unmap(p_a, d_a);
+    for &d_a in &d_anchors {
+        if p_index.kind(p_a) != d_index.kind(d_a) {
+            continue;
         }
+        let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
+        if !compat::cells_compatible(p_a, d_a, &p_index, &d_index, &empty_state) {
+            continue;
+        }
+
+        let mut st = state::State::new(p_index.gate_count());
+        st.map(p_a, d_a);
+
+        // Add IO boundaries implied by anchor mapping
+        let added = search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st);
+
+        search::backtrack(
+            &p_index,
+            &d_index,
+            &mut st,
+            &mut results,
+            &pat_inputs,
+            &pat_outputs,
+        );
+
+        // Backtrack anchor boundaries
+        search::remove_boundaries(added, &mut st);
+        st.unmap(p_a, d_a);
     }
 
     // Dedupe by combined signature

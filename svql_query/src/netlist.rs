@@ -2,7 +2,6 @@ use svql_driver::prelude::Driver;
 use svql_subgraph::{SubgraphMatch, find_subgraphs};
 
 use crate::instance::Instance;
-use crate::{Search, State};
 
 /// Direction of a port on a netlist
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
