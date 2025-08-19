@@ -91,7 +91,8 @@ impl AndMux<Search> {
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
+        config: &svql_subgraph::config::Config,
     ) -> Vec<AndMux<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path)
+        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

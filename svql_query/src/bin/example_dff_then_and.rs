@@ -10,6 +10,7 @@ use svql_query::{Connection, Match, Search, State, WithPath};
 
 use svql_query::queries::netlist::basic::and::and_gate::AndGate;
 use svql_query::queries::netlist::basic::dff::Sdffe;
+use svql_subgraph::config::{self, Config, DedupeMode};
 
 /// DFF -> AND composite:
 /// - Require that sdffe.q drives either and.a or and.b (one must hold).
@@ -145,20 +146,21 @@ impl DffThenAnd<Search> {
         and_pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
+        config: &Config,
     ) -> Vec<DffThenAnd<Match<'p, 'd>>> {
         // Sub-queries at stable locations in the instance tree
-        let sdffe_hits: Vec<Sdffe<Match<'p, 'd>>> =
-            svql_query::queries::netlist::basic::dff::Sdffe::<Search>::query(
-                sdffe_pattern,
-                haystack,
-                path.child("sdffe".to_string()),
-            );
-        let and_hits: Vec<AndGate<Match<'p, 'd>>> =
-            svql_query::queries::netlist::basic::and::and_gate::AndGate::<Search>::query(
-                and_pattern,
-                haystack,
-                path.child("andg".to_string()),
-            );
+        let sdffe_hits: Vec<Sdffe<Match<'p, 'd>>> = Sdffe::<Search>::query(
+            sdffe_pattern,
+            haystack,
+            path.child("sdffe".to_string()),
+            config,
+        );
+        let and_hits: Vec<AndGate<Match<'p, 'd>>> = AndGate::<Search>::query(
+            and_pattern,
+            haystack,
+            path.child("andg".to_string()),
+            config,
+        );
 
         trace!(
             "DffThenAnd.query: sdffe_hits={}, and_hits={}",
@@ -237,8 +239,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // root path for the composite
     let root = Instance::root("dff_then_and".to_string());
 
+    let config = Config::new(true, DedupeMode::Full);
+
     // run composite query
-    let hits = DffThenAnd::<Search>::query(&sdffe_driver, &and_gate_driver, &haystack, root);
+    let hits =
+        DffThenAnd::<Search>::query(&sdffe_driver, &and_gate_driver, &haystack, root, &config);
 
     trace!("main: DffThenAnd matches={}", hits.len());
 

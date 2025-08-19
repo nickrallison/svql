@@ -8,6 +8,7 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::queries::netlist::basic::and::and_gate::AndGate;
+        use svql_subgraph::config::{Config, DedupeMode};
 
         lazy_static::lazy_static! {
 
@@ -16,6 +17,7 @@ mod integration_tests {
             static ref AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
             static ref MIXED_AND_TREE: Driver = load_driver_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
             static ref AND_SEQ: Driver = load_driver_from("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
+            static ref CONFIG: Config = Config::new(true, DedupeMode::Full);
         }
 
         fn root_instance() -> Instance {
@@ -52,7 +54,7 @@ mod integration_tests {
         ) {
             use svql_query::{Search, queries::netlist::basic::and::and_gate::AndGate};
 
-            let hits = AndGate::<Search>::query(needle, haystack, root_instance());
+            let hits = AndGate::<Search>::query(needle, haystack, root_instance(), &CONFIG);
 
             assert_eq!(
                 hits.len(),
@@ -68,7 +70,7 @@ mod integration_tests {
         #[test]
         fn and_bindings_present_and_gate_vs_and_tree() {
             // For each match, confirm a, b, y have bound design cells
-            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance(), &CONFIG);
             assert!(!hits.is_empty());
 
             for h in &hits {
@@ -135,7 +137,7 @@ mod integration_tests {
 
         #[test]
         fn and_connectivity_exists_in_and_tree() {
-            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_TREE, root_instance(), &CONFIG);
             assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
             let connected = any_connection_exists(&hits);
@@ -147,7 +149,7 @@ mod integration_tests {
 
         #[test]
         fn and_connectivity_exists_in_and_seq() {
-            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_SEQ, root_instance());
+            let hits = AndGate::<Search>::query(&*AND_GATE, &*AND_SEQ, root_instance(), &CONFIG);
             assert_eq!(hits.len(), 7, "sanity: expect 7 hits");
 
             let connected = any_connection_exists(&hits);

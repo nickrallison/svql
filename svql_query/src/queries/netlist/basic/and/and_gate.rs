@@ -94,7 +94,8 @@ impl AndGate<Search> {
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
+        config: &svql_subgraph::config::Config,
     ) -> Vec<AndGate<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path)
+        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

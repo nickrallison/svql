@@ -99,7 +99,8 @@ impl Sdffe<Search> {
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
+        config: &svql_subgraph::config::Config,
     ) -> Vec<Sdffe<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path)
+        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

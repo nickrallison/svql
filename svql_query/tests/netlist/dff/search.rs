@@ -7,6 +7,7 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::queries::netlist::basic::dff::Sdffe;
+        use svql_subgraph::config::{Config, DedupeMode};
 
         lazy_static::lazy_static! {
             static ref COMB_D_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
@@ -14,6 +15,7 @@ mod integration_tests {
             static ref PAR_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
             static ref SEQ_DOUBLE_SDFFE: Driver = load_driver_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
             static ref SDFFE: Driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+            static ref CONFIG: Config = Config::new(true, DedupeMode::Full);
         }
 
         fn root_instance() -> Instance {
@@ -56,7 +58,7 @@ mod integration_tests {
             #[case] haystack: &'static Driver,
             #[case] expected: usize,
         ) {
-            let hits = Sdffe::<Search>::query(needle, haystack, root_instance());
+            let hits = Sdffe::<Search>::query(needle, haystack, root_instance(), &CONFIG);
             assert_eq!(
                 hits.len(),
                 expected,
@@ -71,7 +73,8 @@ mod integration_tests {
         #[test]
         fn sdffe_bindings_present_in_seq_double() {
             // sanity: two flops connected in sequence
-            let hits = Sdffe::<Search>::query(&*SDFFE, &*SEQ_DOUBLE_SDFFE, root_instance());
+            let hits =
+                Sdffe::<Search>::query(&*SDFFE, &*SEQ_DOUBLE_SDFFE, root_instance(), &CONFIG);
             assert_eq!(
                 hits.len(),
                 2,
@@ -145,7 +148,8 @@ mod integration_tests {
 
         #[test]
         fn sdffe_connectivity_exists_in_seq_double() {
-            let hits = Sdffe::<Search>::query(&*SDFFE, &*SEQ_DOUBLE_SDFFE, root_instance());
+            let hits =
+                Sdffe::<Search>::query(&*SDFFE, &*SEQ_DOUBLE_SDFFE, root_instance(), &CONFIG);
             assert_eq!(hits.len(), 2, "sanity: expect 2 sdffe hits");
 
             let connected = any_q_to_d_connection(&hits);

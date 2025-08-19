@@ -1,13 +1,11 @@
 use log::trace;
-use svql_driver::cache::Cache;
-use svql_driver::prelude::Driver;
-use svql_driver::util::load_driver_cached;
-
-use svql_query::instance::Instance;
-use svql_query::queries::netlist::basic::and::{
-    and_gate::AndGate, and_mux::AndMux, and_nor::AndNor,
+use svql_driver::{cache::Cache, prelude::Driver, util::load_driver_cached};
+use svql_query::{
+    Match, Search, State, Wire, WithPath,
+    instance::Instance,
+    queries::netlist::basic::and::{and_gate::AndGate, and_mux::AndMux, and_nor::AndNor},
 };
-use svql_query::{Match, Search, State, Wire, WithPath};
+use svql_subgraph::config::{Config, DedupeMode};
 
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
@@ -41,29 +39,25 @@ where
 }
 
 impl AndAny<Search> {
-    /// Run a unified query that accepts any of:
-    /// - and_gate
-    /// - and_mux
-    /// - and_nor
-    ///
-    /// Each inner query is invoked with the same root path so the wrapped
-    /// variants are interchangeable in composites or further processing.
+    /// Unified query across and_gate, and_mux, and and_nor.
+    /// Uses gates-only dedupe to collapse matches that differ only by IO bindings.
     pub fn query<'p, 'd>(
         and_gate_pattern: &'p Driver,
         and_mux_pattern: &'p Driver,
         and_nor_pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
+        config: &Config,
     ) -> Vec<AndAny<Match<'p, 'd>>> {
         let mut out: Vec<AndAny<Match<'p, 'd>>> = Vec::new();
 
-        let gate_hits = AndGate::<Search>::query(and_gate_pattern, haystack, path.clone());
+        let gate_hits = AndGate::<Search>::query(and_gate_pattern, haystack, path.clone(), &config);
         out.extend(gate_hits.into_iter().map(AndAny::Gate));
 
-        let mux_hits = AndMux::<Search>::query(and_mux_pattern, haystack, path.clone());
+        let mux_hits = AndMux::<Search>::query(and_mux_pattern, haystack, path.clone(), &config);
         out.extend(mux_hits.into_iter().map(AndAny::Mux));
 
-        let nor_hits = AndNor::<Search>::query(and_nor_pattern, haystack, path.clone());
+        let nor_hits = AndNor::<Search>::query(and_nor_pattern, haystack, path.clone(), &config);
         out.extend(nor_hits.into_iter().map(AndAny::Nor));
 
         out
@@ -89,6 +83,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut cache,
     )?;
 
+    let config = Config::new(true, DedupeMode::Full);
+
     // root path for the composite
     let root = Instance::root("dff_then_and".to_string());
 
@@ -99,6 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &and_nor_driver,
         &haystack,
         root,
+        &config,
     );
 
     // trace!("main: AndAny matches={}", hits.len());

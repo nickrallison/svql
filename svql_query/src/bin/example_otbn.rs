@@ -1,5 +1,6 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
 use svql_query::{Search, instance::Instance, queries::netlist::basic::dff::Sdffe};
+use svql_subgraph::config::{Config, DedupeMode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
@@ -17,10 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut cache,
     )?;
 
+    let config = Config::new(true, DedupeMode::Full);
+
     let hits = Sdffe::<Search>::query(
         &sdffe_driver,
         &otbn_driver,
         Instance::root("sdffe".to_string()),
+        &config,
     );
 
     for hit in hits {

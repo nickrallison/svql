@@ -118,6 +118,8 @@ mod tests {
 
     use prjunnamed_netlist::Design;
 
+    use crate::config::{Config, DedupeMode};
+
     use super::*;
 
     lazy_static::lazy_static! {
@@ -135,7 +137,7 @@ mod tests {
         let inputs = super::super::cell_kind::get_input_cells(d);
         let outputs = super::super::cell_kind::get_output_cells(d);
 
-        let config = config::Config { match_length: true };
+        let config = Config::new(true, DedupeMode::Full);
 
         backtrack(
             &p_index, &d_index, &mut st, &mut out, &inputs, &outputs, &config,
