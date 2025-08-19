@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
@@ -13,14 +13,10 @@ mod ports;
 mod search;
 mod state;
 mod strategy;
-pub(crate) mod util;
+pub mod util;
 
-// Public re-exports for a minimal, stable external API.
 pub use cell_kind::{CellWrapper, InputCell, OutputCell};
 pub use config::{Config, DedupeMode};
-
-// Also re-export under their original short names for ergonomic use in dependents.
-// pub use config::{Config, DedupeMode};
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -163,16 +159,14 @@ pub fn find_subgraphs<'p, 'd>(
         st.unmap(p_a, d_a);
     }
 
-    // Dedupe according to config
     match config.dedupe {
         DedupeMode::Full => {
-            let mut seen: HashSet<Vec<(u8, usize, usize, usize, usize)>> = HashSet::new();
+            let mut seen: std::collections::HashSet<Vec<(u8, usize, usize, usize, usize)>> =
+                std::collections::HashSet::new();
             results.retain(|m| seen.insert(signature_full(m)));
         }
         DedupeMode::GatesOnly => {
-            // Collapse matches that select the same set of design gates, regardless of
-            // which pattern gates they map to (ignores boundary bindings and automorphisms).
-            let mut seen: HashSet<Vec<usize>> = HashSet::new();
+            let mut seen: std::collections::HashSet<Vec<usize>> = std::collections::HashSet::new();
             results.retain(|m| seen.insert(signature_gates_only(m)));
         }
     }
@@ -204,17 +198,14 @@ fn signature_full<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<(u8, usize, usize, u
 }
 
 fn signature_gates_only<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
-    // Only the set of design gate IDs matter; ignore which pattern gates map to them
-    // and ignore any boundary bindings. This collapses automorphisms/permutations.
     let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
     sig.sort_unstable();
     sig.dedup();
     sig
 }
-
 #[cfg(test)]
 mod tests {
-    use crate::{config::ConfigBuilder, util::load_design_from};
+    use crate::config::ConfigBuilder;
 
     use super::*;
 

@@ -8,7 +8,7 @@ use log::error;
 use prjunnamed_netlist::Design;
 
 #[allow(dead_code)]
-pub(crate) fn load_design_from(design: &str) -> Result<Design, Box<dyn std::error::Error>> {
+pub fn load_design_from(design: &str) -> Result<Design, Box<dyn std::error::Error>> {
     let json_temp_file = tempfile::Builder::new()
         .prefix("svql_prjunnamed_")
         .suffix(".json")
