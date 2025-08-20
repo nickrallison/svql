@@ -3,7 +3,7 @@ use std::{borrow::Cow, hash::Hash};
 use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Trit, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum CellKind {
+pub(super) enum CellKind {
     Buf,
     Not,
     And,

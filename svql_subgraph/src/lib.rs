@@ -4,11 +4,16 @@ use prjunnamed_netlist::Design;
 
 use cell::{get_input_cells, get_output_cells};
 
-pub mod cell;
+// Only expose the minimal API surface publicly.
+// Internal modules remain private to the crate.
+mod cell;
 pub mod config;
 mod index;
 mod search;
 mod state;
+
+// Keep util publicly available for tests but hide it from docs.
+#[doc(hidden)]
 pub mod util;
 
 pub use cell::CellWrapper;
@@ -185,7 +190,8 @@ pub fn find_subgraphs<'p, 'd>(
     AllSubgraphMatches { matches: results }
 }
 
-pub fn get_pattern_io_cells<'p>(
+// Internal helper for tests and internal wiring only.
+pub(crate) fn get_pattern_io_cells<'p>(
     pattern: &'p Design,
 ) -> (Vec<CellWrapper<'p>>, Vec<CellWrapper<'p>>) {
     (get_input_cells(pattern), get_output_cells(pattern))
