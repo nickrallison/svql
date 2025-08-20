@@ -18,6 +18,8 @@ pub mod util;
 pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
 
+use crate::compat::cells_compatible;
+
 // Alias to simplify clippy::type_complexity in dedupe signatures
 type SigBoundary = Vec<(u8, usize, usize, usize, usize)>;
 
@@ -128,7 +130,7 @@ pub fn find_subgraphs<'p, 'd>(
 
     for &d_a in &d_anchors {
         let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
-        if !compat::cells_compatible(
+        if !cells_compatible(
             p_a,
             d_a,
             &p_index,
@@ -141,8 +143,7 @@ pub fn find_subgraphs<'p, 'd>(
 
         let mut st = state::State::new(p_index.gate_count());
         st.map(p_a, d_a);
-        let added =
-            search::add_io_boundaries_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
+        let added = search::add_bindings_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
 
         search::backtrack(
             &p_index,
@@ -154,7 +155,7 @@ pub fn find_subgraphs<'p, 'd>(
             config,
         );
 
-        search::remove_boundaries(added, &mut st);
+        search::remove_bindings(added, &mut st);
         st.unmap(p_a, d_a);
     }
 

@@ -1,4 +1,4 @@
-use crate::state::check_and_collect_boundary;
+use crate::state::check_and_collect_bindings;
 
 use super::index::{Index, NodeId};
 use super::ports::Source;
@@ -17,9 +17,9 @@ pub(super) fn cells_compatible<'p, 'd>(
         return false;
     }
 
-    // Pairwise pin checks + (side-effect-free) collection of boundary insertions
-    let Some(_pending_boundary) =
-        check_and_collect_boundary(p_id, d_id, p_index, d_index, state, match_length)
+    // Pairwise pin checks + (side-effect-free) collection of driver bindings
+    let Some(_pending_bindings) =
+        check_and_collect_bindings(p_id, d_id, p_index, d_index, state, match_length)
     else {
         return false;
     };
@@ -62,8 +62,8 @@ fn design_has_input_from_bit<'d>(
 /// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
 /// as a source in q_p is mirrored by a usage of d_id in q_d at the same bit index.
 ///
-/// This enforces that mapping (p_id -> d_id) remains consistent with the portion
-/// of the mapping already built, regardless of mapping order.
+/// This mirrors historical behavior and preserves automorphisms. It keeps matching
+/// order-independent without recording producer-identity bindings.
 fn downstream_consumers_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,

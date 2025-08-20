@@ -1,6 +1,6 @@
 use crate::cell::CellWrapper;
 use crate::config;
-use crate::state::check_and_collect_boundary;
+use crate::state::check_and_collect_bindings;
 
 use super::SubgraphMatch;
 use super::compat::cells_compatible;
@@ -37,31 +37,31 @@ pub(super) fn backtrack<'p, 'd>(
         }
 
         st.map(next_p, d_cand);
-        let added = add_io_boundaries_from_pair(next_p, d_cand, p_index, d_index, st, config);
+        let added = add_bindings_from_pair(next_p, d_cand, p_index, d_index, st, config);
 
         backtrack(p_index, d_index, st, out, pat_inputs, pat_outputs, config);
 
-        remove_boundaries(added, st);
+        remove_bindings(added, st);
         st.unmap(next_p, d_cand);
     }
 }
 
-pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
+pub(super) fn add_bindings_from_pair<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
     config: &config::Config,
-) -> Vec<(CellWrapper<'p>, usize)> {
+) -> Vec<crate::state::PatSrcKey<'p>> {
     let mut added = Vec::new();
 
     if let Some(pending) =
-        check_and_collect_boundary(p_id, d_id, p_index, d_index, st, config.match_length)
+        check_and_collect_bindings(p_id, d_id, p_index, d_index, st, config.match_length)
     {
-        for ((p_cell, p_bit), (d_cell, d_bit)) in pending {
-            if st.boundary_insert((p_cell, p_bit), (d_cell, d_bit)) {
-                added.push((p_cell, p_bit));
+        for (p_key, d_key) in pending {
+            if st.binding_insert(p_key, d_key) {
+                added.push(p_key);
             }
         }
     }
@@ -69,11 +69,11 @@ pub(super) fn add_io_boundaries_from_pair<'p, 'd>(
     added
 }
 
-pub(super) fn remove_boundaries<'p, 'd>(
-    added: Vec<(CellWrapper<'p>, usize)>,
+pub(super) fn remove_bindings<'p, 'd>(
+    added: Vec<crate::state::PatSrcKey<'p>>,
     st: &mut State<'p, 'd>,
 ) {
-    st.boundary_remove_keys(&added);
+    st.bindings_remove_keys(&added);
 }
 
 #[cfg(test)]
