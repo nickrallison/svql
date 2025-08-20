@@ -1,23 +1,29 @@
-use std::path::PathBuf;
+use std::path::Path;
 
-use crate::{cache::Cache, driver::Driver};
+use crate::{driver::DesignKey, driver::Driver};
 
-pub fn load_driver_from(path: &str) -> Result<Driver, Box<dyn std::error::Error>> {
-    let mut cache: Cache = Cache::new();
-    load_driver_cached(path, &mut cache)
+/// Create a new shared driver (design registry).
+pub fn new_shared_driver() -> Result<Driver, Box<dyn std::error::Error>> {
+    Driver::new()
 }
 
-pub fn load_driver_cached(
-    path: &str,
-    cache: &mut Cache,
-) -> Result<Driver, Box<dyn std::error::Error>> {
-    let path = std::path::PathBuf::from(path);
-    let name = PathBuf::from(path.file_stem().ok_or("Failed to get file stem")?)
-        .to_str()
-        .unwrap()
-        .to_string();
-    let driver = Driver::new(path, name.clone(), Some(cache))?;
-    Ok(driver)
+/// Load a design into the given shared driver; module name defaults to file stem.
+/// Returns the DesignKey.
+pub fn ensure_loaded<P: AsRef<Path>>(
+    driver: &Driver,
+    path: P,
+) -> Result<DesignKey, Box<dyn std::error::Error>> {
+    driver.ensure_loaded(path)
+}
+
+/// Load a design into the given shared driver with explicit top module name.
+/// Returns the DesignKey.
+pub fn ensure_loaded_with_top<P: Into<std::path::PathBuf>>(
+    driver: &Driver,
+    path: P,
+    top: impl Into<String>,
+) -> Result<DesignKey, Box<dyn std::error::Error>> {
+    driver.ensure_loaded_with_top(path.into(), top.into())
 }
 
 #[cfg(test)]
@@ -25,7 +31,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_load_driver() {
-        let _driver = load_driver_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+    fn can_load_design_key() {
+        let driver = new_shared_driver().unwrap();
+        let key = ensure_loaded(&driver, "examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        let d = driver.get(&key).unwrap();
+        assert!(d.iter_cells().count() > 0);
     }
 }

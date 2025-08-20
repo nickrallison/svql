@@ -1,4 +1,7 @@
-use svql_driver::{cache::Cache, util::load_driver_cached};
+use svql_driver::{
+    prelude::DesignKey,
+    util::{ensure_loaded, new_shared_driver},
+};
 use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -6,23 +9,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let mut cache = Cache::new();
+    let driver = new_shared_driver()?;
 
-    let haystack_path = "examples/fixtures/basic/ff/verilog/seq_sdffe.v";
-    let haystack_driver = load_driver_cached(haystack_path, &mut cache)?;
-
-    let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
-    let needle_driver = load_driver_cached(needle_path, &mut cache)?;
+    let hay_key: DesignKey =
+        ensure_loaded(&driver, "examples/fixtures/basic/ff/verilog/seq_sdffe.v")?;
+    let needle_key: DesignKey =
+        ensure_loaded(&driver, "examples/patterns/basic/ff/verilog/sdffe.v")?;
 
     let config = Config::builder().exact_length().none().build();
 
     let search_results = find_subgraphs(
-        needle_driver.design_as_ref(),
-        haystack_driver.design_as_ref(),
+        driver.get(&needle_key).unwrap().as_ref(),
+        driver.get(&hay_key).unwrap().as_ref(),
         &config,
     );
 
-    // Every match should resolve both d (input) and q (output) via O(1) helpers
     for m in search_results.iter() {
         assert!(
             m.design_source_of_input_bit("d", 0).is_some(),
@@ -34,7 +35,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // There should exist a pair of matches where q of one drives d of the other.
     let ms: Vec<_> = search_results.iter().collect();
     let mut found = false;
     for m1 in &ms {
