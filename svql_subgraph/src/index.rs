@@ -27,18 +27,24 @@ impl<'a> Index<'a> {
         let mut by_kind: HashMap<CellKind, Vec<NodeId>> = HashMap::new();
         let mut cell_to_id: HashMap<usize, NodeId> = HashMap::new();
 
-        for cell in design.iter_cells().map(CellWrapper::new) {
-            let k = CellKind::from(cell.get().as_ref());
-            if !k.is_gate() {
-                continue;
-            }
-            let id = nodes.len() as NodeId;
+        // Filter to gates first, then enumerate so NodeIds are contiguous and stable.
+        let gate_triplets: Vec<(CellWrapper<'a>, CellKind, CellPins<'a>)> = design
+            .iter_cells()
+            .map(CellWrapper::new)
+            .filter_map(|cell| {
+                let kind = CellKind::from(cell.get().as_ref());
+                kind.is_gate()
+                    .then_some((cell, kind, super::ports::extract_pins(cell)))
+            })
+            .collect();
 
+        for (id, (cell, kind, cell_pins)) in gate_triplets.into_iter().enumerate() {
+            let id = id as NodeId;
             nodes.push(cell);
-            kinds.push(k);
-            let p = extract_pins(cell);
-            pins.push(p);
-            by_kind.entry(k).or_default().push(id);
+            kinds.push(kind);
+            pins.push(cell_pins);
+
+            by_kind.entry(kind).or_default().push(id);
             cell_to_id.insert(cell.debug_index(), id);
         }
 

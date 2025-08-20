@@ -114,107 +114,14 @@ impl<'p, 'd> State<'p, 'd> {
         pat_input_cells: &[CellWrapper<'p>],
         pat_output_cells: &[CellWrapper<'p>],
     ) -> super::SubgraphMatch<'p, 'd> {
-        // Gate mapping (pattern gate -> design gate)
-        let mut cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>> = HashMap::new();
-        for (&p_node, &d_node) in &self.mapping {
-            let p_cell = p_index.node_to_cell(p_node);
-            let d_cell = d_index.node_to_cell(d_node);
-            cell_mapping.insert(p_cell, d_cell);
-        }
+        let cell_mapping = self.build_cell_mapping(p_index, d_index);
 
-        // Keep public boundary semantics: only expose bindings for pattern External IO keys.
-        let mut boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
-            HashMap::new();
-        for (k, v) in &self.bindings {
-            if let PatSrcKey::External {
-                cell: p_cell,
-                bit: p_bit,
-            } = k
-            {
-                match v {
-                    DesSrcKey::Gate {
-                        node: d_node,
-                        bit: d_bit,
-                    } => {
-                        let d_cell = d_index.node_to_cell(*d_node);
-                        boundary_src_map.insert((*p_cell, *p_bit), (d_cell, *d_bit));
-                    }
-                    DesSrcKey::External {
-                        cell: d_cell,
-                        bit: d_bit,
-                    } => {
-                        boundary_src_map.insert((*p_cell, *p_bit), (*d_cell, *d_bit));
-                    }
-                    DesSrcKey::Const(_) => {
-                        // Not surfaced in boundary_src_map (can be added later if desired).
-                    }
-                }
-            }
-        }
+        let boundary_src_map = self.build_boundary_src_map(d_index);
 
-        // Name → pattern IO lookup
-        let mut input_by_name = HashMap::new();
-        for ic in pat_input_cells {
-            if let Some(nm) = input_name(ic) {
-                input_by_name.insert(nm, *ic);
-            }
-        }
+        let input_by_name = name_map(pat_input_cells, input_name);
+        let output_by_name = name_map(pat_output_cells, output_name);
 
-        let mut output_by_name = HashMap::new();
-        for oc in pat_output_cells {
-            if let Some(nm) = output_name(oc) {
-                output_by_name.insert(nm, *oc);
-            }
-        }
-
-        // For each pattern output bit, find design driver:
-        // 1) If it is driven by a pattern gate: use cell_mapping for the gate.
-        // 2) Else (driven by a pattern external): use bindings to resolve the design driver.
-        let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
-            HashMap::new();
-
-        for oc in pat_output_cells {
-            if let Cell::Output(_, value) = oc.cref().get().as_ref() {
-                for (out_bit, net) in value.iter().enumerate() {
-                    if let Ok((p_src_cell_ref, p_bit)) = oc.cref().design().find_cell(net) {
-                        let p_src = CellWrapper::from(p_src_cell_ref);
-
-                        if let Some(&d_src) = cell_mapping.get(&p_src) {
-                            out_driver_map.insert((*oc, out_bit), (d_src, p_bit));
-                            continue;
-                        }
-
-                        // Reconstruct External binding for this driver (if present)
-                        let key = PatSrcKey::External {
-                            cell: p_src,
-                            bit: p_bit,
-                        };
-                        if let Some(v) = self.binding_get(key) {
-                            match v {
-                                DesSrcKey::Gate {
-                                    node: d_node,
-                                    bit: d_bit,
-                                } => {
-                                    out_driver_map.insert(
-                                        (*oc, out_bit),
-                                        (d_index.node_to_cell(d_node), d_bit),
-                                    );
-                                }
-                                DesSrcKey::External {
-                                    cell: d_cell,
-                                    bit: d_bit,
-                                } => {
-                                    out_driver_map.insert((*oc, out_bit), (d_cell, d_bit));
-                                }
-                                DesSrcKey::Const(_) => {
-                                    // Skip: not surfaced currently.
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        let out_driver_map = self.build_out_driver_map(d_index, &cell_mapping, pat_output_cells);
 
         super::SubgraphMatch {
             cell_mapping,
@@ -226,6 +133,105 @@ impl<'p, 'd> State<'p, 'd> {
             out_driver_map,
         }
     }
+
+    fn build_cell_mapping(
+        &self,
+        p_index: &Index<'p>,
+        d_index: &Index<'d>,
+    ) -> HashMap<CellWrapper<'p>, CellWrapper<'d>> {
+        self.mapping
+            .iter()
+            .map(|(&p_node, &d_node)| (p_index.node_to_cell(p_node), d_index.node_to_cell(d_node)))
+            .collect()
+    }
+
+    fn build_boundary_src_map(
+        &self,
+        d_index: &Index<'d>,
+    ) -> HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> {
+        self.bindings
+            .iter()
+            .filter_map(|(k, v)| match k {
+                PatSrcKey::External {
+                    cell: p_cell,
+                    bit: p_bit,
+                } => match v {
+                    DesSrcKey::Gate {
+                        node: d_node,
+                        bit: d_bit,
+                    } => Some(((*p_cell, *p_bit), (d_index.node_to_cell(*d_node), *d_bit))),
+                    DesSrcKey::External {
+                        cell: d_cell,
+                        bit: d_bit,
+                    } => Some(((*p_cell, *p_bit), (*d_cell, *d_bit))),
+                    DesSrcKey::Const(_) => None,
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn build_out_driver_map(
+        &self,
+        d_index: &Index<'d>,
+        cell_mapping: &HashMap<CellWrapper<'p>, CellWrapper<'d>>,
+        pat_output_cells: &[CellWrapper<'p>],
+    ) -> HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> {
+        let mut out = HashMap::new();
+
+        for oc in pat_output_cells {
+            if let Cell::Output(_, value) = oc.cref().get().as_ref() {
+                for (out_bit, net) in value.iter().enumerate() {
+                    if let Ok((p_src_cell_ref, p_bit)) = oc.cref().design().find_cell(net) {
+                        let p_src = CellWrapper::from(p_src_cell_ref);
+
+                        if let Some(&d_src) = cell_mapping.get(&p_src) {
+                            out.insert((*oc, out_bit), (d_src, p_bit));
+                            continue;
+                        }
+
+                        let key = PatSrcKey::External {
+                            cell: p_src,
+                            bit: p_bit,
+                        };
+                        if let Some(v) = self.binding_get(key) {
+                            match v {
+                                DesSrcKey::Gate {
+                                    node: d_node,
+                                    bit: d_bit,
+                                } => {
+                                    out.insert(
+                                        (*oc, out_bit),
+                                        (d_index.node_to_cell(d_node), d_bit),
+                                    );
+                                }
+                                DesSrcKey::External {
+                                    cell: d_cell,
+                                    bit: d_bit,
+                                } => {
+                                    out.insert((*oc, out_bit), (d_cell, d_bit));
+                                }
+                                DesSrcKey::Const(_) => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        out
+    }
+}
+
+/// Build a map from IO name to CellWrapper, ignoring unnamed items.
+fn name_map<'p>(
+    cells: &[CellWrapper<'p>],
+    namer: fn(&CellWrapper<'p>) -> Option<&'p str>,
+) -> HashMap<&'p str, CellWrapper<'p>> {
+    cells
+        .iter()
+        .filter_map(|c| namer(c).map(|nm| (nm, *c)))
+        .collect()
 }
 
 /// Compute deterministic aligned input pairs for pattern/design nodes,
@@ -259,10 +265,13 @@ pub(super) fn aligned_sources<'p, 'd>(
 
     let take_len = std::cmp::min(p_len, d_len);
 
-    let p_srcs = p_inputs.into_iter();
-    let d_srcs = d_inputs.into_iter();
-
-    Some(p_srcs.zip(d_srcs).take(take_len).collect())
+    Some(
+        p_inputs
+            .into_iter()
+            .zip(d_inputs.into_iter())
+            .take(take_len)
+            .collect(),
+    )
 }
 
 /// Validate aligned sources pairwise and collect any driver bindings implied.
@@ -290,19 +299,13 @@ pub(super) fn check_and_collect_bindings<'p, 'd>(
                     if pc != dc {
                         return None;
                     }
-                    // Const-Const is validated; not recorded.
                 }
                 (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                     let p_node = p_index.try_cell_to_node(p_cell)?;
                     let d_node = d_index.try_cell_to_node(d_cell)?;
-                    // If producer already mapped, it must equal the aligned design node,
-                    // and the bit must match.
-                    if let Some(mapped_d) = st.mapped_to(p_node) {
-                        if mapped_d != d_node || p_bit != d_bit {
-                            return None;
-                        }
+                    if !mapped_gate_pair_ok(st, p_node, p_bit, d_node, d_bit) {
+                        return None;
                     }
-                    // Do NOT record Gate->Gate bindings here.
                 }
                 (Source::Io(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                     let d_node = d_index.try_cell_to_node(d_cell)?;
@@ -314,12 +317,10 @@ pub(super) fn check_and_collect_bindings<'p, 'd>(
                         node: d_node,
                         bit: d_bit,
                     };
-                    if let Some(existing) = st.binding_get(p_key) {
-                        if existing != d_key {
-                            return None;
-                        }
-                    } else {
-                        additions.push((p_key, d_key));
+                    match st.binding_get(p_key) {
+                        Some(existing) if existing != d_key => return None,
+                        Some(_) => {}
+                        None => additions.push((p_key, d_key)),
                     }
                 }
                 (Source::Io(p_cell, p_bit), Source::Io(d_cell, d_bit)) => {
@@ -331,19 +332,28 @@ pub(super) fn check_and_collect_bindings<'p, 'd>(
                         cell: d_cell,
                         bit: d_bit,
                     };
-                    if let Some(existing) = st.binding_get(p_key) {
-                        if existing != d_key {
-                            return None;
-                        }
-                    } else {
-                        additions.push((p_key, d_key));
+                    match st.binding_get(p_key) {
+                        Some(existing) if existing != d_key => return None,
+                        Some(_) => {}
+                        None => additions.push((p_key, d_key)),
                     }
                 }
-                // Extend here if you want IO to match constants in the future:
-                // (Source::Io(p_cell, p_bit), Source::Const(dc)) => { ... }
                 _ => return None,
             }
             Some(additions)
         },
     )
+}
+
+fn mapped_gate_pair_ok<'p, 'd>(
+    st: &State<'p, 'd>,
+    p_node: NodeId,
+    p_bit: usize,
+    d_node: NodeId,
+    d_bit: usize,
+) -> bool {
+    match st.mapped_to(p_node) {
+        Some(mapped_d) => mapped_d == d_node && p_bit == d_bit,
+        None => true,
+    }
 }

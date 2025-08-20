@@ -4,7 +4,6 @@ use super::index::{Index, NodeId};
 use super::ports::Source;
 use super::state::State;
 
-/// Check if two cells (pattern/design) are compatible under the current state and config.
 pub(super) fn cells_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -17,14 +16,10 @@ pub(super) fn cells_compatible<'p, 'd>(
         return false;
     }
 
-    // Pairwise pin checks + (side-effect-free) collection of driver bindings
-    let Some(_pending_bindings) =
-        check_and_collect_bindings(p_id, d_id, p_index, d_index, state, match_length)
-    else {
-        return false;
-    };
-
-    downstream_consumers_compatible(p_id, d_id, p_index, d_index, state)
+    check_and_collect_bindings(p_id, d_id, p_index, d_index, state, match_length)
+        .map_or(false, |_| {
+            downstream_consumers_compatible(p_id, d_id, p_index, d_index, state)
+        })
 }
 
 /// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.

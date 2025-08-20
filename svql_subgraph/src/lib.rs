@@ -180,20 +180,25 @@ pub fn get_pattern_io_cells<'p>(
 }
 
 fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigBoundary {
-    let mut sig: SigBoundary = Vec::new();
+    let gates = m
+        .cell_mapping
+        .iter()
+        .map(|(p, d)| (0, p.debug_index(), 0usize, d.debug_index(), 0usize));
 
-    for (p, d) in m.cell_mapping.iter() {
-        sig.push((0, p.debug_index(), 0, d.debug_index(), 0));
-    }
-    for ((p_cell, p_bit), (d_cell, d_bit)) in m.boundary_src_map.iter() {
-        sig.push((
-            1,
-            p_cell.debug_index(),
-            *p_bit,
-            d_cell.debug_index(),
-            *d_bit,
-        ));
-    }
+    let boundaries = m
+        .boundary_src_map
+        .iter()
+        .map(|((p_cell, p_bit), (d_cell, d_bit))| {
+            (
+                1,
+                p_cell.debug_index(),
+                *p_bit,
+                d_cell.debug_index(),
+                *d_bit,
+            )
+        });
+
+    let mut sig: SigBoundary = gates.chain(boundaries).collect();
     sig.sort_unstable();
     sig
 }

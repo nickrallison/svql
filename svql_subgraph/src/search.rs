@@ -22,28 +22,54 @@ pub(super) fn backtrack<'p, 'd>(
         return;
     }
 
-    let next_p = match choose_next(p_index, st) {
-        Some(n) => n,
-        None => return,
+    let Some(next_p) = choose_next(p_index, st) else {
+        return;
     };
 
     let kind = p_index.kind(next_p);
-    for &d_cand in d_index.of_kind(kind) {
-        if st.is_used_design(d_cand) {
-            continue;
-        }
-        if !cells_compatible(next_p, d_cand, p_index, d_index, st, config.match_length) {
-            continue;
-        }
 
-        st.map(next_p, d_cand);
-        let added = add_bindings_from_pair(next_p, d_cand, p_index, d_index, st, config);
+    let candidates: Vec<NodeId> = d_index
+        .of_kind(kind)
+        .iter()
+        .copied()
+        .filter(|&d_cand| !st.is_used_design(d_cand))
+        .filter(|&d_cand| {
+            cells_compatible(next_p, d_cand, p_index, d_index, st, config.match_length)
+        })
+        .collect();
 
-        backtrack(p_index, d_index, st, out, pat_inputs, pat_outputs, config);
-
-        remove_bindings(added, st);
-        st.unmap(next_p, d_cand);
+    for d_cand in candidates {
+        with_mapping(st, next_p, d_cand, p_index, d_index, config, |st_inner| {
+            backtrack(
+                p_index,
+                d_index,
+                st_inner,
+                out,
+                pat_inputs,
+                pat_outputs,
+                config,
+            );
+        });
     }
+}
+
+/// Scoped helper that maps (p_id -> d_id), records IO bindings implied by the pair,
+/// runs `f`, then automatically removes those bindings and unmaps.
+/// Localizes mutation and prevents deep nesting.
+fn with_mapping<'p, 'd>(
+    st: &mut State<'p, 'd>,
+    p_id: NodeId,
+    d_id: NodeId,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    config: &config::Config,
+    f: impl FnOnce(&mut State<'p, 'd>),
+) {
+    st.map(p_id, d_id);
+    let added = add_bindings_from_pair(p_id, d_id, p_index, d_index, st, config);
+    f(st);
+    remove_bindings(added, st);
+    st.unmap(p_id, d_id);
 }
 
 pub(super) fn add_bindings_from_pair<'p, 'd>(

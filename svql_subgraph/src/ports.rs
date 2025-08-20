@@ -1,4 +1,4 @@
-use prjunnamed_netlist::Trit;
+use prjunnamed_netlist::{Design, Net, Trit};
 
 use crate::cell::CellWrapper;
 
@@ -24,26 +24,24 @@ pub(super) fn is_commutative(kind: CellKind) -> bool {
 }
 
 pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
-    let mut idx = 0usize;
     let mut inputs: Vec<Source<'a>> = Vec::new();
-
     cref.visit(|net| {
-        let _pin_index = idx;
-        idx += 1;
-
-        match cref.design().find_cell(net) {
-            Ok((src, bit)) => {
-                if is_gate_cell_ref(src) {
-                    inputs.push(Source::Gate(src.into(), bit));
-                } else {
-                    inputs.push(Source::Io(src.into(), bit));
-                }
-            }
-            Err(trit) => inputs.push(Source::Const(trit)),
-        }
+        inputs.push(net_to_source(cref.design(), net));
     });
-
     CellPins { inputs }
+}
+
+fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
+    match design.find_cell(net) {
+        Ok((src, bit)) => {
+            if is_gate_cell_ref(src) {
+                Source::Gate(src.into(), bit)
+            } else {
+                Source::Io(src.into(), bit)
+            }
+        }
+        Err(trit) => Source::Const(trit),
+    }
 }
 
 pub(super) fn normalize_commutative<'a>(inputs: &mut [Source<'a>]) {

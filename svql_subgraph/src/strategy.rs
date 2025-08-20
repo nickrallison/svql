@@ -4,40 +4,25 @@ use super::ports::Source;
 use super::state::State;
 
 pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
-    for p in 0..p_index.gate_count() {
-        let p = p as NodeId;
-        if st.is_mapped(p) {
-            continue;
-        }
+    let first_resolvable = (0..p_index.gate_count() as u32)
+        .map(|i| i as NodeId)
+        .find(|&p| !st.is_mapped(p) && inputs_resolved_for(p_index, st, p));
 
-        let pins = &p_index.pins(p).inputs;
-        let mut all_resolvable = true;
-        for src in pins {
-            match src {
-                Source::Const(_) => {}
-                Source::Io(_, _) => {}
-                Source::Gate(gc, _) => {
-                    if let Some(g) = p_index.try_cell_to_node(*gc)
-                        && !st.is_mapped(g)
-                    {
-                        all_resolvable = false;
-                        break;
-                    }
-                }
-            }
-        }
-        if all_resolvable {
-            return Some(p);
-        }
-    }
+    first_resolvable.or_else(|| {
+        (0..p_index.gate_count() as u32)
+            .map(|i| i as NodeId)
+            .find(|&p| !st.is_mapped(p))
+    })
+}
 
-    for p in 0..p_index.gate_count() {
-        let p = p as NodeId;
-        if !st.is_mapped(p) {
-            return Some(p);
-        }
-    }
-    None
+fn inputs_resolved_for<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>, p: NodeId) -> bool {
+    p_index.pins(p).inputs.iter().all(|src| match src {
+        Source::Const(_) => true,
+        Source::Io(_, _) => true,
+        Source::Gate(gc, _) => p_index
+            .try_cell_to_node(*gc)
+            .map_or(false, |g| st.is_mapped(g)),
+    })
 }
 
 #[cfg(test)]
