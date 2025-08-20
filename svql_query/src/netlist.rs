@@ -29,18 +29,6 @@ pub trait NetlistMeta {
             Self::MODULE_NAME.to_string(),
         )
     }
-
-    /// Open a QueryCtx for this netlist’s pattern against the given haystack key.
-    /// Parent queries can call ChildNetlist::<Search>::open_ctx(driver, &hay_key).
-    fn open_ctx(
-        driver: &Driver,
-        hay_key: &DesignKey,
-    ) -> Result<QueryCtx, Box<dyn std::error::Error>> {
-        let pat_key = Self::ensure_pattern_key(driver)?;
-        driver
-            .open_ctx(&pat_key, hay_key)
-            .ok_or_else(|| "failed to open QueryCtx (pattern or haystack missing)".into())
-    }
 }
 
 pub trait SearchableNetlist: NetlistMeta + Sized {
@@ -48,12 +36,10 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
 
-    fn query<'ctx>(
-        ctx: &'ctx QueryCtx,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<Self::Hit<'ctx, 'ctx>> {
-        find_subgraphs(ctx.pat(), ctx.hay(), config)
+    fn query(driver: Driver, path: Instance, config: &Config) -> Vec<Self::Hit<'_, '_>> {
+
+        
+        find_subgraphs(driver.pat(), driver.hay(), config)
             .iter()
             .map(|m| Self::from_subgraph(m, path.clone()))
             .collect()
