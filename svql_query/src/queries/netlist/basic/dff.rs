@@ -46,7 +46,7 @@ where
 
 impl NetlistMeta for Sdffe<Search> {
     const MODULE_NAME: &'static str = "sdffe";
-    const FILE_PATH: &'static str = "examples/patterns/basic/ff/sdffe.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/ff/verilog/sdffe.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
