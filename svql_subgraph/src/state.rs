@@ -40,8 +40,30 @@ pub(super) enum DesSrcKey<'d> {
     Const(Trit),
 }
 
-// Alias to keep signatures short and clear (satisfy clippy::type_complexity)
-pub(super) type BindingAdditions<'p, 'd> = Vec<(PatSrcKey<'p>, DesSrcKey<'d>)>;
+/// Self-documenting wrapper for an aligned pattern/design input pair.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct AlignedPair<'p, 'd> {
+    pub pattern: Source<'p>,
+    pub design: Source<'d>,
+}
+
+/// Self-documenting wrapper for one binding addition (instead of tuple typing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) struct BindingAddition<'p, 'd> {
+    pub pattern: PatSrcKey<'p>,
+    pub design: DesSrcKey<'d>,
+}
+
+/// Alias to keep signatures short and clear
+pub(super) type BindingAdditions<'p, 'd> = Vec<BindingAddition<'p, 'd>>;
+
+/// Self-documenting wrapper for an output source description.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct OutputSource<'p> {
+    pub out_bit: usize,
+    pub src_cell: CellWrapper<'p>,
+    pub src_bit: usize,
+}
 
 pub(super) struct State<'p, 'd> {
     // Pattern gate node -> Design gate node
@@ -197,26 +219,23 @@ impl<'p, 'd> State<'p, 'd> {
         pat_output_cells
             .iter()
             .flat_map(|oc| {
-                self.output_sources_for_cell(oc).into_iter().filter_map(
-                    move |(out_bit, p_src, p_bit)| {
+                self.output_sources_for_cell(oc)
+                    .into_iter()
+                    .filter_map(move |os| {
                         self.resolve_design_driver_for_pattern_source(
                             d_index,
                             cell_mapping,
-                            p_src,
-                            p_bit,
+                            os.src_cell,
+                            os.src_bit,
                         )
-                        .map(|d| ((*oc, out_bit), d))
-                    },
-                )
+                        .map(|d| ((*oc, os.out_bit), d))
+                    })
             })
             .collect()
     }
 
-    /// Extract (out_bit, pattern_source_cell, pattern_source_bit) for a pattern output cell.
-    fn output_sources_for_cell(
-        &self,
-        oc: &CellWrapper<'p>,
-    ) -> Vec<(usize, CellWrapper<'p>, usize)> {
+    /// Extract per-output sources in a self-documenting struct form.
+    fn output_sources_for_cell(&self, oc: &CellWrapper<'p>) -> Vec<OutputSource<'p>> {
         match oc.cref().get().as_ref() {
             Cell::Output(_, value) => value
                 .iter()
@@ -226,8 +245,10 @@ impl<'p, 'd> State<'p, 'd> {
                         .design()
                         .find_cell(net)
                         .ok()
-                        .map(|(p_src_cell_ref, p_bit)| {
-                            (out_bit, CellWrapper::from(p_src_cell_ref), p_bit)
+                        .map(|(p_src_cell_ref, p_bit)| OutputSource {
+                            out_bit,
+                            src_cell: CellWrapper::from(p_src_cell_ref),
+                            src_bit: p_bit,
                         })
                 })
                 .collect(),
@@ -279,7 +300,7 @@ pub(super) fn aligned_sources<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     match_length: bool,
-) -> Option<Vec<(Source<'p>, Source<'d>)>> {
+) -> Option<Vec<AlignedPair<'p, 'd>>> {
     let kind = p_index.kind(p_id);
 
     let mut p_inputs = p_index.pins(p_id).inputs.clone();
@@ -302,16 +323,18 @@ pub(super) fn aligned_sources<'p, 'd>(
 
     let take_len = std::cmp::min(p_len, d_len);
 
-    Some(p_inputs.into_iter().zip(d_inputs).take(take_len).collect())
+    Some(
+        p_inputs
+            .into_iter()
+            .zip(d_inputs)
+            .take(take_len)
+            .map(|(pattern, design)| AlignedPair { pattern, design })
+            .collect(),
+    )
 }
 
 /// Validate aligned sources pairwise and collect any driver bindings implied.
-/// Does NOT mutate state; returns additions to apply if compatible.
-///
-/// Unification rule:
-/// - IO and Const: we record (or validate) bindings.
-/// - Gate: we only validate if already mapped; we do NOT record bindings to avoid
-///   collapsing automorphisms prematurely.
+/// Returns additions to apply if compatible.
 pub(super) fn check_and_collect_bindings<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -323,7 +346,11 @@ pub(super) fn check_and_collect_bindings<'p, 'd>(
     let pairs = aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
     let mut additions: BindingAdditions<'p, 'd> = Vec::new();
 
-    for (p_src, d_src) in pairs {
+    for AlignedPair {
+        pattern: p_src,
+        design: d_src,
+    } in pairs
+    {
         match (p_src, d_src) {
             (Source::Const(pc), Source::Const(dc)) => {
                 if pc != dc {
@@ -398,7 +425,10 @@ fn unify_external_binding<'p, 'd>(
     match st.binding_get(p_key) {
         Some(existing) => existing == d_key,
         None => {
-            additions.push((p_key, d_key));
+            additions.push(BindingAddition {
+                pattern: p_key,
+                design: d_key,
+            });
             true
         }
     }
@@ -454,9 +484,6 @@ fn design_has_input_from_bit<'d>(
 
 /// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
 /// as a source in q_p is mirrored by a usage of d_id in q_d at the same bit index.
-///
-/// This mirrors historical behavior and preserves automorphisms. It keeps matching
-/// order-independent without recording producer-identity bindings.
 fn downstream_consumers_compatible<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,

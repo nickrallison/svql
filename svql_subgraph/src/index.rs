@@ -8,6 +8,13 @@ use super::cell::{CellKind, CellPins};
 
 pub(super) type NodeId = u32;
 
+/// Self-documenting wrapper for "all nodes of a given CellKind".
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct KindNodes {
+    pub kind: CellKind,
+    pub nodes: Vec<NodeId>,
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
     nodes: Vec<CellWrapper<'a>>,
@@ -79,11 +86,18 @@ impl<'a> Index<'a> {
         self.cell_to_id.get(&c.debug_index()).copied()
     }
 
-    // Deterministic iteration over kinds: sort by CellKind (which derives Ord).
-    pub(super) fn by_kind_iter(&self) -> Vec<(&CellKind, &[NodeId])> {
-        let mut items: Vec<(&CellKind, &Vec<NodeId>)> = self.by_kind.iter().collect();
-        items.sort_by_key(|(k, _)| **k);
-        items.into_iter().map(|(k, v)| (k, v.as_slice())).collect()
+    /// Deterministic owned iteration over kinds.
+    pub(super) fn by_kind_iter(&self) -> Vec<KindNodes> {
+        let mut items: Vec<KindNodes> = self
+            .by_kind
+            .iter()
+            .map(|(k, v)| KindNodes {
+                kind: *k,
+                nodes: v.clone(),
+            })
+            .collect();
+        items.sort_by_key(|kn| kn.kind);
+        items
     }
 }
 
@@ -104,5 +118,16 @@ mod tests {
         let idx = Index::build(d);
         assert!(idx.gate_count() > 0);
         assert_eq!(idx.of_kind(super::CellKind::Dff).len() > 0, true);
+    }
+
+    #[test]
+    fn by_kind_iter_is_owned_and_sorted() {
+        let d = &*SDFFE;
+        let idx = Index::build(d);
+        let pairs = idx.by_kind_iter();
+        assert!(!pairs.is_empty());
+        let mut sorted = pairs.clone();
+        sorted.sort_by_key(|kn| kn.kind);
+        assert_eq!(pairs, sorted);
     }
 }

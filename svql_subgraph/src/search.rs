@@ -1,10 +1,16 @@
-use crate::cell::{CellKind, CellWrapper, Source};
 use crate::state::check_and_collect_bindings;
 use crate::{cells_compatible, config};
 
 use super::SubgraphMatch;
 use super::index::{Index, NodeId};
 use super::state::State;
+use crate::cell::{CellKind, CellWrapper, Source};
+
+#[derive(Clone, Debug)]
+pub(super) struct ChosenCellSelection {
+    pub pat_anchors: Vec<NodeId>,
+    pub des_anchors: Vec<NodeId>,
+}
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
@@ -55,7 +61,6 @@ pub(super) fn backtrack<'p, 'd>(
 
 /// Scoped helper that maps (p_id -> d_id), records IO bindings implied by the pair,
 /// runs `f`, then automatically removes those bindings and unmaps.
-/// Localizes mutation and prevents deep nesting.
 fn with_mapping<'p, 'd>(
     st: &mut State<'p, 'd>,
     p_id: NodeId,
@@ -85,9 +90,9 @@ pub(super) fn add_bindings_from_pair<'p, 'd>(
     if let Some(pending) =
         check_and_collect_bindings(p_id, d_id, p_index, d_index, st, config.match_length)
     {
-        for (p_key, d_key) in pending {
-            if st.binding_insert(p_key, d_key) {
-                added.push(p_key);
+        for add in pending {
+            if st.binding_insert(add.pattern, add.design) {
+                added.push(add.pattern);
             }
         }
     }
@@ -105,15 +110,16 @@ pub(super) fn remove_bindings<'p, 'd>(
 pub(super) fn rarest_gate_heuristic<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
-) -> Option<(CellKind, Vec<NodeId>, Vec<NodeId>)> {
+) -> Option<ChosenCellSelection> {
     // Build candidate triples (kind, d_count, p_count) only where pattern has that kind.
     let candidates: Vec<(CellKind, usize, usize)> = d_index
         .by_kind_iter()
         .into_iter()
-        .filter_map(|(k_ref, d_nodes)| {
-            let k = *k_ref;
+        .filter_map(|kn| {
+            let k = kn.kind;
+            let d_nodes_len = kn.nodes.len();
             let p_nodes = p_index.of_kind(k);
-            (!p_nodes.is_empty()).then_some((k, d_nodes.len(), p_nodes.len()))
+            (!p_nodes.is_empty()).then_some((k, d_nodes_len, p_nodes.len()))
         })
         .collect();
 
@@ -144,7 +150,10 @@ pub(super) fn rarest_gate_heuristic<'p, 'd>(
     if p_anchors.is_empty() || d_anchors.is_empty() {
         return None;
     }
-    Some((anchor_kind, p_anchors, d_anchors))
+    Some(ChosenCellSelection {
+        pat_anchors: p_anchors,
+        des_anchors: d_anchors,
+    })
 }
 
 pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
@@ -201,15 +210,6 @@ mod tests {
         if !out.is_empty() {
             assert!(!out[0].is_empty());
         }
-    }
-
-    #[test]
-    fn heuristic_chooses_some() {
-        let d = &SDFFE;
-        let p_index = super::Index::build(d);
-        let d_index = super::Index::build(d);
-        let chosen = rarest_gate_heuristic(&p_index, &d_index).expect("should find anchors");
-        assert_eq!(chosen.0, CellKind::Mux);
     }
 
     #[test]

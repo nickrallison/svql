@@ -11,13 +11,29 @@ mod search;
 mod state;
 pub mod util;
 
+// New: wrapper for designs to avoid bare references in public API
+pub mod view;
+
 pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
+pub use view::DesignView;
 
 use crate::{search::rarest_gate_heuristic, state::cells_compatible};
 
+/// A small, self-documenting signature component replacing tuple typing.
+///
+/// role: 0 = gate mapping; 1 = boundary (IO) binding
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct SigPart {
+    role: u8,
+    p_idx: usize,
+    p_bit: usize,
+    d_idx: usize,
+    d_bit: usize,
+}
+
 // Alias to simplify clippy::type_complexity in dedupe signatures
-type SigBoundary = Vec<(u8, usize, usize, usize, usize)>;
+type SigBoundary = Vec<SigPart>;
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -97,6 +113,7 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
+/// Original API (borrowed references)
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
@@ -111,8 +128,7 @@ pub fn find_subgraphs<'p, 'd>(
         };
     }
 
-    let Some((_anchor_kind, p_anchors, d_anchors)) = rarest_gate_heuristic(&p_index, &d_index)
-    else {
+    let Some(anchor) = rarest_gate_heuristic(&p_index, &d_index) else {
         return AllSubgraphMatches {
             matches: Vec::new(),
         };
@@ -122,9 +138,13 @@ pub fn find_subgraphs<'p, 'd>(
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
 
     // Deterministically pick a single pattern anchor (the minimum NodeId).
-    let p_a = *p_anchors.iter().min().expect("No pattern anchors found");
+    let p_a = *anchor
+        .pat_anchors
+        .iter()
+        .min()
+        .expect("No pattern anchors found");
 
-    for &d_a in &d_anchors {
+    for &d_a in &anchor.des_anchors {
         let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
         if !cells_compatible(
             p_a,
@@ -176,22 +196,23 @@ pub fn get_pattern_io_cells<'p>(
 }
 
 fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigBoundary {
-    let gates = m
-        .cell_mapping
-        .iter()
-        .map(|(p, d)| (0, p.debug_index(), 0usize, d.debug_index(), 0usize));
+    let gates = m.cell_mapping.iter().map(|(p, d)| SigPart {
+        role: 0,
+        p_idx: p.debug_index(),
+        p_bit: 0,
+        d_idx: d.debug_index(),
+        d_bit: 0,
+    });
 
     let boundaries = m
         .boundary_src_map
         .iter()
-        .map(|((p_cell, p_bit), (d_cell, d_bit))| {
-            (
-                1,
-                p_cell.debug_index(),
-                *p_bit,
-                d_cell.debug_index(),
-                *d_bit,
-            )
+        .map(|((p_cell, p_bit), (d_cell, d_bit))| SigPart {
+            role: 1,
+            p_idx: p_cell.debug_index(),
+            p_bit: *p_bit,
+            d_idx: d_cell.debug_index(),
+            d_bit: *d_bit,
         });
 
     let mut sig: SigBoundary = gates.chain(boundaries).collect();
