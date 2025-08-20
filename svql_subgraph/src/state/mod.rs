@@ -9,15 +9,10 @@ mod align;
 mod bindings;
 mod constraints;
 
-pub(crate) use align::aligned_sources;
 pub(crate) use bindings::{
-    BindingAddition, BindingAdditions, DesSrcKey, PatSrcKey, check_and_collect_bindings,
-    des_key_from_gate_or_io, unify_external_binding,
+    DesSrcKey, PatSrcKey, check_and_collect_bindings,
 };
-pub(crate) use constraints::{
-    cells_compatible, design_has_input_from_bit, downstream_consumers_compatible,
-    mapped_gate_pair_ok, pattern_consumption_bits,
-};
+pub(crate) use constraints::cells_compatible;
 
 /// Self-documenting wrapper for an output source description.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
