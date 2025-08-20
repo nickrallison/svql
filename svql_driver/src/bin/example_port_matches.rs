@@ -1,7 +1,6 @@
-use svql_driver::{
-    prelude::DesignKey,
-    util::{ensure_loaded, new_shared_driver},
-};
+use std::path::Path;
+
+use svql_driver::{prelude::DesignKey, util::new_shared_driver};
 use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -11,14 +10,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let driver = new_shared_driver()?;
 
-    let hay_key: DesignKey =
-        ensure_loaded(&driver, "examples/fixtures/basic/ff/verilog/seq_sdffe.v")?;
-    let needle_key: DesignKey =
-        ensure_loaded(&driver, "examples/patterns/basic/ff/verilog/sdffe.v")?;
-
     // Hold Arcs in locals so borrows outlive the search_results
-    let pat_arc = driver.get(&needle_key).expect("pattern design present");
-    let hay_arc = driver.get(&hay_key).expect("haystack design present");
+    let pat_arc = driver
+        .get_by_path(
+            Path::new("examples/fixtures/basic/ff/verilog/seq_sdffe.v"),
+            "seq_sdffe",
+        )
+        .expect("pattern design present");
+    let hay_arc = driver
+        .get_by_path(
+            Path::new("examples/fixtures/basic/ff/verilog/seq_sdffe.v"),
+            "seq_sdffe",
+        )
+        .expect("haystack design present");
 
     let config = Config::builder().exact_length().none().build();
 
