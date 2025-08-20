@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-use crate::cell::{CellWrapper, extract_pins};
-
-use super::cell::{CellKind, CellPins};
+use crate::model::{CellKind, CellPins, CellWrapper, extract_pins};
 
 pub(super) type NodeId = u32;
 
@@ -109,7 +107,7 @@ mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
     }
 
     #[test]
@@ -117,7 +115,7 @@ mod tests {
         let d = &*SDFFE;
         let idx = Index::build(d);
         assert!(idx.gate_count() > 0);
-        assert_eq!(idx.of_kind(super::CellKind::Dff).len() > 0, true);
+        assert_eq!(idx.of_kind(crate::model::CellKind::Dff).len() > 0, true);
     }
 
     #[test]

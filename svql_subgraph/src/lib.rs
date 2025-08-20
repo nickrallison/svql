@@ -1,40 +1,32 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::Design;
 
-use cell::{get_input_cells, get_output_cells};
-
-// Only expose the minimal API surface publicly.
-// Internal modules remain private to the crate.
-mod cell;
 pub mod config;
+mod dedupe;
 mod index;
+mod model;
 mod search;
 mod state;
 
-// Keep util publicly available for tests but hide it from docs.
+// Backward-compatible re-export for existing tests and users.
 #[doc(hidden)]
-pub mod util;
-
-pub use cell::CellWrapper;
-pub use config::{Config, DedupeMode};
-
-use crate::{search::rarest_gate_heuristic, state::cells_compatible};
-
-/// A small, self-documenting signature component replacing tuple typing.
-///
-/// role: 0 = gate mapping; 1 = boundary (IO) binding
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct SigPart {
-    role: u8,
-    p_idx: usize,
-    p_bit: usize,
-    d_idx: usize,
-    d_bit: usize,
+pub mod util {
+    pub use crate::test_support::load_design_from;
 }
 
-// Alias to simplify clippy::type_complexity in dedupe signatures
-type SigBoundary = Vec<SigPart>;
+// Test support module (not cfg-gated to keep integration tests working).
+pub mod test_support;
+
+pub use config::{Config, DedupeMode};
+pub use model::CellWrapper;
+
+use crate::dedupe::{signature_mapped_gate_set, signature_with_boundary};
+use crate::index::Index;
+use crate::model::{get_input_cells, get_output_cells};
+use crate::search::heuristics::ChosenCellSelection;
+use crate::search::{backtrack, rarest_gate_heuristic};
+use crate::state::{State, cells_compatible};
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -114,14 +106,14 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-/// Original API (borrowed references)
+/// Original public API (borrowed references).
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
 ) -> AllSubgraphMatches<'p, 'd> {
-    let p_index = index::Index::build(pattern);
-    let d_index = index::Index::build(design);
+    let p_index = Index::build(pattern);
+    let d_index = Index::build(design);
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
         return AllSubgraphMatches {
@@ -129,7 +121,8 @@ pub fn find_subgraphs<'p, 'd>(
         };
     }
 
-    let Some(anchor) = rarest_gate_heuristic(&p_index, &d_index) else {
+    let Some(anchor @ ChosenCellSelection { .. }) = rarest_gate_heuristic(&p_index, &d_index)
+    else {
         return AllSubgraphMatches {
             matches: Vec::new(),
         };
@@ -146,7 +139,7 @@ pub fn find_subgraphs<'p, 'd>(
         .expect("No pattern anchors found");
 
     for &d_a in &anchor.des_anchors {
-        let empty_state = state::State::<'p, 'd>::new(p_index.gate_count());
+        let empty_state = State::<'p, 'd>::new(p_index.gate_count());
         if !cells_compatible(
             p_a,
             d_a,
@@ -158,11 +151,11 @@ pub fn find_subgraphs<'p, 'd>(
             continue;
         }
 
-        let mut st = state::State::new(p_index.gate_count());
+        let mut st = State::new(p_index.gate_count());
         st.map(p_a, d_a);
         let added = search::add_bindings_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
 
-        search::backtrack(
+        backtrack(
             &p_index,
             &d_index,
             &mut st,
@@ -178,11 +171,11 @@ pub fn find_subgraphs<'p, 'd>(
 
     match config.dedupe {
         DedupeMode::None => {
-            let mut seen: std::collections::HashSet<SigBoundary> = std::collections::HashSet::new();
+            let mut seen = HashSet::new();
             results.retain(|m| seen.insert(signature_with_boundary(m)));
         }
         DedupeMode::AutoMorph => {
-            let mut seen: std::collections::HashSet<Vec<usize>> = std::collections::HashSet::new();
+            let mut seen = std::collections::HashSet::new();
             results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
         }
     }
@@ -197,56 +190,26 @@ pub(crate) fn get_pattern_io_cells<'p>(
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 
-fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigBoundary {
-    let gates = m.cell_mapping.iter().map(|(p, d)| SigPart {
-        role: 0,
-        p_idx: p.debug_index(),
-        p_bit: 0,
-        d_idx: d.debug_index(),
-        d_bit: 0,
-    });
-
-    let boundaries = m
-        .boundary_src_map
-        .iter()
-        .map(|((p_cell, p_bit), (d_cell, d_bit))| SigPart {
-            role: 1,
-            p_idx: p_cell.debug_index(),
-            p_bit: *p_bit,
-            d_idx: d_cell.debug_index(),
-            d_bit: *d_bit,
-        });
-
-    let mut sig: SigBoundary = gates.chain(boundaries).collect();
-    sig.sort_unstable();
-    sig
-}
-
-fn signature_mapped_gate_set<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
-    let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
-    sig.sort_unstable();
-    sig.dedup();
-    sig
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::config::ConfigBuilder;
+    use prjunnamed_netlist::Design;
+
+    use crate::config::{Config, ConfigBuilder, DedupeMode};
 
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref ASYNC_MUX: Design = crate::util::load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-        static ref COMB_D_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
-        static ref PAR_DOUBLE_SDFFE: Design = crate::util::load_design_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
+        static ref ASYNC_MUX: Design = crate::test_support::load_design_from("examples/patterns/security/access_control/locked_reg/json/async_mux.json").unwrap();
+        static ref SEQ_DOUBLE_SDFFE: Design = crate::test_support::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref COMB_D_DOUBLE_SDFFE: Design = crate::test_support::load_design_from("examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v").unwrap();
+        static ref PAR_DOUBLE_SDFFE: Design = crate::test_support::load_design_from("examples/fixtures/basic/ff/verilog/par_double_sdffe.v").unwrap();
     }
 
     #[test]
     fn smoke_io_cells() {
         let design = &ASYNC_MUX;
-        let (ins, outs) = get_pattern_io_cells(&design);
+        let (ins, outs) = get_pattern_io_cells(design);
         assert!(!ins.is_empty());
         assert!(!outs.is_empty());
     }

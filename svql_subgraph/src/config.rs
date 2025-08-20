@@ -1,55 +1,4 @@
 //! Configuration for the subgraph isomorphism search.
-//!
-//! This module exposes a minimal, stable surface for consumers (for example,
-//! the `svql_query` crate) to parameterize how matching should behave.
-//!
-//! The two main concepts are:
-//! - match_length: whether input arity must match exactly, or whether the
-//!   design can have a superset of inputs (deterministically aligned).
-//! - dedupe: how to deduplicate matches after search, controlled by `DedupeMode`:
-//!     - `None`: include boundary (IO) bindings when deduplicating.
-//!     - `AutoMorph`: collapse permutations/automorphisms by deduping on the
-//!       set of matched design gates only (ignoring boundary bindings).
-//!
-//! Quick examples
-//!
-//! Exact-length, None dedupe (original/default behavior):
-//! ```ignore
-//! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(true, DedupeMode::None);
-//! ```
-//!
-//! AutoMorph dedupe (collapse permutations/automorphisms) with exact-length:
-//! ```ignore
-//! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(true, DedupeMode::AutoMorph);
-//! ```
-//!
-//! Superset-length (allow design gates to have extra inputs) with AutoMorph dedupe:
-//! ```ignore
-//! use svql_subgraph::{Config, DedupeMode};
-//! let cfg = Config::new(false, DedupeMode::AutoMorph);
-//! ```
-//!
-//! Builder usage (recommended for future-proofing):
-//! ```ignore
-//! use svql_subgraph::{Config, DedupeMode};
-//!
-//! // Equivalent to Config::new(true, DedupeMode::None)
-//! let cfg_default = Config::builder().exact_length().none().build();
-//!
-//! // Superset-length and AutoMorph dedupe
-//! let cfg_superset = Config::builder()
-//!     .superset_length()
-//!     .auto_morph()
-//!     .build();
-//!
-//! // Or mix and match explicitly
-//! let cfg_explicit = Config::builder()
-//!     .match_length(false)
-//!     .dedupe(DedupeMode::AutoMorph)
-//!     .build();
-//! ```
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -61,11 +10,6 @@ pub struct Config {
 
 impl Config {
     /// Create a new configuration.
-    ///
-    /// - match_length:
-    ///     - true  => exact-length mode (pattern inputs count must equal design).
-    ///     - false => superset-length mode (design may have extra inputs).
-    /// - dedupe (`DedupeMode`): how to deduplicate results after the search completes.
     pub fn new(match_length: bool, dedupe: DedupeMode) -> Self {
         Self {
             match_length,

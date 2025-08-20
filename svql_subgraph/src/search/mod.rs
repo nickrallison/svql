@@ -1,16 +1,12 @@
-use crate::state::check_and_collect_bindings;
-use crate::{cells_compatible, config};
+use crate::config;
+use crate::index::{Index, NodeId};
+use crate::model::{CellWrapper, Source};
+use crate::state::{PatSrcKey, State, check_and_collect_bindings};
 
 use super::SubgraphMatch;
-use super::index::{Index, NodeId};
-use super::state::State;
-use crate::cell::{CellKind, CellWrapper, Source};
 
-#[derive(Clone, Debug)]
-pub(super) struct ChosenCellSelection {
-    pub pat_anchors: Vec<NodeId>,
-    pub des_anchors: Vec<NodeId>,
-}
+pub mod heuristics;
+pub(crate) use heuristics::rarest_gate_heuristic;
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
@@ -39,7 +35,14 @@ pub(super) fn backtrack<'p, 'd>(
         .copied()
         .filter(|&d_cand| !st.is_used_design(d_cand))
         .filter(|&d_cand| {
-            cells_compatible(next_p, d_cand, p_index, d_index, st, config.match_length)
+            crate::state::cells_compatible(
+                next_p,
+                d_cand,
+                p_index,
+                d_index,
+                st,
+                config.match_length,
+            )
         })
         .collect();
 
@@ -84,7 +87,7 @@ pub(super) fn add_bindings_from_pair<'p, 'd>(
     d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
     config: &config::Config,
-) -> Vec<crate::state::PatSrcKey<'p>> {
+) -> Vec<PatSrcKey<'p>> {
     let mut added = Vec::new();
 
     if let Some(pending) =
@@ -100,60 +103,8 @@ pub(super) fn add_bindings_from_pair<'p, 'd>(
     added
 }
 
-pub(super) fn remove_bindings<'p, 'd>(
-    added: Vec<crate::state::PatSrcKey<'p>>,
-    st: &mut State<'p, 'd>,
-) {
+pub(super) fn remove_bindings<'p, 'd>(added: Vec<PatSrcKey<'p>>, st: &mut State<'p, 'd>) {
     st.bindings_remove_keys(&added);
-}
-
-pub(super) fn rarest_gate_heuristic<'p, 'd>(
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-) -> Option<ChosenCellSelection> {
-    // Build candidate triples (kind, d_count, p_count) only where pattern has that kind.
-    let candidates: Vec<(CellKind, usize, usize)> = d_index
-        .by_kind_iter()
-        .into_iter()
-        .filter_map(|kn| {
-            let k = kn.kind;
-            let d_nodes_len = kn.nodes.len();
-            let p_nodes = p_index.of_kind(k);
-            (!p_nodes.is_empty()).then_some((k, d_nodes_len, p_nodes.len()))
-        })
-        .collect();
-
-    // No candidates means no common kinds to anchor by.
-    let (anchor_kind, _, _) = candidates.into_iter().min_by(|a, b| {
-        // Primary: rarest in design
-        let primary = a.1.cmp(&b.1);
-        if primary != std::cmp::Ordering::Equal {
-            return primary;
-        }
-        // Secondary: smallest design-to-pattern ratio, compare as cross-product
-        let a_ratio = (a.1 as u64, a.2 as u64);
-        let b_ratio = (b.1 as u64, b.2 as u64);
-        let secondary = (a_ratio.0 * b_ratio.1).cmp(&(b_ratio.0 * a_ratio.1));
-        if secondary != std::cmp::Ordering::Equal {
-            return secondary;
-        }
-        // Tertiary: deterministic tie-breaker by kind
-        a.0.cmp(&b.0)
-    })?;
-
-    // Deterministic order of anchors
-    let mut p_anchors = p_index.of_kind(anchor_kind).to_vec();
-    let mut d_anchors = d_index.of_kind(anchor_kind).to_vec();
-    p_anchors.sort_unstable();
-    d_anchors.sort_unstable();
-
-    if p_anchors.is_empty() || d_anchors.is_empty() {
-        return None;
-    }
-    Some(ChosenCellSelection {
-        pat_anchors: p_anchors,
-        des_anchors: d_anchors,
-    })
 }
 
 pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
@@ -188,7 +139,7 @@ mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
     }
 
     #[test]
@@ -199,8 +150,8 @@ mod tests {
 
         let mut st = State::new(p_index.gate_count());
         let mut out = Vec::new();
-        let inputs = super::super::cell::get_input_cells(d);
-        let outputs = super::super::cell::get_output_cells(d);
+        let inputs = crate::model::get_input_cells(d);
+        let outputs = crate::model::get_output_cells(d);
 
         let config = Config::default();
 

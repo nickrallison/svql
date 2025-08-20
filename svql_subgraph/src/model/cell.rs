@@ -3,7 +3,7 @@ use std::{borrow::Cow, hash::Hash};
 use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Trit, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(super) enum CellKind {
+pub(crate) enum CellKind {
     Buf,
     Not,
     And,
@@ -189,15 +189,15 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum Source<'a> {
+pub(crate) enum Source<'a> {
     Gate(CellWrapper<'a>, usize),
     Io(CellWrapper<'a>, usize),
     Const(Trit),
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct CellPins<'a> {
-    pub(super) inputs: Vec<Source<'a>>,
+pub(crate) struct CellPins<'a> {
+    pub(crate) inputs: Vec<Source<'a>>,
 }
 
 pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
@@ -222,26 +222,19 @@ pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<CellWrapper<'a>> {
 
 pub(crate) fn input_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
     match cell.cref().get() {
-        Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+        std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
         _ => None,
     }
 }
 
 pub(crate) fn output_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
     match cell.cref().get() {
-        Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+        std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
         _ => None,
     }
 }
 
-pub(super) fn is_commutative(kind: CellKind) -> bool {
-    matches!(
-        kind,
-        CellKind::And | CellKind::Or | CellKind::Xor | CellKind::Eq
-    )
-}
-
-pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
+pub(crate) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
     let mut inputs: Vec<Source<'a>> = Vec::new();
     cref.visit(|net| {
         inputs.push(net_to_source(cref.design(), net));
@@ -262,24 +255,16 @@ fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
     }
 }
 
-pub(super) fn normalize_commutative<'a>(inputs: &mut [Source<'a>]) {
-    inputs.sort_by_key(|a| stable_key(a));
-}
-
-fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
-    match s {
-        Source::Const(t) => (0, (*t as i8 as i32) as usize, 0),
-        Source::Io(c, bit) => (1, c.debug_index(), *bit),
-        Source::Gate(c, bit) => (2, c.debug_index(), *bit),
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use prjunnamed_netlist::Design;
+
+    use crate::model::normalize::normalize_commutative;
+
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::util::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
     }
 
     #[test]
