@@ -16,14 +16,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle_key: DesignKey =
         ensure_loaded(&driver, "examples/patterns/basic/ff/verilog/sdffe.v")?;
 
+    // Hold Arcs in locals so borrows outlive the search_results
+    let pat_arc = driver.get(&needle_key).expect("pattern design present");
+    let hay_arc = driver.get(&hay_key).expect("haystack design present");
+
     let config = Config::builder().exact_length().none().build();
 
-    let search_results = find_subgraphs(
-        driver.get(&needle_key).unwrap().as_ref(),
-        driver.get(&hay_key).unwrap().as_ref(),
-        &config,
-    );
+    let search_results = find_subgraphs(pat_arc.as_ref(), hay_arc.as_ref(), &config);
 
+    // Every match should resolve both d (input) and q (output) via O(1) helpers
     for m in search_results.iter() {
         assert!(
             m.design_source_of_input_bit("d", 0).is_some(),
@@ -35,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    // There should exist a pair of matches where q of one drives d of the other.
     let ms: Vec<_> = search_results.iter().collect();
     let mut found = false;
     for m1 in &ms {

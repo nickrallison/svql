@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "svql_driver",
-    "svql_query",
+    # "svql_query",
     "svql_subgraph",
     ######
     "prjunnamed/netlist",
@@ -15,14 +15,14 @@ members = [
 ]
 default-members = [
     "svql_driver",
-    "svql_query",
+    # "svql_query",
     "svql_subgraph",
 ]
 resolver = "3"
 
 [workspace.dependencies]
 svql_driver = { path = "svql_driver" }
-svql_query = { path = "svql_query" }
+# svql_query = { path = "svql_query" }
 svql_subgraph = { path = "svql_subgraph" }
 
 # ---------------------

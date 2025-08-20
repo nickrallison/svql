@@ -46,11 +46,12 @@ mod integration_tests {
             #[case] haystack: &'static DesignKey,
             #[case] expected: usize,
         ) {
-            let matches = svql_subgraph::find_subgraphs(
-                DRIVER.get(needle).unwrap().as_ref(),
-                DRIVER.get(haystack).unwrap().as_ref(),
-                &CONFIG,
-            );
+            let pat_arc = DRIVER.get(needle).expect("pattern present");
+            let hay_arc = DRIVER.get(haystack).expect("haystack present");
+
+            let matches =
+                svql_subgraph::find_subgraphs(pat_arc.as_ref(), hay_arc.as_ref(), &CONFIG);
+
             assert_eq!(
                 matches.len(),
                 expected,

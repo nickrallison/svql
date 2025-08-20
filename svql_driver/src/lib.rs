@@ -58,34 +58,22 @@ mod tests {
         let match_length = false;
         let config = Config::builder().match_length(match_length).none().build();
 
+        // Hold Arcs so the borrows into results live long enough
+        let hay_arc = driver.get(&hay_key).unwrap();
+        let and_arc = driver.get(&and_key).unwrap();
+        let n1_arc = driver.get(&needle_key_1).unwrap();
+        let n2_arc = driver.get(&needle_key_2).unwrap();
+        let n3_arc = driver.get(&needle_key_3).unwrap();
+        let n4_arc = driver.get(&needle_key_4).unwrap();
+
         let time_start = std::time::Instant::now();
 
-        let results_1 = find_subgraphs(
-            driver.get(&needle_key_1).unwrap().as_ref(),
-            driver.get(&hay_key).unwrap().as_ref(),
-            &config,
-        );
-        let results_2 = find_subgraphs(
-            driver.get(&needle_key_2).unwrap().as_ref(),
-            driver.get(&hay_key).unwrap().as_ref(),
-            &config,
-        );
-        let results_3 = find_subgraphs(
-            driver.get(&needle_key_3).unwrap().as_ref(),
-            driver.get(&hay_key).unwrap().as_ref(),
-            &config,
-        );
-        let results_4 = find_subgraphs(
-            driver.get(&needle_key_4).unwrap().as_ref(),
-            driver.get(&hay_key).unwrap().as_ref(),
-            &config,
-        );
+        let results_1 = find_subgraphs(n1_arc.as_ref(), hay_arc.as_ref(), &config);
+        let results_2 = find_subgraphs(n2_arc.as_ref(), hay_arc.as_ref(), &config);
+        let results_3 = find_subgraphs(n3_arc.as_ref(), hay_arc.as_ref(), &config);
+        let results_4 = find_subgraphs(n4_arc.as_ref(), hay_arc.as_ref(), &config);
 
-        let results_and = find_subgraphs(
-            driver.get(&and_key).unwrap().as_ref(),
-            driver.get(&hay_key).unwrap().as_ref(),
-            &config,
-        );
+        let results_and = find_subgraphs(and_arc.as_ref(), hay_arc.as_ref(), &config);
 
         println!("Found {} matches for needle 1", results_1.matches.len());
         println!("Found {} matches for needle 2", results_2.matches.len());
@@ -96,6 +84,7 @@ mod tests {
         let time_elapsed = time_start.elapsed();
         println!("Test completed in {:?}", time_elapsed);
 
+        // test should take less than 2 seconds in release or 14 seconds in debug
         let time_expected = if cfg!(debug_assertions) {
             std::time::Duration::from_millis(14000)
         } else {
