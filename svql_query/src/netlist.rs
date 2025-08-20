@@ -1,4 +1,7 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use prjunnamed_netlist::Design;
 use svql_driver::prelude::Driver;
@@ -30,18 +33,26 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
     fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
 
     fn query<'ctx>(
-        driver: &'ctx Driver,
+        driver: Driver,
         haystack_module_name: &str,
         haystack_path: &Path,
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx, 'ctx>> {
-        // find_subgraphs(ctx.pat(), ctx.hay(), config)
-        //     .iter()
-        //     .map(|m| Self::from_subgraph(m, path.clone()))
-        //     .collect()
+        let haystack: Arc<Design> = driver
+            .get_by_path(haystack_path, haystack_module_name)
+            .expect("Failed to get haystack from driver");
 
-        todo!("fix lifetime issue")
+        let needle: Arc<Design> = driver
+            .get_by_path(&PathBuf::from(Self::FILE_PATH), Self::MODULE_NAME)
+            .expect("Failed to get needle from driver");
+
+        let subgraphs = find_subgraphs(needle.as_ref(), haystack.as_ref(), config)
+            .iter()
+            .map(|m| Self::from_subgraph(m, path.clone()))
+            .collect::<Vec<_>>();
+
+        subgraphs
     }
 }
 

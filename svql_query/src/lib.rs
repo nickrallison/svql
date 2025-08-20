@@ -5,10 +5,9 @@ use crate::instance::Instance;
 pub mod binding;
 pub mod composite;
 pub mod connect;
-pub mod haystack;
 pub mod instance;
 pub mod netlist;
-pub mod queries; // NEW
+pub mod queries;
 
 // ########################
 // Type State Tags

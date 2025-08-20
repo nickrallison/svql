@@ -1,11 +1,9 @@
-use log::{error, trace};
+use log::trace;
 use prjunnamed_netlist::Design;
 use std::{
     collections::HashMap,
     fmt,
-    fs::File,
     path::{Path, PathBuf},
-    process::Stdio,
     sync::{Arc, RwLock},
 };
 
@@ -66,7 +64,7 @@ impl Driver {
         })
     }
 
-    /// Ensure a design exists in the registry by (path, module_name). Returns the key.
+    /// Ensure a design exists in the registry by (path, module_name).
     pub fn ensure_loaded_with_top(
         &self,
         path: PathBuf,
@@ -92,7 +90,10 @@ impl Driver {
         };
 
         {
-            let guard = self.registry.read().unwrap();
+            let guard = self
+                .registry
+                .read()
+                .map_err(|e| format!("registry read lock poisoned: {}", e))?;
             if guard.contains_key(&key) {
                 return Ok(());
             }
@@ -105,7 +106,10 @@ impl Driver {
         );
 
         let design = run_yosys_cmd(&self.yosys, &design_path, &module_name)?;
-        let mut guard = self.registry.write().unwrap();
+        let mut guard = self
+            .registry
+            .write()
+            .map_err(|e| format!("registry write lock poisoned: {}", e))?;
         guard.insert(key.clone(), Arc::new(design));
         Ok(())
     }
@@ -123,14 +127,28 @@ impl Driver {
 
     /// Get an Arc<Design> for a key (clone Arc for cheap sharing).
     pub fn get(&self, key: &DesignKey) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
-        let guard = self.registry.read()?;
-        if !guard.contains_key(key) {
-            self.ensure_loaded_with_top(key.path.path().to_path_buf(), key.top.clone())?;
+        // Read, check. If missing, load with a write. Then read again to fetch.
+        {
+            let guard = self
+                .registry
+                .read()
+                .map_err(|e| format!("registry read lock poisoned: {}", e))?;
+            if let Some(design) = guard.get(key) {
+                return Ok(design.clone());
+            }
         }
+
+        // Not present; load it, then fetch.
+        self.ensure_loaded_with_top(key.path.path().to_path_buf(), key.top.clone())?;
+
+        let guard = self
+            .registry
+            .read()
+            .map_err(|e| format!("registry read lock poisoned: {}", e))?;
         guard
             .get(key)
             .cloned()
-            .ok_or_else(move || format!("Design not found for key: {:?}", key).into())
+            .ok_or_else(|| format!("Design not found for key: {:?}", key).into())
     }
 
     pub fn get_by_path(
@@ -139,7 +157,8 @@ impl Driver {
         module_name: &str,
     ) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
         let key = DesignKey {
-            path: DesignPath::new(path.to_path_buf()).ok()?,
+            path: DesignPath::new(path.to_path_buf())
+                .map_err(|e| format!("bad design path: {}", e))?,
             top: module_name.to_string(),
         };
         self.get(&key)
@@ -157,18 +176,27 @@ mod tests {
         let json_path = PathBuf::from("examples/patterns/basic/ff/sdffe.json");
         let unsupported_path = PathBuf::from("examples/patterns/basic/ff/sdffe.txt");
 
-        assert!(DesignPath::new(verilog_path).is_ok());
-        assert!(DesignPath::new(rtlil_path).is_ok());
-        assert!(DesignPath::new(json_path).is_ok());
-        assert!(DesignPath::new(unsupported_path).is_err());
+        assert!(crate::util::DesignPath::new(verilog_path).is_ok());
+        assert!(crate::util::DesignPath::new(rtlil_path).is_ok());
+        assert!(crate::util::DesignPath::new(json_path).is_ok());
+        assert!(crate::util::DesignPath::new(unsupported_path).is_err());
     }
 
     #[test]
     fn test_run_yosys_cmd_via_driver() {
         let driver = Driver::new().unwrap();
-        let key = driver
+        driver
             .ensure_loaded("examples/patterns/basic/ff/verilog/sdffe.v")
             .unwrap();
+
+        let key = DesignKey {
+            path: crate::util::DesignPath::new(PathBuf::from(
+                "examples/patterns/basic/ff/verilog/sdffe.v",
+            ))
+            .unwrap(),
+            top: "sdffe".to_string(),
+        };
+
         let d = driver.get(&key).expect("design must be present");
         assert!(d.iter_cells().count() > 0);
     }
