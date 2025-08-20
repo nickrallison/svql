@@ -1,5 +1,10 @@
+use std::path::Path;
+
+use itertools::iproduct;
+use svql_driver::driver::Driver;
+use svql_subgraph::Config;
+
 use crate::composite::{Composite, MatchedComposite, SearchableComposite};
-use crate::haystack::HaystackPool;
 use crate::instance::Instance;
 use crate::{Match, Search, State, Wire, WithPath};
 
@@ -7,7 +12,7 @@ use crate::queries::netlist::basic::and::and_gate::AndGate;
 use crate::queries::netlist::basic::dff::Sdffe;
 
 /// DFF -> AND composite:
-/// Require that sdffe.q drives either andg.a or andg.b (one must hold).
+/// Require that sdffe.q drives either and_gate.a or and_gate.b (one must hold).
 #[derive(Debug, Clone)]
 pub struct DffThenAnd<S>
 where
@@ -15,7 +20,7 @@ where
 {
     pub path: Instance,
     pub sdffe: Sdffe<S>,
-    pub andg: AndGate<S>,
+    pub and_gate: AndGate<S>,
 }
 
 impl<S> DffThenAnd<S>
@@ -26,7 +31,7 @@ where
         Self {
             path: path.clone(),
             sdffe: Sdffe::new(path.child("sdffe".to_string())),
-            andg: AndGate::new(path.child("andg".to_string())),
+            and_gate: AndGate::new(path.child("and_gate".to_string())),
         }
     }
 }
@@ -35,7 +40,7 @@ impl<S> WithPath<S> for DffThenAnd<S>
 where
     S: State,
 {
-    crate::impl_find_port!(DffThenAnd, sdffe, andg);
+    crate::impl_find_port!(DffThenAnd, sdffe, and_gate);
 
     fn path(&self) -> Instance {
         self.path.clone()
@@ -46,16 +51,16 @@ impl<S> Composite<S> for DffThenAnd<S>
 where
     S: State,
 {
-    /// Single OR-set of connections: sdffe.q -> andg.a OR sdffe.q -> andg.b
+    /// Single OR-set of connections: sdffe.q -> and_gate.a OR sdffe.q -> and_gate.b
     fn connections(&self) -> Vec<Vec<crate::Connection<S>>> {
         vec![vec![
             crate::Connection {
                 from: self.sdffe.q.clone(),
-                to: self.andg.a.clone(),
+                to: self.and_gate.a.clone(),
             },
             crate::Connection {
                 from: self.sdffe.q.clone(),
-                to: self.andg.b.clone(),
+                to: self.and_gate.b.clone(),
             },
         ]]
     }
@@ -94,36 +99,41 @@ impl SearchableComposite for DffThenAnd<Search> {
     type Hit<'p, 'd> = DffThenAnd<Match<'p, 'd>>;
 
     fn query<'ctx>(
-        hay: &'ctx HaystackPool,
+        driver: &'ctx Driver,
+        haystack_module_name: &str,
+        haystack_path: &Path,
         path: Instance,
-        config: &svql_subgraph::config::Config,
+        config: &Config,
     ) -> Vec<Self::Hit<'ctx, 'ctx>> {
         // Borrow child contexts from the pool (must have been ensured by the caller).
-        let sdffe_ctx = hay.get::<Sdffe<Search>>();
-        let and_ctx = hay.get::<AndGate<Search>>();
+        let and_results = AndGate::query(
+            driver,
+            haystack_module_name,
+            haystack_path,
+            path.child("and_gate".to_string()),
+            config,
+        );
+        let sdffe_results = Sdffe::query(
+            driver,
+            haystack_module_name,
+            haystack_path,
+            path.child("sdffe".to_string()),
+            config,
+        );
 
-        // Run sub-queries under their respective contexts.
-        let sdffe_hits = Sdffe::<Search>::query(sdffe_ctx, path.child("sdffe".to_string()), config);
-        let and_hits = AndGate::<Search>::query(and_ctx, path.child("andg".to_string()), config);
+        let results = iproduct!(and_results, sdffe_results)
+            .map(|(and_gate, sdffe)| Self::Hit {
+                and_gate,
+                sdffe,
+                path: path.clone(),
+            })
+            .filter(|s| {
+                let conn_ok = s.validate_connections(s.connections());
+                let other_ok = s.other_filters().iter().all(|f| f(s));
+                conn_ok && other_ok
+            })
+            .collect::<Vec<_>>();
 
-        // Assemble candidates and validate connections.
-        let mut out: Vec<Self::Hit<'ctx, 'ctx>> = Vec::new();
-
-        for s in &sdffe_hits {
-            for a in &and_hits {
-                let cand = DffThenAnd::<Match> {
-                    path: path.clone(),
-                    sdffe: s.clone(),
-                    andg: a.clone(),
-                };
-                if cand.validate_connections(cand.connections())
-                    && cand.other_filters().iter().all(|f| f(&cand))
-                {
-                    out.push(cand);
-                }
-            }
-        }
-
-        out
+        results
     }
 }

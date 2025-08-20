@@ -1,6 +1,5 @@
-use svql_driver::prelude::{DesignKey, Driver};
+use svql_driver::prelude::Driver;
 use svql_query::Search;
-use svql_query::haystack::HaystackPool;
 use svql_query::instance::Instance;
 use svql_query::queries::composites::dff_then_and::DffThenAnd;
 use svql_query::queries::netlist::basic::and::and_gate::AndGate;
@@ -14,21 +13,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let driver = Driver::new()?;
 
-    // haystack
-    let hay_key: DesignKey =
-        driver.ensure_loaded("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v")?;
-
-    // Build a haystack-scoped pool and ensure child contexts once.
-    let mut pool = HaystackPool::new(driver.clone(), hay_key.clone());
-    pool.ensure::<Sdffe<Search>>()?;
-    pool.ensure::<AndGate<Search>>()?;
-
     let config = Config::builder().exact_length().none().build();
     let root = Instance::root("dff_then_and".to_string());
 
     // Run the composite query via the trait method
+    let haystack_path = Path::from("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v");
+    let haystack_module_name = "and_q_double_sdffe";
+
     let hits = <DffThenAnd<Search> as svql_query::composite::SearchableComposite>::query(
-        &pool, root, &config,
+        &driver,
+        haystack_module_name,
+        &haystack_path,
+        root,
+        &config,
     );
 
     log::trace!("DffThenAnd matches={}", hits.len());

@@ -1,6 +1,5 @@
 pub mod api;
 pub mod driver;
-pub mod query_ctx;
 pub mod util;
 
 pub mod prelude {
@@ -11,61 +10,65 @@ pub mod prelude {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use svql_subgraph::{config::Config, find_subgraphs};
 
-    use crate::{
-        prelude::DesignKey,
-        util::{ensure_loaded, new_shared_driver},
-    };
+    use crate::util::new_shared_driver;
 
     #[test]
     fn test_otbn_run_time() {
         let driver = new_shared_driver().expect("driver");
 
-        let hay_key: DesignKey = ensure_loaded(
-            &driver,
-            "examples/fixtures/larger_designs/json/otbn_core.json",
-        )
-        .expect("Failed to read input design");
-
-        let and_key: DesignKey =
-            ensure_loaded(&driver, "examples/patterns/basic/and/verilog/and_gate.v")
-                .expect("Failed to read input design");
-
-        let needle_key_1: DesignKey = ensure_loaded(
-            &driver,
-            "examples/patterns/security/access_control/locked_reg/json/async_en.json",
-        )
-        .expect("Failed to read input design");
-
-        let needle_key_2: DesignKey = ensure_loaded(
-            &driver,
-            "examples/patterns/security/access_control/locked_reg/json/async_mux.json",
-        )
-        .expect("Failed to read input design");
-
-        let needle_key_3: DesignKey = ensure_loaded(
-            &driver,
-            "examples/patterns/security/access_control/locked_reg/json/sync_en.json",
-        )
-        .expect("Failed to read input design");
-
-        let needle_key_4: DesignKey = ensure_loaded(
-            &driver,
-            "examples/patterns/security/access_control/locked_reg/json/sync_mux.json",
-        )
-        .expect("Failed to read input design");
-
-        let match_length = false;
-        let config = Config::builder().match_length(match_length).none().build();
+        let config = Config::builder().match_length(false).none().build();
 
         // Hold Arcs so the borrows into results live long enough
-        let hay_arc = driver.get(&hay_key).unwrap();
-        let and_arc = driver.get(&and_key).unwrap();
-        let n1_arc = driver.get(&needle_key_1).unwrap();
-        let n2_arc = driver.get(&needle_key_2).unwrap();
-        let n3_arc = driver.get(&needle_key_3).unwrap();
-        let n4_arc = driver.get(&needle_key_4).unwrap();
+        let hay_arc = driver
+            .get_by_path(
+                &PathBuf::from("examples/fixtures/larger_designs/json/otbn_core.json"),
+                "otbn_core",
+            )
+            .unwrap();
+
+        let and_arc = driver
+            .get_by_path(
+                &PathBuf::from("examples/patterns/basic/and/verilog/and_gate.v"),
+                "and_gate",
+            )
+            .unwrap();
+
+        let n1_arc = driver
+            .get_by_path(
+                &PathBuf::from(
+                    "examples/patterns/security/access_control/locked_reg/json/async_en.json",
+                ),
+                "async_en",
+            )
+            .unwrap();
+        let n2_arc = driver
+            .get_by_path(
+                &PathBuf::from(
+                    "examples/patterns/security/access_control/locked_reg/json/async_mux.json",
+                ),
+                "async_mux",
+            )
+            .unwrap();
+        let n3_arc = driver
+            .get_by_path(
+                &PathBuf::from(
+                    "examples/patterns/security/access_control/locked_reg/json/sync_en.json",
+                ),
+                "sync_en",
+            )
+            .unwrap();
+        let n4_arc = driver
+            .get_by_path(
+                &PathBuf::from(
+                    "examples/patterns/security/access_control/locked_reg/json/sync_mux.json",
+                ),
+                "sync_mux",
+            )
+            .unwrap();
 
         let time_start = std::time::Instant::now();
 

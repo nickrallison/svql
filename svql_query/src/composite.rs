@@ -1,4 +1,9 @@
-use crate::haystack::HaystackPool;
+use std::path::Path;
+
+use svql_driver::driver::Driver;
+use svql_subgraph::Config;
+
+use crate::instance::Instance;
 use crate::{Connection, Match, Search, State, WithPath};
 
 /// A composite is a tree of sub-queries (netlists or other composites) and a set of
@@ -21,14 +26,15 @@ where
 /// Search-time surface for composites.
 /// - Hit<'p,'d> fixes the payload type returned for a query
 /// - The query is executed under a shared HaystackPool, which owns child
-///   QueryCtx instances and returns &'ctx QueryCtx on demand.
 pub trait SearchableComposite: Composite<Search> {
     type Hit<'p, 'd>;
 
     fn query<'ctx>(
-        hay: &'ctx HaystackPool,
-        path: crate::instance::Instance,
-        config: &svql_subgraph::config::Config,
+        driver: &'ctx Driver,
+        haystack_module_name: &str,
+        haystack_path: &Path,
+        path: Instance,
+        config: &Config,
     ) -> Vec<Self::Hit<'ctx, 'ctx>>;
 }
 

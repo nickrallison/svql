@@ -1,5 +1,7 @@
+use std::path::Path;
+
 use svql_driver::prelude::Driver;
-use svql_driver::query_ctx::QueryCtx;
+use svql_subgraph::Config;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -84,10 +86,19 @@ impl SearchableNetlist for AndMux<Search> {
 
 impl AndMux<Search> {
     pub fn query<'ctx>(
-        ctx: &'ctx QueryCtx,
+        driver: &'ctx Driver,
+        haystack_module_name: &str,
+        haystack_path: &Path,
         path: Instance,
-        config: &svql_subgraph::config::Config,
+        config: &Config,
     ) -> Vec<AndMux<Match<'ctx, 'ctx>>> {
-        <Self as SearchableNetlist>::query(ctx, path, config)
+        let _ = haystack_path;
+        <Self as SearchableNetlist>::query(
+            driver,
+            haystack_module_name,
+            haystack_path,
+            path,
+            config,
+        )
     }
 }

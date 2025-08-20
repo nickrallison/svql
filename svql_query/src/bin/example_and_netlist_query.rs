@@ -13,20 +13,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // One shared driver for everything.
     let driver = Driver::new()?;
 
-    // Load haystack once via the shared driver and keep the key.
-    let hay_key: DesignKey =
-        driver.ensure_loaded("examples/fixtures/basic/and/verilog/and_seq.v")?;
-
-    // Build a QueryCtx for this netlist type from its metadata.
-    let ctx = ctx_for::<AndGate<Search>>(&driver, &hay_key)?;
-
     let config = Config::builder().exact_length().none().build();
 
-    let hits = AndGate::<Search>::query(&ctx, Instance::root("and".to_string()), &config);
+    // let hits = AndGate::<Search>::query(&driver, Instance::root("and".to_string()), &config);
 
-    for hit in hits {
-        println!("Found match: {:#?}", hit);
-    }
+    // for hit in hits {
+    //     println!("Found match: {:#?}", hit);
+    // }
 
-    Ok(())
+    // Ok(())
 }

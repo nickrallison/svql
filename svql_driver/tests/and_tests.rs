@@ -4,15 +4,15 @@ mod integration_tests {
 
         use rstest::rstest;
         use svql_driver::prelude::{DesignKey, Driver};
-        use svql_driver::util::{ensure_loaded, new_shared_driver};
+        use svql_driver::util::new_shared_driver;
 
         lazy_static::lazy_static! {
             static ref DRIVER: Driver = new_shared_driver().unwrap();
 
-            static ref AND_Q_DOUBLE_SDFFE: DesignKey = ensure_loaded(&DRIVER, "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
-            static ref AND_GATE: DesignKey = ensure_loaded(&DRIVER, "examples/patterns/basic/and/verilog/and_gate.v").unwrap();
-            static ref AND_TREE: DesignKey = ensure_loaded(&DRIVER, "examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
-            static ref AND_SEQ: DesignKey = ensure_loaded(&DRIVER, "examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
+            static ref AND_Q_DOUBLE_SDFFE: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
+            static ref AND_GATE: DesignKey = DRIVER.ensure_loaded("examples/patterns/basic/and/verilog/and_gate.v").unwrap();
+            static ref AND_TREE: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
+            static ref AND_SEQ: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
 
             static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::builder()
                 .match_length(false)

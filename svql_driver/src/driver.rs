@@ -71,7 +71,7 @@ impl Driver {
         &self,
         path: PathBuf,
         module_name: String,
-    ) -> Result<DesignKey, Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let design_path_buf = if path.is_absolute() {
             path
         } else {
@@ -94,7 +94,7 @@ impl Driver {
         {
             let guard = self.registry.read().unwrap();
             if guard.contains_key(&key) {
-                return Ok(key);
+                return Ok(());
             }
         }
 
@@ -107,14 +107,11 @@ impl Driver {
         let design = run_yosys_cmd(&self.yosys, &design_path, &module_name)?;
         let mut guard = self.registry.write().unwrap();
         guard.insert(key.clone(), Arc::new(design));
-        Ok(key)
+        Ok(())
     }
 
     /// Ensure a design exists by path; module name is file stem.
-    pub fn ensure_loaded(
-        &self,
-        path: impl AsRef<Path>,
-    ) -> Result<DesignKey, Box<dyn std::error::Error>> {
+    pub fn ensure_loaded(&self, path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
         let p = path.as_ref();
         let module_name = p
             .file_stem()
@@ -125,19 +122,27 @@ impl Driver {
     }
 
     /// Get an Arc<Design> for a key (clone Arc for cheap sharing).
-    pub fn get(&self, key: &DesignKey) -> Option<Arc<Design>> {
-        let guard = self.registry.read().ok()?;
-        guard.get(key).cloned()
+    pub fn get(&self, key: &DesignKey) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
+        let guard = self.registry.read()?;
+        if !guard.contains_key(key) {
+            self.ensure_loaded_with_top(key.path.path().to_path_buf(), key.top.clone())?;
+        }
+        guard
+            .get(key)
+            .cloned()
+            .ok_or_else(move || format!("Design not found for key: {:?}", key).into())
     }
-    pub fn open_ctx(
+
+    pub fn get_by_path(
         &self,
-        pat_key: &DesignKey,
-        hay_key: &DesignKey,
-    ) -> Option<crate::query_ctx::QueryCtx> {
-        let guard = self.registry.read().ok()?;
-        let pat = guard.get(pat_key).cloned()?;
-        let hay = guard.get(hay_key).cloned()?;
-        Some(crate::query_ctx::QueryCtx::new(pat, hay))
+        path: &Path,
+        module_name: &str,
+    ) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
+        let key = DesignKey {
+            path: DesignPath::new(path.to_path_buf()).ok()?,
+            top: module_name.to_string(),
+        };
+        self.get(&key)
     }
 }
 
