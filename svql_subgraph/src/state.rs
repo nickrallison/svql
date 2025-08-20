@@ -8,6 +8,9 @@ use crate::{
     ports::{Source, is_commutative, normalize_commutative},
 };
 
+// Alias to keep signatures short and clear (satisfy clippy::type_complexity)
+pub(super) type BoundAdditions<'p, 'd> = Vec<((CellWrapper<'p>, usize), (CellWrapper<'d>, usize))>;
+
 pub(super) struct State<'p, 'd> {
     mapping: HashMap<NodeId, NodeId>,
     used_d: HashSet<NodeId>,
@@ -81,6 +84,9 @@ impl<'p, 'd> State<'p, 'd> {
         self.mapping.len() == self.target_gate_count
     }
 
+    // We intentionally construct HashMaps keyed by CellWrapper here because the
+    // public SubgraphMatch API exposes those keys. Suppress clippy’s warning.
+    #[allow(clippy::mutable_key_type)]
     pub(super) fn to_subgraph_match(
         &self,
         p_index: &Index<'p>,
@@ -88,25 +94,26 @@ impl<'p, 'd> State<'p, 'd> {
         pat_input_cells: &[CellWrapper<'p>],
         pat_output_cells: &[CellWrapper<'p>],
     ) -> super::SubgraphMatch<'p, 'd> {
-        let mut cell_mapping = HashMap::new();
+        let mut cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>> = HashMap::new();
         for (&p_node, &d_node) in &self.mapping {
             let p_cell = p_index.node_to_cell(p_node);
             let d_cell = d_index.node_to_cell(d_node);
             cell_mapping.insert(p_cell, d_cell);
         }
 
-        let mut boundary_src_map = HashMap::new();
+        let mut boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
+            HashMap::new();
         for ((p_cell, p_bit), (d_cell, d_bit)) in &self.boundary {
             boundary_src_map.insert((*p_cell, *p_bit), (*d_cell, *d_bit));
         }
 
-        // Name maps
         let mut input_by_name = HashMap::new();
         for ic in pat_input_cells {
             if let Some(nm) = input_name(ic) {
                 input_by_name.insert(nm, *ic);
             }
         }
+
         let mut output_by_name = HashMap::new();
         for oc in pat_output_cells {
             if let Some(nm) = output_name(oc) {
@@ -114,7 +121,6 @@ impl<'p, 'd> State<'p, 'd> {
             }
         }
 
-        // Build (pattern Output bit) -> (design cell, bit) drivers
         let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
             HashMap::new();
         for oc in pat_output_cells {
@@ -194,7 +200,7 @@ pub(super) fn check_and_collect_boundary<'p, 'd>(
     d_index: &Index<'d>,
     st: &State<'p, 'd>,
     match_length: bool,
-) -> Option<Vec<((CellWrapper<'p>, usize), (CellWrapper<'d>, usize))>> {
+) -> Option<BoundAdditions<'p, 'd>> {
     let pairs = aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
 
     pairs.into_iter().try_fold(
@@ -207,13 +213,9 @@ pub(super) fn check_and_collect_boundary<'p, 'd>(
                     }
                 }
                 (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
-                    let Some(p_node) = p_index.try_cell_to_node(p_cell) else {
-                        return None;
-                    };
+                    let p_node = p_index.try_cell_to_node(p_cell)?;
                     if let Some(mapped_d) = st.mapped_to(p_node) {
-                        let Some(d_node) = d_index.try_cell_to_node(d_cell) else {
-                            return None;
-                        };
+                        let d_node = d_index.try_cell_to_node(d_cell)?;
                         if mapped_d != d_node || p_bit != d_bit {
                             return None;
                         }

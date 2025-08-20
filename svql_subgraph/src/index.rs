@@ -15,8 +15,8 @@ pub(super) struct Index<'a> {
     kinds: Vec<CellKind>,
     pins: Vec<CellPins<'a>>,
     by_kind: HashMap<CellKind, Vec<NodeId>>,
-    cell_to_id: HashMap<CellWrapper<'a>, NodeId>,
-    gate_count: usize,
+    // Key by debug_index to avoid interior mutability key lint.
+    cell_to_id: HashMap<usize, NodeId>,
 }
 
 impl<'a> Index<'a> {
@@ -25,22 +25,21 @@ impl<'a> Index<'a> {
         let mut kinds: Vec<CellKind> = Vec::new();
         let mut pins: Vec<CellPins<'a>> = Vec::new();
         let mut by_kind: HashMap<CellKind, Vec<NodeId>> = HashMap::new();
-        let mut cell_to_id: HashMap<CellWrapper<'a>, NodeId> = HashMap::new();
-        let mut gate_count = 0usize;
+        let mut cell_to_id: HashMap<usize, NodeId> = HashMap::new();
 
         for cell in design.iter_cells().map(CellWrapper::new) {
             let k = CellKind::from(cell.get().as_ref());
-            if !(k.is_gate()) {
+            if !k.is_gate() {
                 continue;
             }
             let id = nodes.len() as NodeId;
-            gate_count += 1;
+
             nodes.push(cell);
             kinds.push(k);
             let p = extract_pins(cell);
             pins.push(p);
             by_kind.entry(k).or_default().push(id);
-            cell_to_id.insert(cell, id);
+            cell_to_id.insert(cell.debug_index(), id);
         }
 
         Index {
@@ -49,16 +48,17 @@ impl<'a> Index<'a> {
             pins,
             by_kind,
             cell_to_id,
-            gate_count,
         }
     }
 
     pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper<'a> {
         self.nodes[id as usize]
     }
+
     pub(super) fn kind(&self, id: NodeId) -> CellKind {
         self.kinds[id as usize]
     }
+
     pub(super) fn pins(&self, id: NodeId) -> &CellPins<'a> {
         &self.pins[id as usize]
     }
@@ -68,11 +68,11 @@ impl<'a> Index<'a> {
     }
 
     pub(super) fn gate_count(&self) -> usize {
-        self.gate_count
+        self.nodes.len()
     }
 
     pub(super) fn try_cell_to_node(&self, c: CellWrapper<'a>) -> Option<NodeId> {
-        self.cell_to_id.get(&c).copied()
+        self.cell_to_id.get(&c.debug_index()).copied()
     }
 
     // Deterministic iteration over kinds: sort by CellKind (which derives Ord).
@@ -86,6 +86,8 @@ impl<'a> Index<'a> {
 #[cfg(test)]
 mod tests {
 
+    use prjunnamed_netlist::Design;
+
     use super::*;
 
     lazy_static::lazy_static! {
@@ -97,6 +99,6 @@ mod tests {
         let d = &*SDFFE;
         let idx = Index::build(d);
         assert!(idx.gate_count() > 0);
-        assert_eq!(idx.of_kind(CellKind::Dff).len() > 0, true);
+        assert_eq!(idx.of_kind(super::CellKind::Dff).len() > 0, true);
     }
 }

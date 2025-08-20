@@ -33,14 +33,13 @@ fn pattern_consumption_bits<'p>(p_index: &Index<'p>, q_p: NodeId, p_id: NodeId) 
         .pins(q_p)
         .inputs
         .iter()
-        .filter_map(|p_src| match p_src {
-            Source::Gate(p_src_cell, p_bit) => {
-                let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) else {
-                    return None;
-                };
-                (p_src_node == p_id).then_some(*p_bit)
-            }
-            _ => None,
+        .filter_map(|p_src| {
+            let (p_src_cell, p_bit) = match p_src {
+                Source::Gate(c, b) => (*c, *b),
+                _ => return None,
+            };
+            let p_src_node = p_index.try_cell_to_node(p_src_cell)?;
+            (p_src_node == p_id).then_some(p_bit)
         })
         .collect()
 }
@@ -84,6 +83,8 @@ fn downstream_consumers_compatible<'p, 'd>(
 mod tests {
     use prjunnamed_netlist::Design;
 
+    use crate::cell::CellKind;
+
     use super::*;
 
     lazy_static::lazy_static! {
@@ -92,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn same_cell_kind_is_compatible_with_itself() {
+    fn same_cell_is_compatible_with_itself() {
         let d = &*SDFFE;
         let idx = super::Index::build(d);
         let st = super::State::<'_, '_>::new(idx.gate_count());
@@ -114,8 +115,8 @@ mod tests {
 
         let match_length = true;
 
-        let p = p_idx.of_kind(crate::cell::CellKind::Dff)[0];
-        for &d in d_idx.of_kind(crate::cell::CellKind::Dff) {
+        let p = p_idx.of_kind(CellKind::Dff)[0];
+        for &d in d_idx.of_kind(CellKind::Dff) {
             assert!(
                 cells_compatible(p, d, &p_idx, &d_idx, &st, match_length),
                 "pattern IO D should be compatible with design DFF regardless of external driver kind"

@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-pub mod cell;
 use cell::{get_input_cells, get_output_cells};
 
 mod anchor;
+pub mod cell;
 mod compat;
 pub mod config;
 mod index;
@@ -17,6 +17,9 @@ pub mod util;
 
 pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
+
+// Alias to simplify clippy::type_complexity in dedupe signatures
+type SigBoundary = Vec<(u8, usize, usize, usize, usize)>;
 
 #[derive(Clone, Debug)]
 pub struct AllSubgraphMatches<'p, 'd> {
@@ -157,8 +160,7 @@ pub fn find_subgraphs<'p, 'd>(
 
     match config.dedupe {
         DedupeMode::None => {
-            let mut seen: std::collections::HashSet<Vec<(u8, usize, usize, usize, usize)>> =
-                std::collections::HashSet::new();
+            let mut seen: std::collections::HashSet<SigBoundary> = std::collections::HashSet::new();
             results.retain(|m| seen.insert(signature_with_boundary(m)));
         }
         DedupeMode::AutoMorph => {
@@ -176,10 +178,8 @@ pub fn get_pattern_io_cells<'p>(
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 
-fn signature_with_boundary<'p, 'd>(
-    m: &SubgraphMatch<'p, 'd>,
-) -> Vec<(u8, usize, usize, usize, usize)> {
-    let mut sig: Vec<(u8, usize, usize, usize, usize)> = Vec::new();
+fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigBoundary {
+    let mut sig: SigBoundary = Vec::new();
 
     for (p, d) in m.cell_mapping.iter() {
         sig.push((0, p.debug_index(), 0, d.debug_index(), 0));

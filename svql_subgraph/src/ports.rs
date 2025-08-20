@@ -13,7 +13,6 @@ pub(super) enum Source<'a> {
 
 #[derive(Clone, Debug)]
 pub(super) struct CellPins<'a> {
-    pub(super) kind: CellKind,
     pub(super) inputs: Vec<Source<'a>>,
 }
 
@@ -25,12 +24,13 @@ pub(super) fn is_commutative(kind: CellKind) -> bool {
 }
 
 pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
-    let kind = CellKind::from(cref.get().as_ref());
     let mut idx = 0usize;
     let mut inputs: Vec<Source<'a>> = Vec::new();
+
     cref.visit(|net| {
         let _pin_index = idx;
         idx += 1;
+
         match cref.design().find_cell(net) {
             Ok((src, bit)) => {
                 if is_gate_cell_ref(src) {
@@ -42,11 +42,12 @@ pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
             Err(trit) => inputs.push(Source::Const(trit)),
         }
     });
-    CellPins { kind, inputs }
+
+    CellPins { inputs }
 }
 
 pub(super) fn normalize_commutative<'a>(inputs: &mut [Source<'a>]) {
-    inputs.sort_by_key(|a| stable_key(a));
+    inputs.sort_by(|a, b| stable_key(a).cmp(&stable_key(b)));
 }
 
 fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
