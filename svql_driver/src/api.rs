@@ -82,15 +82,15 @@ pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBi
     SimpleMatchBinding { inputs, outputs }
 }
 
-fn port_width_from_input(cell: &std::borrow::Cow<'_, prjunnamed_netlist::Cell>) -> usize {
-    match cell.as_ref() {
+fn port_width_from_input(cell: &Cell) -> usize {
+    match cell {
         Cell::Input(_, w) => *w,
         _ => 0,
     }
 }
 
-fn port_width_from_output(cell: &std::borrow::Cow<'_, prjunnamed_netlist::Cell>) -> usize {
-    match cell.as_ref() {
+fn port_width_from_output(cell: &Cell) -> usize {
+    match cell {
         Cell::Output(_, v) => value_width(v),
         _ => 0,
     }

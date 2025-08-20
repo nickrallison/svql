@@ -46,7 +46,7 @@ pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
 }
 
 pub(super) fn normalize_commutative<'a>(inputs: &mut [Source<'a>]) {
-    inputs.sort_by(|a, b| stable_key(a).cmp(&stable_key(b)));
+    inputs.sort_by_key(|a| stable_key(a));
 }
 
 fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
