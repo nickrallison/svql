@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-pub mod cell_kind;
-use cell_kind::{get_input_cells, get_output_cells};
+pub mod cell;
+use cell::{get_input_cells, get_output_cells};
 
 mod anchor;
 mod compat;
@@ -15,7 +15,7 @@ mod state;
 mod strategy;
 pub mod util;
 
-pub use cell_kind::{CellWrapper, InputCell, OutputCell};
+pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
 
 #[derive(Clone, Debug)]
@@ -57,8 +57,8 @@ impl<'p, 'd, 'a> IntoIterator for &'a AllSubgraphMatches<'p, 'd> {
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
     pub cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
-    pub pat_input_cells: Vec<InputCell<'p>>,
-    pub pat_output_cells: Vec<OutputCell<'p>>,
+    pub pat_input_cells: Vec<CellWrapper<'p>>,
+    pub pat_output_cells: Vec<CellWrapper<'p>>,
     pub boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
 
     pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
@@ -170,7 +170,9 @@ pub fn find_subgraphs<'p, 'd>(
     AllSubgraphMatches { matches: results }
 }
 
-pub fn get_pattern_io_cells<'p>(pattern: &'p Design) -> (Vec<InputCell<'p>>, Vec<OutputCell<'p>>) {
+pub fn get_pattern_io_cells<'p>(
+    pattern: &'p Design,
+) -> (Vec<CellWrapper<'p>>, Vec<CellWrapper<'p>>) {
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 

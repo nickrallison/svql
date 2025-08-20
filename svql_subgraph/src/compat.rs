@@ -1,6 +1,7 @@
 use crate::state::check_and_collect_boundary;
 
 use super::index::{Index, NodeId};
+use super::ports::Source;
 use super::state::State;
 
 /// Check if two cells (pattern/design) are compatible under the current state and config.
@@ -28,20 +29,18 @@ pub(super) fn cells_compatible<'p, 'd>(
 
 /// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.
 fn pattern_consumption_bits<'p>(p_index: &Index<'p>, q_p: NodeId, p_id: NodeId) -> Vec<usize> {
-    use super::ports::Source;
-
     p_index
         .pins(q_p)
         .inputs
         .iter()
-        .filter_map(|(_, p_src)| {
-            let Source::Gate(p_src_cell, p_bit) = p_src else {
-                return None;
-            };
-            let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) else {
-                return None;
-            };
-            (p_src_node == p_id).then_some(*p_bit)
+        .filter_map(|p_src| match p_src {
+            Source::Gate(p_src_cell, p_bit) => {
+                let Some(p_src_node) = p_index.try_cell_to_node(*p_src_cell) else {
+                    return None;
+                };
+                (p_src_node == p_id).then_some(*p_bit)
+            }
+            _ => None,
         })
         .collect()
 }
@@ -53,18 +52,12 @@ fn design_has_input_from_bit<'d>(
     d_id: NodeId,
     bit: usize,
 ) -> bool {
-    use super::ports::Source;
-
-    d_index
-        .pins(q_d)
-        .inputs
-        .iter()
-        .any(|(_, d_src)| match d_src {
-            Source::Gate(d_src_cell, d_bit) => d_index
-                .try_cell_to_node(*d_src_cell)
-                .is_some_and(|d_src_node| d_src_node == d_id && *d_bit == bit),
-            _ => false,
-        })
+    d_index.pins(q_d).inputs.iter().any(|d_src| match d_src {
+        Source::Gate(d_src_cell, d_bit) => d_index
+            .try_cell_to_node(*d_src_cell)
+            .is_some_and(|d_src_node| d_src_node == d_id && *d_bit == bit),
+        _ => false,
+    })
 }
 
 /// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
@@ -101,11 +94,11 @@ mod tests {
     #[test]
     fn same_cell_kind_is_compatible_with_itself() {
         let d = &*SDFFE;
-        let idx = Index::build(d);
-        let st = State::<'_, '_>::new(idx.gate_count());
+        let idx = super::Index::build(d);
+        let st = super::State::<'_, '_>::new(idx.gate_count());
         let match_length = true;
 
-        for &n in idx.of_kind(crate::cell_kind::CellKind::Dff) {
+        for &n in idx.of_kind(crate::cell::CellKind::Dff) {
             assert!(cells_compatible(n, n, &idx, &idx, &st, match_length));
         }
     }
@@ -115,14 +108,14 @@ mod tests {
         let d_p = &SDFFE;
         let d_d = &SEQ_DOUBLE_SDFFE;
 
-        let p_idx = Index::build(d_p);
-        let d_idx = Index::build(d_d);
-        let st = State::new(p_idx.gate_count());
+        let p_idx = super::Index::build(d_p);
+        let d_idx = super::Index::build(d_d);
+        let st = super::State::new(p_idx.gate_count());
 
         let match_length = true;
 
-        let p = p_idx.of_kind(crate::cell_kind::CellKind::Dff)[0];
-        for &d in d_idx.of_kind(crate::cell_kind::CellKind::Dff) {
+        let p = p_idx.of_kind(crate::cell::CellKind::Dff)[0];
+        for &d in d_idx.of_kind(crate::cell::CellKind::Dff) {
             assert!(
                 cells_compatible(p, d, &p_idx, &d_idx, &st, match_length),
                 "pattern IO D should be compatible with design DFF regardless of external driver kind"

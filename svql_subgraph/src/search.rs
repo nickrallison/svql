@@ -1,23 +1,20 @@
-use crate::cell_kind::CellWrapper;
+use crate::cell::CellWrapper;
 use crate::config;
 use crate::state::check_and_collect_boundary;
 
+use super::SubgraphMatch;
 use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
 use super::state::State;
 use super::strategy::choose_next;
-use super::{
-    SubgraphMatch,
-    cell_kind::{InputCell, OutputCell},
-};
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
     out: &mut Vec<SubgraphMatch<'p, 'd>>,
-    pat_inputs: &[InputCell<'p>],
-    pat_outputs: &[OutputCell<'p>],
+    pat_inputs: &[CellWrapper<'p>],
+    pat_outputs: &[CellWrapper<'p>],
     config: &config::Config,
 ) {
     if st.done() {
@@ -100,8 +97,8 @@ mod tests {
 
         let mut st = State::new(p_index.gate_count());
         let mut out = Vec::new();
-        let inputs = super::super::cell_kind::get_input_cells(d);
-        let outputs = super::super::cell_kind::get_output_cells(d);
+        let inputs = super::super::cell::get_input_cells(d);
+        let outputs = super::super::cell::get_output_cells(d);
 
         let config = Config::default();
 

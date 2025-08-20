@@ -1,4 +1,4 @@
-use super::cell_kind::CellKind;
+use super::cell::CellKind;
 use super::index::{Index, NodeId};
 
 /// Choose an anchor kind and the candidate anchors in both pattern and design.

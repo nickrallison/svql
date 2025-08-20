@@ -12,7 +12,7 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
 
         let pins = &p_index.pins(p).inputs;
         let mut all_resolvable = true;
-        for (_, src) in pins {
+        for src in pins {
             match src {
                 Source::Const(_) => {}
                 Source::Io(_, _) => {}

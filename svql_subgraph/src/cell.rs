@@ -160,6 +160,13 @@ impl<'p> CellWrapper<'p> {
     pub fn design(self) -> &'p Design {
         self.cref.design()
     }
+    pub fn maybe_name(&self) -> Option<&str> {
+        match self.cref.get() {
+            Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+            Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Debug for CellWrapper<'_> {
@@ -181,100 +188,38 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InputCell<'p> {
-    pub cref: CellWrapper<'p>,
+pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
+    CellKind::from(c.get().as_ref()).is_gate()
 }
 
-impl<'p> InputCell<'p> {
-    pub fn name(&self) -> Option<&'p str> {
-        match self.cref.cref().get() {
-            Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn get_gates(&self) -> Vec<CellRef<'p>> {
-        if matches!(self.cref.cref().get().as_ref(), Cell::Input(_, _)) {
-            get_fanout(self.cref.cref().design(), self.cref.cref())
-        } else {
-            vec![]
-        }
-    }
-}
-
-pub(crate) fn get_fanout<'a>(design: &'a Design, cell: CellRef<'a>) -> Vec<CellRef<'a>> {
-    let mut fanout: Vec<CellRef<'a>> = Vec::new();
-
-    for dest in design.iter_cells() {
-        if dest == cell {
-            continue;
-        }
-
-        let mut driven_by_cell = false;
-        dest.visit(|net| {
-            if driven_by_cell {
-                return;
-            }
-            if let Ok((src, _bit)) = design.find_cell(net)
-                && src == cell
-            {
-                driven_by_cell = true;
-            }
-        });
-
-        if driven_by_cell {
-            fanout.push(dest);
-        }
-    }
-
-    fanout
-}
-
-pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<InputCell<'a>> {
+pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<CellWrapper<'a>> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
-        .map(|cref| InputCell { cref: cref.into() })
+        .map(CellWrapper::from)
         .collect()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct OutputCell<'p> {
-    pub cref: CellWrapper<'p>,
-}
-
-impl<'p> OutputCell<'p> {
-    pub fn name(&self) -> Option<&'p str> {
-        match self.cref.cref().get() {
-            Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn get_gate(&self) -> CellRef<'p> {
-        let mut source: Option<CellRef<'p>> = None;
-        if matches!(self.cref.cref().get().as_ref(), Cell::Output(_, _)) {
-            self.cref.cref().visit(|net| {
-                if let Ok((src, _bit)) = self.cref.cref().design().find_cell(net) {
-                    source = Some(src);
-                }
-            });
-        }
-        source.expect("Output cell should have a driving source")
-    }
-}
-
-pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<OutputCell<'a>> {
+pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<CellWrapper<'a>> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
-        .map(|cref| OutputCell { cref: cref.into() })
+        .map(CellWrapper::from)
         .collect()
 }
 
-pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
-    CellKind::from(c.get().as_ref()).is_gate()
+pub(crate) fn input_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
+    match cell.cref().get() {
+        Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+pub(crate) fn output_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
+    match cell.cref().get() {
+        Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

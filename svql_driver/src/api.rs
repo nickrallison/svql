@@ -55,9 +55,9 @@ pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBi
     let mut outputs: HashMap<(String, usize), NetId> = HashMap::new();
 
     for ic in &m.pat_input_cells {
-        if let Some(name) = ic.name() {
+        if let Some(name) = ic.maybe_name() {
             // Pull bit width from the Cell::Input value
-            let width = port_width_from_input(&ic.cref.cref().get());
+            let width = port_width_from_input(&ic.cref.get());
             for bit in 0..width {
                 if let Some((d_cell, d_bit)) = m.design_source_of_input_bit(name, bit) {
                     let net = d_cell.output()[d_bit];
@@ -68,8 +68,8 @@ pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBi
     }
 
     for oc in &m.pat_output_cells {
-        if let Some(name) = oc.name() {
-            let width = port_width_from_output(&oc.cref.cref().get());
+        if let Some(name) = oc.maybe_name() {
+            let width = port_width_from_output(&oc.cref.get());
             for bit in 0..width {
                 if let Some((d_cell, d_bit)) = m.design_driver_of_output_bit(name, bit) {
                     let net = d_cell.output()[d_bit];

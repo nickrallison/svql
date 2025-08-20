@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-use crate::cell_kind::CellWrapper;
+use crate::cell::CellWrapper;
 
-use super::cell_kind::CellKind;
+use super::cell::CellKind;
 use super::ports::{CellPins, extract_pins};
 
 pub(super) type NodeId = u32;

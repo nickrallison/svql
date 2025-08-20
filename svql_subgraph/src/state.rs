@@ -4,7 +4,7 @@ use prjunnamed_netlist::Cell;
 
 use super::index::{Index, NodeId};
 use crate::{
-    cell_kind::CellWrapper,
+    cell::{CellWrapper, input_name, output_name},
     ports::{Source, is_commutative, normalize_commutative},
 };
 
@@ -28,9 +28,11 @@ impl<'p, 'd> State<'p, 'd> {
     pub(super) fn is_mapped(&self, p: NodeId) -> bool {
         self.mapping.contains_key(&p)
     }
+
     pub(super) fn mapped_to(&self, p: NodeId) -> Option<NodeId> {
         self.mapping.get(&p).copied()
     }
+
     pub(super) fn mappings(&self) -> &std::collections::HashMap<NodeId, NodeId> {
         &self.mapping
     }
@@ -56,6 +58,7 @@ impl<'p, 'd> State<'p, 'd> {
     ) -> Option<(CellWrapper<'d>, usize)> {
         self.boundary.get(&(p_cell, p_bit)).copied()
     }
+
     pub(super) fn boundary_insert(
         &mut self,
         key: (CellWrapper<'p>, usize),
@@ -67,6 +70,7 @@ impl<'p, 'd> State<'p, 'd> {
         self.boundary.insert(key, val);
         true
     }
+
     pub(super) fn boundary_remove_keys(&mut self, keys: &[(CellWrapper<'p>, usize)]) {
         for k in keys {
             self.boundary.remove(k);
@@ -81,8 +85,8 @@ impl<'p, 'd> State<'p, 'd> {
         &self,
         p_index: &Index<'p>,
         d_index: &Index<'d>,
-        pat_input_cells: &[super::cell_kind::InputCell<'p>],
-        pat_output_cells: &[super::cell_kind::OutputCell<'p>],
+        pat_input_cells: &[CellWrapper<'p>],
+        pat_output_cells: &[CellWrapper<'p>],
     ) -> super::SubgraphMatch<'p, 'd> {
         let mut cell_mapping = HashMap::new();
         for (&p_node, &d_node) in &self.mapping {
@@ -99,14 +103,14 @@ impl<'p, 'd> State<'p, 'd> {
         // Name maps
         let mut input_by_name = HashMap::new();
         for ic in pat_input_cells {
-            if let Some(nm) = ic.name() {
-                input_by_name.insert(nm, ic.cref);
+            if let Some(nm) = input_name(ic) {
+                input_by_name.insert(nm, *ic);
             }
         }
         let mut output_by_name = HashMap::new();
         for oc in pat_output_cells {
-            if let Some(nm) = oc.name() {
-                output_by_name.insert(nm, oc.cref);
+            if let Some(nm) = output_name(oc) {
+                output_by_name.insert(nm, *oc);
             }
         }
 
@@ -114,18 +118,18 @@ impl<'p, 'd> State<'p, 'd> {
         let mut out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)> =
             HashMap::new();
         for oc in pat_output_cells {
-            if let Cell::Output(_, value) = oc.cref.cref().get().as_ref() {
+            if let Cell::Output(_, value) = oc.cref().get().as_ref() {
                 for (out_bit, net) in value.iter().enumerate() {
-                    if let Ok((p_src_cell_ref, p_bit)) = oc.cref.cref().design().find_cell(net) {
+                    if let Ok((p_src_cell_ref, p_bit)) = oc.cref().design().find_cell(net) {
                         let p_src = CellWrapper::from(p_src_cell_ref);
 
                         if let Some(&d_src) = cell_mapping.get(&p_src) {
-                            out_driver_map.insert((oc.cref, out_bit), (d_src, p_bit));
+                            out_driver_map.insert((*oc, out_bit), (d_src, p_bit));
                             continue;
                         }
 
                         if let Some(&(d_cell, d_bit)) = self.boundary.get(&(p_src, p_bit)) {
-                            out_driver_map.insert((oc.cref, out_bit), (d_cell, d_bit));
+                            out_driver_map.insert((*oc, out_bit), (d_cell, d_bit));
                         }
                     }
                 }
@@ -175,15 +179,10 @@ pub(super) fn aligned_sources<'p, 'd>(
 
     let take_len = std::cmp::min(p_len, d_len);
 
-    let p_srcs = p_inputs.into_iter().map(|(_, s)| s);
-    let d_srcs = d_inputs.into_iter().map(|(_, s)| s);
+    let p_srcs = p_inputs.into_iter();
+    let d_srcs = d_inputs.into_iter();
 
-    Some(
-        p_srcs
-            .zip(d_srcs)
-            .take(take_len)
-            .collect(),
-    )
+    Some(p_srcs.zip(d_srcs).take(take_len).collect())
 }
 
 /// Validate aligned sources pairwise and collect any boundary insertions implied.
@@ -201,8 +200,6 @@ pub(super) fn check_and_collect_boundary<'p, 'd>(
     pairs.into_iter().try_fold(
         Vec::<((CellWrapper<'p>, usize), (CellWrapper<'d>, usize))>::new(),
         |mut additions, (p_src, d_src)| {
-            use crate::ports::Source;
-
             match (p_src, d_src) {
                 (Source::Const(pc), Source::Const(dc)) => {
                     if pc != dc {

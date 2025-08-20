@@ -1,13 +1,8 @@
 use prjunnamed_netlist::Trit;
 
-use crate::cell_kind::CellWrapper;
+use crate::cell::CellWrapper;
 
-use super::cell_kind::{CellKind, is_gate_cell_ref};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum PinKind {
-    Data(usize),
-}
+use super::cell::{CellKind, is_gate_cell_ref};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum Source<'a> {
@@ -19,7 +14,7 @@ pub(super) enum Source<'a> {
 #[derive(Clone, Debug)]
 pub(super) struct CellPins<'a> {
     pub(super) kind: CellKind,
-    pub(super) inputs: Vec<(PinKind, Source<'a>)>,
+    pub(super) inputs: Vec<Source<'a>>,
 }
 
 pub(super) fn is_commutative(kind: CellKind) -> bool {
@@ -32,26 +27,26 @@ pub(super) fn is_commutative(kind: CellKind) -> bool {
 pub(super) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
     let kind = CellKind::from(cref.get().as_ref());
     let mut idx = 0usize;
-    let mut inputs: Vec<(PinKind, Source<'a>)> = Vec::new();
+    let mut inputs: Vec<Source<'a>> = Vec::new();
     cref.visit(|net| {
-        let pin = PinKind::Data(idx);
+        let _pin_index = idx;
         idx += 1;
         match cref.design().find_cell(net) {
             Ok((src, bit)) => {
                 if is_gate_cell_ref(src) {
-                    inputs.push((pin, Source::Gate(src.into(), bit)));
+                    inputs.push(Source::Gate(src.into(), bit));
                 } else {
-                    inputs.push((pin, Source::Io(src.into(), bit)));
+                    inputs.push(Source::Io(src.into(), bit));
                 }
             }
-            Err(trit) => inputs.push((pin, Source::Const(trit))),
+            Err(trit) => inputs.push(Source::Const(trit)),
         }
     });
     CellPins { kind, inputs }
 }
 
-pub(super) fn normalize_commutative<'a>(inputs: &mut [(PinKind, Source<'a>)]) {
-    inputs.sort_by(|a, b| stable_key(&a.1).cmp(&stable_key(&b.1)));
+pub(super) fn normalize_commutative<'a>(inputs: &mut [Source<'a>]) {
+    inputs.sort_by(|a, b| stable_key(a).cmp(&stable_key(b)));
 }
 
 fn stable_key<'a>(s: &Source<'a>) -> (u8, usize, usize) {
