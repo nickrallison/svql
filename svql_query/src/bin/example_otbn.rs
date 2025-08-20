@@ -1,5 +1,9 @@
 use svql_driver::{cache::Cache, util::load_driver_cached};
-use svql_query::{Search, instance::Instance, queries::netlist::basic::dff::Sdffe};
+use svql_query::{
+    Search,
+    instance::Instance,
+    queries::netlist::basic::{and::and_gate::AndGate, dff::Sdffe},
+};
 use svql_subgraph::config::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,17 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "examples/fixtures/larger_designs/json/otbn_core.json",
         &mut cache,
     )?;
-    let sdffe_driver = load_driver_cached(
-        "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
-        &mut cache,
-    )?;
+    let and_driver =
+        load_driver_cached("examples/patterns/basic/and/verilog/and_gate.v", &mut cache)?;
 
     let config = Config::builder().exact_length().none().build();
 
-    let hits = Sdffe::<Search>::query(
-        &sdffe_driver,
+    let hits = AndGate::<Search>::query(
+        &and_driver,
         &otbn_driver,
-        Instance::root("sdffe".to_string()),
+        Instance::root("and_gate".to_string()),
         &config,
     );
 
