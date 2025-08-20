@@ -1,5 +1,6 @@
 pub mod api;
 pub mod driver;
+pub mod query_ctx;
 pub mod util;
 
 pub mod prelude {

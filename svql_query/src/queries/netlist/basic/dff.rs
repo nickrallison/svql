@@ -1,4 +1,5 @@
 use svql_driver::prelude::Driver;
+use svql_driver::query_ctx::QueryCtx;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -21,7 +22,6 @@ impl<S> Sdffe<S>
 where
     S: State,
 {
-    /// Uniform constructor so composites can assemble a Search-only shape.
     pub fn new(path: Instance) -> Self {
         Sdffe {
             path: path.clone(),
@@ -44,7 +44,6 @@ where
     }
 }
 
-// Static metadata for codegen/introspection (macro-friendly)
 impl NetlistMeta for Sdffe<Search> {
     const MODULE_NAME: &'static str = "sdffe";
     const FILE_PATH: &'static str = "examples/patterns/basic/ff/sdffe.v";
@@ -69,7 +68,6 @@ impl NetlistMeta for Sdffe<Search> {
     ];
 }
 
-// Query surface; a macro can emit the same impl for any netlist with similar shape
 impl SearchableNetlist for Sdffe<Search> {
     type Hit<'p, 'd> = Sdffe<Match<'p, 'd>>;
 
@@ -77,7 +75,6 @@ impl SearchableNetlist for Sdffe<Search> {
         m: &svql_subgraph::SubgraphMatch<'p, 'd>,
         path: Instance,
     ) -> Self::Hit<'p, 'd> {
-        // Single-bit ports; multi-bit support could iterate 0..width later
         let clk_m = bind_input(m, "clk", 0);
         let d_m = bind_input(m, "d", 0);
         let reset_m = bind_input(m, "reset", 0);
@@ -93,14 +90,12 @@ impl SearchableNetlist for Sdffe<Search> {
     }
 }
 
-// Inherent shim for ergonomic call sites
 impl Sdffe<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
+    pub fn query<'ctx>(
+        ctx: &'ctx QueryCtx,
         path: Instance,
         config: &svql_subgraph::config::Config,
-    ) -> Vec<Sdffe<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
+    ) -> Vec<Sdffe<Match<'ctx, 'ctx>>> {
+        <Self as SearchableNetlist>::query(ctx, path, config)
     }
 }

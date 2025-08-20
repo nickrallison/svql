@@ -9,6 +9,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use crate::query_ctx::QueryCtx;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DesignKey {
     pub path: DesignPath,
@@ -238,6 +240,16 @@ impl Driver {
     pub fn get(&self, key: &DesignKey) -> Option<Arc<Design>> {
         let guard = self.registry.read().ok()?;
         guard.get(key).cloned()
+    }
+    pub fn open_ctx(
+        &self,
+        pat_key: &DesignKey,
+        hay_key: &DesignKey,
+    ) -> Option<crate::query_ctx::QueryCtx> {
+        let guard = self.registry.read().ok()?;
+        let pat = guard.get(pat_key).cloned()?;
+        let hay = guard.get(hay_key).cloned()?;
+        Some(crate::query_ctx::QueryCtx::new(pat, hay))
     }
 }
 

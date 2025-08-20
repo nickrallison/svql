@@ -1,4 +1,5 @@
 use svql_driver::prelude::Driver;
+use svql_driver::query_ctx::QueryCtx;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -20,7 +21,6 @@ impl<S> AndNor<S>
 where
     S: State,
 {
-    /// Uniform constructor so composites can assemble a Search-only shape.
     pub fn new(path: Instance) -> Self {
         AndNor {
             path: path.clone(),
@@ -42,11 +42,9 @@ where
     }
 }
 
-// Static metadata for codegen/introspection.
 impl NetlistMeta for AndNor<Search> {
     const MODULE_NAME: &'static str = "and_nor";
-    // Keep consistency with And<Search>::FILE_PATH (no `/verilog/` in the path).
-    const FILE_PATH: &'static str = "examples/patterns/basic/and/and_nor.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/and/verilog/and_nor.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
@@ -64,7 +62,6 @@ impl NetlistMeta for AndNor<Search> {
     ];
 }
 
-// Query surface; mirrors the implementation used for And<Search>.
 impl SearchableNetlist for AndNor<Search> {
     type Hit<'p, 'd> = AndNor<Match<'p, 'd>>;
 
@@ -85,14 +82,12 @@ impl SearchableNetlist for AndNor<Search> {
     }
 }
 
-// Inherent shim for ergonomic call sites.
 impl AndNor<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
+    pub fn query<'ctx>(
+        ctx: &'ctx QueryCtx,
         path: Instance,
         config: &svql_subgraph::config::Config,
-    ) -> Vec<AndNor<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
+    ) -> Vec<AndNor<Match<'ctx, 'ctx>>> {
+        <Self as SearchableNetlist>::query(ctx, path, config)
     }
 }

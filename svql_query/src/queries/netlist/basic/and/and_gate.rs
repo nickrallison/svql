@@ -1,4 +1,5 @@
 use svql_driver::prelude::Driver;
+use svql_driver::query_ctx::QueryCtx;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -20,7 +21,6 @@ impl<S> AndGate<S>
 where
     S: State,
 {
-    /// Uniform constructor so composites can assemble a Search-only shape.
     pub fn new(path: Instance) -> Self {
         AndGate {
             path: path.clone(),
@@ -42,11 +42,9 @@ where
     }
 }
 
-// Static metadata for codegen/introspection.
-// A define_netlist! macro would generate this from the declarative input.
 impl NetlistMeta for AndGate<Search> {
     const MODULE_NAME: &'static str = "and_gate";
-    const FILE_PATH: &'static str = "examples/patterns/basic/and/and_gate.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/and/verilog/and_gate.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
@@ -64,8 +62,6 @@ impl NetlistMeta for AndGate<Search> {
     ];
 }
 
-// The query surface. A macro can generate this impl (and the inherent
-// wrapper below) for any netlist with the same shape.
 impl SearchableNetlist for AndGate<Search> {
     type Hit<'p, 'd> = AndGate<Match<'p, 'd>>;
 
@@ -73,7 +69,6 @@ impl SearchableNetlist for AndGate<Search> {
         m: &svql_subgraph::SubgraphMatch<'p, 'd>,
         path: Instance,
     ) -> Self::Hit<'p, 'd> {
-        // Single‑bit ports in this example; multi‑bit support would iterate 0..width.
         let a_match = bind_input(m, "a", 0);
         let b_match = bind_input(m, "b", 0);
         let y_match = bind_output(m, "y", 0);
@@ -87,15 +82,12 @@ impl SearchableNetlist for AndGate<Search> {
     }
 }
 
-// Inherent shim so callers can write And::<Search>::query(...) without UFCS.
-// A macro can also emit this block verbatim for each netlist type.
 impl AndGate<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
+    pub fn query<'ctx>(
+        ctx: &'ctx QueryCtx,
         path: Instance,
         config: &svql_subgraph::config::Config,
-    ) -> Vec<AndGate<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
+    ) -> Vec<AndGate<Match<'ctx, 'ctx>>> {
+        <Self as SearchableNetlist>::query(ctx, path, config)
     }
 }
