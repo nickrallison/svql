@@ -5,7 +5,6 @@ use svql_subgraph::SubgraphMatch;
 /// into our `Match<'p, 'd>` payload. A codegen macro can call these for each
 /// declared port (and iterate width as needed if/when multi‑bit ports are
 /// supported at the query layer).
-
 pub fn bind_input<'p, 'd>(m: &SubgraphMatch<'p, 'd>, name: &str, bit: usize) -> Match<'p, 'd> {
     let pat = m.input_by_name.get(name).copied();
     let des = m.design_source_of_input_bit(name, bit).map(|(c, _b)| c);

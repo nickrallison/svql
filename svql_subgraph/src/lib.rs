@@ -11,12 +11,8 @@ mod search;
 mod state;
 pub mod util;
 
-// New: wrapper for designs to avoid bare references in public API
-pub mod view;
-
 pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
-pub use view::DesignView;
 
 use crate::{search::rarest_gate_heuristic, state::cells_compatible};
 

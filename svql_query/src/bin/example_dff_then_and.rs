@@ -1,3 +1,5 @@
+use std::vec;
+
 use log::trace;
 use svql_driver::cache::Cache;
 use svql_driver::prelude::Driver;
@@ -54,20 +56,16 @@ where
 {
     /// Single OR-set of connections: sdffe.q -> andg.a OR sdffe.q -> andg.b
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        let mut sets: Vec<Vec<Connection<S>>> = Vec::new();
-        let mut one_or_set: Vec<Connection<S>> = Vec::new();
-
-        one_or_set.push(Connection {
-            from: self.sdffe.q.clone(),
-            to: self.andg.a.clone(),
-        });
-        one_or_set.push(Connection {
-            from: self.sdffe.q.clone(),
-            to: self.andg.b.clone(),
-        });
-
-        sets.push(one_or_set);
-        sets
+        vec![vec![
+            Connection {
+                from: self.sdffe.q.clone(),
+                to: self.andg.a.clone(),
+            },
+            Connection {
+                from: self.sdffe.q.clone(),
+                to: self.andg.b.clone(),
+            },
+        ]]
     }
 }
 
