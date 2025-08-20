@@ -1,12 +1,10 @@
-use crate::cell::CellWrapper;
-use crate::config;
+use crate::cell::{CellKind, CellWrapper, Source};
 use crate::state::check_and_collect_bindings;
+use crate::{cells_compatible, config};
 
 use super::SubgraphMatch;
-use super::compat::cells_compatible;
 use super::index::{Index, NodeId};
 use super::state::State;
-use super::strategy::choose_next;
 
 pub(super) fn backtrack<'p, 'd>(
     p_index: &Index<'p>,
@@ -28,6 +26,7 @@ pub(super) fn backtrack<'p, 'd>(
 
     let kind = p_index.kind(next_p);
 
+    // Phase 1: compute candidates with only immutable access to `st`.
     let candidates: Vec<NodeId> = d_index
         .of_kind(kind)
         .iter()
@@ -38,6 +37,7 @@ pub(super) fn backtrack<'p, 'd>(
         })
         .collect();
 
+    // Phase 2: iterate candidates and perform scoped mutable updates.
     for d_cand in candidates {
         with_mapping(st, next_p, d_cand, p_index, d_index, config, |st_inner| {
             backtrack(
@@ -102,6 +102,73 @@ pub(super) fn remove_bindings<'p, 'd>(
     st.bindings_remove_keys(&added);
 }
 
+pub(super) fn rarest_gate_heuristic<'p, 'd>(
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+) -> Option<(CellKind, Vec<NodeId>, Vec<NodeId>)> {
+    // Build candidate triples (kind, d_count, p_count) only where pattern has that kind.
+    let candidates: Vec<(CellKind, usize, usize)> = d_index
+        .by_kind_iter()
+        .into_iter()
+        .filter_map(|(k_ref, d_nodes)| {
+            let k = *k_ref;
+            let p_nodes = p_index.of_kind(k);
+            (!p_nodes.is_empty()).then_some((k, d_nodes.len(), p_nodes.len()))
+        })
+        .collect();
+
+    // No candidates means no common kinds to anchor by.
+    let (anchor_kind, _, _) = candidates.into_iter().min_by(|a, b| {
+        // Primary: rarest in design
+        let primary = a.1.cmp(&b.1);
+        if primary != std::cmp::Ordering::Equal {
+            return primary;
+        }
+        // Secondary: smallest design-to-pattern ratio, compare as cross-product
+        let a_ratio = (a.1 as u64, a.2 as u64);
+        let b_ratio = (b.1 as u64, b.2 as u64);
+        let secondary = (a_ratio.0 * b_ratio.1).cmp(&(b_ratio.0 * a_ratio.1));
+        if secondary != std::cmp::Ordering::Equal {
+            return secondary;
+        }
+        // Tertiary: deterministic tie-breaker by kind
+        a.0.cmp(&b.0)
+    })?;
+
+    // Deterministic order of anchors
+    let mut p_anchors = p_index.of_kind(anchor_kind).to_vec();
+    let mut d_anchors = d_index.of_kind(anchor_kind).to_vec();
+    p_anchors.sort_unstable();
+    d_anchors.sort_unstable();
+
+    if p_anchors.is_empty() || d_anchors.is_empty() {
+        return None;
+    }
+    Some((anchor_kind, p_anchors, d_anchors))
+}
+
+pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
+    let first_resolvable = (0..p_index.gate_count() as u32)
+        .map(|i| i as NodeId)
+        .find(|&p| !st.is_mapped(p) && inputs_resolved_for(p_index, st, p));
+
+    first_resolvable.or_else(|| {
+        (0..p_index.gate_count() as u32)
+            .map(|i| i as NodeId)
+            .find(|&p| !st.is_mapped(p))
+    })
+}
+
+fn inputs_resolved_for<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>, p: NodeId) -> bool {
+    p_index.pins(p).inputs.iter().all(|src| match src {
+        Source::Const(_) => true,
+        Source::Io(_, _) => true,
+        Source::Gate(gc, _) => p_index
+            .try_cell_to_node(*gc)
+            .is_some_and(|g| st.is_mapped(g)),
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -134,5 +201,22 @@ mod tests {
         if !out.is_empty() {
             assert!(!out[0].is_empty());
         }
+    }
+
+    #[test]
+    fn heuristic_chooses_some() {
+        let d = &SDFFE;
+        let p_index = super::Index::build(d);
+        let d_index = super::Index::build(d);
+        let chosen = rarest_gate_heuristic(&p_index, &d_index).expect("should find anchors");
+        assert_eq!(chosen.0, CellKind::Mux);
+    }
+
+    #[test]
+    fn choose_next_returns_some() {
+        let d = &SDFFE;
+        let idx = Index::build(d);
+        let st = State::new(idx.gate_count());
+        assert!(choose_next(&idx, &st).is_some());
     }
 }

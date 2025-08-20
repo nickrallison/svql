@@ -4,21 +4,17 @@ use prjunnamed_netlist::Design;
 
 use cell::{get_input_cells, get_output_cells};
 
-mod anchor;
 pub mod cell;
-mod compat;
 pub mod config;
 mod index;
-mod ports;
 mod search;
 mod state;
-mod strategy;
 pub mod util;
 
 pub use cell::CellWrapper;
 pub use config::{Config, DedupeMode};
 
-use crate::compat::cells_compatible;
+use crate::{search::rarest_gate_heuristic, state::cells_compatible};
 
 // Alias to simplify clippy::type_complexity in dedupe signatures
 type SigBoundary = Vec<(u8, usize, usize, usize, usize)>;
@@ -115,7 +111,7 @@ pub fn find_subgraphs<'p, 'd>(
         };
     }
 
-    let Some((_anchor_kind, p_anchors, d_anchors)) = anchor::choose_anchors(&p_index, &d_index)
+    let Some((_anchor_kind, p_anchors, d_anchors)) = rarest_gate_heuristic(&p_index, &d_index)
     else {
         return AllSubgraphMatches {
             matches: Vec::new(),

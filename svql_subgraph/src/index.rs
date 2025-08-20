@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::Design;
 
-use crate::cell::CellWrapper;
+use crate::cell::{CellWrapper, extract_pins};
 
-use super::cell::CellKind;
-use super::ports::{CellPins, extract_pins};
+use super::cell::{CellKind, CellPins};
 
 pub(super) type NodeId = u32;
 
@@ -33,8 +32,7 @@ impl<'a> Index<'a> {
             .map(CellWrapper::new)
             .filter_map(|cell| {
                 let kind = CellKind::from(cell.get().as_ref());
-                kind.is_gate()
-                    .then_some((cell, kind, super::ports::extract_pins(cell)))
+                kind.is_gate().then_some((cell, kind, extract_pins(cell)))
             })
             .collect();
 
