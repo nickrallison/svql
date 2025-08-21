@@ -51,14 +51,12 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .collect()
     }
 
-    fn context(driver: &Driver) -> Context {
+    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
         let key = Self::driver_key();
-        if let Some(design) = driver.get_design(&key) {
-            Context::from_single(key, design)
-        } else {
-            todo!(
-                "Design is not loaded, at a later point Implement some live design loading so this point is not reached"
-            );
-        }
+        let design = driver
+            .get_or_load_design(key.path(), key.module_name().to_string())?
+            .1;
+
+        Ok(Context::from_single(key, design))
     }
 }
