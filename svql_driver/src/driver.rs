@@ -17,6 +17,7 @@ pub enum DriverError {
     DesignLoading(String),
 }
 
+#[derive(Debug, Clone)]
 pub struct Driver {
     registry: Arc<RwLock<HashMap<DriverKey, Arc<Design>>>>,
     yosys_path: PathBuf,

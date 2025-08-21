@@ -1,14 +1,8 @@
-use std::vec;
-
-use log::trace;
-
-use crate::composite::{Composite, MatchedComposite, SearchableComposite};
 use crate::impl_find_port;
 use crate::instance::Instance;
 use crate::queries::netlist::basic::and::and_gate::AndGate;
 use crate::queries::netlist::basic::dff::Sdffe;
-use crate::{Connection, Match, Search, State, WithPath};
-use svql_subgraph::config::Config;
+use crate::{State, WithPath};
 
 /// DFF -> AND composite:
 /// - Require that sdffe.q drives either and.a or and.b (one must hold).
@@ -46,207 +40,41 @@ where
     }
 }
 
-impl<S> Composite<S> for DffThenAnd<S>
-where
-    S: State,
-{
-    /// Single OR-set of connections: sdffe.q -> andg.a OR sdffe.q -> andg.b
-    fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        vec![vec![
-            Connection {
-                from: self.sdffe.q.clone(),
-                to: self.andg.a.clone(),
-            },
-            Connection {
-                from: self.sdffe.q.clone(),
-                to: self.andg.b.clone(),
-            },
-        ]]
-    }
-}
-
-impl SearchableComposite for DffThenAnd<Search> {
-    type Hit<'p, 'd> = DffThenAnd<Match<'p, 'd>>;
-
-    fn context(driver: &svql_driver::Driver) -> svql_driver::Context {
-        todo!()
-    }
-
-    fn query<'ctx>(
-        haystack_key: &svql_driver::DriverKey,
-        context: &'ctx svql_driver::Context,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<Self::Hit<'ctx, 'ctx>> {
-        todo!()
-    }
-}
-
-impl<'p, 'd> MatchedComposite<'p, 'd> for DffThenAnd<Match<'p, 'd>> {
-    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool>> {
-        // No extra user filters for the demo
-        vec![]
-    }
-
-    /// OVERRIDE: Compare only the design endpoints (drivers/sources).
-    /// The default equality on Match would compare both pattern and design cells,
-    /// which cannot succeed across different sub-netlists inside a composite.
-    fn validate_connection(&self, connection: Connection<Match<'p, 'd>>) -> bool {
-        let from_wire = self.find_port(&connection.from.path);
-        let to_wire = self.find_port(&connection.to.path);
-
-        match (from_wire, to_wire) {
-            (Some(from), Some(to)) => {
-                let from_m = from.val.as_ref();
-                let to_m = to.val.as_ref();
-
-                match (from_m, to_m) {
-                    (Some(fm), Some(tm)) => {
-                        let from_cell = fm.design_cell_ref;
-                        let to_cell = tm.design_cell_ref;
-
-                        trace!(
-                            "validate_connection: from={} to={} => from_cell={:?} to_cell={:?}",
-                            connection.from.path.inst_path(),
-                            connection.to.path.inst_path(),
-                            from_cell.as_ref().map(|c| c.debug_index()),
-                            to_cell.as_ref().map(|c| c.debug_index())
-                        );
-
-                        let ok = from_cell.is_some() && to_cell.is_some() && from_cell == to_cell;
-                        if !ok {
-                            trace!(
-                                "validate_connection: REJECT: design endpoints do not match (or missing)"
-                            );
-                        } else {
-                            trace!("validate_connection: ACCEPT");
-                        }
-                        ok
-                    }
-                    _ => {
-                        trace!(
-                            "validate_connection: REJECT: missing Match values: from_val_present={} to_val_present={}",
-                            from_m.is_some(),
-                            to_m.is_some()
-                        );
-                        false
-                    }
-                }
-            }
-            (f, t) => {
-                trace!(
-                    "validate_connection: REJECT: could not resolve ports: from_found={} to_found={}",
-                    f.is_some(),
-                    t.is_some()
-                );
-                false
-            }
-        }
-    }
-}
-
-impl DffThenAnd<Search> {
-    /// Composite-specific, macro-friendly query signature:
-    /// pass the two pattern drivers (sdffe, and) and the haystack.
-    pub fn query<'p, 'd>(
-        sdffe_pattern: &'p Driver,
-        and_pattern: &'p Driver,
-        haystack: &'d Driver,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<DffThenAnd<Match<'p, 'd>>> {
-        // Sub-queries at stable locations in the instance tree
-        let sdffe_hits: Vec<Sdffe<Match<'p, 'd>>> = Sdffe::<Search>::query(
-            sdffe_pattern,
-            haystack,
-            path.child("sdffe".to_string()),
-            config,
-        );
-        let and_hits: Vec<AndGate<Match<'p, 'd>>> = AndGate::<Search>::query(
-            and_pattern,
-            haystack,
-            path.child("andg".to_string()),
-            config,
-        );
-
-        trace!(
-            "DffThenAnd.query: sdffe_hits={}, and_hits={}",
-            sdffe_hits.len(),
-            and_hits.len()
-        );
-
-        let mut out: Vec<DffThenAnd<Match<'p, 'd>>> = Vec::new();
-
-        for (i, s) in sdffe_hits.into_iter().enumerate() {
-            let s_q = s.q.val.as_ref().and_then(|m| m.design_cell_ref);
-            trace!(
-                "  sdffe[{}]: q.design_cell_ref={:?}",
-                i,
-                s_q.as_ref().map(|c| c.debug_index())
-            );
-
-            for (j, a) in and_hits.clone().into_iter().enumerate() {
-                let a_a = a.a.val.as_ref().and_then(|m| m.design_cell_ref);
-                let a_b = a.b.val.as_ref().and_then(|m| m.design_cell_ref);
-
-                trace!(
-                    "    and[{}]: a.design_cell_ref={:?} b.design_cell_ref={:?}",
-                    j,
-                    a_a.as_ref().map(|c| c.debug_index()),
-                    a_b.as_ref().map(|c| c.debug_index())
-                );
-
-                let cand = DffThenAnd::<Match> {
-                    path: path.clone(),
-                    sdffe: s.clone(),
-                    andg: a.clone(),
-                };
-
-                let conn_ok = cand.validate_connections(cand.connections());
-                let other_ok = cand.other_filters().iter().all(|f| f(&cand));
-
-                trace!(
-                    "    candidate(sdffe={}, and={}): conn_ok={} other_ok={}",
-                    i, j, conn_ok, other_ok
-                );
-
-                if conn_ok && other_ok {
-                    trace!("    => ACCEPT candidate");
-                    out.push(cand);
-                } else {
-                    trace!("    => REJECT candidate");
-                }
-            }
-        }
-
-        trace!("DffThenAnd.query: total accepted matches={}", out.len());
-        out
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    fn test_dff_then_and() {
-        let mut cache = Cache::new();
+    use svql_driver::{Driver, DriverKey};
+    use svql_subgraph::Config;
 
-        let and_gate_driver =
-            load_driver_cached("examples/patterns/basic/and/verilog/and_gate.v", &mut cache)?;
-        let sdffe_driver =
-            load_driver_cached("examples/patterns/basic/ff/verilog/sdffe.v", &mut cache)?;
+    use crate::{
+        Search,
+        instance::Instance,
+        queries::{composite::dff_then_and::DffThenAnd, netlist::basic::dff::Sdffe},
+    };
+
+    #[test]
+    fn test_dff_then_and() {
+        let driver = Driver::new_workspace();
+
+        let context = Sdffe::context(driver);
+
         // haystack
-        let haystack = load_driver_cached(
-            "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
-            &mut cache,
-        )?;
+        let haystack_path = "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v";
+        let haystack_module_name = "and_q_double_sdffe";
+        let haystack = DriverKey::new(haystack_path.to_string(), haystack_module_name.to_string());
 
         // root path for the composite
         let root = Instance::root("dff_then_and".to_string());
-
         let config = Config::builder().exact_length().none().build();
 
         // run composite query
-        let hits =
-            DffThenAnd::<Search>::query(&sdffe_driver, &and_gate_driver, &haystack, root, &config);
+        // fn query<'ctx>(
+        //     haystack_key: &DriverKey,
+        //     context: &'ctx Context,
+        //     path: Instance,
+        //     config: &Config,
+        // ) -> Vec<Self::Hit<'ctx, 'ctx>>;
+
+        let hits = DffThenAnd::<Search>::query(&haystack, &context, root, &config);
 
         trace!("main: DffThenAnd matches={}", hits.len());
 
