@@ -7,7 +7,7 @@ pub mod composite;
 pub mod connect;
 pub mod instance;
 pub mod netlist;
-// pub mod queries;
+pub mod queries;
 
 // ########################
 // Type State Tags
