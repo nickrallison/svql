@@ -23,6 +23,7 @@ pub struct Design {
     changes: Arc<RwLock<ChangeQueue>>,
     metadata: Arc<RwLock<MetadataStore>>,
     target: Option<Arc<dyn Target>>,
+    prev_hash: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -50,6 +51,7 @@ impl Design {
             changes: Arc::new(RwLock::new(ChangeQueue::default())),
             metadata: Arc::new(RwLock::new(MetadataStore::new())),
             target,
+            prev_hash: None,
         }
     }
 
@@ -512,6 +514,17 @@ impl Design {
             .prototype(&target_cell.kind)
             .expect("target prototype not defined")
     }
+
+    pub fn new_hash(&mut self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.cells.hash(&mut s);
+        let val = s.finish();
+        self.prev_hash = Some(val);
+        val
+    }
+    pub fn hash(&self) -> Option<u64> {
+        self.prev_hash
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -660,18 +673,28 @@ impl CellHash {
     pub fn index(&self) -> usize {
         self.index
     }
-
     pub fn design_hash(&self) -> u64 {
         self.design_hash
     }
+}
 
+impl Into<CellHash> for CellRef<'_> {
+    fn into(self) -> CellHash {
+        let design_hash = self.design.hash().expect("design hash not set");
+        CellHash {
+            index: self.index,
+            design_hash,
+        }
+    }
+}
+
+impl CellHash {
     pub fn try_into_cell_ref<'a>(
         self,
         design: &'a Design,
     ) -> Result<CellRef<'a>, Box<dyn std::error::Error>> {
-        let expected_hash = calculate_hash(design);
-        let actual_hash = self.design_hash;
-        if expected_hash == actual_hash && self.index < design.cells.len() {
+        let expected_hash = design.hash().ok_or("design hash not set")?;
+        if expected_hash == self.design_hash {
             Ok(CellRef {
                 design,
                 index: self.index,
@@ -679,35 +702,6 @@ impl CellHash {
         } else {
             Err("Invalid CellHash".into())
         }
-    }
-
-    pub fn try_into_cell_ref_unchecked<'a>(self, design: &'a Design) -> CellRef<'a> {
-        CellRef {
-            design,
-            index: self.index,
-        }
-    }
-}
-
-impl Into<CellHash> for CellRef<'_> {
-    fn into(self) -> CellHash {
-        CellHash {
-            index: self.index,
-            design_hash: calculate_hash(&self.design),
-        }
-    }
-}
-
-fn calculate_hash(design: &Design) -> u64 {
-    let mut s = DefaultHasher::new();
-    design.hash(&mut s);
-    s.finish()
-}
-
-impl Hash for Design {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ios.hash(state);
-        self.cells.hash(state);
     }
 }
 

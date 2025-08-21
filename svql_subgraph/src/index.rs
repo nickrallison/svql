@@ -1,7 +1,10 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use log::trace;
-use prjunnamed_netlist::Design;
+use prjunnamed_netlist::{CellHash, Design};
 
 use crate::model::{CellKind, CellPins, CellWrapper, extract_pins};
 
@@ -23,6 +26,7 @@ pub(super) struct Index<'a> {
     // Key by debug_index to avoid interior mutability key lint.
     cell_to_id: HashMap<usize, NodeId>,
     design: &'a Design,
+    design_hash: u64,
 }
 
 impl<'a> Index<'a> {
@@ -37,14 +41,19 @@ impl<'a> Index<'a> {
         let mut pins: Vec<CellPins> = Vec::new();
         let mut by_kind: HashMap<CellKind, Vec<NodeId>> = HashMap::new();
         let mut cell_to_id: HashMap<usize, NodeId> = HashMap::new();
+        let design_hash = calculate_design_hash(design);
 
         // Filter to gates first, then enumerate so NodeIds are contiguous and stable.
         let gate_wrappers: Vec<(CellWrapper, CellKind)> = design
             .iter_cells()
-            .map(CellWrapper::from)
+            .map(|cref| {
+                let cell_hash = CellHash::new(cref.debug_index(), design_hash);
+                let cell_wrapper = CellWrapper::new(cell_hash);
+                cell_wrapper
+            })
             .filter_map(|cell_wrapper| {
                 // Convert to ValidCellWrapper to inspect the cell
-                let valid_cell = cell_wrapper.try_into_valid_cell_wrapper_unchecked(design);
+                let valid_cell = cell_wrapper.into_valid_cell_wrapper_unchecked(design);
                 let kind = CellKind::from(valid_cell.get().as_ref());
                 if kind.is_gate() {
                     trace!("Found gate: {:?} at index {}", kind, cell_wrapper.index());
@@ -63,7 +72,7 @@ impl<'a> Index<'a> {
 
         for (id, (cell_wrapper, kind)) in gate_wrappers.into_iter().enumerate() {
             let id = id as NodeId;
-            let cell_pins = extract_pins(cell_wrapper, design);
+            let cell_pins = extract_pins(cell_wrapper, design, design_hash);
 
             nodes.push(cell_wrapper);
             kinds.push(kind);
@@ -81,6 +90,7 @@ impl<'a> Index<'a> {
             by_kind,
             cell_to_id,
             design,
+            design_hash,
         }
     }
 
@@ -124,6 +134,9 @@ impl<'a> Index<'a> {
 
     pub(super) fn design(&self) -> &Design {
         self.design
+    }
+    pub fn design_hash(&self) -> u64 {
+        self.design_hash
     }
 }
 

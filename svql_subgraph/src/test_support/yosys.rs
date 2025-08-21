@@ -78,7 +78,8 @@ pub fn load_design_from(design: &str) -> Result<Design, Box<dyn std::error::Erro
         1,
         "can only convert single-module Yosys JSON to Unnamed IR"
     );
-    let design = designs.into_values().next().unwrap();
+    let mut design = designs.into_values().next().unwrap();
+    design.new_hash();
 
     Ok(design)
 }

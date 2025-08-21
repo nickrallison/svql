@@ -90,7 +90,7 @@ fn get_cell_ref<'a>(
     cell: &svql_subgraph::CellWrapper,
     design: &'a Design,
 ) -> prjunnamed_netlist::CellRef<'a> {
-    cell.try_into_valid_cell_wrapper_unchecked(design).cref()
+    cell.into_valid_cell_wrapper_unchecked(design).cref()
 }
 
 fn input_name<'a>(cell: &svql_subgraph::CellWrapper, design: &'a Design) -> Option<&'a str> {

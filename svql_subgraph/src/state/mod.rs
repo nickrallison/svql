@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use log::trace;
-use prjunnamed_netlist::{Cell, Design};
+use prjunnamed_netlist::{Cell, CellHash, Design};
 
 use crate::index::{Index, NodeId};
 use crate::model::{CellWrapper, input_name, output_name};
@@ -240,8 +240,12 @@ impl<'p, 'd> State<'p, 'd> {
     }
 
     /// Extract per-output sources in a self-documenting struct form.
-    fn output_sources_for_cell(&self, oc: CellWrapper) -> Vec<OutputSource> {
-        let cell_ref = oc.cref.try_into_cell_ref_unchecked(self.p_design);
+    fn output_sources_for_cell(
+        &self,
+        oc: CellWrapper,
+        design: &Design,
+    ) -> Result<Vec<OutputSource>, Box<dyn std::error::Error>> {
+        let cell_ref = oc.try_into_valid_cell_wrapper(design)?;
         match cell_ref.get().as_ref() {
             Cell::Output(_, value) => value
                 .iter()
@@ -251,7 +255,9 @@ impl<'p, 'd> State<'p, 'd> {
                         .find_cell(net)
                         .ok()
                         .map(|(p_src_cell_ref, p_bit)| {
-                            let src_cell_wrapper = CellWrapper::from(p_src_cell_ref);
+                            let cell_hash =
+                                CellHash::new(p_src_cell_ref.debug_index(), self.p_design_hash);
+                            let src_cell_wrapper = CellWrapper::new(cell_hash);
                             OutputSource {
                                 out_bit,
                                 src_cell: src_cell_wrapper,

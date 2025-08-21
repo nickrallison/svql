@@ -113,49 +113,28 @@ impl From<&Cell> for CellKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CellWrapper {
-    pub cref: CellHash,
+    pub c_hash: CellHash,
 }
 
 impl CellWrapper {
-    pub fn new(cref: CellHash) -> Self {
-        CellWrapper { cref }
+    pub fn new(c_hash: CellHash) -> Self {
+        CellWrapper { c_hash }
     }
 
     pub fn c_hash(&self) -> CellHash {
-        self.cref
+        self.c_hash
     }
 
     pub fn index(&self) -> usize {
-        self.cref.index()
+        self.c_hash.index()
     }
 
-    pub fn debug_index(&self) -> usize {
-        self.cref.index()
-    }
     pub fn try_into_valid_cell_wrapper<'a>(
         &self,
         design: &'a Design,
     ) -> Result<ValidCellWrapper<'a>, Box<dyn std::error::Error>> {
-        let cell_ref = self.cref.try_into_cell_ref(design)?;
+        let cell_ref = self.c_hash.try_into_cell_ref(design)?;
         Ok(ValidCellWrapper::new(cell_ref))
-    }
-    pub fn try_into_valid_cell_wrapper_unchecked<'a>(
-        &self,
-        design: &'a Design,
-    ) -> ValidCellWrapper<'a> {
-        ValidCellWrapper::new(self.cref.try_into_cell_ref(design).unwrap())
-    }
-}
-
-impl From<CellHash> for CellWrapper {
-    fn from(cref: CellHash) -> Self {
-        CellWrapper { cref }
-    }
-}
-
-impl<'a> From<CellRef<'a>> for CellWrapper {
-    fn from(cref: CellRef<'a>) -> Self {
-        CellWrapper { cref: cref.into() }
     }
 }
 
@@ -235,9 +214,21 @@ impl std::fmt::Debug for ValidCellWrapper<'_> {
     }
 }
 
+impl Into<CellWrapper> for ValidCellWrapper<'_> {
+    fn into(self) -> CellWrapper {
+        CellWrapper::new(self.cref.into())
+    }
+}
+
 impl<'a> From<CellRef<'a>> for ValidCellWrapper<'a> {
     fn from(cref: CellRef<'a>) -> Self {
         ValidCellWrapper { cref }
+    }
+}
+
+impl From<CellRef<'_>> for CellWrapper {
+    fn from(cref: CellRef<'_>) -> Self {
+        CellWrapper::new(cref.into())
     }
 }
 
@@ -264,7 +255,7 @@ pub(crate) fn get_input_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
-        .map(|cell_ref| CellWrapper::from(cell_ref))
+        .map(CellWrapper::from)
         .collect()
 }
 
@@ -272,7 +263,7 @@ pub(crate) fn get_output_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
-        .map(|cell_ref| CellWrapper::from(cell_ref))
+        .map(|cell_ref| CellWrapper::new(cell_ref.into()))
         .collect()
 }
 
@@ -298,21 +289,23 @@ pub(crate) fn output_name<'p>(
     }
 }
 
-pub fn extract_pins(cref: CellWrapper, design: &Design) -> CellPins {
-    trace!("Extracting pins for cell index {}", cref.index());
-    let cell_ref = cref.cref.try_into_cell_ref_unchecked(design);
+pub fn extract_pins(
+    cref: CellWrapper,
+    design: &Design,
+) -> Result<CellPins, Box<dyn std::error::Error>> {
+    let valid_cell_wrapper = cref.try_into_valid_cell_wrapper(design)?;
     let mut inputs: Vec<Source> = Vec::new();
-    cell_ref.visit(|net| {
+    valid_cell_wrapper.visit(|net| {
         inputs.push(net_to_source(design, net));
     });
-    trace!("Extracted {} input pins", inputs.len());
-    CellPins { inputs }
+    Ok(CellPins { inputs })
 }
 
 fn net_to_source(design: &Design, net: Net) -> Source {
     match design.find_cell(net) {
         Ok((src, bit)) => {
-            let cell_wrapper = CellWrapper::from(src);
+            let cell_hash = src.into();
+            let cell_wrapper = CellWrapper::new(cell_hash);
             let source = if is_gate_cell_ref(src) {
                 Source::Gate(cell_wrapper, bit)
             } else {
@@ -332,7 +325,7 @@ fn net_to_source(design: &Design, net: Net) -> Source {
 mod tests {
     use prjunnamed_netlist::Design;
 
-    use crate::model::normalize::normalize_commutative;
+    use crate::{index::calculate_design_hash, model::normalize::normalize_commutative};
 
     use super::*;
 
@@ -392,16 +385,26 @@ mod tests {
     fn can_extract_some_pins() {
         let d = &SDFFE;
         for c in d.iter_cells() {
-            let _pins = extract_pins(CellWrapper::from(c), d);
+            let cell_hash = c.into();
+            let cell_wrapper = CellWrapper::new(cell_hash);
+            let _pins = extract_pins(cell_wrapper, d);
         }
     }
 
     #[test]
     fn commutative_sort_is_stable() {
         let d = &SDFFE;
+
         for c in d.iter_cells() {
-            let mut pins1 = extract_pins(CellWrapper::from(c), d).inputs;
-            let mut pins2 = extract_pins(CellWrapper::from(c), d).inputs;
+            let cell_hash = c.into();
+            let cell_wrapper = CellWrapper::new(cell_hash);
+
+            let mut pins1 = extract_pins(cell_wrapper, d)
+                .expect("Failed to extract pins")
+                .inputs;
+            let mut pins2 = extract_pins(cell_wrapper, d)
+                .expect("Failed to extract pins")
+                .inputs;
             normalize_commutative(&mut pins1);
             normalize_commutative(&mut pins2);
             assert_eq!(pins1.len(), pins2.len());

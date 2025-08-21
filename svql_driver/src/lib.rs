@@ -121,16 +121,13 @@ mod tests {
         let mut found_port_matches = 0;
         for m1 in ms.iter() {
             if let Some((dq_cell, dq_bit)) = m1.design_driver_of_output_bit("q", 0) {
-                let valid_dq_cell = dq_cell
-                    .try_into_valid_cell_wrapper(hay_arc.as_ref())
-                    .expect("valid cell wrapper");
+                let valid_dq_cell = dq_cell.into_valid_cell_wrapper_unchecked(hay_arc.as_ref());
                 let dq_net = valid_dq_cell.output()[dq_bit];
 
                 for m2 in ms.iter() {
                     if let Some((sd_cell, sd_bit)) = m2.design_source_of_input_bit("d", 0) {
-                        let valid_sd_cell = sd_cell
-                            .try_into_valid_cell_wrapper(hay_arc.as_ref())
-                            .expect("valid cell wrapper");
+                        let valid_sd_cell =
+                            sd_cell.into_valid_cell_wrapper_unchecked(hay_arc.as_ref());
                         let sd_net = valid_sd_cell.output()[sd_bit];
                         if dq_net == sd_net {
                             println!("Found connection at cell: {:#?}", valid_dq_cell.metadata());

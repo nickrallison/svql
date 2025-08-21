@@ -135,7 +135,7 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
     trace!("Selected anchor: {:?}", anchor);
 
     let mut results: Vec<SubgraphMatch> = Vec::new();
-    let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
+    let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern, d_index.design_hash());
     trace!(
         "Pattern IO cells - inputs: {}, outputs: {}",
         pat_inputs.len(),
@@ -218,15 +218,24 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
 }
 
 // Internal helper for tests and internal wiring only.
-pub(crate) fn get_pattern_io_cells(pattern: &Design) -> (Vec<CellWrapper>, Vec<CellWrapper>) {
-    (get_input_cells(pattern), get_output_cells(pattern))
+pub(crate) fn get_pattern_io_cells(
+    pattern: &Design,
+    design_hash: u64,
+) -> (Vec<CellWrapper>, Vec<CellWrapper>) {
+    (
+        get_input_cells(pattern, design_hash),
+        get_output_cells(pattern, design_hash),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use prjunnamed_netlist::Design;
 
-    use crate::config::{Config, ConfigBuilder, DedupeMode};
+    use crate::{
+        config::{Config, ConfigBuilder, DedupeMode},
+        index::calculate_design_hash,
+    };
 
     use super::*;
 
@@ -241,7 +250,8 @@ mod tests {
     #[test]
     fn smoke_io_cells() {
         let design = &ASYNC_MUX;
-        let (ins, outs) = get_pattern_io_cells(design);
+        let design_hash = calculate_design_hash(design);
+        let (ins, outs) = get_pattern_io_cells(design, design_hash);
         assert!(!ins.is_empty());
         assert!(!outs.is_empty());
     }
