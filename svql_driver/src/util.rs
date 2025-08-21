@@ -6,8 +6,6 @@ use std::{
 
 use log::error;
 
-use crate::driver::DesignKey;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DesignPath {
     Verilog(PathBuf),

@@ -14,11 +14,11 @@ mod tests {
 
     use svql_subgraph::{config::Config, find_subgraphs};
 
-    use crate::driver::{self, DesignKey};
+    use crate::driver::{self};
 
     #[test]
     fn test_otbn_run_time() {
-        let mut driver = driver::Driver::new_workspace().unwrap();
+        let driver = driver::Driver::new_workspace().unwrap();
 
         let haystack_path = "examples/fixtures/larger_designs/json/otbn_core.json";
         let haystack_module = "otbn_core".to_string();
