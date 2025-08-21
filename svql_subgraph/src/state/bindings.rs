@@ -7,28 +7,28 @@ use prjunnamed_netlist::Trit;
 
 /// Self-documenting wrapper for an aligned pattern/design input pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct AlignedPair<'p, 'd> {
-    pub pattern: Source<'p>,
-    pub design: Source<'d>,
+pub(crate) struct AlignedPair {
+    pub pattern: Source,
+    pub design: Source,
 }
 
 /// Self-documenting wrapper for one binding addition (instead of tuple typing).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct BindingAddition<'p, 'd> {
-    pub pattern: PatSrcKey<'p>,
-    pub design: DesSrcKey<'d>,
+pub(crate) struct BindingAddition {
+    pub pattern: PatSrcKey,
+    pub design: DesSrcKey,
 }
 
 /// Alias to keep signatures short and clear
-pub(crate) type BindingAdditions<'p, 'd> = Vec<BindingAddition<'p, 'd>>;
+pub(crate) type BindingAdditions = Vec<BindingAddition>;
 
 /// A canonical representation of a pattern driver bit used by some sink pin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum PatSrcKey<'p> {
+pub(crate) enum PatSrcKey {
     #[allow(dead_code)]
     Gate { node: NodeId, bit: usize },
     External {
-        cell: crate::model::CellWrapper<'p>,
+        cell: crate::model::CellWrapper,
         bit: usize,
     },
     #[allow(dead_code)]
@@ -37,13 +37,13 @@ pub(crate) enum PatSrcKey<'p> {
 
 /// A canonical representation of a design driver bit used by some sink pin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum DesSrcKey<'d> {
+pub(crate) enum DesSrcKey {
     Gate {
         node: NodeId,
         bit: usize,
     },
     External {
-        cell: crate::model::CellWrapper<'d>,
+        cell: crate::model::CellWrapper,
         bit: usize,
     },
     #[allow(dead_code)]
@@ -52,16 +52,16 @@ pub(crate) enum DesSrcKey<'d> {
 
 /// Validate aligned sources pairwise and collect any driver bindings implied.
 /// Returns additions to apply if compatible.
-pub(crate) fn check_and_collect_bindings<'p, 'd>(
+pub(crate) fn check_and_collect_bindings(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    st: &State<'p, 'd>,
+    p_index: &Index,
+    d_index: &Index,
+    st: &State,
     match_length: bool,
-) -> Option<BindingAdditions<'p, 'd>> {
+) -> Option<BindingAdditions> {
     let pairs = aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
-    let mut additions: BindingAdditions<'p, 'd> = Vec::new();
+    let mut additions: BindingAdditions = Vec::new();
 
     for AlignedPair {
         pattern: p_src,
@@ -100,10 +100,7 @@ pub(crate) fn check_and_collect_bindings<'p, 'd>(
 
 /// Convert a design-side Source (Gate or Io) into a DesSrcKey.
 /// Returns None if the source is not supported in this context (e.g., Const).
-pub(crate) fn des_key_from_gate_or_io<'d>(
-    d_index: &Index<'d>,
-    d_src: Source<'d>,
-) -> Option<DesSrcKey<'d>> {
+pub(crate) fn des_key_from_gate_or_io(d_index: &Index, d_src: Source) -> Option<DesSrcKey> {
     match d_src {
         Source::Gate(d_cell, d_bit) => {
             let d_node = d_index.try_cell_to_node(d_cell)?;
@@ -123,11 +120,11 @@ pub(crate) fn des_key_from_gate_or_io<'d>(
 /// Insert-or-validate a binding for a pattern External source.
 /// - If a binding exists, it must match d_key.
 /// - If not, record it in additions (to be inserted by the caller later).
-pub(crate) fn unify_external_binding<'p, 'd>(
-    st: &State<'p, 'd>,
-    additions: &mut BindingAdditions<'p, 'd>,
-    p_key: PatSrcKey<'p>,
-    d_key: DesSrcKey<'d>,
+pub(crate) fn unify_external_binding(
+    st: &State,
+    additions: &mut BindingAdditions,
+    p_key: PatSrcKey,
+    d_key: DesSrcKey,
 ) -> bool {
     match st.binding_get(p_key) {
         Some(existing) => existing == d_key,

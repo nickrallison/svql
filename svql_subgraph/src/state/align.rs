@@ -6,13 +6,13 @@ use crate::model::{
 
 /// Compute deterministic aligned input pairs for pattern/design nodes,
 /// respecting exact-length vs superset-length and commutativity normalization.
-pub(crate) fn aligned_sources<'p, 'd>(
+pub(crate) fn aligned_sources(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
+    p_index: &Index,
+    d_index: &Index,
     match_length: bool,
-) -> Option<Vec<super::bindings::AlignedPair<'p, 'd>>> {
+) -> Option<Vec<super::bindings::AlignedPair>> {
     let kind: CellKind = p_index.kind(p_id);
 
     let mut p_inputs = p_index.pins(p_id).inputs.clone();

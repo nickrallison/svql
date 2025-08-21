@@ -8,13 +8,13 @@ use super::SubgraphMatch;
 pub mod heuristics;
 pub(crate) use heuristics::rarest_gate_heuristic;
 
-pub(super) fn backtrack<'p, 'd>(
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    st: &mut State<'p, 'd>,
-    out: &mut Vec<SubgraphMatch<'p, 'd>>,
-    pat_inputs: &[CellWrapper<'p>],
-    pat_outputs: &[CellWrapper<'p>],
+pub(super) fn backtrack(
+    p_index: &Index,
+    d_index: &Index,
+    st: &mut State,
+    out: &mut Vec<SubgraphMatch>,
+    pat_inputs: &[CellWrapper],
+    pat_outputs: &[CellWrapper],
     config: &config::Config,
 ) {
     if st.done() {
@@ -64,14 +64,14 @@ pub(super) fn backtrack<'p, 'd>(
 
 /// Scoped helper that maps (p_id -> d_id), records IO bindings implied by the pair,
 /// runs `f`, then automatically removes those bindings and unmaps.
-fn with_mapping<'p, 'd>(
-    st: &mut State<'p, 'd>,
+fn with_mapping(
+    st: &mut State,
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
+    p_index: &Index,
+    d_index: &Index,
     config: &config::Config,
-    f: impl FnOnce(&mut State<'p, 'd>),
+    f: impl FnOnce(&mut State),
 ) {
     st.map(p_id, d_id);
     let added = add_bindings_from_pair(p_id, d_id, p_index, d_index, st, config);
@@ -80,14 +80,14 @@ fn with_mapping<'p, 'd>(
     st.unmap(p_id, d_id);
 }
 
-pub(super) fn add_bindings_from_pair<'p, 'd>(
+pub(super) fn add_bindings_from_pair(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    st: &mut State<'p, 'd>,
+    p_index: &Index,
+    d_index: &Index,
+    st: &mut State,
     config: &config::Config,
-) -> Vec<PatSrcKey<'p>> {
+) -> Vec<PatSrcKey> {
     let mut added = Vec::new();
 
     if let Some(pending) =
@@ -103,11 +103,11 @@ pub(super) fn add_bindings_from_pair<'p, 'd>(
     added
 }
 
-pub(super) fn remove_bindings<'p, 'd>(added: Vec<PatSrcKey<'p>>, st: &mut State<'p, 'd>) {
+pub(super) fn remove_bindings(added: Vec<PatSrcKey>, st: &mut State) {
     st.bindings_remove_keys(&added);
 }
 
-pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) -> Option<NodeId> {
+pub(super) fn choose_next(p_index: &Index, st: &State) -> Option<NodeId> {
     let first_resolvable = (0..p_index.gate_count() as u32)
         .map(|i| i as NodeId)
         .find(|&p| !st.is_mapped(p) && inputs_resolved_for(p_index, st, p));
@@ -119,7 +119,7 @@ pub(super) fn choose_next<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>) ->
     })
 }
 
-fn inputs_resolved_for<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>, p: NodeId) -> bool {
+fn inputs_resolved_for(p_index: &Index, st: &State, p: NodeId) -> bool {
     p_index.pins(p).inputs.iter().all(|src| match src {
         Source::Const(_) => true,
         Source::Io(_, _) => true,

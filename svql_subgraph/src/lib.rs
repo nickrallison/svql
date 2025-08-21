@@ -19,7 +19,7 @@ pub mod util {
 pub mod test_support;
 
 pub use config::{Config, DedupeMode};
-pub use model::CellWrapper;
+pub use model::{CellWrapper, ValidCellWrapper};
 
 use crate::dedupe::{signature_mapped_gate_set, signature_with_boundary};
 use crate::index::Index;

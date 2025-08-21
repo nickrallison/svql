@@ -1,6 +1,6 @@
 use std::{borrow::Cow, hash::Hash};
 
-use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Trit, Value};
+use prjunnamed_netlist::{Cell, CellHash, CellRef, Design, MetaItemRef, Net, Trit, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum CellKind {
@@ -110,14 +110,37 @@ impl From<&Cell> for CellKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CellWrapper {
+    pub cref: CellHash,
+}
+
+impl CellWrapper {
+    pub fn new(cref: CellHash) -> Self {
+        CellWrapper { cref }
+    }
+    pub fn c_hash(&self) -> CellHash {
+        self.cref
+    }
+    pub fn index(&self) -> usize {
+        self.cref.index()
+    }
+}
+
+impl From<CellHash> for CellWrapper {
+    fn from(cref: CellHash) -> Self {
+        CellWrapper { cref }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CellWrapper<'p> {
+pub struct ValidCellWrapper<'p> {
     pub cref: CellRef<'p>,
 }
 
-impl<'p> CellWrapper<'p> {
+impl<'p> ValidCellWrapper<'p> {
     pub fn new(cref: CellRef<'p>) -> Self {
-        CellWrapper { cref }
+        ValidCellWrapper { cref }
     }
     pub fn cref(&self) -> CellRef<'p> {
         self.cref
@@ -169,7 +192,7 @@ impl<'p> CellWrapper<'p> {
     }
 }
 
-impl std::fmt::Debug for CellWrapper<'_> {
+impl std::fmt::Debug for ValidCellWrapper<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let index: usize = self.cref.debug_index();
         let metadata: MetaItemRef = self.cref.metadata();
@@ -182,73 +205,73 @@ impl std::fmt::Debug for CellWrapper<'_> {
     }
 }
 
-impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
+impl<'a> From<CellRef<'a>> for ValidCellWrapper<'a> {
     fn from(cref: CellRef<'a>) -> Self {
-        CellWrapper { cref }
+        ValidCellWrapper { cref }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum Source<'a> {
-    Gate(CellWrapper<'a>, usize),
-    Io(CellWrapper<'a>, usize),
+pub(crate) enum Source {
+    Gate(CellWrapper, usize),
+    Io(CellWrapper, usize),
     Const(Trit),
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CellPins<'a> {
-    pub(crate) inputs: Vec<Source<'a>>,
+pub(crate) struct CellPins {
+    pub(crate) inputs: Vec<Source>,
 }
 
 pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
     CellKind::from(c.get().as_ref()).is_gate()
 }
 
-pub(crate) fn get_input_cells<'a>(design: &'a Design) -> Vec<CellWrapper<'a>> {
+pub(crate) fn get_input_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
-        .map(CellWrapper::from)
+        .map(|cell_ref| CellHash::from(cell_ref.into()).into())
         .collect()
 }
 
-pub(crate) fn get_output_cells<'a>(design: &'a Design) -> Vec<CellWrapper<'a>> {
+pub(crate) fn get_output_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
-        .map(CellWrapper::from)
+        .map(|cell_ref| CellHash::from(cell_ref.into()).into())
         .collect()
 }
 
-pub(crate) fn input_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
+pub(crate) fn input_name<'p>(cell: &'p ValidCellWrapper) -> Option<&'p str> {
     match cell.cref().get() {
         std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
         _ => None,
     }
 }
 
-pub(crate) fn output_name<'p>(cell: &CellWrapper<'p>) -> Option<&'p str> {
+pub(crate) fn output_name<'p>(cell: &'p ValidCellWrapper) -> Option<&'p str> {
     match cell.cref().get() {
         std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
         _ => None,
     }
 }
 
-pub(crate) fn extract_pins<'a>(cref: CellWrapper<'a>) -> CellPins<'a> {
-    let mut inputs: Vec<Source<'a>> = Vec::new();
+pub(crate) fn extract_pins(cref: ValidCellWrapper) -> CellPins {
+    let mut inputs: Vec<Source> = Vec::new();
     cref.visit(|net| {
         inputs.push(net_to_source(cref.design(), net));
     });
     CellPins { inputs }
 }
 
-fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
+fn net_to_source(design: &Design, net: Net) -> Source {
     match design.find_cell(net) {
         Ok((src, bit)) => {
             if is_gate_cell_ref(src) {
-                Source::Gate(src.into(), bit)
+                Source::Gate(CellWrapper::new(src.into()), bit)
             } else {
-                Source::Io(src.into(), bit)
+                Source::Io(CellWrapper::new(src.into()), bit)
             }
         }
         Err(trit) => Source::Const(trit),

@@ -3,12 +3,12 @@ use crate::model::Source;
 
 use super::State;
 
-pub(crate) fn cells_compatible<'p, 'd>(
+pub(crate) fn cells_compatible(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    state: &State<'p, 'd>,
+    p_index: &Index,
+    d_index: &Index,
+    state: &State,
     match_length: bool,
 ) -> bool {
     if p_index.kind(p_id) != d_index.kind(d_id) {
@@ -20,11 +20,7 @@ pub(crate) fn cells_compatible<'p, 'd>(
 }
 
 /// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.
-pub(crate) fn pattern_consumption_bits<'p>(
-    p_index: &Index<'p>,
-    q_p: NodeId,
-    p_id: NodeId,
-) -> Vec<usize> {
+pub(crate) fn pattern_consumption_bits(p_index: &Index, q_p: NodeId, p_id: NodeId) -> Vec<usize> {
     p_index
         .pins(q_p)
         .inputs
@@ -41,8 +37,8 @@ pub(crate) fn pattern_consumption_bits<'p>(
 }
 
 /// Does the mapped design consumer q_d have an input from d_id at the given bit?
-pub(crate) fn design_has_input_from_bit<'d>(
-    d_index: &Index<'d>,
+pub(crate) fn design_has_input_from_bit(
+    d_index: &Index,
     q_d: NodeId,
     d_id: NodeId,
     bit: usize,
@@ -57,12 +53,12 @@ pub(crate) fn design_has_input_from_bit<'d>(
 
 /// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
 /// as a source in q_p is mirrored by a usage of d_id in q_d at the same bit index.
-pub(crate) fn downstream_consumers_compatible<'p, 'd>(
+pub(crate) fn downstream_consumers_compatible(
     p_id: NodeId,
     d_id: NodeId,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    state: &State<'p, 'd>,
+    p_index: &Index,
+    d_index: &Index,
+    state: &State,
 ) -> bool {
     state.mappings().iter().all(|(&q_p, &q_d)| {
         let required_bits = pattern_consumption_bits(p_index, q_p, p_id);
@@ -74,8 +70,8 @@ pub(crate) fn downstream_consumers_compatible<'p, 'd>(
 
 /// Validate that a mapped gate pair is consistent if pattern node is already mapped.
 /// If the pattern node is unmapped, any bit is acceptable at this stage.
-pub(crate) fn mapped_gate_pair_ok<'p, 'd>(
-    st: &State<'p, 'd>,
+pub(crate) fn mapped_gate_pair_ok(
+    st: &State,
     p_node: NodeId,
     p_bit: usize,
     d_node: NodeId,
