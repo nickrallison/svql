@@ -1,4 +1,5 @@
-use svql_driver::prelude::Driver;
+// svql_query/src/queries/netlist/basic/dff.rs
+use svql_driver::driver::Driver;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -47,7 +48,7 @@ where
 // Static metadata for codegen/introspection (macro-friendly)
 impl NetlistMeta for Sdffe<Search> {
     const MODULE_NAME: &'static str = "sdffe";
-    const FILE_PATH: &'static str = "examples/patterns/basic/ff/sdffe.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/ff/verilog/sdffe.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
@@ -90,17 +91,5 @@ impl SearchableNetlist for Sdffe<Search> {
             reset: Wire::with_val(path.child("reset".to_string()), reset_m),
             q: Wire::with_val(path.child("q".to_string()), q_m),
         }
-    }
-}
-
-// Inherent shim for ergonomic call sites
-impl Sdffe<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
-        path: Instance,
-        config: &svql_subgraph::config::Config,
-    ) -> Vec<Sdffe<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

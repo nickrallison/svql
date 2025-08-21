@@ -1,4 +1,5 @@
-use svql_driver::prelude::Driver;
+// svql_query/src/queries/netlist/basic/and/and_nor.rs
+use svql_driver::driver::Driver;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -46,7 +47,7 @@ where
 impl NetlistMeta for AndNor<Search> {
     const MODULE_NAME: &'static str = "and_nor";
     // Keep consistency with And<Search>::FILE_PATH (no `/verilog/` in the path).
-    const FILE_PATH: &'static str = "examples/patterns/basic/and/and_nor.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/and/verilog/and_nor.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
@@ -82,17 +83,5 @@ impl SearchableNetlist for AndNor<Search> {
             b: Wire::with_val(path.child("b".to_string()), b_match),
             y: Wire::with_val(path.child("y".to_string()), y_match),
         }
-    }
-}
-
-// Inherent shim for ergonomic call sites.
-impl AndNor<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
-        path: Instance,
-        config: &svql_subgraph::config::Config,
-    ) -> Vec<AndNor<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

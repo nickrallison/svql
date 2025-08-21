@@ -1,4 +1,6 @@
-use svql_driver::prelude::Driver;
+// svql_query/src/queries/netlist/basic/and/and_gate.rs
+use svql_driver::Context;
+use svql_driver::driver::Driver;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
@@ -46,7 +48,7 @@ where
 // A define_netlist! macro would generate this from the declarative input.
 impl NetlistMeta for AndGate<Search> {
     const MODULE_NAME: &'static str = "and_gate";
-    const FILE_PATH: &'static str = "examples/patterns/basic/and/and_gate.v";
+    const FILE_PATH: &'static str = "examples/patterns/basic/and/verilog/and_gate.v";
 
     const PORTS: &'static [PortSpec] = &[
         PortSpec {
@@ -64,8 +66,6 @@ impl NetlistMeta for AndGate<Search> {
     ];
 }
 
-// The query surface. A macro can generate this impl (and the inherent
-// wrapper below) for any netlist with the same shape.
 impl SearchableNetlist for AndGate<Search> {
     type Hit<'p, 'd> = AndGate<Match<'p, 'd>>;
 
@@ -84,18 +84,5 @@ impl SearchableNetlist for AndGate<Search> {
             b: Wire::with_val(path.child("b".to_string()), b_match),
             y: Wire::with_val(path.child("y".to_string()), y_match),
         }
-    }
-}
-
-// Inherent shim so callers can write And::<Search>::query(...) without UFCS.
-// A macro can also emit this block verbatim for each netlist type.
-impl AndGate<Search> {
-    pub fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
-        path: Instance,
-        config: &svql_subgraph::config::Config,
-    ) -> Vec<AndGate<Match<'p, 'd>>> {
-        <Self as SearchableNetlist>::query(pattern, haystack, path, config)
     }
 }

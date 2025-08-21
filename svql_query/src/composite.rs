@@ -1,3 +1,4 @@
+// svql_query/src/composite.rs
 use svql_driver::{DriverKey, context::Context, driver::Driver};
 use svql_subgraph::Config;
 
@@ -13,7 +14,7 @@ where
 pub trait SearchableComposite: Composite<Search> {
     type Hit<'p, 'd>;
 
-    fn context(&self, driver: &Driver) -> Context;
+    fn context(driver: &Driver) -> Context;
 
     fn query<'ctx>(
         haystack_key: &DriverKey,
