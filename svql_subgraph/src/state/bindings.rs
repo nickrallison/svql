@@ -3,6 +3,7 @@ use crate::model::Source;
 
 use super::State;
 
+use log::trace;
 use prjunnamed_netlist::Trit;
 
 /// Self-documenting wrapper for an aligned pattern/design input pair.
@@ -50,9 +51,7 @@ pub(crate) enum DesSrcKey {
     Const(Trit),
 }
 
-/// Validate aligned sources pairwise and collect any driver bindings implied.
-/// Returns additions to apply if compatible.
-pub(crate) fn check_and_collect_bindings(
+pub fn check_and_collect_bindings(
     p_id: NodeId,
     d_id: NodeId,
     p_index: &Index,
@@ -60,7 +59,11 @@ pub(crate) fn check_and_collect_bindings(
     st: &State,
     match_length: bool,
 ) -> Option<BindingAdditions> {
+    trace!("Checking bindings for pattern {} -> design {}", p_id, d_id);
+
     let pairs = super::align::aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
+    trace!("Got {} aligned pairs", pairs.len());
+
     let mut additions: BindingAdditions = Vec::new();
 
     for AlignedPair {
@@ -68,18 +71,26 @@ pub(crate) fn check_and_collect_bindings(
         design: d_src,
     } in pairs
     {
+        trace!("Checking aligned pair: {:?} -> {:?}", p_src, d_src);
+
         match (p_src, d_src) {
             (Source::Const(pc), Source::Const(dc)) => {
                 if pc != dc {
+                    trace!("Constant mismatch: {:?} vs {:?}", pc, dc);
                     return None;
                 }
+                trace!("Constants match");
             }
             (Source::Gate(p_cell, p_bit), Source::Gate(d_cell, d_bit)) => {
                 let p_node = p_index.try_cell_to_node(p_cell)?;
                 let d_node = d_index.try_cell_to_node(d_cell)?;
+                trace!("Gate pair: {}:{} -> {}:{}", p_node, p_bit, d_node, d_bit);
+
                 if !super::constraints::mapped_gate_pair_ok(st, p_node, p_bit, d_node, d_bit) {
+                    trace!("Mapped gate pair not OK");
                     return None;
                 }
+                trace!("Mapped gate pair OK");
             }
             (Source::Io(p_cell, p_bit), d_src @ (Source::Gate(_, _) | Source::Io(_, _))) => {
                 let p_key = PatSrcKey::External {
@@ -87,14 +98,22 @@ pub(crate) fn check_and_collect_bindings(
                     bit: p_bit,
                 };
                 let d_key = des_key_from_gate_or_io(d_index, d_src)?;
+                trace!("IO pair: {:?} -> {:?}", p_key, d_key);
+
                 if !unify_external_binding(st, &mut additions, p_key, d_key) {
+                    trace!("External binding unification failed");
                     return None;
                 }
+                trace!("External binding unified");
             }
-            _ => return None,
+            _ => {
+                trace!("Unsupported source combination");
+                return None;
+            }
         }
     }
 
+    trace!("Returning {} binding additions", additions.len());
     Some(additions)
 }
 

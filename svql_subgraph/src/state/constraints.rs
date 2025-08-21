@@ -1,23 +1,9 @@
+use log::trace;
+
 use crate::index::{Index, NodeId};
 use crate::model::Source;
 
 use super::State;
-
-pub(crate) fn cells_compatible(
-    p_id: NodeId,
-    d_id: NodeId,
-    p_index: &Index,
-    d_index: &Index,
-    state: &State,
-    match_length: bool,
-) -> bool {
-    if p_index.kind(p_id) != d_index.kind(d_id) {
-        return false;
-    }
-
-    super::bindings::check_and_collect_bindings(p_id, d_id, p_index, d_index, state, match_length)
-        .is_some_and(|_| downstream_consumers_compatible(p_id, d_id, p_index, d_index, state))
-}
 
 /// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.
 pub(crate) fn pattern_consumption_bits(p_index: &Index, q_p: NodeId, p_id: NodeId) -> Vec<usize> {
@@ -51,21 +37,71 @@ pub(crate) fn design_has_input_from_bit(
     })
 }
 
-/// Ensure that for every already-mapped consumer (q_p -> q_d), any usage of p_id
-/// as a source in q_p is mirrored by a usage of d_id in q_d at the same bit index.
-pub(crate) fn downstream_consumers_compatible(
+pub fn cells_compatible(
+    p_id: NodeId,
+    d_id: NodeId,
+    p_index: &Index,
+    d_index: &Index,
+    state: &State,
+    match_length: bool,
+) -> bool {
+    trace!(
+        "Checking compatibility for pattern {} and design {}",
+        p_id, d_id
+    );
+
+    if p_index.kind(p_id) != d_index.kind(d_id) {
+        trace!("Kind mismatch");
+        return false;
+    }
+
+    let bindings_ok = super::bindings::check_and_collect_bindings(
+        p_id,
+        d_id,
+        p_index,
+        d_index,
+        state,
+        match_length,
+    )
+    .is_some();
+
+    if !bindings_ok {
+        trace!("Bindings check failed");
+        return false;
+    }
+
+    let downstream_ok = downstream_consumers_compatible(p_id, d_id, p_index, d_index, state);
+    trace!("Downstream consumers compatible: {}", downstream_ok);
+    downstream_ok
+}
+
+pub fn downstream_consumers_compatible(
     p_id: NodeId,
     d_id: NodeId,
     p_index: &Index,
     d_index: &Index,
     state: &State,
 ) -> bool {
-    state.mappings().iter().all(|(&q_p, &q_d)| {
+    trace!(
+        "Checking downstream consumers for pattern {} -> design {}",
+        p_id, d_id
+    );
+
+    let result = state.mappings().iter().all(|(&q_p, &q_d)| {
+        trace!("Checking mapping {} -> {}", q_p, q_d);
         let required_bits = pattern_consumption_bits(p_index, q_p, p_id);
-        required_bits
-            .iter()
-            .all(|&bit| design_has_input_from_bit(d_index, q_d, d_id, bit))
-    })
+        trace!("Required bits for pattern {}: {:?}", p_id, required_bits);
+
+        let all_bits_ok = required_bits.iter().all(|&bit| {
+            let ok = design_has_input_from_bit(d_index, q_d, d_id, bit);
+            trace!("Design {} has input from {} bit {}: {}", q_d, d_id, bit, ok);
+            ok
+        });
+        all_bits_ok
+    });
+
+    trace!("Downstream consumers compatible result: {}", result);
+    result
 }
 
 /// Validate that a mapped gate pair is consistent if pattern node is already mapped.

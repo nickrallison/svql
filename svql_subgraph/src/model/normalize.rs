@@ -1,3 +1,5 @@
+use log::trace;
+
 use super::{CellKind, Source};
 
 pub(crate) fn is_commutative(kind: CellKind) -> bool {
@@ -7,8 +9,10 @@ pub(crate) fn is_commutative(kind: CellKind) -> bool {
     )
 }
 
-pub(crate) fn normalize_commutative(inputs: &mut [Source]) {
+pub fn normalize_commutative(inputs: &mut [Source]) {
+    trace!("Normalizing {} commutative inputs", inputs.len());
     inputs.sort_by_key(stable_key);
+    trace!("Normalized inputs: {:?}", inputs);
 }
 
 fn stable_key(s: &Source) -> (u8, usize, usize) {

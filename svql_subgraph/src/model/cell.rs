@@ -1,5 +1,6 @@
 use std::{borrow::Cow, hash::Hash};
 
+use log::trace;
 use prjunnamed_netlist::{Cell, CellHash, CellRef, Design, MetaItemRef, Net, Trit, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -252,8 +253,11 @@ pub(crate) struct CellPins {
     pub(crate) inputs: Vec<Source>,
 }
 
-pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
-    CellKind::from(c.get().as_ref()).is_gate()
+pub fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
+    let kind = CellKind::from(c.get().as_ref());
+    let result = kind.is_gate();
+    trace!("Cell {:?} is gate: {}", c.get().as_ref(), result);
+    result
 }
 
 pub(crate) fn get_input_cells(design: &Design) -> Vec<CellWrapper> {
@@ -294,12 +298,14 @@ pub(crate) fn output_name<'p>(
     }
 }
 
-pub(crate) fn extract_pins(cref: CellWrapper, design: &Design) -> CellPins {
+pub fn extract_pins(cref: CellWrapper, design: &Design) -> CellPins {
+    trace!("Extracting pins for cell index {}", cref.index());
     let cell_ref = cref.cref.try_into_cell_ref_unchecked(design);
     let mut inputs: Vec<Source> = Vec::new();
     cell_ref.visit(|net| {
         inputs.push(net_to_source(design, net));
     });
+    trace!("Extracted {} input pins", inputs.len());
     CellPins { inputs }
 }
 
@@ -307,13 +313,18 @@ fn net_to_source(design: &Design, net: Net) -> Source {
     match design.find_cell(net) {
         Ok((src, bit)) => {
             let cell_wrapper = CellWrapper::from(src);
-            if is_gate_cell_ref(src) {
+            let source = if is_gate_cell_ref(src) {
                 Source::Gate(cell_wrapper, bit)
             } else {
                 Source::Io(cell_wrapper, bit)
-            }
+            };
+            trace!("Net {} resolved to source: {:?}", net, source);
+            source
         }
-        Err(trit) => Source::Const(trit),
+        Err(trit) => {
+            trace!("Net {} resolved to constant: {:?}", net, trit);
+            Source::Const(trit)
+        }
     }
 }
 

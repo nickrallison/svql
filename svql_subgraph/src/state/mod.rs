@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use log::trace;
 use prjunnamed_netlist::{Cell, Design};
 
 use crate::index::{Index, NodeId};
@@ -36,11 +37,11 @@ pub(crate) struct State<'p, 'd> {
 }
 
 impl<'p, 'd> State<'p, 'd> {
-    pub(crate) fn new(
-        target_gate_count: usize,
-        p_design: &'p Design,
-        d_design: &'d Design,
-    ) -> Self {
+    pub fn new(target_gate_count: usize, p_design: &'p Design, d_design: &'d Design) -> Self {
+        trace!(
+            "Creating new state with target gate count: {}",
+            target_gate_count
+        );
         State {
             mapping: HashMap::new(),
             used_d: HashSet::new(),
@@ -67,18 +68,27 @@ impl<'p, 'd> State<'p, 'd> {
         self.used_d.contains(&d)
     }
 
-    pub(crate) fn map(&mut self, p: NodeId, d: NodeId) {
+    pub fn map(&mut self, p: NodeId, d: NodeId) {
+        trace!("Mapping pattern {} -> design {}", p, d);
         self.mapping.insert(p, d);
         self.used_d.insert(d);
     }
 
-    pub(crate) fn unmap(&mut self, p: NodeId, d: NodeId) {
+    pub fn unmap(&mut self, p: NodeId, d: NodeId) {
+        trace!("Unmapping pattern {} -> design {}", p, d);
         self.mapping.remove(&p);
         self.used_d.remove(&d);
     }
 
-    pub(crate) fn done(&self) -> bool {
-        self.mapping.len() == self.target_gate_count
+    pub fn done(&self) -> bool {
+        let result = self.mapping.len() == self.target_gate_count;
+        trace!(
+            "State done check: {} == {} -> {}",
+            self.mapping.len(),
+            self.target_gate_count,
+            result
+        );
+        result
     }
 
     /// Get a previously established binding, if any.
@@ -88,11 +98,14 @@ impl<'p, 'd> State<'p, 'd> {
 
     /// Insert a new binding, returns true if inserted, false if it already existed.
     /// Callers only pass External (IO) bindings here — we do not persist Gate->Gate.
-    pub(crate) fn binding_insert(&mut self, key: PatSrcKey, val: DesSrcKey) -> bool {
+    pub fn binding_insert(&mut self, key: PatSrcKey, val: DesSrcKey) -> bool {
+        trace!("Inserting binding: {:?} -> {:?}", key, val);
         if self.bindings.contains_key(&key) {
+            trace!("Binding already exists");
             return false;
         }
         self.bindings.insert(key, val);
+        trace!("Binding inserted");
         true
     }
 
@@ -106,20 +119,31 @@ impl<'p, 'd> State<'p, 'd> {
     // We intentionally construct HashMaps keyed by CellWrapper here because the
     // public SubgraphMatch API exposes those keys. Suppress clippy's warning.
     #[allow(clippy::mutable_key_type)]
-    pub(crate) fn to_subgraph_match(
+    pub fn to_subgraph_match(
         &self,
         p_index: &Index<'p>,
         d_index: &Index<'d>,
         pat_input_cells: &[CellWrapper],
         pat_output_cells: &[CellWrapper],
     ) -> crate::SubgraphMatch {
+        trace!("Converting state to subgraph match");
+        trace!("Current mappings: {:?}", self.mapping);
+        trace!("Current bindings: {:?}", self.bindings);
+
         let cell_mapping = self.build_cell_mapping(p_index, d_index);
+        trace!("Built cell mapping with {} entries", cell_mapping.len());
 
         let boundary_src_map = self.build_boundary_src_map(d_index);
+        trace!(
+            "Built boundary source map with {} entries",
+            boundary_src_map.len()
+        );
 
         let input_by_name = name_map(pat_input_cells, p_index.design(), |cell_wrapper, design| {
             input_name(cell_wrapper, design).ok().map(|s| s.to_string())
         });
+        trace!("Built input name map with {} entries", input_by_name.len());
+
         let output_by_name = name_map(
             pat_output_cells,
             p_index.design(),
@@ -129,8 +153,16 @@ impl<'p, 'd> State<'p, 'd> {
                     .map(|s| s.to_string())
             },
         );
+        trace!(
+            "Built output name map with {} entries",
+            output_by_name.len()
+        );
 
         let out_driver_map = self.build_out_driver_map(d_index, &cell_mapping, pat_output_cells);
+        trace!(
+            "Built output driver map with {} entries",
+            out_driver_map.len()
+        );
 
         crate::SubgraphMatch {
             cell_mapping,

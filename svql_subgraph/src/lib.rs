@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use log::trace;
 use prjunnamed_netlist::Design;
 
 pub mod config;
@@ -107,12 +108,18 @@ impl SubgraphMatch {
     }
 }
 
-/// Original public API (borrowed references).
+// Main Public API
 pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> AllSubgraphMatches {
+    trace!("Starting find_subgraphs with config: {:?}", config);
+
     let p_index = Index::build(pattern);
+    trace!("Built pattern index with {} gates", p_index.gate_count());
+
     let d_index = Index::build(design);
+    trace!("Built design index with {} gates", d_index.gate_count());
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
+        trace!("Early exit: no gates in pattern or design");
         return AllSubgraphMatches {
             matches: Vec::new(),
         };
@@ -120,13 +127,20 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
 
     let Some(anchor @ ChosenCellSelection { .. }) = rarest_gate_heuristic(&p_index, &d_index)
     else {
+        trace!("No anchor found - early exit");
         return AllSubgraphMatches {
             matches: Vec::new(),
         };
     };
+    trace!("Selected anchor: {:?}", anchor);
 
     let mut results: Vec<SubgraphMatch> = Vec::new();
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
+    trace!(
+        "Pattern IO cells - inputs: {}, outputs: {}",
+        pat_inputs.len(),
+        pat_outputs.len()
+    );
 
     // Deterministically pick a single pattern anchor (the minimum NodeId).
     let p_a = *anchor
@@ -134,8 +148,11 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
         .iter()
         .min()
         .expect("No pattern anchors found");
+    trace!("Using pattern anchor node: {}", p_a);
 
     for &d_a in &anchor.des_anchors {
+        trace!("Trying design anchor node: {}", d_a);
+
         let empty_state = State::new(p_index.gate_count(), pattern, design);
         if !crate::state::cells_compatible(
             p_a,
@@ -145,12 +162,17 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
             &empty_state,
             config.match_length,
         ) {
+            trace!("Anchor pair incompatible - skipping");
             continue;
         }
+        trace!("Anchor pair compatible");
 
         let mut st = State::new(p_index.gate_count(), pattern, design);
         st.map(p_a, d_a);
+        trace!("Mapped anchor {} -> {}", p_a, d_a);
+
         let added = search::add_bindings_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
+        trace!("Added {} bindings from anchor pair", added.len());
 
         backtrack(
             &p_index,
@@ -164,19 +186,34 @@ pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> All
 
         search::remove_bindings(added, &mut st);
         st.unmap(p_a, d_a);
+        trace!("Backtracked from anchor {}", d_a);
     }
+    trace!("Found {} raw matches", results.len());
 
     match config.dedupe {
         DedupeMode::None => {
             let mut seen = HashSet::new();
+            let before = results.len();
             results.retain(|m| seen.insert(signature_with_boundary(m)));
+            trace!(
+                "Deduped from {} to {} matches (None mode)",
+                before,
+                results.len()
+            );
         }
         DedupeMode::AutoMorph => {
             let mut seen = std::collections::HashSet::new();
+            let before = results.len();
             results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
+            trace!(
+                "Deduped from {} to {} matches (AutoMorph mode)",
+                before,
+                results.len()
+            );
         }
     }
 
+    trace!("Returning {} final matches", results.len());
     AllSubgraphMatches { matches: results }
 }
 

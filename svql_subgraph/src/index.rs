@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use log::trace;
 use prjunnamed_netlist::Design;
 
 use crate::model::{CellKind, CellPins, CellWrapper, extract_pins};
@@ -25,7 +26,12 @@ pub(super) struct Index<'a> {
 }
 
 impl<'a> Index<'a> {
-    pub(super) fn build(design: &'a Design) -> Self {
+    pub fn build(design: &'a Design) -> Self {
+        trace!(
+            "Building index for design with {} cells",
+            design.iter_cells().count()
+        );
+
         let mut nodes: Vec<CellWrapper> = Vec::new();
         let mut kinds: Vec<CellKind> = Vec::new();
         let mut pins: Vec<CellPins> = Vec::new();
@@ -40,9 +46,20 @@ impl<'a> Index<'a> {
                 // Convert to ValidCellWrapper to inspect the cell
                 let valid_cell = cell_wrapper.try_into_valid_cell_wrapper_unchecked(design);
                 let kind = CellKind::from(valid_cell.get().as_ref());
-                kind.is_gate().then_some((cell_wrapper, kind))
+                if kind.is_gate() {
+                    trace!("Found gate: {:?} at index {}", kind, cell_wrapper.index());
+                    Some((cell_wrapper, kind))
+                } else {
+                    trace!(
+                        "Skipping non-gate: {:?} at index {}",
+                        kind,
+                        cell_wrapper.index()
+                    );
+                    None
+                }
             })
             .collect();
+        trace!("Found {} gate wrappers", gate_wrappers.len());
 
         for (id, (cell_wrapper, kind)) in gate_wrappers.into_iter().enumerate() {
             let id = id as NodeId;
@@ -56,6 +73,7 @@ impl<'a> Index<'a> {
             cell_to_id.insert(cell_wrapper.index(), id);
         }
 
+        trace!("Index built with {} nodes", nodes.len());
         Index {
             nodes,
             kinds,

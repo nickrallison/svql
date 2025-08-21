@@ -7,8 +7,9 @@ use super::SubgraphMatch;
 
 pub mod heuristics;
 pub(crate) use heuristics::rarest_gate_heuristic;
+use log::trace;
 
-pub(super) fn backtrack(
+pub fn backtrack(
     p_index: &Index,
     d_index: &Index,
     st: &mut State,
@@ -17,38 +18,64 @@ pub(super) fn backtrack(
     pat_outputs: &[CellWrapper],
     config: &config::Config,
 ) {
+    trace!(
+        "Backtrack called with state mappings: {}",
+        st.mappings().len()
+    );
+
     if st.done() {
+        trace!("State is complete - creating subgraph match");
         out.push(st.to_subgraph_match(p_index, d_index, pat_inputs, pat_outputs));
+        trace!("Subgraph match created, now have {} matches", out.len());
         return;
     }
 
     let Some(next_p) = choose_next(p_index, st) else {
+        trace!("No next pattern node to choose - returning");
         return;
     };
+    trace!("Chose next pattern node: {}", next_p);
 
     let kind = p_index.kind(next_p);
+    trace!("Pattern node kind: {:?}", kind);
 
     // Phase 1: compute candidates with only immutable access to `st`.
     let candidates: Vec<NodeId> = d_index
         .of_kind(kind)
         .iter()
         .copied()
-        .filter(|&d_cand| !st.is_used_design(d_cand))
         .filter(|&d_cand| {
-            crate::state::cells_compatible(
+            let used = st.is_used_design(d_cand);
+            trace!("Checking if design node {} is used: {}", d_cand, used);
+            !used
+        })
+        .filter(|&d_cand| {
+            let compatible = crate::state::cells_compatible(
                 next_p,
                 d_cand,
                 p_index,
                 d_index,
                 st,
                 config.match_length,
-            )
+            );
+            trace!(
+                "Design node {} compatible with pattern node {}: {}",
+                d_cand, next_p, compatible
+            );
+            compatible
         })
         .collect();
+    trace!(
+        "Found {} candidates for pattern node {}",
+        candidates.len(),
+        next_p
+    );
 
     // Phase 2: iterate candidates and perform scoped mutable updates.
     for d_cand in candidates {
+        trace!("Trying candidate design node: {}", d_cand);
         with_mapping(st, next_p, d_cand, p_index, d_index, config, |st_inner| {
+            trace!("Recursing with updated state");
             backtrack(
                 p_index,
                 d_index,
@@ -58,8 +85,11 @@ pub(super) fn backtrack(
                 pat_outputs,
                 config,
             );
+            trace!("Back from recursion");
         });
+        trace!("Finished with candidate {}", d_cand);
     }
+    trace!("Backtrack completed for pattern node {}", next_p);
 }
 
 /// Scoped helper that maps (p_id -> d_id), records IO bindings implied by the pair,
@@ -107,26 +137,64 @@ pub(super) fn remove_bindings(added: Vec<PatSrcKey>, st: &mut State) {
     st.bindings_remove_keys(&added);
 }
 
-pub(super) fn choose_next(p_index: &Index, st: &State) -> Option<NodeId> {
-    let first_resolvable = (0..p_index.gate_count() as u32)
-        .map(|i| i as NodeId)
-        .find(|&p| !st.is_mapped(p) && inputs_resolved_for(p_index, st, p));
-
-    first_resolvable.or_else(|| {
-        (0..p_index.gate_count() as u32)
-            .map(|i| i as NodeId)
-            .find(|&p| !st.is_mapped(p))
-    })
+fn inputs_resolved_for(p_index: &Index, st: &State, p: NodeId) -> bool {
+    trace!("Checking if inputs are resolved for pattern node {}", p);
+    let result = p_index.pins(p).inputs.iter().all(|src| match src {
+        Source::Const(_) => {
+            trace!("Pattern node {} input is constant - resolved", p);
+            true
+        }
+        Source::Io(_, _) => {
+            trace!("Pattern node {} input is IO - resolved", p);
+            true
+        }
+        Source::Gate(gc, _) => {
+            let resolved = p_index.try_cell_to_node(*gc).is_some_and(|g| {
+                let mapped = st.is_mapped(g);
+                trace!(
+                    "Pattern node {} input gate {} mapped: {}",
+                    p,
+                    gc.index(),
+                    mapped
+                );
+                mapped
+            });
+            resolved
+        }
+    });
+    trace!("Inputs resolved for pattern node {}: {}", p, result);
+    result
 }
 
-fn inputs_resolved_for(p_index: &Index, st: &State, p: NodeId) -> bool {
-    p_index.pins(p).inputs.iter().all(|src| match src {
-        Source::Const(_) => true,
-        Source::Io(_, _) => true,
-        Source::Gate(gc, _) => p_index
-            .try_cell_to_node(*gc)
-            .is_some_and(|g| st.is_mapped(g)),
-    })
+pub fn choose_next(p_index: &Index, st: &State) -> Option<NodeId> {
+    trace!("Choosing next pattern node");
+
+    let first_resolvable = (0..p_index.gate_count() as u32)
+        .map(|i| i as NodeId)
+        .find(|&p| {
+            let mapped = st.is_mapped(p);
+            trace!("Checking if pattern node {} is mapped: {}", p, mapped);
+            !mapped && inputs_resolved_for(p_index, st, p)
+        });
+
+    if let Some(node) = first_resolvable {
+        trace!("Found first resolvable node: {}", node);
+        return Some(node);
+    }
+
+    let first_unmapped = (0..p_index.gate_count() as u32)
+        .map(|i| i as NodeId)
+        .find(|&p| {
+            let mapped = st.is_mapped(p);
+            trace!(
+                "Checking if pattern node {} is mapped (fallback): {}",
+                p, mapped
+            );
+            !mapped
+        });
+
+    trace!("Fallback choice: {:?}", first_unmapped);
+    first_unmapped
 }
 
 #[cfg(test)]
