@@ -14,7 +14,7 @@ where
 pub trait SearchableComposite: Composite<Search> {
     type Hit<'p, 'd>;
 
-    fn context(driver: &Driver) -> Context;
+    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>>;
 
     fn query<'ctx>(
         haystack_key: &DriverKey,

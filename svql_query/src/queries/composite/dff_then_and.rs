@@ -1,13 +1,17 @@
-use crate::impl_find_port;
-use crate::instance::Instance;
-use crate::queries::netlist::basic::and::and_gate::AndGate;
-use crate::queries::netlist::basic::dff::Sdffe;
-use crate::{State, WithPath};
+// svql_query/src/queries/composite/sdffe_then_and.rs
+use crate::{
+    Connection, Match, Search, State, Wire, WithPath,
+    composite::{Composite, MatchedComposite, SearchableComposite},
+    instance::Instance,
+    netlist::SearchableNetlist,
+    queries::netlist::basic::{and::and_gate::AndGate, dff::Sdffe},
+};
+use itertools::iproduct;
+use svql_driver::{Context, Driver, DriverKey};
+use svql_subgraph::Config;
 
-/// DFF -> AND composite:
-/// - Require that sdffe.q drives either and.a or and.b (one must hold).
 #[derive(Debug, Clone)]
-pub struct DffThenAnd<S>
+pub struct SdffeThenAnd<S>
 where
     S: State,
 {
@@ -16,18 +20,7 @@ where
     pub andg: AndGate<S>,
 }
 
-impl<S> WithPath<S> for DffThenAnd<S>
-where
-    S: State,
-{
-    impl_find_port!(DffThenAnd, sdffe, andg);
-
-    fn path(&self) -> Instance {
-        self.path.clone()
-    }
-}
-
-impl<S> DffThenAnd<S>
+impl<S> SdffeThenAnd<S>
 where
     S: State,
 {
@@ -40,31 +33,111 @@ where
     }
 }
 
+impl<S> WithPath<S> for SdffeThenAnd<S>
+where
+    S: State,
+{
+    crate::impl_find_port!(SdffeThenAnd, sdffe, andg);
+
+    fn path(&self) -> Instance {
+        self.path.clone()
+    }
+}
+
+impl<S> Composite<S> for SdffeThenAnd<S>
+where
+    S: State,
+{
+    fn connections(&self) -> Vec<Vec<Connection<S>>> {
+        // Define the connection: sdffe.q -> (andg.a OR andg.b)
+        vec![vec![
+            Connection {
+                from: self.sdffe.q.clone(),
+                to: self.andg.a.clone(),
+            },
+            Connection {
+                from: self.sdffe.q.clone(),
+                to: self.andg.b.clone(),
+            },
+        ]]
+    }
+}
+
+impl SearchableComposite for SdffeThenAnd<Search> {
+    type Hit<'p, 'd> = SdffeThenAnd<Match<'p, 'd>>;
+
+    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
+        let sdffe_context = Sdffe::<Search>::context(driver)?;
+        let and_context = AndGate::<Search>::context(driver)?;
+        Ok(sdffe_context.merge(and_context))
+    }
+
+    fn query<'ctx>(
+        haystack_key: &DriverKey,
+        context: &'ctx Context,
+        path: Instance,
+        config: &Config,
+    ) -> Vec<Self::Hit<'ctx, 'ctx>> {
+        // First get individual matches
+        let sdffe_matches = Sdffe::<Search>::query(haystack_key, context, path.clone(), config);
+        let and_matches = AndGate::<Search>::query(haystack_key, context, path.clone(), config);
+
+        // Create composite instances
+        let mut composites = Vec::new();
+
+        for (sdffe, andg) in iproduct!(sdffe_matches, and_matches) {
+            let composite = SdffeThenAnd {
+                path: path.clone(),
+                sdffe: sdffe.clone(),
+                andg: andg.clone(),
+            };
+            composites.push(composite);
+        }
+
+        // Filter by connectivity
+        composites.retain(|composite| composite.validate_connections(composite.connections()));
+
+        composites
+    }
+}
+
+impl<'p, 'd> MatchedComposite<'p, 'd> for SdffeThenAnd<Match<'p, 'd>> {
+    // Additional validation can be added here if needed
+}
+
 #[cfg(test)]
 mod tests {
+    use log::trace;
     use svql_driver::{Driver, DriverKey};
     use svql_subgraph::Config;
 
     use crate::{
         Search,
+        composite::SearchableComposite,
         instance::Instance,
-        queries::{composite::dff_then_and::DffThenAnd, netlist::basic::dff::Sdffe},
+        netlist::SearchableNetlist,
+        queries::{composite::dff_then_and::SdffeThenAnd, netlist::basic::dff::Sdffe},
     };
 
     #[test]
     fn test_dff_then_and() {
-        let driver = Driver::new_workspace();
+        let driver = Driver::new_workspace().expect("Failed to create driver");
 
-        let context = Sdffe::context(driver);
+        let context =
+            SdffeThenAnd::<Search>::context(&driver).expect("Failed to create context for Sdffe");
 
         // haystack
         let haystack_path = "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v";
         let haystack_module_name = "and_q_double_sdffe";
-        let haystack = DriverKey::new(haystack_path.to_string(), haystack_module_name.to_string());
+        let (haystack_key, haystack) = driver
+            .get_or_load_design(haystack_path, haystack_module_name.to_string())
+            .expect("Failed to get haystack design");
 
         // root path for the composite
         let root = Instance::root("dff_then_and".to_string());
         let config = Config::builder().exact_length().none().build();
+
+        let context = context.with_design(haystack_key.clone(), haystack.clone());
 
         // run composite query
         // fn query<'ctx>(
@@ -74,7 +147,7 @@ mod tests {
         //     config: &Config,
         // ) -> Vec<Self::Hit<'ctx, 'ctx>>;
 
-        let hits = DffThenAnd::<Search>::query(&haystack, &context, root, &config);
+        let hits = SdffeThenAnd::<Search>::query(&haystack_key, &context, root, &config);
 
         trace!("main: DffThenAnd matches={}", hits.len());
 
@@ -122,7 +195,5 @@ mod tests {
 
             println!("hit[{}]: {:#?}", k, h);
         }
-
-        Ok(())
     }
 }
