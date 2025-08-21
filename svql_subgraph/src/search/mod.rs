@@ -148,7 +148,7 @@ mod tests {
         let p_index = Index::build(d);
         let d_index = Index::build(d);
 
-        let mut st = State::new(p_index.gate_count());
+        let mut st = State::new(p_index.gate_count(), d, d);
         let mut out = Vec::new();
         let inputs = crate::model::get_input_cells(d);
         let outputs = crate::model::get_output_cells(d);
@@ -167,7 +167,7 @@ mod tests {
     fn choose_next_returns_some() {
         let d = &SDFFE;
         let idx = Index::build(d);
-        let st = State::new(idx.gate_count());
+        let st = State::new(idx.gate_count(), d, d);
         assert!(choose_next(&idx, &st).is_some());
     }
 }

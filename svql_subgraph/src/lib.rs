@@ -26,64 +26,65 @@ use crate::index::Index;
 use crate::model::{get_input_cells, get_output_cells};
 use crate::search::heuristics::ChosenCellSelection;
 use crate::search::{backtrack, rarest_gate_heuristic};
-use crate::state::{State, cells_compatible};
+use crate::state::State;
 
 #[derive(Clone, Debug)]
-pub struct AllSubgraphMatches<'p, 'd> {
-    pub matches: Vec<SubgraphMatch<'p, 'd>>,
+pub struct AllSubgraphMatches {
+    pub matches: Vec<SubgraphMatch>,
 }
 
-impl<'p, 'd> AllSubgraphMatches<'p, 'd> {
+impl AllSubgraphMatches {
     pub fn len(&self) -> usize {
         self.matches.len()
     }
     pub fn is_empty(&self) -> bool {
         self.matches.is_empty()
     }
-    pub fn iter(&self) -> std::slice::Iter<'_, SubgraphMatch<'p, 'd>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, SubgraphMatch> {
         self.matches.iter()
     }
-    pub fn first(&self) -> Option<&SubgraphMatch<'p, 'd>> {
+    pub fn first(&self) -> Option<&SubgraphMatch> {
         self.matches.first()
     }
 }
 
-impl<'p, 'd> IntoIterator for AllSubgraphMatches<'p, 'd> {
-    type Item = SubgraphMatch<'p, 'd>;
-    type IntoIter = std::vec::IntoIter<SubgraphMatch<'p, 'd>>;
+impl IntoIterator for AllSubgraphMatches {
+    type Item = SubgraphMatch;
+    type IntoIter = std::vec::IntoIter<SubgraphMatch>;
     fn into_iter(self) -> Self::IntoIter {
         self.matches.into_iter()
     }
 }
 
-impl<'p, 'd, 'a> IntoIterator for &'a AllSubgraphMatches<'p, 'd> {
-    type Item = &'a SubgraphMatch<'p, 'd>;
-    type IntoIter = std::slice::Iter<'a, SubgraphMatch<'p, 'd>>;
+impl<'a> IntoIterator for &'a AllSubgraphMatches {
+    type Item = &'a SubgraphMatch;
+    type IntoIter = std::slice::Iter<'a, SubgraphMatch>;
     fn into_iter(self) -> Self::IntoIter {
         self.matches.iter()
     }
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct SubgraphMatch<'p, 'd> {
-    pub cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
-    pub pat_input_cells: Vec<CellWrapper<'p>>,
-    pub pat_output_cells: Vec<CellWrapper<'p>>,
-    pub boundary_src_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
+pub struct SubgraphMatch {
+    pub cell_mapping: HashMap<CellWrapper, CellWrapper>,
+    pub pat_input_cells: Vec<CellWrapper>,
+    pub pat_output_cells: Vec<CellWrapper>,
+    pub boundary_src_map: HashMap<(CellWrapper, usize), (CellWrapper, usize)>,
 
-    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    pub out_driver_map: HashMap<(CellWrapper<'p>, usize), (CellWrapper<'d>, usize)>,
+    // this is by the pattern so it is hopefully small enough to not be a problem cloning
+    pub input_by_name: HashMap<String, CellWrapper>,
+    pub output_by_name: HashMap<String, CellWrapper>,
+    pub out_driver_map: HashMap<(CellWrapper, usize), (CellWrapper, usize)>,
 }
 
-impl<'p, 'd> SubgraphMatch<'p, 'd> {
+impl SubgraphMatch {
     pub fn len(&self) -> usize {
         self.cell_mapping.len()
     }
     pub fn is_empty(&self) -> bool {
         self.cell_mapping.is_empty()
     }
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellWrapper<'p>, CellWrapper<'d>> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellWrapper, CellWrapper> {
         self.cell_mapping.iter()
     }
 
@@ -91,7 +92,7 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         &self,
         name: &str,
         bit: usize,
-    ) -> Option<(CellWrapper<'d>, usize)> {
+    ) -> Option<(CellWrapper, usize)> {
         let p_in = *self.input_by_name.get(name)?;
         self.boundary_src_map.get(&(p_in, bit)).copied()
     }
@@ -100,18 +101,14 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         &self,
         name: &str,
         bit: usize,
-    ) -> Option<(CellWrapper<'d>, usize)> {
+    ) -> Option<(CellWrapper, usize)> {
         let p_out = *self.output_by_name.get(name)?;
         self.out_driver_map.get(&(p_out, bit)).copied()
     }
 }
 
 /// Original public API (borrowed references).
-pub fn find_subgraphs<'p, 'd>(
-    pattern: &'p Design,
-    design: &'d Design,
-    config: &Config,
-) -> AllSubgraphMatches<'p, 'd> {
+pub fn find_subgraphs(pattern: &Design, design: &Design, config: &Config) -> AllSubgraphMatches {
     let p_index = Index::build(pattern);
     let d_index = Index::build(design);
 
@@ -128,7 +125,7 @@ pub fn find_subgraphs<'p, 'd>(
         };
     };
 
-    let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
+    let mut results: Vec<SubgraphMatch> = Vec::new();
     let (pat_inputs, pat_outputs) = get_pattern_io_cells(pattern);
 
     // Deterministically pick a single pattern anchor (the minimum NodeId).
@@ -139,8 +136,8 @@ pub fn find_subgraphs<'p, 'd>(
         .expect("No pattern anchors found");
 
     for &d_a in &anchor.des_anchors {
-        let empty_state = State::<'p, 'd>::new(p_index.gate_count());
-        if !cells_compatible(
+        let empty_state = State::new(p_index.gate_count(), pattern, design);
+        if !crate::state::cells_compatible(
             p_a,
             d_a,
             &p_index,
@@ -151,7 +148,7 @@ pub fn find_subgraphs<'p, 'd>(
             continue;
         }
 
-        let mut st = State::new(p_index.gate_count());
+        let mut st = State::new(p_index.gate_count(), pattern, design);
         st.map(p_a, d_a);
         let added = search::add_bindings_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
 
@@ -184,9 +181,7 @@ pub fn find_subgraphs<'p, 'd>(
 }
 
 // Internal helper for tests and internal wiring only.
-pub(crate) fn get_pattern_io_cells<'p>(
-    pattern: &'p Design,
-) -> (Vec<CellWrapper<'p>>, Vec<CellWrapper<'p>>) {
+pub(crate) fn get_pattern_io_cells(pattern: &Design) -> (Vec<CellWrapper>, Vec<CellWrapper>) {
     (get_input_cells(pattern), get_output_cells(pattern))
 }
 

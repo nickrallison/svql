@@ -1,7 +1,7 @@
 use crate::index::{Index, NodeId};
 use crate::model::Source;
 
-use super::{State, align::aligned_sources};
+use super::State;
 
 use prjunnamed_netlist::Trit;
 
@@ -60,7 +60,7 @@ pub(crate) fn check_and_collect_bindings(
     st: &State,
     match_length: bool,
 ) -> Option<BindingAdditions> {
-    let pairs = aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
+    let pairs = super::align::aligned_sources(p_id, d_id, p_index, d_index, match_length)?;
     let mut additions: BindingAdditions = Vec::new();
 
     for AlignedPair {

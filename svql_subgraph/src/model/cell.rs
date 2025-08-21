@@ -119,17 +119,42 @@ impl CellWrapper {
     pub fn new(cref: CellHash) -> Self {
         CellWrapper { cref }
     }
+
     pub fn c_hash(&self) -> CellHash {
         self.cref
     }
+
     pub fn index(&self) -> usize {
         self.cref.index()
+    }
+
+    pub fn debug_index(&self) -> usize {
+        self.cref.index()
+    }
+    pub fn try_into_valid_cell_wrapper<'a>(
+        &self,
+        design: &'a Design,
+    ) -> Result<ValidCellWrapper<'a>, Box<dyn std::error::Error>> {
+        let cell_ref = self.cref.try_into_cell_ref(design)?;
+        Ok(ValidCellWrapper::new(cell_ref))
+    }
+    pub fn try_into_valid_cell_wrapper_unchecked<'a>(
+        &self,
+        design: &'a Design,
+    ) -> ValidCellWrapper<'a> {
+        ValidCellWrapper::new(self.cref.try_into_cell_ref(design).unwrap())
     }
 }
 
 impl From<CellHash> for CellWrapper {
     fn from(cref: CellHash) -> Self {
         CellWrapper { cref }
+    }
+}
+
+impl<'a> From<CellRef<'a>> for CellWrapper {
+    fn from(cref: CellRef<'a>) -> Self {
+        CellWrapper { cref: cref.into() }
     }
 }
 
@@ -142,12 +167,15 @@ impl<'p> ValidCellWrapper<'p> {
     pub fn new(cref: CellRef<'p>) -> Self {
         ValidCellWrapper { cref }
     }
+
     pub fn cref(&self) -> CellRef<'p> {
         self.cref
     }
+
     pub fn debug_index(&self) -> usize {
         self.cref.debug_index()
     }
+
     pub fn get(self) -> Cow<'p, Cell> {
         self.cref.get()
     }
@@ -183,6 +211,7 @@ impl<'p> ValidCellWrapper<'p> {
     pub fn design(self) -> &'p Design {
         self.cref.design()
     }
+
     pub fn maybe_name(&self) -> Option<&str> {
         match self.cref.get() {
             Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
@@ -219,8 +248,15 @@ pub(crate) enum Source {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CellPins {
+pub(crate) struct CellPins<'a> {
     pub(crate) inputs: Vec<Source>,
+    design: &'a Design,
+}
+
+impl<'a> CellPins<'a> {
+    pub(crate) fn design(&self) -> &'a Design {
+        self.design
+    }
 }
 
 pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
@@ -231,7 +267,7 @@ pub(crate) fn get_input_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Input(_, _)))
-        .map(|cell_ref| CellHash::from(cell_ref.into()).into())
+        .map(|cell_ref| CellWrapper::from(cell_ref))
         .collect()
 }
 
@@ -239,39 +275,49 @@ pub(crate) fn get_output_cells(design: &Design) -> Vec<CellWrapper> {
     design
         .iter_cells()
         .filter(|cell_ref| matches!(cell_ref.get().as_ref(), Cell::Output(_, _)))
-        .map(|cell_ref| CellHash::from(cell_ref.into()).into())
+        .map(|cell_ref| CellWrapper::from(cell_ref))
         .collect()
 }
 
-pub(crate) fn input_name<'p>(cell: &'p ValidCellWrapper) -> Option<&'p str> {
-    match cell.cref().get() {
-        std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-        _ => None,
+pub(crate) fn input_name<'p>(
+    cell: &CellWrapper,
+    design: &'p Design,
+) -> Result<&'p str, Box<dyn std::error::Error>> {
+    let valid_cell = cell.try_into_valid_cell_wrapper(design)?;
+    match valid_cell.get() {
+        Cow::Borrowed(Cell::Input(name, _)) => Ok(name.as_str()),
+        _ => Err("Invalid cell type".into()),
     }
 }
 
-pub(crate) fn output_name<'p>(cell: &'p ValidCellWrapper) -> Option<&'p str> {
-    match cell.cref().get() {
-        std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-        _ => None,
+pub(crate) fn output_name<'p>(
+    cell: &CellWrapper,
+    design: &'p Design,
+) -> Result<&'p str, Box<dyn std::error::Error>> {
+    let valid_cell = cell.try_into_valid_cell_wrapper(design)?;
+    match valid_cell.get() {
+        Cow::Borrowed(Cell::Output(name, _)) => Ok(name.as_str()),
+        _ => Err("Invalid cell type".into()),
     }
 }
 
-pub(crate) fn extract_pins(cref: ValidCellWrapper) -> CellPins {
+pub(crate) fn extract_pins<'a>(cref: CellWrapper, design: &'a Design) -> CellPins<'a> {
+    let cell_ref = cref.cref.try_into_cell_ref_unchecked(design);
     let mut inputs: Vec<Source> = Vec::new();
-    cref.visit(|net| {
-        inputs.push(net_to_source(cref.design(), net));
+    cell_ref.visit(|net| {
+        inputs.push(net_to_source(design, net));
     });
-    CellPins { inputs }
+    CellPins { inputs, design }
 }
 
 fn net_to_source(design: &Design, net: Net) -> Source {
     match design.find_cell(net) {
         Ok((src, bit)) => {
+            let cell_wrapper = CellWrapper::from(src);
             if is_gate_cell_ref(src) {
-                Source::Gate(CellWrapper::new(src.into()), bit)
+                Source::Gate(cell_wrapper, bit)
             } else {
-                Source::Io(CellWrapper::new(src.into()), bit)
+                Source::Io(cell_wrapper, bit)
             }
         }
         Err(trit) => Source::Const(trit),
@@ -342,7 +388,7 @@ mod tests {
     fn can_extract_some_pins() {
         let d = &SDFFE;
         for c in d.iter_cells() {
-            let _pins = extract_pins(c.into());
+            let _pins = extract_pins(CellWrapper::from(c), d);
         }
     }
 
@@ -350,8 +396,8 @@ mod tests {
     fn commutative_sort_is_stable() {
         let d = &SDFFE;
         for c in d.iter_cells() {
-            let mut pins1 = extract_pins(c.into()).inputs;
-            let mut pins2 = extract_pins(c.into()).inputs;
+            let mut pins1 = extract_pins(CellWrapper::from(c), d).inputs;
+            let mut pins2 = extract_pins(CellWrapper::from(c), d).inputs;
             normalize_commutative(&mut pins1);
             normalize_commutative(&mut pins2);
             assert_eq!(pins1.len(), pins2.len());

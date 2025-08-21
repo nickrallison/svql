@@ -15,40 +15,45 @@ pub(super) struct KindNodes {
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
-    nodes: Vec<CellWrapper<'a>>,
+    nodes: Vec<CellWrapper>,
     kinds: Vec<CellKind>,
     pins: Vec<CellPins<'a>>,
     by_kind: HashMap<CellKind, Vec<NodeId>>,
     // Key by debug_index to avoid interior mutability key lint.
     cell_to_id: HashMap<usize, NodeId>,
+    design: &'a Design,
 }
 
 impl<'a> Index<'a> {
     pub(super) fn build(design: &'a Design) -> Self {
-        let mut nodes: Vec<CellWrapper<'a>> = Vec::new();
+        let mut nodes: Vec<CellWrapper> = Vec::new();
         let mut kinds: Vec<CellKind> = Vec::new();
-        let mut pins: Vec<CellPins<'a>> = Vec::new();
+        let mut pins: Vec<CellPins> = Vec::new();
         let mut by_kind: HashMap<CellKind, Vec<NodeId>> = HashMap::new();
         let mut cell_to_id: HashMap<usize, NodeId> = HashMap::new();
 
         // Filter to gates first, then enumerate so NodeIds are contiguous and stable.
-        let gate_triplets: Vec<(CellWrapper<'a>, CellKind, CellPins<'a>)> = design
+        let gate_wrappers: Vec<(CellWrapper, CellKind)> = design
             .iter_cells()
-            .map(CellWrapper::new)
-            .filter_map(|cell| {
-                let kind = CellKind::from(cell.get().as_ref());
-                kind.is_gate().then_some((cell, kind, extract_pins(cell)))
+            .map(CellWrapper::from)
+            .filter_map(|cell_wrapper| {
+                // Convert to ValidCellWrapper to inspect the cell
+                let valid_cell = cell_wrapper.try_into_valid_cell_wrapper_unchecked(design);
+                let kind = CellKind::from(valid_cell.get().as_ref());
+                kind.is_gate().then_some((cell_wrapper, kind))
             })
             .collect();
 
-        for (id, (cell, kind, cell_pins)) in gate_triplets.into_iter().enumerate() {
+        for (id, (cell_wrapper, kind)) in gate_wrappers.into_iter().enumerate() {
             let id = id as NodeId;
-            nodes.push(cell);
+            let cell_pins = extract_pins(cell_wrapper, design);
+
+            nodes.push(cell_wrapper);
             kinds.push(kind);
             pins.push(cell_pins);
 
             by_kind.entry(kind).or_default().push(id);
-            cell_to_id.insert(cell.debug_index(), id);
+            cell_to_id.insert(cell_wrapper.index(), id);
         }
 
         Index {
@@ -57,10 +62,11 @@ impl<'a> Index<'a> {
             pins,
             by_kind,
             cell_to_id,
+            design,
         }
     }
 
-    pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper<'a> {
+    pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper {
         self.nodes[id as usize]
     }
 
@@ -68,7 +74,7 @@ impl<'a> Index<'a> {
         self.kinds[id as usize]
     }
 
-    pub(super) fn pins(&self, id: NodeId) -> &CellPins<'a> {
+    pub(super) fn pins(&self, id: NodeId) -> &CellPins {
         &self.pins[id as usize]
     }
 
@@ -80,8 +86,8 @@ impl<'a> Index<'a> {
         self.nodes.len()
     }
 
-    pub(super) fn try_cell_to_node(&self, c: CellWrapper<'a>) -> Option<NodeId> {
-        self.cell_to_id.get(&c.debug_index()).copied()
+    pub(super) fn try_cell_to_node(&self, c: CellWrapper) -> Option<NodeId> {
+        self.cell_to_id.get(&c.index()).copied()
     }
 
     /// Deterministic owned iteration over kinds.
@@ -96,6 +102,10 @@ impl<'a> Index<'a> {
             .collect();
         items.sort_by_key(|kn| kn.kind);
         items
+    }
+
+    pub(super) fn design(&self) -> &Design {
+        self.design
     }
 }
 

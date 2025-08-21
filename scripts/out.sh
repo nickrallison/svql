@@ -21,11 +21,11 @@
 
 md_tree.py --root . \
     --include 'prjunnamed/netlist/src/design.rs' \
-    --include 'svql_*/**.rs' \
+    --include 'svql_subgraph/**.rs' \
     --include 'examples/**.v' \
     --include 'Cargo.toml' \
     --include 'README.md' \
-    --include 'svql_*/Cargo.toml' \
+    --include 'svql_subgraph/Cargo.toml' \
     --header-base-level 2 \
     --section "examples=Examples" \
     --section "prjunnamed/netlist=Netlist" \

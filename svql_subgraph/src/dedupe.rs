@@ -15,7 +15,7 @@ pub(crate) struct SigPart {
 // Alias to simplify clippy::type_complexity in dedupe signatures
 type SigBoundary = Vec<SigPart>;
 
-pub(crate) fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigBoundary {
+pub(crate) fn signature_with_boundary(m: &SubgraphMatch) -> SigBoundary {
     let gates = m.cell_mapping.iter().map(|(p, d)| SigPart {
         role: 0,
         p_idx: p.debug_index(),
@@ -40,7 +40,7 @@ pub(crate) fn signature_with_boundary<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SigB
     sig
 }
 
-pub(crate) fn signature_mapped_gate_set<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> Vec<usize> {
+pub(crate) fn signature_mapped_gate_set(m: &SubgraphMatch) -> Vec<usize> {
     let mut sig: Vec<usize> = m.cell_mapping.values().map(|d| d.debug_index()).collect();
     sig.sort_unstable();
     sig.dedup();
