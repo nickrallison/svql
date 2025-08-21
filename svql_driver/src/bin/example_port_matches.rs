@@ -1,4 +1,4 @@
-use svql_driver::driver::{DesignKey, Driver};
+use svql_driver::driver::Driver;
 use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,14 +9,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let driver = Driver::new_workspace().unwrap();
 
     let haystack_path = "examples/fixtures/basic/ff/verilog/seq_sdffe.v";
-    let haystack_key = DesignKey::new(haystack_path.to_string(), "seq_sdffe".to_string()).unwrap();
-    let haystack = driver.get(&haystack_key)?;
+    let haystack_module_name = "seq_sdffe";
+
+    let haystack = driver.get(haystack_path, haystack_module_name.to_string())?;
 
     let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
-    let needle_key = DesignKey::new(needle_path.to_string(), "sdffe".to_string()).unwrap();
-    let needle = driver
-        .get(&needle_key)
-        .expect("Failed to read input design");
+    let needle_module_name = "sdffe";
+
+    let needle = driver.get(needle_path, needle_module_name.to_string())?;
 
     let config = Config::builder().exact_length().none().build();
 

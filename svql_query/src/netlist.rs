@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use svql_driver::{context::Context, prelude::Driver};
 use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
 
@@ -27,18 +29,30 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
     fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
 
     fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
+        haystack_path: &Path,
+        haystack_module_name: &str,
+        context: &Context,
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
-        find_subgraphs(pattern.design_as_ref(), haystack.design_as_ref(), config)
+        let pattern = context.get_pattern(haystack_module_name);
+
+        find_subgraphs(pattern_path, haystack_path, config)
             .iter()
             .map(|m| Self::from_subgraph(m, path.clone()))
             .collect()
     }
 
+    fn query_top<'p, 'd>(
+        haystack_path: &Path,
+        haystack_module_name: &str,
+        path: Instance,
+        config: &Config,
+    ) -> Vec<Self::Hit<'p, 'd>> {
+        // prepare context, and then call query
+    }
+
     fn context(&self, driver: &Driver) -> &Context {
-        d
+        todo!()
     }
 }
