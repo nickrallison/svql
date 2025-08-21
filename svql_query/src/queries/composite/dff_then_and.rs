@@ -82,6 +82,12 @@ impl SearchableComposite for SdffeThenAnd<Search> {
         let sdffe_matches = Sdffe::<Search>::query(haystack_key, context, path.clone(), config);
         let and_matches = AndGate::<Search>::query(haystack_key, context, path.clone(), config);
 
+        println!(
+            "SdffeThenAnd::query: sdffe_matches={}, and_matches={}",
+            sdffe_matches.len(),
+            and_matches.len()
+        );
+
         // Create composite instances
         let mut composites = Vec::new();
 
@@ -138,14 +144,6 @@ mod tests {
         let config = Config::builder().exact_length().none().build();
 
         let context = context.with_design(haystack_key.clone(), haystack.clone());
-
-        // run composite query
-        // fn query<'ctx>(
-        //     haystack_key: &DriverKey,
-        //     context: &'ctx Context,
-        //     path: Instance,
-        //     config: &Config,
-        // ) -> Vec<Self::Hit<'ctx, 'ctx>>;
 
         let hits = SdffeThenAnd::<Search>::query(&haystack_key, &context, root, &config);
 
