@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use prjunnamed_netlist::{Cell, Design, Net, Value};
 
@@ -50,17 +50,21 @@ impl MatchBinding for SimpleMatchBinding {
     }
 }
 
-pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBinding {
+pub fn binding_from_subgraph(
+    m: &SubgraphMatch,
+    pattern: &Design,
+    design: &Design,
+) -> SimpleMatchBinding {
     let mut inputs: HashMap<(String, usize), NetId> = HashMap::new();
     let mut outputs: HashMap<(String, usize), NetId> = HashMap::new();
 
     for ic in &m.pat_input_cells {
-        if let Some(name) = ic.maybe_name() {
+        if let Some(name) = input_name(ic, pattern) {
             // Pull bit width from the Cell::Input value
-            let width = port_width_from_input(&ic.cref.get());
+            let width = port_width_from_input(get_cell_ref(ic, pattern).get().as_ref());
             for bit in 0..width {
                 if let Some((d_cell, d_bit)) = m.design_source_of_input_bit(name, bit) {
-                    let net = d_cell.output()[d_bit];
+                    let net = get_cell_output(&d_cell, design)[d_bit];
                     inputs.insert((name.to_string(), bit), NetId(net));
                 }
             }
@@ -68,11 +72,11 @@ pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBi
     }
 
     for oc in &m.pat_output_cells {
-        if let Some(name) = oc.maybe_name() {
-            let width = port_width_from_output(&oc.cref.get());
+        if let Some(name) = output_name(oc, pattern) {
+            let width = port_width_from_output(get_cell_ref(oc, pattern).get().as_ref());
             for bit in 0..width {
                 if let Some((d_cell, d_bit)) = m.design_driver_of_output_bit(name, bit) {
-                    let net = d_cell.output()[d_bit];
+                    let net = get_cell_output(&d_cell, design)[d_bit];
                     outputs.insert((name.to_string(), bit), NetId(net));
                 }
             }
@@ -80,6 +84,27 @@ pub fn binding_from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>) -> SimpleMatchBi
     }
 
     SimpleMatchBinding { inputs, outputs }
+}
+
+fn get_cell_ref<'a>(
+    cell: &svql_subgraph::CellWrapper,
+    design: &'a Design,
+) -> prjunnamed_netlist::CellRef<'a> {
+    cell.try_into_valid_cell_wrapper_unchecked(design).cref()
+}
+
+fn input_name<'a>(cell: &svql_subgraph::CellWrapper, design: &'a Design) -> Option<&'a str> {
+    match get_cell_ref(cell, design).get() {
+        Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+fn output_name<'a>(cell: &svql_subgraph::CellWrapper, design: &'a Design) -> Option<&'a str> {
+    match get_cell_ref(cell, design).get() {
+        Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+        _ => None,
+    }
 }
 
 fn port_width_from_input(cell: &Cell) -> usize {
@@ -100,11 +125,17 @@ fn value_width(v: &Value) -> usize {
     v.iter().count()
 }
 
+fn get_cell_output(cell: &svql_subgraph::CellWrapper, design: &Design) -> Value {
+    get_cell_ref(cell, design).output()
+}
+
 pub fn find_bindings(
     pattern: &Design,
     design: &Design,
     config: &svql_subgraph::config::Config,
 ) -> Vec<SimpleMatchBinding> {
     let all = svql_subgraph::find_subgraphs(pattern, design, config);
-    all.iter().map(binding_from_subgraph).collect()
+    all.iter()
+        .map(|m| binding_from_subgraph(m, pattern, design))
+        .collect()
 }

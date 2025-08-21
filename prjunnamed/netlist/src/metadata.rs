@@ -7,7 +7,6 @@
 use indexmap::IndexSet;
 use std::{
     borrow::Cow,
-    cell::Ref,
     collections::BTreeSet,
     fmt::{Debug, Display},
     hash::Hash,

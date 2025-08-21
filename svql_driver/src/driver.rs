@@ -75,6 +75,8 @@ impl Driver {
         } else {
             self.workspace.join(path)
         };
+
+        let design_path_buf = design_path_buf.canonicalize()?;
         let design_path = DesignPath::new(design_path_buf.clone())
             .map_err(|e| format!("Failed to create design path: {}", e))?;
 
@@ -110,6 +112,7 @@ impl Driver {
             .registry
             .write()
             .map_err(|e| format!("registry write lock poisoned: {}", e))?;
+        trace!("Inserting design into registry: {:?}", key);
         guard.insert(key.clone(), Arc::new(design));
         Ok(())
     }
@@ -156,6 +159,7 @@ impl Driver {
         path: &Path,
         module_name: &str,
     ) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
+        let path = path.canonicalize()?;
         let key = DesignKey {
             path: DesignPath::new(path.to_path_buf())
                 .map_err(|e| format!("bad design path: {}", e))?,

@@ -248,15 +248,8 @@ pub(crate) enum Source {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CellPins<'a> {
+pub(crate) struct CellPins {
     pub(crate) inputs: Vec<Source>,
-    design: &'a Design,
-}
-
-impl<'a> CellPins<'a> {
-    pub(crate) fn design(&self) -> &'a Design {
-        self.design
-    }
 }
 
 pub(crate) fn is_gate_cell_ref(c: CellRef<'_>) -> bool {
@@ -301,13 +294,13 @@ pub(crate) fn output_name<'p>(
     }
 }
 
-pub(crate) fn extract_pins<'a>(cref: CellWrapper, design: &'a Design) -> CellPins<'a> {
+pub(crate) fn extract_pins(cref: CellWrapper, design: &Design) -> CellPins {
     let cell_ref = cref.cref.try_into_cell_ref_unchecked(design);
     let mut inputs: Vec<Source> = Vec::new();
     cell_ref.visit(|net| {
         inputs.push(net_to_source(design, net));
     });
-    CellPins { inputs, design }
+    CellPins { inputs }
 }
 
 fn net_to_source(design: &Design, net: Net) -> Source {

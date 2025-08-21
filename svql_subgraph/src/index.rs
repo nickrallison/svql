@@ -17,7 +17,7 @@ pub(super) struct KindNodes {
 pub(super) struct Index<'a> {
     nodes: Vec<CellWrapper>,
     kinds: Vec<CellKind>,
-    pins: Vec<CellPins<'a>>,
+    pins: Vec<CellPins>,
     by_kind: HashMap<CellKind, Vec<NodeId>>,
     // Key by debug_index to avoid interior mutability key lint.
     cell_to_id: HashMap<usize, NodeId>,
