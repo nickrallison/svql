@@ -1,5 +1,9 @@
 # svql
 
+## Purpose
+
+svql (SystemVerilog Query Language) is a hardware analysis tool designed for linting and code searching in Verilog designs. It provides pattern matching capabilities to identify specific circuit structures within larger designs using subgraph isomorphism algorithms. The tool enables users to build composable queries that can search for hardware patterns, making it useful for design verification, security analysis, and code comprehension tasks.
+
 ## Brain Thoughts
 
 Above is a project being created to work as a verilog linter / code search tool. It is presently cut up into the following crates

@@ -1,4 +1,0 @@
-read_rtlil examples/larger_designs/opentitan_otbn.il
-hierarchy -top otbn_core
-proc; flatten; opt_clean
-svql_driver -net -port 9999
