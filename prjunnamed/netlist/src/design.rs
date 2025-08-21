@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, btree_map};
 use std::fmt::Display;
-use std::hash::Hash;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, Range};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
@@ -647,6 +647,60 @@ impl<'a> CellRef<'a> {
     /// Returns a reference to the underlying [`Design`].
     pub fn design(self) -> &'a Design {
         self.design
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CellHash {
+    index: usize,
+    design_hash: u64,
+}
+
+impl CellHash {
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn design_hash(&self) -> u64 {
+        self.design_hash
+    }
+
+    pub fn try_into_cell_ref<'a>(
+        self,
+        design: &'a Design,
+    ) -> Result<CellRef<'a>, Box<dyn std::error::Error>> {
+        let expected_hash = calculate_hash(design);
+        let actual_hash = self.design_hash;
+        if expected_hash == actual_hash && self.index < design.cells.len() {
+            Ok(CellRef {
+                design,
+                index: self.index,
+            })
+        } else {
+            Err("Invalid CellHash".into())
+        }
+    }
+}
+
+impl Into<CellHash> for CellRef<'_> {
+    fn into(self) -> CellHash {
+        CellHash {
+            index: self.index,
+            design_hash: calculate_hash(&self.design),
+        }
+    }
+}
+
+fn calculate_hash(design: &Design) -> u64 {
+    let mut s = DefaultHasher::new();
+    design.hash(&mut s);
+    s.finish()
+}
+
+impl Hash for Design {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ios.hash(state);
+        self.cells.hash(state);
     }
 }
 
