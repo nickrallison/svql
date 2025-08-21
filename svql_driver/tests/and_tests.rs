@@ -2,17 +2,40 @@ mod integration_tests {
     #[cfg(test)]
     mod and {
 
+        use std::path::PathBuf;
+        use std::sync::Arc;
+
+        use prjunnamed_netlist::Design;
         use rstest::rstest;
         use svql_driver::prelude::{DesignKey, Driver};
         use svql_driver::util::new_shared_driver;
 
         lazy_static::lazy_static! {
             static ref DRIVER: Driver = new_shared_driver().unwrap();
+            static ref WORKSPACE: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
 
-            static ref AND_Q_DOUBLE_SDFFE: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v").unwrap();
-            static ref AND_GATE: DesignKey = DRIVER.ensure_loaded("examples/patterns/basic/and/verilog/and_gate.v").unwrap();
-            static ref AND_TREE: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/and/verilog/and_tree.v").unwrap();
-            static ref AND_SEQ: DesignKey = DRIVER.ensure_loaded("examples/fixtures/basic/and/verilog/and_seq.v").unwrap();
+
+            static ref AND_Q_DOUBLE_SDFFE: (Arc<Design>, PathBuf) = (
+                DRIVER.get_by_path(
+                    &WORKSPACE.join("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v"),
+                    "and_q_double_sdffe",
+                ).unwrap(),
+                WORKSPACE.join("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v"));
+
+            static ref AND_GATE: (Arc<Design>, PathBuf) = (DRIVER.get_by_path(
+                &WORKSPACE.join("examples/patterns/basic/and/verilog/and_gate.v"),
+                "and_gate",
+            ).unwrap(), WORKSPACE.join("examples/patterns/basic/and/verilog/and_gate.v"));
+
+            static ref AND_TREE: (Arc<Design>, PathBuf) = (DRIVER.get_by_path(
+                &WORKSPACE.join("examples/fixtures/basic/and/verilog/and_tree.v"),
+                "and_tree",
+            ).unwrap(), WORKSPACE.join("examples/fixtures/basic/and/verilog/and_tree.v"));
+
+            static ref AND_SEQ: (Arc<Design>, PathBuf) = (DRIVER.get_by_path(
+                &WORKSPACE.join("examples/fixtures/basic/and/verilog/and_seq.v"),
+                "and_seq",
+            ).unwrap(), WORKSPACE.join("examples/fixtures/basic/and/verilog/and_seq.v"));
 
             static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::builder()
                 .match_length(false)
@@ -22,35 +45,31 @@ mod integration_tests {
 
         #[rstest]
         // AND_Q_DOUBLE_SDFFE Needle
-        #[case(&*AND_Q_DOUBLE_SDFFE, &*AND_Q_DOUBLE_SDFFE, 2)]
-        #[case(&*AND_Q_DOUBLE_SDFFE, &*AND_GATE, 0)]
-        #[case(&*AND_Q_DOUBLE_SDFFE, &*AND_TREE, 0)]
-        #[case(&*AND_Q_DOUBLE_SDFFE, &*AND_SEQ, 0)]
+        #[case(AND_Q_DOUBLE_SDFFE, AND_Q_DOUBLE_SDFFE, 2)]
+        #[case(AND_Q_DOUBLE_SDFFE, AND_GATE, 0)]
+        #[case(AND_Q_DOUBLE_SDFFE, AND_TREE, 0)]
+        #[case(AND_Q_DOUBLE_SDFFE, AND_SEQ, 0)]
         // AND_GATE Needle
-        #[case(&*AND_GATE, &*AND_Q_DOUBLE_SDFFE, 1)]
-        #[case(&*AND_GATE, &*AND_GATE, 1)]
-        #[case(&*AND_GATE, &*AND_TREE, 7)]
-        #[case(&*AND_GATE, &*AND_SEQ, 7)]
+        #[case(AND_GATE, AND_Q_DOUBLE_SDFFE, 1)]
+        #[case(AND_GATE, AND_GATE, 1)]
+        #[case(AND_GATE, AND_TREE, 7)]
+        #[case(AND_GATE, AND_SEQ, 7)]
         // AND_TREE Needle
-        #[case(&*AND_TREE, &*AND_Q_DOUBLE_SDFFE, 0)]
-        #[case(&*AND_TREE, &*AND_GATE, 0)]
-        #[case(&*AND_TREE, &*AND_TREE, 1)]
-        #[case(&*AND_TREE, &*AND_SEQ, 0)]
+        #[case(AND_TREE, AND_Q_DOUBLE_SDFFE, 0)]
+        #[case(AND_TREE, AND_GATE, 0)]
+        #[case(AND_TREE, AND_TREE, 1)]
+        #[case(AND_TREE, AND_SEQ, 0)]
         // AND_SEQ Needle
-        #[case(&*AND_SEQ, &*AND_Q_DOUBLE_SDFFE, 0)]
-        #[case(&*AND_SEQ, &*AND_GATE, 0)]
-        #[case(&*AND_SEQ, &*AND_TREE, 0)]
-        #[case(&*AND_SEQ, &*AND_SEQ, 1)]
+        #[case(AND_SEQ, AND_Q_DOUBLE_SDFFE, 0)]
+        #[case(AND_SEQ, AND_GATE, 0)]
+        #[case(AND_SEQ, AND_TREE, 0)]
+        #[case(AND_SEQ, AND_SEQ, 1)]
         fn test_subgraph_matches(
-            #[case] needle: &'static DesignKey,
-            #[case] haystack: &'static DesignKey,
+            #[case] needle: &(Arc<Design>, PathBuf),
+            #[case] haystack: &(Arc<Design>, PathBuf),
             #[case] expected: usize,
         ) {
-            let pat_arc = DRIVER.get(needle).expect("pattern present");
-            let hay_arc = DRIVER.get(haystack).expect("haystack present");
-
-            let matches =
-                svql_subgraph::find_subgraphs(pat_arc.as_ref(), hay_arc.as_ref(), &CONFIG);
+            let matches = svql_subgraph::find_subgraphs(needle, haystack, &CONFIG);
 
             assert_eq!(
                 matches.len(),
