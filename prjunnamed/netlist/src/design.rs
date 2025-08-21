@@ -650,7 +650,7 @@ impl<'a> CellRef<'a> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CellHash {
     index: usize,
     design_hash: u64,
