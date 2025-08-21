@@ -1,44 +1,25 @@
-use log::trace;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+use std::{collections::HashMap, path::Path};
+
 use prjunnamed_netlist::Design;
-use std::{
-    collections::HashMap,
-    fmt,
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
 
-use crate::{key::DesignKey, util::run_yosys_cmd};
-
-/// A shared registry of loaded designs keyed by (path, top-module).
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Driver {
-    registry: Arc<RwLock<HashMap<DesignKey, Arc<Design>>>>,
-    yosys: PathBuf,
-    root: PathBuf,
-}
-
-impl std::fmt::Debug for Driver {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let guard = self.registry.read().unwrap();
-        f.debug_struct("Driver")
-            .field("entries", &guard.len())
-            .field("yosys", &self.yosys)
-            .field("root", &self.root)
-            .finish()
-    }
+    registry: Arc<RwLock<HashMap<DriverKey, Arc<Design>>>>,
+    yosys_path: std::path::PathBuf,
+    root_path: std::path::PathBuf,
 }
 
 impl Driver {
-    // #####################
-    // Constructors
-    // #####################
-    pub fn new(root: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn std::error::Error>> {
         let yosys =
             which::which("yosys").map_err(|e| format!("Failed to find yosys binary: {}", e))?;
+
         Ok(Self {
-            registry: Arc::new(RwLock::new(HashMap::new())),
-            yosys,
-            root,
+            registry: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            yosys_path: yosys,
+            root_path: std::fs::canonicalize(root.as_ref())?,
         })
     }
 
@@ -47,98 +28,30 @@ impl Driver {
         Self::new(workspace)
     }
 
-    pub fn with_yosys(root: PathBuf, yosys: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        if !yosys.exists() {
-            return Err(format!("Yosys binary not found at: {}", yosys.display()).into());
+    pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
+        root: P,
+        yosys: Y,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let yosys_path = yosys.as_ref().to_path_buf();
+        if !yosys_path.exists() {
+            return Err(format!("Yosys binary not found at: {}", yosys_path.display()).into());
         }
 
-        let root = if root.is_absolute() {
-            root
-        } else {
-            std::env::current_dir()?.join(root)
-        };
-        let root = root.canonicalize()?;
-
         Ok(Self {
-            registry: Arc::new(RwLock::new(HashMap::new())),
-            yosys,
-            root,
+            registry: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            yosys_path,
+            root_path: std::fs::canonicalize(root.as_ref())?,
         })
     }
 
-    // ################
-    // Ensure the design is loaded
-    // ################
+    // #####################
+    // methods to manage designs
+    // #####################
 
-    fn ensure(&self, key: &DesignKey) -> Result<(), Box<dyn std::error::Error>> {
-        {
-            if self.registry.read().unwrap().contains_key(&key) {
-                return Ok(());
-            }
-            // drop guard and run yosys
-        }
-
-        trace!(
-            "Loading design via Yosys: path={} top={}",
-            key.path.path().display(),
-            &key.top
-        );
-
-        let design = run_yosys_cmd(&self.yosys, &key.path, &key.top)?;
-        let mut guard = self.registry.write().unwrap();
-        guard.insert(key.clone(), Arc::new(design));
-        Ok(())
-    }
-
-    // ##################
-    // Get a design from the registry
-    // ##################
-    pub fn get<P: Into<PathBuf>>(
-        &self,
-        path: P,
-        module_name: String,
-    ) -> Result<Arc<Design>, Box<dyn std::error::Error>> {
-        let key = DesignKey::new(path.into(), module_name)?.normalize(&self.root)?;
-        self.ensure_loaded(&key)?;
-
-        match self.registry.read() {
-            Ok(guard) => {
-                let opt_design = guard.get(&key).cloned();
-                opt_design.ok_or_else(|| format!("Design not found in registry: {}", key).into())
-            }
-            Err(e) => {
-                return Err(format!("Failed to read registry: {}", e).into());
-            }
-        }
-    }
+    // TBD
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_design_path_new() {
-        let verilog_path = PathBuf::from("examples/patterns/basic/ff/verilog/sdffe.v");
-        let rtlil_path = PathBuf::from("examples/patterns/basic/ff/sdffe.il");
-        let json_path = PathBuf::from("examples/patterns/basic/ff/sdffe.json");
-        let unsupported_path = PathBuf::from("examples/patterns/basic/ff/sdffe.txt");
-
-        assert!(DesignPath::new(verilog_path).is_ok());
-        assert!(DesignPath::new(rtlil_path).is_ok());
-        assert!(DesignPath::new(json_path).is_ok());
-        assert!(DesignPath::new(unsupported_path).is_err());
-    }
-
-    #[test]
-    fn test_run_yosys_cmd_via_driver() {
-        let driver = Driver::new_workspace().unwrap();
-        let path = "examples/patterns/basic/ff/verilog/sdffe.v".to_string();
-        let module_name = "sdffe".to_string();
-
-        let d = driver
-            .get(&path, module_name)
-            .expect("design must be present");
-        assert!(d.iter_cells().count() > 0);
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DriverKey {
+    // TBD
 }

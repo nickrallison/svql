@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use svql_driver::{context::Context, prelude::Driver};
+use svql_driver::{Driver, context::Context};
 use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
 
 use crate::instance::Instance;
@@ -28,22 +28,24 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
 
+    #[allow(unreachable_code)]
     fn query<'p, 'd>(
-        haystack_path: &Path,
-        haystack_module_name: &str,
-        context: &Context,
-        path: Instance,
-        config: &Config,
+        _haystack_path: &Path,
+        _haystack_module_name: &str,
+        _context: &Context,
+        _path: Instance,
+        _config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
-        let pattern = context.get_ref(path)
+        let _needle = todo!("Get needle_path from context");
+        let _haystack = todo!("Get haystack_path from context");
 
-        find_subgraphs(pattern_path, haystack_path, config)
+        find_subgraphs(_needle, _haystack, _config)
             .iter()
-            .map(|m| Self::from_subgraph(m, path.clone()))
+            .map(|m| Self::from_subgraph(m, _path.clone()))
             .collect()
     }
 
-    fn context(&self, driver: &Driver) -> Context {
-        todo!()
+    fn context(_driver: &Driver) -> Context {
+        todo!("Get context from driver, return single context item containing self")
     }
 }
