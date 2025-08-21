@@ -45,39 +45,40 @@ mod integration_tests {
 
         #[rstest]
         // AND_Q_DOUBLE_SDFFE Needle
-        #[case(AND_Q_DOUBLE_SDFFE, AND_Q_DOUBLE_SDFFE, 2)]
-        #[case(AND_Q_DOUBLE_SDFFE, AND_GATE, 0)]
-        #[case(AND_Q_DOUBLE_SDFFE, AND_TREE, 0)]
-        #[case(AND_Q_DOUBLE_SDFFE, AND_SEQ, 0)]
+        #[case(&AND_Q_DOUBLE_SDFFE, &AND_Q_DOUBLE_SDFFE, 2)]
+        #[case(&AND_Q_DOUBLE_SDFFE, &AND_GATE, 0)]
+        #[case(&AND_Q_DOUBLE_SDFFE, &AND_TREE, 0)]
+        #[case(&AND_Q_DOUBLE_SDFFE, &AND_SEQ, 0)]
         // AND_GATE Needle
-        #[case(AND_GATE, AND_Q_DOUBLE_SDFFE, 1)]
-        #[case(AND_GATE, AND_GATE, 1)]
-        #[case(AND_GATE, AND_TREE, 7)]
-        #[case(AND_GATE, AND_SEQ, 7)]
+        #[case(&AND_GATE, &AND_Q_DOUBLE_SDFFE, 1)]
+        #[case(&AND_GATE, &AND_GATE, 1)]
+        #[case(&AND_GATE, &AND_TREE, 7)]
+        #[case(&AND_GATE, &AND_SEQ, 7)]
         // AND_TREE Needle
-        #[case(AND_TREE, AND_Q_DOUBLE_SDFFE, 0)]
-        #[case(AND_TREE, AND_GATE, 0)]
-        #[case(AND_TREE, AND_TREE, 1)]
-        #[case(AND_TREE, AND_SEQ, 0)]
+        #[case(&AND_TREE, &AND_Q_DOUBLE_SDFFE, 0)]
+        #[case(&AND_TREE, &AND_GATE, 0)]
+        #[case(&AND_TREE, &AND_TREE, 1)]
+        #[case(&AND_TREE, &AND_SEQ, 0)]
         // AND_SEQ Needle
-        #[case(AND_SEQ, AND_Q_DOUBLE_SDFFE, 0)]
-        #[case(AND_SEQ, AND_GATE, 0)]
-        #[case(AND_SEQ, AND_TREE, 0)]
-        #[case(AND_SEQ, AND_SEQ, 1)]
+        #[case(&AND_SEQ, &AND_Q_DOUBLE_SDFFE, 0)]
+        #[case(&AND_SEQ, &AND_GATE, 0)]
+        #[case(&AND_SEQ, &AND_TREE, 0)]
+        #[case(&AND_SEQ, &AND_SEQ, 1)]
         fn test_subgraph_matches(
             #[case] needle: &(Arc<Design>, PathBuf),
             #[case] haystack: &(Arc<Design>, PathBuf),
             #[case] expected: usize,
         ) {
-            let matches = svql_subgraph::find_subgraphs(needle, haystack, &CONFIG);
+            let matches =
+                svql_subgraph::find_subgraphs(needle.0.as_ref(), haystack.0.as_ref(), &CONFIG);
 
             assert_eq!(
                 matches.len(),
                 expected,
                 "Expected {} matches for needle {}, against haystack {}, got {}",
                 expected,
-                needle.top,
-                haystack.top,
+                needle.1.display(),
+                haystack.1.display(),
                 matches.len()
             );
         }
