@@ -680,6 +680,13 @@ impl CellHash {
             Err("Invalid CellHash".into())
         }
     }
+
+    pub fn try_into_cell_ref_unchecked<'a>(self, design: &'a Design) -> CellRef<'a> {
+        CellRef {
+            design,
+            index: self.index,
+        }
+    }
 }
 
 impl Into<CellHash> for CellRef<'_> {
