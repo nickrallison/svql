@@ -1,4 +1,4 @@
-use svql_driver::context::Context;
+use svql_driver::{context::Context, driver::Driver};
 
 use crate::{Connection, Match, Search, State, WithPath};
 
@@ -31,7 +31,9 @@ where
 pub trait SearchableComposite: Composite<Search> {
     type Hit<'p, 'd>;
 
-    fn context(&self) -> &Context;
+    fn context(&self, driver: &Driver) -> Context {
+        todo!()
+    }
 }
 
 /// Matched/instantiated composite payload, with validation helpers.

@@ -1,13 +1,14 @@
-pub mod api;
-// pub mod cache;
+// svql_driver/src/lib.rs
 pub mod context;
-pub mod driver;
-pub mod util;
+mod key;
+pub mod manager;
+mod util;
 
-pub mod prelude {
-    pub use crate::driver::Driver;
-    pub use svql_subgraph::SubgraphMatch;
-}
+pub use context::QueryContext;
+pub use manager::DesignManager;
+
+// Convenience re-exports
+pub use prjunnamed_netlist::Design;
 
 #[cfg(test)]
 mod tests {

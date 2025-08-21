@@ -35,7 +35,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'p, 'd>> {
-        let pattern = context.get_pattern(haystack_module_name);
+        let pattern = context.get_ref(path)
 
         find_subgraphs(pattern_path, haystack_path, config)
             .iter()
@@ -43,16 +43,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .collect()
     }
 
-    fn query_top<'p, 'd>(
-        haystack_path: &Path,
-        haystack_module_name: &str,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<Self::Hit<'p, 'd>> {
-        // prepare context, and then call query
-    }
-
-    fn context(&self, driver: &Driver) -> &Context {
+    fn context(&self, driver: &Driver) -> Context {
         todo!()
     }
 }

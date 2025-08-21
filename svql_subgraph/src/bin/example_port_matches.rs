@@ -1,4 +1,3 @@
-use svql_driver::driver::Driver;
 use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -6,21 +5,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let driver = Driver::new_workspace().unwrap();
-
     let haystack_path = "examples/fixtures/basic/ff/verilog/seq_sdffe.v";
-    let haystack_module_name = "seq_sdffe";
-
-    let haystack = driver.get(haystack_path, haystack_module_name.to_string())?;
+    let haystack = svql_subgraph::util::load_design_from(haystack_path)?;
 
     let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
-    let needle_module_name = "sdffe";
-
-    let needle = driver.get(needle_path, needle_module_name.to_string())?;
+    let needle = svql_subgraph::util::load_design_from(needle_path)?;
 
     let config = Config::builder().exact_length().none().build();
-
-    let search_results = find_subgraphs(needle.as_ref(), haystack.as_ref(), &config);
+    
+    let search_results = find_subgraphs(&needle, &haystack, &config);
 
     // Every match should resolve both d (input) and q (output) via O(1) helpers
     for m in search_results.iter() {
