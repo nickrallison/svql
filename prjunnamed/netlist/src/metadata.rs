@@ -7,10 +7,10 @@
 use indexmap::IndexSet;
 use std::{
     borrow::Cow,
-    cell::Ref,
     collections::BTreeSet,
     fmt::{Debug, Display},
     hash::Hash,
+    sync::Arc,
 };
 
 use crate::{Design, ParamValue};
@@ -125,8 +125,8 @@ enum MetaItemRepr {
 
 #[derive(Clone, Debug)]
 pub struct MetadataStore {
-    strings: IndexSet<String>,
-    items: IndexSet<MetaItemRepr>,
+    strings: IndexSet<Arc<str>>,
+    items: IndexSet<Arc<MetaItemRepr>>,
 }
 
 #[derive(Clone, Copy)]
@@ -239,8 +239,8 @@ impl MetaItemIndex {
 impl MetadataStore {
     pub(crate) fn new() -> Self {
         Self {
-            strings: IndexSet::from(["".to_owned()]),
-            items: IndexSet::from([MetaItemRepr::None]),
+            strings: IndexSet::from(["".into()]),
+            items: IndexSet::from([Arc::new(MetaItemRepr::None)]),
         }
     }
 
@@ -300,7 +300,7 @@ impl MetadataStore {
                 value: value.clone(),
             },
         };
-        MetaItemIndex(self.items.insert_full(repr).0)
+        MetaItemIndex(self.items.insert_full(Arc::new(repr)).0)
     }
 
     pub(crate) fn ref_item<'a>(&self, design: &'a Design, index: MetaItemIndex) -> MetaItemRef<'a> {
@@ -327,13 +327,13 @@ impl<'a> MetaStringRef<'a> {
         self.index == MetaStringIndex::EMPTY
     }
 
-    pub fn get(&self) -> Cow<'a, str> {
+    pub fn get(&self) -> Arc<str> {
         let store = self.design.metadata();
-        let s = store
+        store
             .strings
             .get_index(self.index.0)
-            .expect("invalid metadata string reference");
-        Cow::Owned(s.clone())
+            .expect("invalid metadata string reference")
+            .clone()
     }
 }
 
@@ -346,13 +346,13 @@ impl<'a> MetaItemRef<'a> {
         self.index == MetaItemIndex::NONE
     }
 
-    fn get_repr(&self) -> Cow<'a, MetaItemRepr> {
+    fn get_repr(&self) -> Arc<MetaItemRepr> {
         let store = self.design.metadata();
-        let meta = store
+        store
             .items
             .get_index(self.index.0)
-            .expect("invalid metadata item reference");
-        Cow::Owned(meta.clone())
+            .expect("invalid metadata item reference")
+            .clone()
     }
 
     pub fn get(&self) -> MetaItem<'a> {

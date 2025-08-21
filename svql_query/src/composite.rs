@@ -1,3 +1,5 @@
+use svql_driver::context::Context;
+
 use crate::{Connection, Match, Search, State, WithPath};
 
 /// A composite is a tree of sub-queries (netlists or other composites) and a set of
@@ -28,6 +30,8 @@ where
 /// inherent fn query(...) that takes the needed pattern drivers and a haystack.
 pub trait SearchableComposite: Composite<Search> {
     type Hit<'p, 'd>;
+
+    fn context(&self) -> &Context;
 }
 
 /// Matched/instantiated composite payload, with validation helpers.

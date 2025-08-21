@@ -1,4 +1,4 @@
-use svql_driver::prelude::Driver;
+use svql_driver::{context::Context, prelude::Driver};
 use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
 
 use crate::instance::Instance;
@@ -26,18 +26,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
 
-    /// Default query that preserves existing behavior (superset arity + Full dedupe).
     fn query<'p, 'd>(
-        pattern: &'p Driver,
-        haystack: &'d Driver,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<Self::Hit<'p, 'd>> {
-        Self::query_with_config(pattern, haystack, path, config)
-    }
-
-    /// New helper to allow callers to select arity and dedupe policy.
-    fn query_with_config<'p, 'd>(
         pattern: &'p Driver,
         haystack: &'d Driver,
         path: Instance,
@@ -47,5 +36,9 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .iter()
             .map(|m| Self::from_subgraph(m, path.clone()))
             .collect()
+    }
+
+    fn context(&self, driver: &Driver) -> &Context {
+        d
     }
 }

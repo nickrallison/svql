@@ -1,4 +1,4 @@
-use svql_driver::{cache::Cache, util::load_driver_cached};
+use svql_driver::driver::{DesignKey, Driver};
 use svql_subgraph::{config::Config, find_subgraphs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -6,21 +6,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let mut cache = Cache::new();
+    let driver = Driver::new_workspace().unwrap();
 
     let haystack_path = "examples/fixtures/basic/ff/verilog/seq_sdffe.v";
-    let haystack_driver = load_driver_cached(haystack_path, &mut cache)?;
+    let haystack_key = DesignKey::new(haystack_path.to_string(), "seq_sdffe".to_string()).unwrap();
+    let haystack = driver.get(&haystack_key)?;
 
     let needle_path = "examples/patterns/basic/ff/verilog/sdffe.v";
-    let needle_driver = load_driver_cached(needle_path, &mut cache)?;
+    let needle_key = DesignKey::new(needle_path.to_string(), "sdffe".to_string()).unwrap();
+    let needle = driver
+        .get(&needle_key)
+        .expect("Failed to read input design");
 
     let config = Config::builder().exact_length().none().build();
 
-    let search_results = find_subgraphs(
-        needle_driver.design_as_ref(),
-        haystack_driver.design_as_ref(),
-        &config,
-    );
+    let search_results = find_subgraphs(needle.as_ref(), haystack.as_ref(), &config);
 
     // Every match should resolve both d (input) and q (output) via O(1) helpers
     for m in search_results.iter() {
