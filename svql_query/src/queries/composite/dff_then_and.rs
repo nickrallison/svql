@@ -7,7 +7,7 @@ use crate::{
     composite::{Composite, MatchedComposite, SearchableComposite},
     instance::Instance,
     netlist::SearchableNetlist,
-    queries::netlist::basic::{and::and_gate::AndGate, dff::Sdffe},
+    queries::netlist::basic::{and::AndGate, dff::Sdffe},
 };
 use itertools::iproduct;
 
