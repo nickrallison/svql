@@ -1,4 +1,3 @@
-// svql_query/src/composite.rs
 use log::trace;
 use svql_driver::{DriverKey, context::Context, driver::Driver};
 use svql_subgraph::Config;

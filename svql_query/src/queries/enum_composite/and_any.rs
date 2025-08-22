@@ -7,7 +7,7 @@ use svql_subgraph::Config;
 
 use crate::{
     Match, Search, State, Wire, WithPath,
-    composite::{Composite, MatchedComposite, SearchableComposite},
+    composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
     instance::Instance,
     netlist::SearchableNetlist,
     queries::netlist::basic::and::{self, and_gate::AndGate, and_mux::AndMux, and_nor::AndNor},
@@ -45,19 +45,12 @@ where
 }
 
 // As a simple container, no connections are enforced.
-// This mirrors the Composite trait surface but remains a no-op.
-impl<S> Composite<S> for AndAny<S>
-where
-    S: State,
-{
-    fn connections(&self) -> Vec<Vec<crate::Connection<S>>> {
-        Vec::new()
-    }
-}
+// This mirrors the EnumComposite trait surface but remains a no-op.
+impl<S> EnumComposite<S> for AndAny<S> where S: State {}
 
-impl<'ctx> MatchedComposite<'ctx> for AndAny<Match<'ctx>> {}
+impl<'ctx> MatchedEnumComposite<'ctx> for AndAny<Match<'ctx>> {}
 
-impl SearchableComposite for AndAny<Search> {
+impl SearchableEnumComposite for AndAny<Search> {
     type Hit<'ctx> = AndAny<Match<'ctx>>;
 
     fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
@@ -126,7 +119,7 @@ mod tests {
     use svql_subgraph::{Config, DedupeMode};
 
     use crate::{
-        Search, composite::SearchableComposite, instance::Instance,
+        Search, composite::SearchableEnumComposite, instance::Instance,
         queries::enum_composite::and_any::AndAny,
     };
 
