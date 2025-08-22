@@ -12,7 +12,7 @@ lazy_static.workspace = true
 rstest.workspace = true
 
 [dependencies]
-svql_test_data.workspace = true
+svql_common.workspace = true
 
 thiserror.workspace = true
 log.workspace = true

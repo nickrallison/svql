@@ -11,6 +11,7 @@ rstest.workspace = true
 [dependencies]
 svql_driver.workspace = true
 svql_subgraph.workspace = true
+svql_common.workspace = true
 
 # ---------------------
 serde.workspace = true

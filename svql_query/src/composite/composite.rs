@@ -1,6 +1,6 @@
 use log::trace;
+use svql_common::Config;
 use svql_driver::{DriverKey, context::Context, driver::Driver};
-use svql_subgraph::Config;
 
 use crate::{Connection, Match, Search, State, WithPath, instance::Instance};
 

@@ -1,6 +1,6 @@
 // svql_query/src/queries/composite/dff_then_and.rs
+use svql_common::Config;
 use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::Config;
 
 use crate::{
     Connection, Match, Search, State, WithPath,
@@ -110,8 +110,8 @@ impl SearchableComposite for SdffeThenAnd<Search> {
 
 #[cfg(test)]
 mod tests {
+    use svql_common::Config;
     use svql_driver::Driver;
-    use svql_subgraph::Config;
 
     use crate::{
         Search, composite::SearchableComposite, instance::Instance,

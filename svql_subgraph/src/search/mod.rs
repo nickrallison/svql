@@ -1,7 +1,7 @@
-use crate::config;
 use crate::index::{Index, NodeId};
 use crate::model::{CellWrapper, Source};
 use crate::state::{PatSrcKey, State, check_and_collect_bindings};
+use svql_common::Config;
 
 use super::SubgraphMatch;
 
@@ -15,7 +15,7 @@ pub(super) fn backtrack<'p, 'd>(
     out: &mut Vec<SubgraphMatch<'p, 'd>>,
     pat_inputs: &[CellWrapper<'p>],
     pat_outputs: &[CellWrapper<'p>],
-    config: &config::Config,
+    config: &Config,
 ) {
     if st.done() {
         out.push(st.to_subgraph_match(p_index, d_index, pat_inputs, pat_outputs));
@@ -70,7 +70,7 @@ fn with_mapping<'p, 'd>(
     d_id: NodeId,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
-    config: &config::Config,
+    config: &Config,
     f: impl FnOnce(&mut State<'p, 'd>),
 ) {
     st.map(p_id, d_id);
@@ -86,7 +86,7 @@ pub(super) fn add_bindings_from_pair<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     st: &mut State<'p, 'd>,
-    config: &config::Config,
+    config: &Config,
 ) -> Vec<PatSrcKey<'p>> {
     let mut added = Vec::new();
 
@@ -134,7 +134,7 @@ mod tests {
 
     use prjunnamed_netlist::Design;
 
-    use crate::config::Config;
+    use svql_common::Config;
 
     use super::*;
 

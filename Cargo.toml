@@ -3,7 +3,7 @@ members = [
     "svql_driver",
     "svql_query",
     "svql_subgraph",
-    "svql_test_data",
+    "svql_common",
     ######
     "prjunnamed/netlist",
     "prjunnamed/pattern",
@@ -18,7 +18,7 @@ default-members = [
     "svql_driver",
     "svql_query",
     "svql_subgraph",
-    "svql_test_data",
+    "svql_common",
 ]
 resolver = "3"
 
@@ -26,7 +26,7 @@ resolver = "3"
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
 svql_subgraph = { path = "svql_subgraph" }
-svql_test_data = { path = "svql_test_data" }
+svql_common = { path = "svql_common" }
 
 # ---------------------
 

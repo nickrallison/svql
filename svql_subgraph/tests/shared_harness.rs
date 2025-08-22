@@ -1,88 +1,47 @@
-use rstest::rstest;
-use svql_subgraph::test_support::load_design_from;
-use svql_test_data::TestCase;
-
 #[cfg(test)]
 mod tests {
+    use svql_common::{
+        ALL_TEST_CASES, BASIC_TEST_CASES, COMPOSITE_TEST_CASES, DEDUPE_TEST_CASES,
+        ENUM_COMPOSITE_TEST_CASES,
+    };
+    use svql_subgraph::test_support::load_design_from;
 
-    #[rstest]
-    #[case::and_gate_self(
-        "examples/patterns/basic/and/verilog/and_gate.v",
-        "examples/patterns/basic/and/verilog/and_gate.v",
-        1
-    )]
-    #[case::and_gate_in_and_q_double(
-        "examples/patterns/basic/and/verilog/and_gate.v",
-        "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
-        2
-    )]
-    #[case::and_gate_in_and_tree(
-        "examples/patterns/basic/and/verilog/and_gate.v",
-        "examples/fixtures/basic/and/verilog/and_tree.v",
-        7
-    )]
-    #[case::and_gate_in_and_seq(
-        "examples/patterns/basic/and/verilog/and_gate.v",
-        "examples/fixtures/basic/and/verilog/and_seq.v",
-        7
-    )]
-    #[case::sdffe_self(
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        1
-    )]
-    #[case::sdffe_in_comb_d_double(
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        "examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v",
-        2
-    )]
-    #[case::sdffe_in_and_q_double(
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
-        2
-    )]
-    #[case::sdffe_in_par_double(
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        "examples/fixtures/basic/ff/verilog/par_double_sdffe.v",
-        2
-    )]
-    #[case::sdffe_in_seq_double(
-        "examples/patterns/basic/ff/verilog/sdffe.v",
-        "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
-        2
-    )]
-    fn test_subgraph_matches(
-        #[case] needle_path: &str,
-        #[case] haystack_path: &str,
-        #[case] expected: usize,
-    ) {
-        let needle = load_design_from(needle_path)
-            .expect(&format!("Failed to load needle: {}", needle_path));
-        let haystack = load_design_from(haystack_path)
-            .expect(&format!("Failed to load haystack: {}", haystack_path));
-        let config = svql_subgraph::Config::builder()
-            .exact_length()
-            .none()
-            .build();
-
-        let matches = svql_subgraph::find_subgraphs(&needle, &haystack, &config);
-
-        assert_eq!(
-            matches.len(),
-            expected,
-            "Expected {} matches for needle {}, against haystack {}, got {}",
-            expected,
-            needle_path,
-            haystack_path,
-            matches.len()
-        );
+    #[test]
+    fn test_all_basic_cases() {
+        for test_case in BASIC_TEST_CASES.iter() {
+            run_test_case(test_case);
+        }
     }
 
-    #[rstest]
-    #[case::dedupe_none(&svql_test_data::DEDUPE_TEST_CASES[0])]
-    #[case::dedupe_auto_morph(&svql_test_data::DEDUPE_TEST_CASES[1])]
-    #[case::dedupe_auto_morph_and_mux(&svql_test_data::DEDUPE_TEST_CASES[2])]
-    fn test_dedupe_modes(#[case] test_case: &TestCase) {
+    #[test]
+    fn test_all_dedupe_cases() {
+        for test_case in DEDUPE_TEST_CASES.iter() {
+            run_test_case(test_case);
+        }
+    }
+
+    #[test]
+    fn test_all_composite_cases() {
+        for test_case in COMPOSITE_TEST_CASES.iter() {
+            run_test_case(test_case);
+        }
+    }
+
+    #[test]
+    fn test_all_enum_composite_cases() {
+        for test_case in ENUM_COMPOSITE_TEST_CASES.iter() {
+            run_test_case(test_case);
+        }
+    }
+
+    #[test]
+    fn test_all_cases() {
+        for test_case in ALL_TEST_CASES.iter() {
+            run_test_case(test_case);
+        }
+    }
+
+    fn run_test_case(test_case: &svql_common::TestCase) {
         let needle = load_design_from(test_case.pattern_path).expect(&format!(
             "Failed to load needle: {}",
             test_case.pattern_path

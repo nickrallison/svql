@@ -577,6 +577,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
+name = "svql_common"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "prjunnamed-netlist",
+ "rstest",
+]
+
+[[package]]
 name = "svql_driver"
 version = "0.1.0"
 dependencies = [
@@ -586,6 +595,7 @@ dependencies = [
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
  "rstest",
+ "svql_common",
  "svql_subgraph",
  "tempfile",
  "thiserror",
@@ -605,6 +615,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "svql_common",
  "svql_driver",
  "svql_subgraph",
  "thiserror",
@@ -620,19 +631,10 @@ dependencies = [
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
  "rstest",
- "svql_test_data",
+ "svql_common",
  "tempfile",
  "thiserror",
  "which",
-]
-
-[[package]]
-name = "svql_test_data"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "prjunnamed-netlist",
- "rstest",
 ]
 
 [[package]]

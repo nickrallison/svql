@@ -1,9 +1,5 @@
 // svql_query/src/queries/enum_composite/and_any.rs
 
-
-use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::Config;
-
 use crate::{
     Match, Search, State, Wire, WithPath,
     composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
@@ -11,6 +7,8 @@ use crate::{
     netlist::SearchableNetlist,
     queries::netlist::basic::and::{AndGate, AndMux, AndNor},
 };
+use svql_common::Config;
+use svql_driver::{Context, Driver, DriverKey};
 
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
@@ -102,7 +100,6 @@ impl SearchableEnumComposite for AndAny<Search> {
 
         // Create composite instances
 
-        
         and_gate_matches
             .into_iter()
             .chain(and_mux_matches)
@@ -114,8 +111,8 @@ impl SearchableEnumComposite for AndAny<Search> {
 #[cfg(test)]
 mod tests {
     use log::trace;
+    use svql_common::{Config, DedupeMode};
     use svql_driver::Driver;
-    use svql_subgraph::{Config, DedupeMode};
 
     use crate::{
         Search, composite::SearchableEnumComposite, instance::Instance,

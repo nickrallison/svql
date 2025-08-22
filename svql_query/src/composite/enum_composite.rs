@@ -1,5 +1,5 @@
+use svql_common::Config;
 use svql_driver::{DriverKey, context::Context, driver::Driver};
-use svql_subgraph::Config;
 
 use crate::{Match, Search, State, instance::Instance};
 

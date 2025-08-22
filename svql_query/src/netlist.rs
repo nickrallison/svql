@@ -1,5 +1,6 @@
+use svql_common::Config;
 use svql_driver::{Driver, DriverKey, context::Context};
-use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
+use svql_subgraph::{SubgraphMatch, find_subgraphs};
 
 use crate::instance::Instance;
 

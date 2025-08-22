@@ -1,4 +1,5 @@
-use svql_subgraph::{config::Config, find_subgraphs};
+use svql_common::Config;
+use svql_subgraph::find_subgraphs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
@@ -12,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle = svql_subgraph::util::load_design_from(needle_path)?;
 
     let config = Config::builder().exact_length().none().build();
-    
+
     let search_results = find_subgraphs(&needle, &haystack, &config);
 
     // Every match should resolve both d (input) and q (output) via O(1) helpers

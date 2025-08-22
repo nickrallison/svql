@@ -2,12 +2,12 @@
 mod integration_tests {
     #[cfg(test)]
     mod and_nor {
+        use svql_common::Config;
         use svql_driver::driver::Driver;
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::netlist::SearchableNetlist;
         use svql_query::queries::netlist::basic::and::AndNor;
-        use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {
             static ref DRIVER: Driver = Driver::new_workspace().expect("Failed to create driver");

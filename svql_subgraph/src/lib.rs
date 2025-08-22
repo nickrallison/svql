@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::Design;
 
-pub mod config;
 mod dedupe;
 mod index;
 mod model;
@@ -18,8 +17,8 @@ pub mod util {
 // Test support module (not cfg-gated to keep integration tests working).
 pub mod test_support;
 
-pub use config::{Config, DedupeMode};
 pub use model::CellWrapper;
+use svql_common::{Config, DedupeMode};
 
 use crate::dedupe::{signature_mapped_gate_set, signature_with_boundary};
 use crate::index::Index;
@@ -194,7 +193,7 @@ pub(crate) fn get_pattern_io_cells<'p>(
 mod tests {
     use prjunnamed_netlist::Design;
 
-    use crate::config::{Config, ConfigBuilder, DedupeMode};
+    use svql_common::{Config, ConfigBuilder, DedupeMode};
 
     use super::*;
 

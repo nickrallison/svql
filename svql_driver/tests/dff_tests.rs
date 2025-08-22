@@ -75,7 +75,7 @@ lazy_static::lazy_static! {
         .expect("SDFFE design not found")
         .clone();
 
-    static ref CONFIG: svql_subgraph::config::Config = svql_subgraph::config::Config::builder()
+    static ref CONFIG: svql_common::Config = svql_common::Config::builder()
         .match_length(false)
         .none()
         .build();

@@ -3,7 +3,8 @@ mod integration_tests {
     #[cfg(test)]
     mod and_nor {
         use prjunnamed_netlist::Design;
-        use svql_subgraph::{config::Config, find_subgraphs, util::load_design_from};
+        use svql_common::Config;
+        use svql_subgraph::{find_subgraphs, util::load_design_from};
 
         lazy_static::lazy_static! {
             static ref MIXED_AND_TREE: Design = load_design_from("examples/fixtures/basic/and/json/mixed_and_tree.json").unwrap();
