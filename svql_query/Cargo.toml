@@ -28,6 +28,7 @@ regex.workspace = true
 env_logger.workspace = true
 unstringify.workspace = true
 walkdir.workspace = true
+contracts.workspace = true
 
 # ---------------------
 prjunnamed-netlist.workspace = true

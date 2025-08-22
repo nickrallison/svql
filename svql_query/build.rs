@@ -52,7 +52,6 @@ fn main() {
     let common_dir = manifest_dir.join("..").join("svql_common");
     let test_cases_rs = common_dir.join("src").join("test_cases.rs");
     let test_case_names = extract_test_case_names(&test_cases_rs);
-    let names_len = test_case_names.len();
 
     // Generate tests source
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -196,12 +195,6 @@ fn {fn_name}() {{
         )
         .unwrap();
     }
-
-    println!(
-        "cargo:warning=svql_query: generated tests for {} discovered types; {} test cases",
-        found.len(),
-        names_len
-    );
 }
 
 fn discover_query_types(src_queries: &Path) -> Vec<Discovered> {

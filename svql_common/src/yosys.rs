@@ -37,6 +37,7 @@ impl DesignPath {
     }
 }
 
+#[contracts::debug_requires(!module_name.is_empty())]
 fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Path) -> Vec<String> {
     let read_cmd = match design {
         DesignPath::Verilog(_) => "read_verilog",
@@ -56,6 +57,7 @@ fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Pat
     ]
 }
 
+#[contracts::debug_requires(!module_name.is_empty())]
 pub fn import_design(
     design_path: PathBuf,
     module_name: &str,
@@ -63,6 +65,9 @@ pub fn import_design(
     let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
     import_design_yosys(&yosys, design_path, module_name)
 }
+
+#[contracts::debug_requires(yosys.exists(), "yosys path must exist")]
+#[contracts::debug_requires(!module_name.is_empty())]
 
 pub fn import_design_yosys(
     yosys: &Path,

@@ -31,6 +31,8 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
 
+    #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
+    #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
     fn query<'ctx>(
         haystack_key: &DriverKey,
         context: &'ctx Context,
@@ -52,6 +54,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .collect()
     }
 
+    #[contracts::debug_ensures(ret.as_ref().map(|c| c.len()).unwrap_or(1) == 1, "Context for a single pattern only")]
     fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
         let key = Self::driver_key();
         let design = driver

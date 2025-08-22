@@ -59,11 +59,16 @@ impl<'p, 'd> State<'p, 'd> {
         self.used_d.contains(&d)
     }
 
+    #[contracts::debug_requires(!self.is_mapped(p))]
+    #[contracts::debug_requires(!self.is_used_design(d))]
+    #[contracts::debug_ensures(self.is_mapped(p) && self.is_used_design(d))]
     pub(crate) fn map(&mut self, p: NodeId, d: NodeId) {
         self.mapping.insert(p, d);
         self.used_d.insert(d);
     }
 
+    #[contracts::debug_requires(self.is_mapped(p) && self.is_used_design(d))]
+    #[contracts::debug_ensures(!self.is_mapped(p) && !self.is_used_design(d))]
     pub(crate) fn unmap(&mut self, p: NodeId, d: NodeId) {
         self.mapping.remove(&p);
         self.used_d.remove(&d);
@@ -89,6 +94,7 @@ impl<'p, 'd> State<'p, 'd> {
     }
 
     /// Remove bindings for the provided keys (used for backtracking).
+    #[contracts::debug_ensures(keys.iter().all(|k| self.binding_get(*k).is_none()))]
     pub(crate) fn bindings_remove_keys(&mut self, keys: &[PatSrcKey<'p>]) {
         for k in keys {
             self.bindings.remove(k);
@@ -98,6 +104,7 @@ impl<'p, 'd> State<'p, 'd> {
     // We intentionally construct HashMaps keyed by CellWrapper here because the
     // public SubgraphMatch API exposes those keys. Suppress clippy’s warning.
     #[allow(clippy::mutable_key_type)]
+    #[contracts::debug_ensures(ret.cell_mapping.len() == self.mapping.len())]
     pub(crate) fn to_subgraph_match(
         &self,
         p_index: &Index<'p>,

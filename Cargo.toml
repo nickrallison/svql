@@ -43,6 +43,7 @@ which = "8.0.0"
 rstest = "0.26.1"
 unstringify = "0.1.4"
 walkdir = "2.5.0"
+contracts = "0.6.6"
 
 # ---------------------
 # PRJUNNAMED

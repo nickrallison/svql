@@ -20,6 +20,7 @@ pub(crate) fn cells_compatible<'p, 'd>(
 }
 
 /// Return all bit indices on q_p's inputs that are driven by p_id in the pattern.
+#[contracts::debug_ensures(ret.iter().all(|&b| b < p_index.pins(q_p).inputs.len()))]
 pub(crate) fn pattern_consumption_bits<'p>(
     p_index: &Index<'p>,
     q_p: NodeId,
@@ -30,12 +31,17 @@ pub(crate) fn pattern_consumption_bits<'p>(
         .inputs
         .iter()
         .filter_map(|p_src| {
-            let (p_src_cell, p_bit) = match p_src {
-                Source::Gate(c, b) => (*c, *b),
-                _ => return None,
+            let p_src_cell_and_p_bit_opt = match p_src {
+                Source::Gate(c, b) => Some((*c, *b)),
+                _ => None,
             };
-            let p_src_node = p_index.try_cell_to_node(p_src_cell)?;
-            (p_src_node == p_id).then_some(p_bit)
+            let res = p_src_cell_and_p_bit_opt
+                .map(|(p_src_cell, p_bit)| {
+                    let p_src_node = p_index.try_cell_to_node(p_src_cell)?;
+                    (p_src_node == p_id).then_some(p_bit)
+                })
+                .flatten();
+            res
         })
         .collect()
 }

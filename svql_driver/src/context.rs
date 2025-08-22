@@ -24,8 +24,9 @@ impl Context {
         }
     }
 
+    #[contracts::debug_ensures(ret.get(&key).is_some())]
     pub fn with_design(mut self, key: DriverKey, design: Arc<Design>) -> Self {
-        self.designs.insert(key, design);
+        self.designs.insert(key.clone(), design);
         self
     }
 
@@ -58,19 +59,21 @@ impl Context {
         self.designs.iter()
     }
 
+    #[contracts::debug_ensures(self.get(&key).is_some())]
     pub(crate) fn insert(&mut self, key: DriverKey, design: Arc<Design>) {
-        self.designs.insert(key, design);
+        self.designs.insert(key.clone(), design);
     }
 
-    /// Merge another context into this one, returning a new context
+    #[contracts::debug_ensures(ret.len() >= self.len())]
     pub fn merge(mut self, other: Context) -> Self {
         for (key, design) in other.designs {
             self.designs.insert(key, design);
         }
-        self
+        self.clone()
     }
 
     /// Create a context from a single design
+    #[contracts::debug_ensures(ret.len() == 1)]
     pub fn from_single(key: DriverKey, design: Arc<Design>) -> Self {
         let mut ctx = Self::new();
         ctx.designs.insert(key, design);

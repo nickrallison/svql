@@ -40,6 +40,8 @@ impl Driver {
         Self::new(workspace)
     }
 
+    #[contracts::debug_ensures(ret.as_ref().map(|o| o.root_path.is_absolute()).unwrap_or(true), "Root path must be absolute")]
+    #[contracts::debug_ensures(ret.as_ref().map(|o| o.yosys_path.exists()).unwrap_or(true), "Custom yosys path must exist")]
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -60,6 +62,7 @@ impl Driver {
     }
 
     /// Load a design and store it in the registry
+    #[contracts::debug_requires(!module_name.is_empty())]
     pub fn load_design<P: AsRef<Path>>(
         &self,
         design_path: P,
@@ -94,6 +97,7 @@ impl Driver {
     }
 
     /// Get a design from the registry, loading it if necessary
+    #[contracts::debug_requires(!module_name.is_empty())]
     pub fn get_or_load_design<P: AsRef<Path>>(
         &self,
         design_path: P,
@@ -145,6 +149,7 @@ impl Driver {
     }
 
     /// Create a context with the specified designs
+    #[contracts::debug_requires(!keys.is_empty(), "Must request at least one design")]
     pub fn create_context(&self, keys: &[DriverKey]) -> Result<Context, DriverError> {
         let mut context = Context::new();
         let registry = self.registry.read().unwrap();
@@ -180,7 +185,31 @@ impl Driver {
         design_path: &Path,
         module_name: &str,
     ) -> Result<Design, DriverError> {
-        svql_common::import_design(design_path.to_path_buf(), module_name)
+        svql_common::import_design_yosys(&self.yosys_path, design_path.to_path_buf(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Driver, DriverError, DriverKey};
+
+    #[test]
+    fn driver_create_workspace() {
+        let d = Driver::new_workspace().expect("workspace driver");
+        // registry should be empty initially
+        assert_eq!(d.get_all_designs().len(), 0);
+    }
+
+    #[test]
+    fn driver_create_context_missing_key() {
+        let d = Driver::new_workspace().expect("workspace driver");
+        // Make a key that won't be in the registry
+        let k = DriverKey::new("nonexistent.v", "missing_top".to_string());
+        let err = d.create_context(&[k]).unwrap_err();
+        match err {
+            DriverError::DesignLoading(msg) => assert!(msg.contains("Design not found")),
+            _ => panic!("unexpected error variant"),
+        }
     }
 }

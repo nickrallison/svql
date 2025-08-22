@@ -64,6 +64,9 @@ pub(super) fn backtrack<'p, 'd>(
 
 /// Scoped helper that maps (p_id -> d_id), records IO bindings implied by the pair,
 /// runs `f`, then automatically removes those bindings and unmaps.
+#[contracts::debug_requires(!st.is_mapped(p_id), "pattern id must be unmapped")]
+#[contracts::debug_requires(!st.is_used_design(d_id), "design id must be unused")]
+#[contracts::debug_ensures(!st.is_mapped(p_id) && !st.is_used_design(d_id), "mapping removed")]
 fn with_mapping<'p, 'd>(
     st: &mut State<'p, 'd>,
     p_id: NodeId,
@@ -80,6 +83,7 @@ fn with_mapping<'p, 'd>(
     st.unmap(p_id, d_id);
 }
 
+#[contracts::debug_ensures(ret.iter().all(|k| st.binding_get(*k).is_some()))]
 pub(super) fn add_bindings_from_pair<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -128,46 +132,3 @@ fn inputs_resolved_for<'p, 'd>(p_index: &'p Index<'p>, st: &State<'p, 'd>, p: No
             .is_some_and(|g| st.is_mapped(g)),
     })
 }
-
-// #[cfg(test)]
-// mod tests {
-
-//     use prjunnamed_netlist::Design;
-
-//     use svql_common::Config;
-
-//     use super::*;
-
-//     lazy_static::lazy_static! {
-//         static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-//     }
-
-//     #[test]
-//     fn backtrack_self_sdffe_produces_some() {
-//         let d = &SDFFE;
-//         let p_index = Index::build(d);
-//         let d_index = Index::build(d);
-
-//         let mut st = State::new(p_index.gate_count());
-//         let mut out = Vec::new();
-//         let inputs = crate::model::get_input_cells(d);
-//         let outputs = crate::model::get_output_cells(d);
-
-//         let config = Config::default();
-
-//         backtrack(
-//             &p_index, &d_index, &mut st, &mut out, &inputs, &outputs, &config,
-//         );
-//         if !out.is_empty() {
-//             assert!(!out[0].is_empty());
-//         }
-//     }
-
-//     #[test]
-//     fn choose_next_returns_some() {
-//         let d = &SDFFE;
-//         let idx = Index::build(d);
-//         let st = State::new(idx.gate_count());
-//         assert!(choose_next(&idx, &st).is_some());
-//     }
-// }

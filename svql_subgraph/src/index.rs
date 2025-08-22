@@ -24,6 +24,7 @@ pub(super) struct Index<'a> {
 }
 
 impl<'a> Index<'a> {
+    #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
         let mut nodes: Vec<CellWrapper<'a>> = Vec::new();
         let mut kinds: Vec<CellKind> = Vec::new();
@@ -60,14 +61,17 @@ impl<'a> Index<'a> {
         }
     }
 
+    #[contracts::debug_requires((id as usize) < self.kinds.len())]
     pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper<'a> {
         self.nodes[id as usize]
     }
 
+    #[contracts::debug_requires((id as usize) < self.kinds.len())]
     pub(super) fn kind(&self, id: NodeId) -> CellKind {
         self.kinds[id as usize]
     }
 
+    #[contracts::debug_requires((id as usize) < self.kinds.len())]
     pub(super) fn pins(&self, id: NodeId) -> &CellPins<'a> {
         &self.pins[id as usize]
     }
@@ -98,34 +102,3 @@ impl<'a> Index<'a> {
         items
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-
-//     use prjunnamed_netlist::Design;
-
-//     use super::*;
-
-//     lazy_static::lazy_static! {
-//         static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-//     }
-
-//     #[test]
-//     fn build_index_has_gates() {
-//         let d = &*SDFFE;
-//         let idx = Index::build(d);
-//         assert!(idx.gate_count() > 0);
-//         assert_eq!(idx.of_kind(crate::model::CellKind::Dff).len() > 0, true);
-//     }
-
-//     #[test]
-//     fn by_kind_iter_is_owned_and_sorted() {
-//         let d = &*SDFFE;
-//         let idx = Index::build(d);
-//         let pairs = idx.by_kind_iter();
-//         assert!(!pairs.is_empty());
-//         let mut sorted = pairs.clone();
-//         sorted.sort_by_key(|kn| kn.kind);
-//         assert_eq!(pairs, sorted);
-//     }
-// }

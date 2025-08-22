@@ -6,6 +6,10 @@ use crate::model::{
 
 /// Compute deterministic aligned input pairs for pattern/design nodes,
 /// respecting exact-length vs superset-length and commutativity normalization.
+#[contracts::debug_ensures(
+    ret.is_none() ||
+    ret.as_ref().unwrap().len() <= std::cmp::min(p_index.pins(p_id).inputs.len(), d_index.pins(d_id).inputs.len())
+)]
 pub(crate) fn aligned_sources<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,

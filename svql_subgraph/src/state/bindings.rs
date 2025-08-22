@@ -52,6 +52,7 @@ pub(crate) enum DesSrcKey<'d> {
 
 /// Validate aligned sources pairwise and collect any driver bindings implied.
 /// Returns additions to apply if compatible.
+#[contracts::debug_ensures(ret.is_none() || ret.as_ref().unwrap().iter().all(|a| st.binding_get(a.pattern).is_none()))]
 pub(crate) fn check_and_collect_bindings<'p, 'd>(
     p_id: NodeId,
     d_id: NodeId,
@@ -100,6 +101,7 @@ pub(crate) fn check_and_collect_bindings<'p, 'd>(
 
 /// Convert a design-side Source (Gate or Io) into a DesSrcKey.
 /// Returns None if the source is not supported in this context (e.g., Const).
+#[contracts::debug_ensures(ret.is_some() || matches!(d_src, Source::Const(_)))]
 pub(crate) fn des_key_from_gate_or_io<'d>(
     d_index: &Index<'d>,
     d_src: Source<'d>,

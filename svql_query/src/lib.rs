@@ -86,6 +86,7 @@ impl<S> WithPath<S> for Wire<S>
 where
     S: State,
 {
+    #[contracts::debug_ensures(p.height() <= self.path.height() + (p.height() - self.path.height()))]
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if p.height() < self.path.height() {
             return None;
