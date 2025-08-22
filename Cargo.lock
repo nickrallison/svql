@@ -590,8 +590,12 @@ name = "svql_common"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
+ "log",
  "prjunnamed-netlist",
+ "prjunnamed-yosys_json",
  "rstest",
+ "tempfile",
+ "which",
 ]
 
 [[package]]

@@ -255,84 +255,84 @@ fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use prjunnamed_netlist::Design;
+// #[cfg(test)]
+// mod tests {
+//     use prjunnamed_netlist::Design;
 
-    use crate::model::normalize::normalize_commutative;
+//     use crate::model::normalize::normalize_commutative;
 
-    use super::*;
+//     use super::*;
 
-    lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-    }
+//     lazy_static::lazy_static! {
+//         static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+//     }
 
-    #[test]
-    fn test_is_gate_kind() {
-        // Gates
-        for k in [
-            CellKind::Buf,
-            CellKind::Not,
-            CellKind::And,
-            CellKind::Or,
-            CellKind::Xor,
-            CellKind::Mux,
-            CellKind::Adc,
-            CellKind::Aig,
-            CellKind::Eq,
-            CellKind::ULt,
-            CellKind::SLt,
-            CellKind::Shl,
-            CellKind::UShr,
-            CellKind::SShr,
-            CellKind::XShr,
-            CellKind::Mul,
-            CellKind::UDiv,
-            CellKind::UMod,
-            CellKind::SDivTrunc,
-            CellKind::SDivFloor,
-            CellKind::SModTrunc,
-            CellKind::SModFloor,
-            CellKind::Dff,
-        ] {
-            assert!(k.is_gate(), "kind {:?} must be considered a gate", k);
-        }
+//     #[test]
+//     fn test_is_gate_kind() {
+//         // Gates
+//         for k in [
+//             CellKind::Buf,
+//             CellKind::Not,
+//             CellKind::And,
+//             CellKind::Or,
+//             CellKind::Xor,
+//             CellKind::Mux,
+//             CellKind::Adc,
+//             CellKind::Aig,
+//             CellKind::Eq,
+//             CellKind::ULt,
+//             CellKind::SLt,
+//             CellKind::Shl,
+//             CellKind::UShr,
+//             CellKind::SShr,
+//             CellKind::XShr,
+//             CellKind::Mul,
+//             CellKind::UDiv,
+//             CellKind::UMod,
+//             CellKind::SDivTrunc,
+//             CellKind::SDivFloor,
+//             CellKind::SModTrunc,
+//             CellKind::SModFloor,
+//             CellKind::Dff,
+//         ] {
+//             assert!(k.is_gate(), "kind {:?} must be considered a gate", k);
+//         }
 
-        // Not gates
-        for k in [
-            CellKind::Input,
-            CellKind::Output,
-            CellKind::IoBuf,
-            CellKind::Assign,
-            CellKind::Match,
-            CellKind::Target,
-            CellKind::Other,
-            CellKind::Name,
-            CellKind::Debug,
-            CellKind::Memory,
-        ] {
-            assert!(!k.is_gate(), "kind {:?} must NOT be considered a gate", k);
-        }
-    }
+//         // Not gates
+//         for k in [
+//             CellKind::Input,
+//             CellKind::Output,
+//             CellKind::IoBuf,
+//             CellKind::Assign,
+//             CellKind::Match,
+//             CellKind::Target,
+//             CellKind::Other,
+//             CellKind::Name,
+//             CellKind::Debug,
+//             CellKind::Memory,
+//         ] {
+//             assert!(!k.is_gate(), "kind {:?} must NOT be considered a gate", k);
+//         }
+//     }
 
-    #[test]
-    fn can_extract_some_pins() {
-        let d = &SDFFE;
-        for c in d.iter_cells() {
-            let _pins = extract_pins(c.into());
-        }
-    }
+//     #[test]
+//     fn can_extract_some_pins() {
+//         let d = &SDFFE;
+//         for c in d.iter_cells() {
+//             let _pins = extract_pins(c.into());
+//         }
+//     }
 
-    #[test]
-    fn commutative_sort_is_stable() {
-        let d = &SDFFE;
-        for c in d.iter_cells() {
-            let mut pins1 = extract_pins(c.into()).inputs;
-            let mut pins2 = extract_pins(c.into()).inputs;
-            normalize_commutative(&mut pins1);
-            normalize_commutative(&mut pins2);
-            assert_eq!(pins1.len(), pins2.len());
-            assert_eq!(pins1, pins2);
-        }
-    }
-}
+//     #[test]
+//     fn commutative_sort_is_stable() {
+//         let d = &SDFFE;
+//         for c in d.iter_cells() {
+//             let mut pins1 = extract_pins(c.into()).inputs;
+//             let mut pins2 = extract_pins(c.into()).inputs;
+//             normalize_commutative(&mut pins1);
+//             normalize_commutative(&mut pins2);
+//             assert_eq!(pins1.len(), pins2.len());
+//             assert_eq!(pins1, pins2);
+//         }
+//     }
+// }

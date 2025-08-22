@@ -180,11 +180,7 @@ impl Driver {
         design_path: &Path,
         module_name: &str,
     ) -> Result<Design, DriverError> {
-        // This would use your existing yosys loading logic
-        // For brevity, I'm showing a placeholder
-        // crate::util::load_design_with_yosys(path, module_name, &self.yosys_path)
-        //     .map_err(|e| DriverError::DesignLoading(e.to_string()))
-        crate::util::run_yosys_cmd(&self.yosys_path, design_path.to_path_buf(), module_name)
+        svql_common::import_design(design_path.to_path_buf(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))
     }
 }

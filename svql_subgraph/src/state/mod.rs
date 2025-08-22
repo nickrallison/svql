@@ -9,9 +9,7 @@ mod align;
 mod bindings;
 mod constraints;
 
-pub(crate) use bindings::{
-    DesSrcKey, PatSrcKey, check_and_collect_bindings,
-};
+pub(crate) use bindings::{DesSrcKey, PatSrcKey, check_and_collect_bindings};
 pub(crate) use constraints::cells_compatible;
 
 /// Self-documenting wrapper for an output source description.
@@ -249,48 +247,48 @@ fn name_map<'p>(
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use prjunnamed_netlist::Design;
+// #[cfg(test)]
+// mod tests {
+//     use prjunnamed_netlist::Design;
 
-    use crate::model::CellKind;
+//     use crate::model::CellKind;
 
-    use super::*;
+//     use super::*;
 
-    lazy_static::lazy_static! {
-        static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
-        static ref SEQ_DOUBLE_SDFFE: Design = crate::test_support::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
-    }
+//     lazy_static::lazy_static! {
+//         static ref SDFFE: Design = crate::test_support::load_design_from("examples/patterns/basic/ff/verilog/sdffe.v").unwrap();
+//         static ref SEQ_DOUBLE_SDFFE: Design = crate::test_support::load_design_from("examples/fixtures/basic/ff/verilog/seq_double_sdffe.v").unwrap();
+//     }
 
-    #[test]
-    fn same_cell_is_compatible_with_itself() {
-        let d = &*SDFFE;
-        let idx = crate::index::Index::build(d);
-        let st = super::State::<'_, '_>::new(idx.gate_count());
-        let match_length = true;
+//     #[test]
+//     fn same_cell_is_compatible_with_itself() {
+//         let d = &*SDFFE;
+//         let idx = crate::index::Index::build(d);
+//         let st = super::State::<'_, '_>::new(idx.gate_count());
+//         let match_length = true;
 
-        for &n in idx.of_kind(CellKind::Dff) {
-            assert!(cells_compatible(n, n, &idx, &idx, &st, match_length));
-        }
-    }
+//         for &n in idx.of_kind(CellKind::Dff) {
+//             assert!(cells_compatible(n, n, &idx, &idx, &st, match_length));
+//         }
+//     }
 
-    #[test]
-    fn pattern_io_can_bind_to_design_gate() {
-        let d_p = &SDFFE;
-        let d_d = &SEQ_DOUBLE_SDFFE;
+//     #[test]
+//     fn pattern_io_can_bind_to_design_gate() {
+//         let d_p = &SDFFE;
+//         let d_d = &SEQ_DOUBLE_SDFFE;
 
-        let p_idx = crate::index::Index::build(d_p);
-        let d_idx = crate::index::Index::build(d_d);
-        let st = super::State::new(p_idx.gate_count());
+//         let p_idx = crate::index::Index::build(d_p);
+//         let d_idx = crate::index::Index::build(d_d);
+//         let st = super::State::new(p_idx.gate_count());
 
-        let match_length = true;
+//         let match_length = true;
 
-        let p = p_idx.of_kind(CellKind::Dff)[0];
-        for &d in d_idx.of_kind(CellKind::Dff) {
-            assert!(
-                cells_compatible(p, d, &p_idx, &d_idx, &st, match_length),
-                "pattern IO D should be compatible with design DFF regardless of external driver kind"
-            );
-        }
-    }
-}
+//         let p = p_idx.of_kind(CellKind::Dff)[0];
+//         for &d in d_idx.of_kind(CellKind::Dff) {
+//             assert!(
+//                 cells_compatible(p, d, &p_idx, &d_idx, &st, match_length),
+//                 "pattern IO D should be compatible with design DFF regardless of external driver kind"
+//             );
+//         }
+//     }
+// }

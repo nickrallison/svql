@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use svql_common::{ALL_TEST_CASES, Pattern};
-    use svql_subgraph::test_support::load_design_from;
+    use svql_common::{ALL_TEST_CASES, Pattern, import_design};
 
     #[test]
     fn test_all_netlist_cases() {
@@ -25,17 +24,17 @@ mod tests {
     }
 
     fn run_test_case(test_case: &svql_common::TestCase) -> Result<(), Box<dyn std::error::Error>> {
-        let (netlist_pattern_path, _netlist_pattern_module) = match test_case.pattern {
+        let (netlist_pattern_path, netlist_pattern_module) = match test_case.pattern {
             Pattern::Netlist { path, module, .. } => (path, module),
             _ => panic!("Test case is not a netlist pattern"),
         };
 
-        let needle = load_design_from(netlist_pattern_path)
+        let needle = import_design(netlist_pattern_path.into(), netlist_pattern_module)
             .expect(&format!("Failed to load needle: {}", netlist_pattern_path));
-        let haystack = load_design_from(test_case.haystack.path).expect(&format!(
-            "Failed to load haystack: {}",
-            test_case.haystack.path
-        ));
+        let haystack =
+            import_design(test_case.haystack.path.into(), test_case.haystack.module).expect(
+                &format!("Failed to load haystack: {}", test_case.haystack.path),
+            );
 
         let matches = svql_subgraph::find_subgraphs(&needle, &haystack, &test_case.config);
 
