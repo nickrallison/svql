@@ -20,13 +20,13 @@ pub trait QueryableState: State {}
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Match<'p, 'd> {
-    pub pat_cell_ref: Option<CellWrapper<'p>>,
-    pub design_cell_ref: Option<CellWrapper<'d>>,
+pub struct Match<'ctx> {
+    pub pat_cell_ref: Option<CellWrapper<'ctx>>,
+    pub design_cell_ref: Option<CellWrapper<'ctx>>,
 }
 
 impl State for Search {}
-impl State for Match<'_, '_> {}
+impl State for Match<'_> {}
 impl QueryableState for Search {}
 
 // ########################

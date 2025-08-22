@@ -13,7 +13,7 @@ where
 }
 
 pub trait SearchableComposite: Composite<Search> {
-    type Hit<'p, 'd>;
+    type Hit<'ctx>;
 
     fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>>;
 
@@ -22,17 +22,17 @@ pub trait SearchableComposite: Composite<Search> {
         context: &'ctx Context,
         path: Instance,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx, 'ctx>>;
+    ) -> Vec<Self::Hit<'ctx>>;
 }
 
-pub trait MatchedComposite<'p, 'd>: Composite<Match<'p, 'd>> {
+pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool + '_>> {
         vec![]
     }
 
     /// Validate that a connection represents a valid design connectivity
     /// where the source and destination refer to the same design cell/bit
-    fn validate_connection(&self, connection: Connection<Match<'p, 'd>>) -> bool {
+    fn validate_connection(&self, connection: Connection<Match<'ctx>>) -> bool {
         trace!(
             "Validating connection: from={:?} to={:?}",
             connection.from.path, connection.to.path
@@ -84,7 +84,7 @@ pub trait MatchedComposite<'p, 'd>: Composite<Match<'p, 'd>> {
     }
 
     /// Validate all connection sets - at least one connection in each set must be valid
-    fn validate_connections(&self, connections: Vec<Vec<Connection<Match<'p, 'd>>>>) -> bool {
+    fn validate_connections(&self, connections: Vec<Vec<Connection<Match<'ctx>>>>) -> bool {
         trace!(
             "Validating {} connection sets for composite",
             connections.len()

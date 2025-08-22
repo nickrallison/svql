@@ -1,5 +1,7 @@
 // svql_query/src/queries/netlist/basic/and/and_gate.rs
 
+use svql_subgraph::SubgraphMatch;
+
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
 use crate::netlist::{NetlistMeta, PortDir, PortSpec, SearchableNetlist};
@@ -65,12 +67,9 @@ impl NetlistMeta for AndGate<Search> {
 }
 
 impl SearchableNetlist for AndGate<Search> {
-    type Hit<'p, 'd> = AndGate<Match<'p, 'd>>;
+    type Hit<'ctx> = AndGate<Match<'ctx>>;
 
-    fn from_subgraph<'p, 'd>(
-        m: &svql_subgraph::SubgraphMatch<'p, 'd>,
-        path: Instance,
-    ) -> Self::Hit<'p, 'd> {
+    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx> {
         // Single‑bit ports in this example; multi‑bit support would iterate 0..width.
         let a_match = bind_input(m, "a", 0);
         let b_match = bind_input(m, "b", 0);

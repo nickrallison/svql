@@ -66,12 +66,12 @@ impl NetlistMeta for AndNor<Search> {
 
 // Query surface; mirrors the implementation used for And<Search>.
 impl SearchableNetlist for AndNor<Search> {
-    type Hit<'p, 'd> = AndNor<Match<'p, 'd>>;
+    type Hit<'ctx> = AndNor<Match<'ctx>>;
 
-    fn from_subgraph<'p, 'd>(
-        m: &svql_subgraph::SubgraphMatch<'p, 'd>,
+    fn from_subgraph<'ctx>(
+        m: &svql_subgraph::SubgraphMatch<'ctx, 'ctx>,
         path: Instance,
-    ) -> Self::Hit<'p, 'd> {
+    ) -> Self::Hit<'ctx> {
         let a_match = bind_input(m, "a", 0);
         let b_match = bind_input(m, "b", 0);
         let y_match = bind_output(m, "y", 0);

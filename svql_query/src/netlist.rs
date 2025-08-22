@@ -26,16 +26,16 @@ pub trait NetlistMeta {
 }
 
 pub trait SearchableNetlist: NetlistMeta + Sized {
-    type Hit<'p, 'd>;
+    type Hit<'ctx>;
 
-    fn from_subgraph<'p, 'd>(m: &SubgraphMatch<'p, 'd>, path: Instance) -> Self::Hit<'p, 'd>;
+    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
 
     fn query<'ctx>(
         haystack_key: &DriverKey,
         context: &'ctx Context,
         path: Instance,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx, 'ctx>> {
+    ) -> Vec<Self::Hit<'ctx>> {
         let needle = context
             .get(&Self::driver_key())
             .expect("Pattern design not found in context")

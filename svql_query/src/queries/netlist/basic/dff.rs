@@ -1,5 +1,7 @@
 // svql_query/src/queries/netlist/basic/dff.rs
 
+use svql_subgraph::SubgraphMatch;
+
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
 use crate::netlist::{NetlistMeta, PortDir, PortSpec, SearchableNetlist};
@@ -71,12 +73,9 @@ impl NetlistMeta for Sdffe<Search> {
 
 // Query surface; a macro can emit the same impl for any netlist with similar shape
 impl SearchableNetlist for Sdffe<Search> {
-    type Hit<'p, 'd> = Sdffe<Match<'p, 'd>>;
+    type Hit<'ctx> = Sdffe<Match<'ctx>>;
 
-    fn from_subgraph<'p, 'd>(
-        m: &svql_subgraph::SubgraphMatch<'p, 'd>,
-        path: Instance,
-    ) -> Self::Hit<'p, 'd> {
+    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx> {
         // Single-bit ports; multi-bit support could iterate 0..width later
         let clk_m = bind_input(m, "clk", 0);
         let d_m = bind_input(m, "d", 0);

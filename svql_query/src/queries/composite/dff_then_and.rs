@@ -64,10 +64,10 @@ where
     }
 }
 
-impl<'p, 'd> MatchedComposite<'p, 'd> for SdffeThenAnd<Match<'p, 'd>> {}
+impl<'ctx> MatchedComposite<'ctx> for SdffeThenAnd<Match<'ctx>> {}
 
 impl SearchableComposite for SdffeThenAnd<Search> {
-    type Hit<'p, 'd> = SdffeThenAnd<Match<'p, 'd>>;
+    type Hit<'ctx> = SdffeThenAnd<Match<'ctx>>;
 
     fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
         let sdffe_context = Sdffe::<Search>::context(driver)?;
@@ -80,7 +80,7 @@ impl SearchableComposite for SdffeThenAnd<Search> {
         context: &'ctx Context,
         path: Instance,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx, 'ctx>> {
+    ) -> Vec<Self::Hit<'ctx>> {
         // First get individual matches
         let sdffe_matches = Sdffe::<Search>::query(
             haystack_key,
@@ -96,7 +96,7 @@ impl SearchableComposite for SdffeThenAnd<Search> {
         );
 
         // Create composite instances
-        
+
         iproduct!(sdffe_matches, and_matches)
             .map(|(sdffe, andg)| SdffeThenAnd {
                 path: path.clone(),

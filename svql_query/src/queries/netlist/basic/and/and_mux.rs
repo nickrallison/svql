@@ -1,5 +1,7 @@
 // svql_query/src/queries/netlist/basic/and/and_mux.rs
 
+use svql_subgraph::SubgraphMatch;
+
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;
 use crate::netlist::{NetlistMeta, PortDir, PortSpec, SearchableNetlist};
@@ -42,10 +44,8 @@ where
     }
 }
 
-// Static metadata for codegen/introspection.
 impl NetlistMeta for AndMux<Search> {
     const MODULE_NAME: &'static str = "and_mux";
-    // Keep consistency with And<Search>::FILE_PATH (no `/verilog/` in the path).
     const FILE_PATH: &'static str = "examples/patterns/basic/and/verilog/and_mux.v";
 
     const PORTS: &'static [PortSpec] = &[
@@ -66,12 +66,9 @@ impl NetlistMeta for AndMux<Search> {
 
 // Query surface; mirrors the implementation used for And<Search>.
 impl SearchableNetlist for AndMux<Search> {
-    type Hit<'p, 'd> = AndMux<Match<'p, 'd>>;
+    type Hit<'ctx> = AndMux<Match<'ctx>>;
 
-    fn from_subgraph<'p, 'd>(
-        m: &svql_subgraph::SubgraphMatch<'p, 'd>,
-        path: Instance,
-    ) -> Self::Hit<'p, 'd> {
+    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx> {
         let a_match = bind_input(m, "a", 0);
         let b_match = bind_input(m, "b", 0);
         let y_match = bind_output(m, "y", 0);
