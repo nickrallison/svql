@@ -12,6 +12,19 @@ pub enum Pattern {
     },
 }
 
+impl Pattern {
+    pub fn is_netlist(&self) -> bool {
+        matches!(self, Pattern::Netlist { .. })
+    }
+
+    pub fn path(&self) -> &'static str {
+        match self {
+            Pattern::Netlist { path, .. } => path,
+            Pattern::Composite { .. } => panic!("Composite patterns don't have paths"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Haystack {
     pub path: &'static str,
@@ -104,156 +117,123 @@ lazy_static::lazy_static! {
         TestCase {
             name: "and_gate_self",
             config: Config::builder().exact_length().none().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_GATE_SELF,
+            pattern: &*AND_GATE,
+            haystack: &*AND_GATE_SELF,
             expected_matches: 1,
         },
-        // TestCase {
-        //     name: "and_gate_in_and_q_double",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*AND_GATE,
-        //         pattern_query_type: Some("and_gate"),
-        //     },
-        //     haystack: &*AND_Q_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "and_gate_in_and_tree",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*AND_GATE,
-        //         pattern_query_type: Some("and_gate"),
-        //     },
-        //     haystack: &*AND_TREE,
-        //     expected_matches: 7,
-        // },
-        // TestCase {
-        //     name: "and_gate_in_and_seq",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*AND_GATE,
-        //         pattern_query_type: Some("and_gate"),
-        //     },
-        //     haystack: &*AND_SEQ,
-        //     expected_matches: 7,
-        // },
+        TestCase {
+            name: "and_gate_in_and_q_double",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*AND_GATE,
+            haystack: &*AND_Q_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "and_gate_in_and_tree",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*AND_GATE,
+            haystack: &*AND_TREE,
+            expected_matches: 7,
+        },
+        TestCase {
+            name: "and_gate_in_and_seq",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*AND_GATE,
+            haystack: &*AND_SEQ,
+            expected_matches: 7,
+        },
 
-        // // DFF tests
-        // TestCase {
-        //     name: "sdffe_self",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*SDFFE,
-        //         pattern_query_type: Some("sdffe"),
-        //     },
-        //     haystack: &*SDFFE_SELF,
-        //     expected_matches: 1,
-        // },
-        // TestCase {
-        //     name: "sdffe_in_comb_d_double",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*SDFFE,
-        //         pattern_query_type: Some("sdffe"),
-        //     },
-        //     haystack: &*COMB_D_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "sdffe_in_and_q_double",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*SDFFE,
-        //         pattern_query_type: Some("sdffe"),
-        //     },
-        //     haystack: &*AND_Q_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "sdffe_in_par_double",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*SDFFE,
-        //         pattern_query_type: Some("sdffe"),
-        //     },
-        //     haystack: &*PAR_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "sdffe_in_seq_double",
-        //     config: Config::builder().exact_length().none().build(),
-        //     pattern: Pattern::Netlist {
-        //         needle: &*SDFFE,
-        //         pattern_query_type: Some("sdffe"),
-        //     },
-        //     haystack: &*SEQ_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
+        // DFF tests
+        TestCase {
+            name: "sdffe_self",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*SDFFE,
+            haystack: &*SDFFE_SELF,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "sdffe_in_comb_d_double",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*SDFFE,
+            haystack: &*COMB_D_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "sdffe_in_and_q_double",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*SDFFE,
+            haystack: &*AND_Q_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "sdffe_in_par_double",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*SDFFE,
+            haystack: &*PAR_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "sdffe_in_seq_double",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*SDFFE,
+            haystack: &*SEQ_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
     ];
 
-    // pub static ref DEDUPE_TEST_CASES: Vec<TestCase> = vec![
-    //     TestCase {
-    //         name: "and_nor_dedupe_none",
-    //         config: Config::builder().exact_length().none().build(),
-    //         pattern: Pattern::Netlist {
-    //             needle: &*AND_NOR,
-    //             pattern_query_type: Some("and_nor"),
-    //         },
-    //         haystack: &*MIXED_AND_TREE,
-    //         expected_matches: 4,
-    //     },
-    //     TestCase {
-    //         name: "and_nor_dedupe_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().build(),
-    //         pattern: Pattern::Netlist {
-    //             needle: &*AND_NOR,
-    //             pattern_query_type: Some("and_nor"),
-    //         },
-    //         haystack: &*MIXED_AND_TREE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "and_mux_dedupe_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().build(),
-    //         pattern: Pattern::Netlist {
-    //             needle: &*AND_MUX,
-    //             pattern_query_type: Some("and_mux"),
-    //         },
-    //         haystack: &*MIXED_AND_TREE,
-    //         expected_matches: 2,
-    //     },
-    // ];
+    pub static ref DEDUPE_TEST_CASES: Vec<TestCase> = vec![
+        TestCase {
+            name: "and_nor_dedupe_none",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &*AND_NOR,
+            haystack: &*MIXED_AND_TREE,
+            expected_matches: 4,
+        },
+        TestCase {
+            name: "and_nor_dedupe_auto_morph",
+            config: Config::builder().exact_length().auto_morph().build(),
+            pattern: &*AND_NOR,
+            haystack: &*MIXED_AND_TREE,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "and_mux_dedupe_auto_morph",
+            config: Config::builder().exact_length().auto_morph().build(),
+            pattern: &*AND_MUX,
+            haystack: &*MIXED_AND_TREE,
+            expected_matches: 2,
+        },
+    ];
 
-    // pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
-    //     TestCase {
-    //         name: "sdffe_then_and_simple",
-    //         config: Config::builder().exact_length().none().build(),
-    //         pattern: Pattern::Composite {
-    //             pattern_query_type: "sdffe_then_and",
-    //         },
-    //         haystack: &*AND_Q_DOUBLE_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    // ];
+    pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
+        TestCase {
+            name: "sdffe_then_and_simple",
+            config: Config::builder().exact_length().none().build(),
+            pattern: &Pattern::Composite {
+                pattern_query_type: "sdffe_then_and",
+            },
+            haystack: &*AND_Q_DOUBLE_SDFFE,
+            expected_matches: 2,
+        },
+    ];
 
-    // pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
-    //     TestCase {
-    //         name: "and_any_in_mixed_tree",
-    //         config: Config::builder().exact_length().auto_morph().build(),
-    //         pattern: Pattern::Composite {
-    //             pattern_query_type: "and_any",
-    //         },
-    //         haystack: &*MIXED_AND_TREE,
-    //         expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
-    //     },
-    // ];
+    pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
+        TestCase {
+            name: "and_any_in_mixed_tree",
+            config: Config::builder().exact_length().auto_morph().build(),
+            pattern: &Pattern::Composite {
+                pattern_query_type: "and_any",
+            },
+            haystack: &*MIXED_AND_TREE,
+            expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
+        },
+    ];
 
-    // pub static ref ALL_TEST_CASES: Vec<TestCase> = {
-    //     let mut all = BASIC_TEST_CASES.clone();
-    //     all.extend(DEDUPE_TEST_CASES.clone());
-    //     all.extend(COMPOSITE_TEST_CASES.clone());
-    //     all.extend(ENUM_COMPOSITE_TEST_CASES.clone());
-    //     all
-    // };
+    pub static ref ALL_TEST_CASES: Vec<TestCase> = {
+        let mut all = BASIC_TEST_CASES.clone();
+        all.extend(DEDUPE_TEST_CASES.clone());
+        all.extend(COMPOSITE_TEST_CASES.clone());
+        all.extend(ENUM_COMPOSITE_TEST_CASES.clone());
+        all
+    };
 }
