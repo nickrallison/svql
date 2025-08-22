@@ -1,4 +1,4 @@
-use svql_subgraph::Config;
+use crate::config::Config;
 
 #[derive(Debug, Clone)]
 pub struct TestCase {
