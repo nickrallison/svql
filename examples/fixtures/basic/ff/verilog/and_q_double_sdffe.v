@@ -4,6 +4,7 @@ module and_q_double_sdffe
 input clk,
 input d1,
 input d2,
+input extra,
 input reset,
 output wire q,
 );
@@ -21,5 +22,5 @@ always @(posedge clk) begin
     else q2 <= d2;
 end
 
-assign q = q1 & q2;
+assign q = (q1 & q2) & extra;
 endmodule

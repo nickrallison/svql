@@ -1,10 +1,9 @@
 // svql_query/src/queries/composite/dff_then_and.rs
-use log::trace;
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::Config;
 
 use crate::{
-    Connection, Match, Search, State, Wire, WithPath,
+    Connection, Match, Search, State, WithPath,
     composite::{Composite, MatchedComposite, SearchableComposite},
     instance::Instance,
     netlist::SearchableNetlist,
@@ -65,54 +64,7 @@ where
     }
 }
 
-impl<'p, 'd> MatchedComposite<'p, 'd> for SdffeThenAnd<Match<'p, 'd>> {
-    fn validate_connection(&self, connection: Connection<Match<'p, 'd>>) -> bool {
-        trace!(
-            "Validating connection: from={:?} to={:?}",
-            connection.from.path, connection.to.path
-        );
-
-        // For composites, we need to find the actual nested ports
-        let from_wire = self.find_port(&connection.from.path);
-        let to_wire = self.find_port(&connection.to.path);
-
-        trace!("Found from port: {:?}", from_wire);
-        trace!("Found to port: {:?}", to_wire);
-
-        match (from_wire, to_wire) {
-            (Some(from), Some(to)) => {
-                let from_match = &from.val;
-                let to_match = &to.val;
-
-                trace!("From match: {:?}", from_match);
-                trace!("To match: {:?}", to_match);
-
-                match (from_match, to_match) {
-                    (Some(from_val), Some(to_val)) => {
-                        let from_cell = from_val.design_cell_ref;
-                        let to_cell = to_val.design_cell_ref;
-
-                        trace!("From cell: {:?}", from_cell);
-                        trace!("To cell: {:?}", to_cell);
-
-                        let result =
-                            from_cell.is_some() && to_cell.is_some() && from_cell == to_cell;
-                        trace!("Connection validation result: {}", result);
-                        result
-                    }
-                    _ => {
-                        trace!("Connection validation failed - missing match values");
-                        false
-                    }
-                }
-            }
-            _ => {
-                trace!("Connection validation failed - could not find ports");
-                false
-            }
-        }
-    }
-}
+impl<'p, 'd> MatchedComposite<'p, 'd> for SdffeThenAnd<Match<'p, 'd>> {}
 
 impl SearchableComposite for SdffeThenAnd<Search> {
     type Hit<'p, 'd> = SdffeThenAnd<Match<'p, 'd>>;
@@ -143,68 +95,31 @@ impl SearchableComposite for SdffeThenAnd<Search> {
             config,
         );
 
-        trace!(
-            "SdffeThenAnd::query: sdffe_matches={}, and_matches={}",
-            sdffe_matches.len(),
-            and_matches.len()
-        );
-
         // Create composite instances
-        let mut composites = Vec::new();
-
-        for (sdffe, andg) in iproduct!(sdffe_matches, and_matches) {
-            let composite = SdffeThenAnd {
+        let composites = iproduct!(sdffe_matches, and_matches)
+            .map(|(sdffe, andg)| SdffeThenAnd {
                 path: path.clone(),
                 sdffe,
                 andg,
-            };
-            composites.push(composite);
-        }
-
-        trace!("Created {} composite candidates", composites.len());
-
-        // Filter by connectivity
-        let initial_count = composites.len();
-        composites.retain(|composite| {
-            let connections_valid = composite.validate_connections(composite.connections());
-            trace!(
-                "Composite {:?} connections valid: {}",
-                composite.path(),
-                connections_valid
-            );
-            connections_valid
-        });
-        let final_count = composites.len();
-
-        trace!(
-            "Filtered composites from {} to {}",
-            initial_count, final_count
-        );
-
+            })
+            .filter(|composite| composite.validate_connections(composite.connections()))
+            .collect::<Vec<_>>();
         composites
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use log::trace;
     use svql_driver::{Driver, DriverKey};
     use svql_subgraph::Config;
 
     use crate::{
-        Search,
-        composite::SearchableComposite,
-        instance::Instance,
-        netlist::SearchableNetlist,
-        queries::{composite::dff_then_and::SdffeThenAnd, netlist::basic::dff::Sdffe},
+        Search, composite::SearchableComposite, instance::Instance,
+        queries::composite::dff_then_and::SdffeThenAnd,
     };
 
     #[test]
     fn test_dff_then_and() {
-        env_logger::builder()
-            .filter_level(log::LevelFilter::Trace)
-            .init();
-
         let driver = Driver::new_workspace().expect("Failed to create driver");
 
         let context =
@@ -224,8 +139,6 @@ mod tests {
         let context = context.with_design(haystack_key.clone(), haystack.clone());
 
         let hits = SdffeThenAnd::<Search>::query(&haystack_key, &context, root, &config);
-
-        trace!("main: DffThenAnd matches={}", hits.len());
 
         assert_eq!(hits.len(), 2, "expected 2 DffThenAnd matches");
 
@@ -256,20 +169,10 @@ mod tests {
                 .design_cell_ref
                 .expect("andg.b should have a design source");
 
-            trace!(
-                "hit[{}]: q={:?} a_src={:?} b_src={:?}",
-                k,
-                q.debug_index(),
-                a_src.debug_index(),
-                b_src.debug_index()
-            );
-
             assert!(
                 q == a_src || q == b_src,
                 "expected sdffe.q to drive either andg.a or andg.b"
             );
-
-            println!("hit[{}]: {:#?}", k, h);
         }
     }
 }

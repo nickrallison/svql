@@ -1,5 +1,5 @@
-use log::trace;
 // svql_query/src/composite.rs
+use log::trace;
 use svql_driver::{DriverKey, context::Context, driver::Driver};
 use svql_subgraph::Config;
 
@@ -30,44 +30,71 @@ pub trait MatchedComposite<'p, 'd>: Composite<Match<'p, 'd>> {
         vec![]
     }
 
+    /// Validate that a connection represents a valid design connectivity
+    /// where the source and destination refer to the same design cell/bit
     fn validate_connection(&self, connection: Connection<Match<'p, 'd>>) -> bool {
-        let in_port_id = self.find_port(&connection.from.path);
-        let out_port_id = self.find_port(&connection.to.path);
-
         trace!(
             "Validating connection: from={:?} to={:?}",
             connection.from.path, connection.to.path
         );
-        trace!("Found from port: {:?}", in_port_id);
-        trace!("Found to port: {:?}", out_port_id);
 
-        if let (Some(in_port), Some(out_port)) = (in_port_id, out_port_id) {
-            let from_match = &in_port.val;
-            let to_match = &out_port.val;
+        // Find the actual wire ports in the composite structure
+        let from_wire = self.find_port(&connection.from.path);
+        let to_wire = self.find_port(&connection.to.path);
 
-            trace!("From match: {:?}", from_match);
-            trace!("To match: {:?}", to_match);
+        trace!("Found from port: {:?}", from_wire.is_some());
+        trace!("Found to port: {:?}", to_wire.is_some());
 
-            if let (Some(from_val), Some(to_val)) = (from_match, to_match) {
-                let from_cell = from_val.design_cell_ref;
-                let to_cell = to_val.design_cell_ref;
+        match (from_wire, to_wire) {
+            (Some(from), Some(to)) => {
+                let from_match = &from.val;
+                let to_match = &to.val;
 
-                trace!("From cell: {:?}", from_cell);
-                trace!("To cell: {:?}", to_cell);
+                trace!("From match present: {:?}", from_match.is_some());
+                trace!("To match present: {:?}", to_match.is_some());
 
-                let result = from_cell.is_some() && to_cell.is_some() && from_cell == to_cell;
-                trace!("Connection validation result: {}", result);
-                return result;
+                match (from_match, to_match) {
+                    (Some(from_val), Some(to_val)) => {
+                        let from_cell = from_val.design_cell_ref;
+                        let to_cell = to_val.design_cell_ref;
+
+                        trace!("From cell present: {:?}", from_cell.is_some());
+                        trace!("To cell present: {:?}", to_cell.is_some());
+
+                        if let (Some(from_c), Some(to_c)) = (from_cell, to_cell) {
+                            let result = from_c == to_c;
+                            trace!("Cells equal: {}", result);
+                            result
+                        } else {
+                            trace!("Connection validation failed - missing cell references");
+                            false
+                        }
+                    }
+                    _ => {
+                        trace!("Connection validation failed - missing match values");
+                        false
+                    }
+                }
+            }
+            _ => {
+                trace!("Connection validation failed - could not find ports");
+                false
             }
         }
-        trace!("Connection validation failed - missing ports or matches");
-        false
     }
 
+    /// Validate all connection sets - at least one connection in each set must be valid
     fn validate_connections(&self, connections: Vec<Vec<Connection<Match<'p, 'd>>>>) -> bool {
-        trace!("Validating connections for composite: {:?}", self.path());
+        trace!(
+            "Validating {} connection sets for composite",
+            connections.len()
+        );
         for (i, connection_set) in connections.iter().enumerate() {
-            trace!("Checking connection set {}: {:?}", i, connection_set);
+            trace!(
+                "Checking connection set {}: {} connections",
+                i,
+                connection_set.len()
+            );
             let mut valid = false;
             for conn in connection_set {
                 if self.validate_connection(conn.clone()) {
