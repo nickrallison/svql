@@ -10,7 +10,7 @@ use crate::{
     composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
     instance::Instance,
     netlist::SearchableNetlist,
-    queries::netlist::basic::and::{self, and_gate::AndGate, and_mux::AndMux, and_nor::AndNor},
+    queries::netlist::basic::and::{AndGate, AndMux, AndNor},
 };
 
 #[derive(Debug, Clone)]

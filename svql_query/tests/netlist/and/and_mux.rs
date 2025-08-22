@@ -6,7 +6,7 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::netlist::SearchableNetlist;
-        use svql_query::queries::netlist::basic::and::and_mux::AndMux;
+        use svql_query::queries::netlist::basic::and::AndMux;
         use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {

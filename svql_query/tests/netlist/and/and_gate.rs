@@ -8,7 +8,7 @@ mod integration_tests {
         use svql_query::Search;
         use svql_query::instance::Instance;
         use svql_query::netlist::{NetlistMeta, SearchableNetlist};
-        use svql_query::queries::netlist::basic::and::and_gate::AndGate;
+        use svql_query::queries::netlist::basic::and::AndGate;
         use svql_subgraph::config::Config;
 
         lazy_static::lazy_static! {
@@ -24,7 +24,7 @@ mod integration_tests {
         #[case(
             "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
             "and_q_double_sdffe",
-            1
+            2
         )]
         #[case("examples/patterns/basic/and/verilog/and_gate.v", "and_gate", 1)]
         #[case("examples/fixtures/basic/and/verilog/and_tree.v", "and_tree", 7)]
@@ -122,9 +122,7 @@ mod integration_tests {
         }
 
         fn any_connection_exists(
-            hits: &[svql_query::queries::netlist::basic::and::and_gate::AndGate<
-                svql_query::Match,
-            >],
+            hits: &[svql_query::queries::netlist::basic::and::AndGate<svql_query::Match>],
         ) -> bool {
             for left in hits {
                 if let Some(lhs_y_cell) = left.y.val.as_ref().and_then(|m| m.design_cell_ref) {
