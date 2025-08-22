@@ -1,6 +1,5 @@
 // svql_query/src/queries/enum_composite/and_any.rs
 
-use std::result;
 
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::Config;
@@ -103,12 +102,12 @@ impl SearchableEnumComposite for AndAny<Search> {
 
         // Create composite instances
 
-        let results = and_gate_matches
+        
+        and_gate_matches
             .into_iter()
             .chain(and_mux_matches)
             .chain(and_nor_matches)
-            .collect::<Vec<_>>();
-        results
+            .collect::<Vec<_>>()
     }
 }
 
