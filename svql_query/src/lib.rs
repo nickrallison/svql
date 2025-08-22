@@ -4,7 +4,6 @@ use crate::instance::Instance;
 
 pub mod binding;
 pub mod composite;
-pub mod connect;
 pub mod instance;
 pub mod netlist;
 pub mod queries;
