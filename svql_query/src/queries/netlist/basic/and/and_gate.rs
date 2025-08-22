@@ -1,6 +1,4 @@
 // svql_query/src/queries/netlist/basic/and/and_gate.rs
-use svql_driver::Context;
-use svql_driver::driver::Driver;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;

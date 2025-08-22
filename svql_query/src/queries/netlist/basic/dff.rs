@@ -1,5 +1,4 @@
 // svql_query/src/queries/netlist/basic/dff.rs
-use svql_driver::driver::Driver;
 
 use crate::binding::{bind_input, bind_output};
 use crate::instance::Instance;

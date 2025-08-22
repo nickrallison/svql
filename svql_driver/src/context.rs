@@ -4,11 +4,17 @@ use std::sync::Arc;
 
 use prjunnamed_netlist::Design;
 
-use crate::{Driver, DriverKey};
+use crate::DriverKey;
 
 #[derive(Debug, Clone)]
 pub struct Context {
     designs: HashMap<DriverKey, Arc<Design>>,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Context {

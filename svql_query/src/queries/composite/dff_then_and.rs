@@ -96,15 +96,15 @@ impl SearchableComposite for SdffeThenAnd<Search> {
         );
 
         // Create composite instances
-        let composites = iproduct!(sdffe_matches, and_matches)
+        
+        iproduct!(sdffe_matches, and_matches)
             .map(|(sdffe, andg)| SdffeThenAnd {
                 path: path.clone(),
                 sdffe,
                 andg,
             })
             .filter(|composite| composite.validate_connections(composite.connections()))
-            .collect::<Vec<_>>();
-        composites
+            .collect::<Vec<_>>()
     }
 }
 
