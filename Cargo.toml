@@ -1,9 +1,8 @@
 [workspace]
 members = [
-    "svql_common", 
-    "svql_driver_handler",
-    "svql_pat",
+    "svql_driver",
     "svql_query",
+    "svql_subgraph",
     ######
     "prjunnamed/netlist",
     "prjunnamed/pattern",
@@ -14,15 +13,17 @@ members = [
     "prjunnamed/siliconblue",
     "prjunnamed/graphviz",
 ]
+default-members = [
+    "svql_driver",
+    "svql_query",
+    "svql_subgraph",
+]
 resolver = "3"
 
 [workspace.dependencies]
-svql_common = { path = "svql_common" }
-svql_driver_handler = { path = "svql_driver_handler" }
-svql_pat = { path = "svql_pat" }
+svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
-svql_query_downstream = { path = "svql_query_downstream" }
-svql_subgraph_isomorphism = { path = "svql_subgraph_isomorphism" }
+svql_subgraph = { path = "svql_subgraph" }
 
 # ---------------------
 
@@ -34,9 +35,9 @@ thiserror = "2.0"
 log = "0.4.27"
 env_logger = "0.11.5"
 itertools = "0.14.0"
-openport = { version = "0.1.1", features = ["rand"] }
 tempfile = "3.20.0"
 which = "8.0.0"
+rstest = "0.26.1"
 
 # ---------------------
 # PRJUNNAMED
@@ -62,4 +63,4 @@ version = "0.1.0"
 license = "0BSD OR Apache-2.0"
 repository = "https://github.com/nickrallison/svql"
 authors = []
-rust-version = "1.91"
+rust-version = "1.87"

@@ -1,19 +1,11 @@
-# svql
+# svql_driver
 
-## Prerequisites
+## Purpose
 
-- cmake
-  - Ubuntu: `sudo apt-get install cmake`
+The svql_driver crate provides design loading and management capabilities for the svql project. It handles the integration with Yosys to parse Verilog designs and convert them into the internal netlist representation. The driver maintains a registry of loaded designs to avoid redundant parsing and provides a context for query execution. It acts as the interface between the file system and the query engine.
 
-## Depends
-
-- nlohmann-json
-  - Ubuntu: `sudo apt-get install nlohmann-json3-dev`
-- Yosys Installed From Source so yosys-config is also installed
-```sh
-git clone https://github.com/YosysHQ/yosys.git
-cd yosys
-git submodule update --init --recursive
-make -j$(nproc)
-sudo make install
-```
+Key responsibilities:
+- Loading Verilog designs via Yosys
+- Managing design registry to avoid duplicate loading
+- Providing design contexts for queries to get around lifetime issues
+- Handling file path resolution and module extraction

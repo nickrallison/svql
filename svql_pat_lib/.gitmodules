@@ -1,3 +1,0 @@
-[submodule "libs/yosys"]
-	path = libs/yosys
-	url = https://github.com/YosysHQ/yosys

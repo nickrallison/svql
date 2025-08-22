@@ -1,44 +1,62 @@
-use std::path::PathBuf;
+use svql_driver::{Driver, DriverKey, context::Context};
+use svql_subgraph::{Config, SubgraphMatch, find_subgraphs};
 
-use svql_common::config::ffi::SvqlRuntimeConfig;
-use crate::{QueryMatch, Search, State, WithPath};
-use svql_driver_handler::Driver;
 use crate::instance::Instance;
 
-pub trait Netlist<S>: WithPath<S> where S: State {
-    // --- Constants ---
-    const MODULE_NAME        : &'static str;
-    const FILE_PATH          : &'static str;
-    const YOSYS              : &'static str;
-    const SVQL_DRIVER_PLUGIN : &'static str;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PortDir {
+    In,
+    Out,
+}
 
-    // --- Shared Functionality ---
-    fn config() -> SvqlRuntimeConfig {
-        let mut cfg = SvqlRuntimeConfig::default();
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PortSpec {
+    pub name: &'static str,
+    pub dir: PortDir,
+}
 
-        let workspace_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        
-        let pat_filename = PathBuf::from(Self::FILE_PATH);
+pub trait NetlistMeta {
+    const MODULE_NAME: &'static str;
+    const FILE_PATH: &'static str;
+    const PORTS: &'static [PortSpec];
 
-        cfg.pat_filename = match pat_filename.is_absolute() {
-            true => pat_filename.display().to_string(),
-            false => workspace_path.join(pat_filename).display().to_string(),
-        };
-
-        cfg.pat_module_name = Self::MODULE_NAME.into();
-        cfg.verbose         = true;
-        cfg.max_fanout = 32;
-        cfg
+    fn driver_key() -> DriverKey {
+        DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 }
 
-pub trait SearchableNetlist: Netlist<Search> {
-    type Hit;
-    fn from_query_match(match_: QueryMatch, path: Instance) -> Self::Hit;
-    fn query(driver:&Driver, path:Instance) -> Vec<Self::Hit> {
-        driver.query(&Self::config())
-            .expect("driver error")
-            .map(|m| Self::from_query_match(m, path.clone()))
+pub trait SearchableNetlist: NetlistMeta + Sized {
+    type Hit<'ctx>;
+
+    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
+
+    fn query<'ctx>(
+        haystack_key: &DriverKey,
+        context: &'ctx Context,
+        path: Instance,
+        config: &Config,
+    ) -> Vec<Self::Hit<'ctx>> {
+        let needle = context
+            .get(&Self::driver_key())
+            .expect("Pattern design not found in context")
+            .as_ref();
+        let haystack = context
+            .get(haystack_key)
+            .expect("Haystack design not found in context")
+            .as_ref();
+
+        find_subgraphs(needle, haystack, config)
+            .into_iter()
+            .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
+    }
+
+    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
+        let key = Self::driver_key();
+        let design = driver
+            .get_or_load_design(key.path(), key.module_name().to_string())?
+            .1;
+
+        Ok(Context::from_single(key, design))
     }
 }

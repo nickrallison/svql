@@ -1,8 +1,0 @@
-out
-build
-cmake-build-debug
-cmake-build-release
-.idea
-*.pdf
-*.dot
-

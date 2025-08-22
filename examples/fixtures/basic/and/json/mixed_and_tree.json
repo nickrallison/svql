@@ -1,0 +1,749 @@
+{
+  "creator": "Yosys 0.33 (git sha1 2584903a060)",
+  "modules": {
+    "mixed_and_tree": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:1.1-63.10"
+      },
+      "ports": {
+        "a": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "b": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "c": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "d": {
+          "direction": "input",
+          "bits": [ 5 ]
+        },
+        "e": {
+          "direction": "input",
+          "bits": [ 6 ]
+        },
+        "f": {
+          "direction": "input",
+          "bits": [ 7 ]
+        },
+        "g": {
+          "direction": "input",
+          "bits": [ 8 ]
+        },
+        "h": {
+          "direction": "input",
+          "bits": [ 9 ]
+        },
+        "y": {
+          "direction": "output",
+          "bits": [ 10 ]
+        }
+      },
+      "cells": {
+        "$flatten\\u_and_gate_0.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:17.14-21.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2 ],
+            "B": [ 3 ],
+            "Y": [ 11 ]
+          }
+        },
+        "$flatten\\u_and_gate_1.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:35.14-39.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 8 ],
+            "B": [ 9 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$flatten\\u_and_gate_2.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:57.14-61.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 13 ],
+            "B": [ 14 ],
+            "Y": [ 10 ]
+          }
+        },
+        "$flatten\\u_and_mux_0.$ternary$examples/patterns/basic/and/verilog/and_mux.v:11$2": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:29.13-33.6|examples/patterns/basic/and/verilog/and_mux.v:11.16-11.28"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ 7 ],
+            "S": [ 6 ],
+            "Y": [ 15 ]
+          }
+        },
+        "$flatten\\u_and_mux_1.$ternary$examples/patterns/basic/and/verilog/and_mux.v:11$2": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:44.13-48.6|examples/patterns/basic/and/verilog/and_mux.v:11.16-11.28"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ 16 ],
+            "S": [ 11 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:12$3": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:12.16-12.18"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:13$4": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:13.16-13.18"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "Y": [ 18 ]
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:17$6": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:17.12-17.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 19 ],
+            "Y": [ 16 ]
+          }
+        },
+        "$flatten\\u_and_nor_0.$or$examples/patterns/basic/and/verilog/and_nor.v:15$5": {
+          "hide_name": 1,
+          "type": "$or",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:15.18-15.31"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 17 ],
+            "B": [ 18 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:12$3": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:12.16-12.18"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15 ],
+            "Y": [ 20 ]
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:13$4": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:13.16-13.18"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 12 ],
+            "Y": [ 21 ]
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:17$6": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:17.12-17.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 22 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$flatten\\u_and_nor_1.$or$examples/patterns/basic/and/verilog/and_nor.v:15$5": {
+          "hide_name": 1,
+          "type": "$or",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:15.18-15.31"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 20 ],
+            "B": [ 21 ],
+            "Y": [ 22 ]
+          }
+        }
+      },
+      "netnames": {
+        "$flatten\\u_and_gate_0.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1_Y": {
+          "hide_name": 1,
+          "bits": [ 11 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:17.14-21.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          }
+        },
+        "$flatten\\u_and_gate_1.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1_Y": {
+          "hide_name": 1,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:35.14-39.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          }
+        },
+        "$flatten\\u_and_gate_2.$and$examples/patterns/basic/and/verilog/and_gate.v:9$1_Y": {
+          "hide_name": 1,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:57.14-61.6|examples/patterns/basic/and/verilog/and_gate.v:9.12-9.17"
+          }
+        },
+        "$flatten\\u_and_mux_0.$ternary$examples/patterns/basic/and/verilog/and_mux.v:11$2_Y": {
+          "hide_name": 1,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:29.13-33.6|examples/patterns/basic/and/verilog/and_mux.v:11.16-11.28"
+          }
+        },
+        "$flatten\\u_and_mux_1.$ternary$examples/patterns/basic/and/verilog/and_mux.v:11$2_Y": {
+          "hide_name": 1,
+          "bits": [ 13 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:44.13-48.6|examples/patterns/basic/and/verilog/and_mux.v:11.16-11.28"
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:12$3_Y": {
+          "hide_name": 1,
+          "bits": [ 17 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:12.16-12.18"
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:13$4_Y": {
+          "hide_name": 1,
+          "bits": [ 18 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:13.16-13.18"
+          }
+        },
+        "$flatten\\u_and_nor_0.$not$examples/patterns/basic/and/verilog/and_nor.v:17$6_Y": {
+          "hide_name": 1,
+          "bits": [ 16 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:17.12-17.20"
+          }
+        },
+        "$flatten\\u_and_nor_0.$or$examples/patterns/basic/and/verilog/and_nor.v:15$5_Y": {
+          "hide_name": 1,
+          "bits": [ 19 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:15.18-15.31"
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:12$3_Y": {
+          "hide_name": 1,
+          "bits": [ 20 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:12.16-12.18"
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:13$4_Y": {
+          "hide_name": 1,
+          "bits": [ 21 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:13.16-13.18"
+          }
+        },
+        "$flatten\\u_and_nor_1.$not$examples/patterns/basic/and/verilog/and_nor.v:17$6_Y": {
+          "hide_name": 1,
+          "bits": [ 14 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:17.12-17.20"
+          }
+        },
+        "$flatten\\u_and_nor_1.$or$examples/patterns/basic/and/verilog/and_nor.v:15$5_Y": {
+          "hide_name": 1,
+          "bits": [ 22 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:15.18-15.31"
+          }
+        },
+        "a": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:3.11-3.12"
+          }
+        },
+        "b": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:4.11-4.12"
+          }
+        },
+        "c": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:5.11-5.12"
+          }
+        },
+        "d": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:6.11-6.12"
+          }
+        },
+        "e": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:7.11-7.12"
+          }
+        },
+        "f": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:8.11-8.12"
+          }
+        },
+        "g": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:9.11-9.12"
+          }
+        },
+        "h": {
+          "hide_name": 0,
+          "bits": [ 9 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:10.11-10.12"
+          }
+        },
+        "s0": {
+          "hide_name": 0,
+          "bits": [ 11 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:15.10-15.12"
+          }
+        },
+        "s1": {
+          "hide_name": 0,
+          "bits": [ 16 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:15.14-15.16"
+          }
+        },
+        "s2": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:15.18-15.20"
+          }
+        },
+        "s3": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:15.22-15.24"
+          }
+        },
+        "t0": {
+          "hide_name": 0,
+          "bits": [ 13 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:42.10-42.12"
+          }
+        },
+        "t1": {
+          "hide_name": 0,
+          "bits": [ 14 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:42.14-42.16"
+          }
+        },
+        "u_and_gate_0.a": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "hdlname": "u_and_gate_0 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:17.14-21.6|examples/patterns/basic/and/verilog/and_gate.v:4.7-4.8"
+          }
+        },
+        "u_and_gate_0.b": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "hdlname": "u_and_gate_0 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:17.14-21.6|examples/patterns/basic/and/verilog/and_gate.v:5.7-5.8"
+          }
+        },
+        "u_and_gate_0.y": {
+          "hide_name": 0,
+          "bits": [ 11 ],
+          "attributes": {
+            "hdlname": "u_and_gate_0 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:17.14-21.6|examples/patterns/basic/and/verilog/and_gate.v:6.8-6.9"
+          }
+        },
+        "u_and_gate_1.a": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "hdlname": "u_and_gate_1 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:35.14-39.6|examples/patterns/basic/and/verilog/and_gate.v:4.7-4.8"
+          }
+        },
+        "u_and_gate_1.b": {
+          "hide_name": 0,
+          "bits": [ 9 ],
+          "attributes": {
+            "hdlname": "u_and_gate_1 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:35.14-39.6|examples/patterns/basic/and/verilog/and_gate.v:5.7-5.8"
+          }
+        },
+        "u_and_gate_1.y": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "hdlname": "u_and_gate_1 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:35.14-39.6|examples/patterns/basic/and/verilog/and_gate.v:6.8-6.9"
+          }
+        },
+        "u_and_gate_2.a": {
+          "hide_name": 0,
+          "bits": [ 13 ],
+          "attributes": {
+            "hdlname": "u_and_gate_2 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:57.14-61.6|examples/patterns/basic/and/verilog/and_gate.v:4.7-4.8"
+          }
+        },
+        "u_and_gate_2.b": {
+          "hide_name": 0,
+          "bits": [ 14 ],
+          "attributes": {
+            "hdlname": "u_and_gate_2 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:57.14-61.6|examples/patterns/basic/and/verilog/and_gate.v:5.7-5.8"
+          }
+        },
+        "u_and_gate_2.y": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "hdlname": "u_and_gate_2 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:57.14-61.6|examples/patterns/basic/and/verilog/and_gate.v:6.8-6.9"
+          }
+        },
+        "u_and_mux_0.a": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "hdlname": "u_and_mux_0 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:29.13-33.6|examples/patterns/basic/and/verilog/and_mux.v:3.12-3.13"
+          }
+        },
+        "u_and_mux_0.b": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "hdlname": "u_and_mux_0 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:29.13-33.6|examples/patterns/basic/and/verilog/and_mux.v:4.12-4.13"
+          }
+        },
+        "u_and_mux_0.y": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "hdlname": "u_and_mux_0 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:29.13-33.6|examples/patterns/basic/and/verilog/and_mux.v:5.12-5.13"
+          }
+        },
+        "u_and_mux_1.a": {
+          "hide_name": 0,
+          "bits": [ 11 ],
+          "attributes": {
+            "hdlname": "u_and_mux_1 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:44.13-48.6|examples/patterns/basic/and/verilog/and_mux.v:3.12-3.13"
+          }
+        },
+        "u_and_mux_1.b": {
+          "hide_name": 0,
+          "bits": [ 16 ],
+          "attributes": {
+            "hdlname": "u_and_mux_1 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:44.13-48.6|examples/patterns/basic/and/verilog/and_mux.v:4.12-4.13"
+          }
+        },
+        "u_and_mux_1.y": {
+          "hide_name": 0,
+          "bits": [ 13 ],
+          "attributes": {
+            "hdlname": "u_and_mux_1 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:44.13-48.6|examples/patterns/basic/and/verilog/and_mux.v:5.12-5.13"
+          }
+        },
+        "u_and_nor_0.a": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:4.12-4.13"
+          }
+        },
+        "u_and_nor_0.b": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:5.12-5.13"
+          }
+        },
+        "u_and_nor_0.nor_out": {
+          "hide_name": 0,
+          "bits": [ 19 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 nor_out",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:9.6-9.13"
+          }
+        },
+        "u_and_nor_0.not_a": {
+          "hide_name": 0,
+          "bits": [ 17 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 not_a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:10.6-10.11"
+          }
+        },
+        "u_and_nor_0.not_b": {
+          "hide_name": 0,
+          "bits": [ 18 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 not_b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:10.13-10.18"
+          }
+        },
+        "u_and_nor_0.y": {
+          "hide_name": 0,
+          "bits": [ 16 ],
+          "attributes": {
+            "hdlname": "u_and_nor_0 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:23.13-27.6|examples/patterns/basic/and/verilog/and_nor.v:6.12-6.13"
+          }
+        },
+        "u_and_nor_1.a": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:4.12-4.13"
+          }
+        },
+        "u_and_nor_1.b": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:5.12-5.13"
+          }
+        },
+        "u_and_nor_1.nor_out": {
+          "hide_name": 0,
+          "bits": [ 22 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 nor_out",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:9.6-9.13"
+          }
+        },
+        "u_and_nor_1.not_a": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 not_a",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:10.6-10.11"
+          }
+        },
+        "u_and_nor_1.not_b": {
+          "hide_name": 0,
+          "bits": [ 21 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 not_b",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:10.13-10.18"
+          }
+        },
+        "u_and_nor_1.y": {
+          "hide_name": 0,
+          "bits": [ 14 ],
+          "attributes": {
+            "hdlname": "u_and_nor_1 y",
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:50.13-54.6|examples/patterns/basic/and/verilog/and_nor.v:6.12-6.13"
+          }
+        },
+        "y": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "examples/fixtures/basic/and/verilog/mixed_and_tree.v:11.12-11.13"
+          }
+        }
+      }
+    }
+  }
+}

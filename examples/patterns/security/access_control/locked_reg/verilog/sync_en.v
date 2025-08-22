@@ -3,15 +3,15 @@
 module sync_en(data_in, clk, resetn, write_en, data_out);
   input clk;
   wire clk;
-  input [15:0] data_in;
-  wire [15:0] data_in;
-  output [15:0] data_out;
-  reg [15:0] data_out;
+  input data_in;
+  wire data_in;
+  output data_out;
+  reg data_out;
   input resetn;
   wire resetn;
   input write_en;
   wire write_en;
   always @(posedge clk)
-    if (!resetn) data_out <= 16'h0000;
+    if (!resetn) data_out <= 1'b0;
     else if (write_en) data_out <= data_in;
 endmodule

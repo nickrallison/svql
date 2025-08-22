@@ -1,10 +1,11 @@
 target
 build
 /.idea
-/.vscode
+# /.vscode
 /.cache
 /cmake-build-*
 /.env
 *.dot
 *.pdf
+out.md
 ##

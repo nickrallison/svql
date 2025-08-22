@@ -1,0 +1,326 @@
+{
+  "creator": "Yosys 0.33 (git sha1 2584903a060)",
+  "modules": {
+    "and_tree": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "examples/patterns/basic/and/verilog/and_tree.v:2.1-16.10"
+      },
+      "ports": {
+        "a": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "b": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "c": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "d": {
+          "direction": "input",
+          "bits": [ 5 ]
+        },
+        "e": {
+          "direction": "input",
+          "bits": [ 6 ]
+        },
+        "f": {
+          "direction": "input",
+          "bits": [ 7 ]
+        },
+        "g": {
+          "direction": "input",
+          "bits": [ 8 ]
+        },
+        "h": {
+          "direction": "input",
+          "bits": [ 9 ]
+        },
+        "y": {
+          "direction": "output",
+          "bits": [ 10 ]
+        }
+      },
+      "cells": {
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$1": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.15-15.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2 ],
+            "B": [ 3 ],
+            "Y": [ 11 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$2": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.25-15.30"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "B": [ 5 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$3": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.14-15.31"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 11 ],
+            "B": [ 12 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$4": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.37-15.42"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 6 ],
+            "B": [ 7 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$5": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.47-15.52"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 8 ],
+            "B": [ 9 ],
+            "Y": [ 15 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$6": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.36-15.53"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 14 ],
+            "B": [ 15 ],
+            "Y": [ 16 ]
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$7": {
+          "hide_name": 1,
+          "type": "$and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.13-15.54"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 13 ],
+            "B": [ 16 ],
+            "Y": [ 10 ]
+          }
+        }
+      },
+      "netnames": {
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$1_Y": {
+          "hide_name": 1,
+          "bits": [ 11 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.15-15.20"
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$2_Y": {
+          "hide_name": 1,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.25-15.30"
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$3_Y": {
+          "hide_name": 1,
+          "bits": [ 13 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.14-15.31"
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$4_Y": {
+          "hide_name": 1,
+          "bits": [ 14 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.37-15.42"
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$5_Y": {
+          "hide_name": 1,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.47-15.52"
+          }
+        },
+        "$and$examples/patterns/basic/and/verilog/and_tree.v:15$6_Y": {
+          "hide_name": 1,
+          "bits": [ 16 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:15.36-15.53"
+          }
+        },
+        "a": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:4.7-4.8"
+          }
+        },
+        "b": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:5.7-5.8"
+          }
+        },
+        "c": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:6.7-6.8"
+          }
+        },
+        "d": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:7.7-7.8"
+          }
+        },
+        "e": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:8.7-8.8"
+          }
+        },
+        "f": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:9.7-9.8"
+          }
+        },
+        "g": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:10.7-10.8"
+          }
+        },
+        "h": {
+          "hide_name": 0,
+          "bits": [ 9 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:11.7-11.8"
+          }
+        },
+        "y": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "examples/patterns/basic/and/verilog/and_tree.v:12.8-12.9"
+          }
+        }
+      }
+    }
+  }
+}

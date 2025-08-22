@@ -1,16 +1,13 @@
-use crate::instance::Instance;
-use std::{collections::HashMap, hash::Hash};
-use svql_common::id_string::IdString;
+use svql_subgraph::CellWrapper;
 
+use crate::instance::Instance;
+
+pub mod binding;
 pub mod composite;
+pub mod connect;
 pub mod instance;
 pub mod netlist;
 pub mod queries;
-
-// ########################
-// Type Definitions
-// ########################
-type QueryMatch = svql_common::matches::SanitizedQueryMatch;
 
 // ########################
 // Type State Tags
@@ -22,31 +19,19 @@ pub trait QueryableState: State {}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Match {
-    pub id: IdString,
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Match<'ctx> {
+    pub pat_cell_ref: Option<CellWrapper<'ctx>>,
+    pub design_cell_ref: Option<CellWrapper<'ctx>>,
 }
 
 impl State for Search {}
-impl State for Match {}
+impl State for Match<'_> {}
 impl QueryableState for Search {}
-impl Default for Match {
-    fn default() -> Self {
-        Self {
-            id: IdString::Named("default".into()),
-        }
-    }
-}
 
 // ########################
 // Helpers
 // ########################
-
-pub fn lookup<'a>(m: &'a HashMap<IdString, IdString>, pin: &str) -> Option<&'a IdString> {
-    m.get(&IdString::Named(pin.into()))
-}
-
-// export
 
 #[macro_export]
 macro_rules! impl_find_port {
@@ -69,11 +54,6 @@ pub trait WithPath<S>: Sized
 where
     S: State,
 {
-    fn new(path: Instance) -> Self;
-
-    fn root(name: impl Into<String>) -> Self {
-        Self::new(Instance::root(name.into()))
-    }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
     fn path(&self) -> Instance;
 }
@@ -97,15 +77,16 @@ where
             val: Some(val),
         }
     }
+
+    pub fn new(path: Instance) -> Self {
+        Self { path, val: None }
+    }
 }
 
 impl<S> WithPath<S> for Wire<S>
 where
     S: State,
 {
-    fn new(path: Instance) -> Self {
-        Self { path, val: None }
-    }
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if p.height() < self.path.height() {
             return None;
