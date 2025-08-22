@@ -79,7 +79,7 @@ lazy_static::lazy_static! {
 #[case(AND_Q_DOUBLE_SDFFE.as_ref(), AND_TREE.as_ref(), 0)]
 #[case(AND_Q_DOUBLE_SDFFE.as_ref(), AND_SEQ.as_ref(), 0)]
 // AND_GATE Needle
-#[case(AND_GATE.as_ref(), AND_Q_DOUBLE_SDFFE.as_ref(), 1)]
+#[case(AND_GATE.as_ref(), AND_Q_DOUBLE_SDFFE.as_ref(), 2)]
 #[case(AND_GATE.as_ref(), AND_GATE.as_ref(), 1)]
 #[case(AND_GATE.as_ref(), AND_TREE.as_ref(), 7)]
 #[case(AND_GATE.as_ref(), AND_SEQ.as_ref(), 7)]
