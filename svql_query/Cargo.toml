@@ -8,6 +8,10 @@ edition = "2024"
 [dev-dependencies]
 rstest.workspace = true
 
+[build-dependencies]
+regex.workspace = true
+walkdir.workspace = true
+
 [dependencies]
 svql_driver.workspace = true
 svql_subgraph.workspace = true
@@ -22,6 +26,9 @@ log.workspace = true
 itertools.workspace = true
 regex.workspace = true
 env_logger.workspace = true
+unstringify.workspace = true
+walkdir.workspace = true
 
 # ---------------------
 prjunnamed-netlist.workspace = true
+

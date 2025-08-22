@@ -41,6 +41,8 @@ itertools = "0.14.0"
 tempfile = "3.20.0"
 which = "8.0.0"
 rstest = "0.26.1"
+unstringify = "0.1.4"
+walkdir = "2.5.0"
 
 # ---------------------
 # PRJUNNAMED

@@ -44,25 +44,38 @@ pub struct TestCase {
 // NEEDLES (Patterns)
 // #####################
 lazy_static::lazy_static! {
-    static ref AND_GATE: Pattern = Pattern::Netlist {
+        static ref AND_GATE: Pattern = Pattern::Netlist {
         path: "examples/patterns/basic/and/verilog/and_gate.v",
         module: "and_gate",
-        pattern_query_type: Some("AndGate"),
+        pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndGate"),
     };
     static ref AND_NOR: Pattern = Pattern::Netlist {
         path: "examples/patterns/basic/and/verilog/and_nor.v",
         module: "and_nor",
-        pattern_query_type: Some("AndNor"),
+        pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndNor"),
     };
     static ref AND_MUX: Pattern = Pattern::Netlist {
         path: "examples/patterns/basic/and/verilog/and_mux.v",
         module: "and_mux",
-        pattern_query_type: Some("AndMux"),
+        pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndMux"),
     };
     static ref SDFFE: Pattern = Pattern::Netlist {
         path: "examples/patterns/basic/ff/verilog/sdffe.v",
         module: "sdffe",
-        pattern_query_type: Some("Sdffe"),
+        pattern_query_type: Some("svql_query::queries::netlist::basic::dff::Sdffe"),
+    };
+}
+
+// #####################
+// COMPOSITE NEEDLES
+// #####################
+
+lazy_static::lazy_static! {
+    static ref SDFFE_THEN_AND: Pattern = Pattern::Composite {
+        pattern_query_type: "svql_query::queries::netlist::composite::SdffeThenAnd",
+    };
+    static ref AND_ANY: Pattern = Pattern::Composite {
+        pattern_query_type: "svql_query::queries::netlist::composite::AndAny",
     };
 }
 
@@ -209,9 +222,7 @@ lazy_static::lazy_static! {
         TestCase {
             name: "sdffe_then_and_simple",
             config: Config::builder().exact_length().none().build(),
-            pattern: &Pattern::Composite {
-                pattern_query_type: "sdffe_then_and",
-            },
+            pattern: &*SDFFE_THEN_AND,
             haystack: &*AND_Q_DOUBLE_SDFFE,
             expected_matches: 2,
         },
@@ -221,9 +232,7 @@ lazy_static::lazy_static! {
         TestCase {
             name: "and_any_in_mixed_tree",
             config: Config::builder().exact_length().auto_morph().build(),
-            pattern: &Pattern::Composite {
-                pattern_query_type: "and_any",
-            },
+            pattern: &*AND_ANY,
             haystack: &*MIXED_AND_TREE,
             expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
         },
