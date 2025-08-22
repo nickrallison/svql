@@ -35,9 +35,6 @@ impl DesignPath {
             DesignPath::Json(p) => p,
         }
     }
-    pub fn exists(&self) -> bool {
-        self.path().exists()
-    }
 }
 
 fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Path) -> Vec<String> {

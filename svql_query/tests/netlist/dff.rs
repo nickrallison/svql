@@ -77,11 +77,6 @@ mod integration_tests {
             // Get the base context with just the pattern
             let mut context = Sdffe::<Search>::context(&*DRIVER).expect("Failed to get context");
 
-            // Load the haystack design and add it to the context
-            let needle_key = svql_driver::DriverKey::new(
-                "examples/patterns/basic/ff/verilog/sdffe.v",
-                "sdffe".to_string(),
-            );
             let haystack_key = svql_driver::DriverKey::new(
                 "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
                 "seq_double_sdffe".to_string(),
@@ -175,11 +170,6 @@ mod integration_tests {
             // Get the base context with just the pattern
             let mut context = Sdffe::<Search>::context(&*DRIVER).expect("Failed to get context");
 
-            // Load the haystack design and add it to the context
-            let needle_key = svql_driver::DriverKey::new(
-                "examples/patterns/basic/ff/verilog/sdffe.v",
-                "sdffe".to_string(),
-            );
             let haystack_key = svql_driver::DriverKey::new(
                 "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
                 "seq_double_sdffe".to_string(),

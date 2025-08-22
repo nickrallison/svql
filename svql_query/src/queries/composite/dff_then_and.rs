@@ -110,7 +110,7 @@ impl SearchableComposite for SdffeThenAnd<Search> {
 
 #[cfg(test)]
 mod tests {
-    use svql_driver::{Driver, DriverKey};
+    use svql_driver::Driver;
     use svql_subgraph::Config;
 
     use crate::{
@@ -142,7 +142,7 @@ mod tests {
 
         assert_eq!(hits.len(), 2, "expected 2 DffThenAnd matches");
 
-        for (k, h) in hits.iter().enumerate() {
+        for (_, h) in hits.iter().enumerate() {
             let q = h
                 .sdffe
                 .q

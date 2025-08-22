@@ -148,12 +148,6 @@ mod integration_tests {
         fn and_connectivity_exists_in_and_tree() {
             // Get the base context with just the needle (pattern)
             let mut context = AndGate::<Search>::context(&*DRIVER).expect("Failed to get context");
-
-            // Load the haystack design and add it to the context
-            let needle_key = svql_driver::DriverKey::new(
-                "examples/patterns/basic/and/verilog/and_gate.v",
-                "and_gate".to_string(),
-            );
             let haystack_key = svql_driver::DriverKey::new(
                 "examples/fixtures/basic/and/verilog/and_tree.v",
                 "and_tree".to_string(),
@@ -183,12 +177,6 @@ mod integration_tests {
         fn and_connectivity_exists_in_and_seq() {
             // Get the base context with just the needle (pattern)
             let mut context = AndGate::<Search>::context(&*DRIVER).expect("Failed to get context");
-
-            // Load the haystack design and add it to the context
-            let needle_key = svql_driver::DriverKey::new(
-                "examples/patterns/basic/and/verilog/and_gate.v",
-                "and_gate".to_string(),
-            );
             let haystack_key = svql_driver::DriverKey::new(
                 "examples/fixtures/basic/and/verilog/and_seq.v",
                 "and_seq".to_string(),
