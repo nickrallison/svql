@@ -620,9 +620,19 @@ dependencies = [
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
  "rstest",
+ "svql_test_data",
  "tempfile",
  "thiserror",
  "which",
+]
+
+[[package]]
+name = "svql_test_data"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "prjunnamed-netlist",
+ "rstest",
 ]
 
 [[package]]
