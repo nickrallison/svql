@@ -66,10 +66,6 @@ mod integration_tests {
             let mut context = AndGate::<Search>::context(&*DRIVER).expect("Failed to get context");
 
             // Load the haystack design and add it to the context
-            let needle_key = svql_driver::DriverKey::new(
-                "examples/patterns/basic/and/verilog/and_gate.v",
-                "and_gate".to_string(),
-            );
             let haystack_key = svql_driver::DriverKey::new(
                 "examples/fixtures/basic/and/verilog/and_tree.v",
                 "and_tree".to_string(),
