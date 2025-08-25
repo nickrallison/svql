@@ -144,12 +144,9 @@ pub fn find_subgraphs<'p, 'd>(
         st.unmap(p_a, d_a);
     }
 
-    match config.dedupe {
-        DedupeMode::AutoMorph => {
-            let mut seen = std::collections::HashSet::new();
-            results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
-        }
-        _ => {}
+    if config.dedupe == DedupeMode::AutoMorph {
+        let mut seen = std::collections::HashSet::new();
+        results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
     }
 
     AllSubgraphMatches { matches: results }

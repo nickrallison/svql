@@ -35,13 +35,12 @@ pub(crate) fn pattern_consumption_bits<'p>(
                 Source::Gate(c, b) => Some((*c, *b)),
                 _ => None,
             };
-            let res = p_src_cell_and_p_bit_opt
-                .map(|(p_src_cell, p_bit)| {
+            
+            p_src_cell_and_p_bit_opt
+                .and_then(|(p_src_cell, p_bit)| {
                     let p_src_node = p_index.try_cell_to_node(p_src_cell)?;
                     (p_src_node == p_id).then_some(p_bit)
                 })
-                .flatten();
-            res
         })
         .collect()
 }

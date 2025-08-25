@@ -213,7 +213,7 @@ fn aligned_sources_simple<'p, 'd>(
     Some(
         p_inputs
             .into_iter()
-            .zip(d_inputs.into_iter())
+            .zip(d_inputs)
             .take(take_len)
             .collect(),
     )
