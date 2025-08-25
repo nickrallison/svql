@@ -1,79 +1,67 @@
-use std::collections::HashMap;
+use std::{cell, collections::HashMap};
 
 use prjunnamed_netlist::Design;
 
-use crate::model::{CellKind, CellPins, CellWrapper, extract_pins};
+use crate::model::{CellKind, CellWrapper, Source};
 
 pub(super) type NodeId = u32;
 
-/// Self-documenting wrapper for "all nodes of a given CellKind".
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct KindNodes {
-    pub kind: CellKind,
-    pub nodes: Vec<NodeId>,
-}
-
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
-    nodes: Vec<CellWrapper<'a>>,
-    kinds: Vec<CellKind>,
-    pins: Vec<CellPins<'a>>,
+    /// Cells of design in topological order
+    cells_topo: Vec<CellWrapper<'a>>,
     by_kind: HashMap<CellKind, Vec<NodeId>>,
-    // Key by debug_index to avoid interior mutability key lint.
     cell_to_id: HashMap<usize, NodeId>,
 }
 
 impl<'a> Index<'a> {
     #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
-        let mut nodes: Vec<CellWrapper<'a>> = Vec::new();
-        let mut kinds: Vec<CellKind> = Vec::new();
-        let mut pins: Vec<CellPins<'a>> = Vec::new();
         let mut by_kind: HashMap<CellKind, Vec<NodeId>> = HashMap::new();
         let mut cell_to_id: HashMap<usize, NodeId> = HashMap::new();
-
         // Filter to gates first, then enumerate so NodeIds are contiguous and stable.
-        let gate_triplets: Vec<(CellWrapper<'a>, CellKind, CellPins<'a>)> = design
-            .iter_cells()
+        let cells_topo: Vec<CellWrapper<'a>> = design
+            .iter_cells_topo()
+            .rev()
             .map(CellWrapper::new)
-            .filter_map(|cell| {
-                let kind = CellKind::from(cell.get().as_ref());
-                kind.is_gate().then_some((cell, kind, extract_pins(cell)))
-            })
+            .filter(|cell| !matches!(cell.kind, CellKind::Name))
+            .collect();
+        let gates: Vec<CellWrapper<'a>> = cells_topo
+            .iter()
+            .filter(|cell| cell.kind.is_gate())
+            .cloned()
             .collect();
 
-        for (id, (cell, kind, cell_pins)) in gate_triplets.into_iter().enumerate() {
+        for (id, cell) in gates.into_iter().enumerate() {
             let id = id as NodeId;
-            nodes.push(cell);
-            kinds.push(kind);
-            pins.push(cell_pins);
-
-            by_kind.entry(kind).or_default().push(id);
+            by_kind.entry(cell.kind).or_default().push(id);
             cell_to_id.insert(cell.debug_index(), id);
         }
 
         Index {
-            nodes,
-            kinds,
-            pins,
+            cells_topo,
             by_kind,
             cell_to_id,
         }
     }
 
-    #[contracts::debug_requires((id as usize) < self.kinds.len())]
-    pub(super) fn node_to_cell(&self, id: NodeId) -> CellWrapper<'a> {
-        self.nodes[id as usize]
+    pub(super) fn get_node_id(&self, index: usize) -> Option<NodeId> {
+        self.cell_to_id.get(&index).copied()
     }
 
-    #[contracts::debug_requires((id as usize) < self.kinds.len())]
+    #[contracts::debug_requires((id as usize) < self.cells_topo.len())]
+    pub(super) fn node_to_cell(&self, id: NodeId) -> &CellWrapper<'a> {
+        &self.cells_topo[id as usize]
+    }
+
+    #[contracts::debug_requires((id as usize) < self.cells_topo.len())]
     pub(super) fn kind(&self, id: NodeId) -> CellKind {
-        self.kinds[id as usize]
+        self.cells_topo[id as usize].kind
     }
 
-    #[contracts::debug_requires((id as usize) < self.kinds.len())]
-    pub(super) fn pins(&self, id: NodeId) -> &CellPins<'a> {
-        &self.pins[id as usize]
+    #[contracts::debug_requires((id as usize) < self.cells_topo.len())]
+    pub(super) fn pins(&self, id: NodeId) -> &Vec<Source<'a>> {
+        &self.cells_topo[id as usize].pins
     }
 
     pub(super) fn of_kind(&self, k: CellKind) -> &[NodeId] {
@@ -81,7 +69,11 @@ impl<'a> Index<'a> {
     }
 
     pub(super) fn gate_count(&self) -> usize {
-        self.nodes.len()
+        self.cells_topo.iter().filter(|c| c.kind.is_gate()).count()
+    }
+
+    pub(super) fn nodes(&self) -> &[CellWrapper<'a>] {
+        &self.cells_topo
     }
 
     pub(super) fn try_cell_to_node(&self, c: CellWrapper<'a>) -> Option<NodeId> {
@@ -89,16 +81,16 @@ impl<'a> Index<'a> {
     }
 
     /// Deterministic owned iteration over kinds.
-    pub(super) fn by_kind_iter(&self) -> Vec<KindNodes> {
-        let mut items: Vec<KindNodes> = self
-            .by_kind
-            .iter()
-            .map(|(k, v)| KindNodes {
-                kind: *k,
-                nodes: v.clone(),
-            })
-            .collect();
-        items.sort_by_key(|kn| kn.kind);
+    pub(super) fn by_kind_iter(&self) -> Vec<(CellKind, Vec<NodeId>)> {
+        let mut items: Vec<(CellKind, Vec<NodeId>)> =
+            self.by_kind.iter().map(|(k, v)| (*k, v.clone())).collect();
+        items.sort_by_key(|kn| kn.0);
         items
+    }
+    pub(super) fn get_cells_topo(&self) -> Vec<&CellWrapper<'a>> {
+        self.cells_topo
+            .iter()
+            // .filter(|c| c.kind.is_gate() | c.kind.is_input())
+            .collect()
     }
 }
