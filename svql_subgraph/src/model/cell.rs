@@ -116,99 +116,99 @@ impl From<&Cell> for CellKind {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CellRefWrapper<'a> {
-    pub cref: CellRef<'a>,
-}
+// #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct CellRefWrapper<'a> {
+//     pub cref: CellRef<'a>,
+// }
 
-impl<'p> CellRefWrapper<'p> {
-    pub fn new(cref: CellRef<'p>) -> Self {
-        CellRefWrapper { cref }
-    }
-    pub fn cref(&self) -> CellRef<'p> {
-        self.cref
-    }
-    pub fn debug_index(&self) -> usize {
-        self.cref.debug_index()
-    }
-    pub fn get(self) -> Cow<'p, Cell> {
-        self.cref.get()
-    }
+// impl<'p> CellRefWrapper<'p> {
+//     pub fn new(cref: CellRef<'p>) -> Self {
+//         CellRefWrapper { cref }
+//     }
+//     pub fn cref(&self) -> CellRef<'p> {
+//         self.cref
+//     }
+//     pub fn debug_index(&self) -> usize {
+//         self.cref.debug_index()
+//     }
+//     pub fn get(self) -> Cow<'p, Cell> {
+//         self.cref.get()
+//     }
 
-    pub fn metadata(&self) -> MetaItemRef<'p> {
-        self.cref.metadata()
-    }
+//     pub fn metadata(&self) -> MetaItemRef<'p> {
+//         self.cref.metadata()
+//     }
 
-    pub fn output_len(&self) -> usize {
-        self.cref.output_len()
-    }
+//     pub fn output_len(&self) -> usize {
+//         self.cref.output_len()
+//     }
 
-    pub fn output(&self) -> Value {
-        self.cref.output()
-    }
+//     pub fn output(&self) -> Value {
+//         self.cref.output()
+//     }
 
-    pub fn visit(&self, f: impl FnMut(Net)) {
-        self.cref.visit(f)
-    }
+//     pub fn visit(&self, f: impl FnMut(Net)) {
+//         self.cref.visit(f)
+//     }
 
-    pub fn replace(&self, to_cell: Cell) {
-        self.cref.replace(to_cell)
-    }
+//     pub fn replace(&self, to_cell: Cell) {
+//         self.cref.replace(to_cell)
+//     }
 
-    pub fn append_metadata(&self, metadata: MetaItemRef<'p>) {
-        self.cref.append_metadata(metadata)
-    }
+//     pub fn append_metadata(&self, metadata: MetaItemRef<'p>) {
+//         self.cref.append_metadata(metadata)
+//     }
 
-    pub fn unalive(&self) {
-        self.cref.unalive()
-    }
+//     pub fn unalive(&self) {
+//         self.cref.unalive()
+//     }
 
-    pub fn design(self) -> &'p Design {
-        self.cref.design()
-    }
+//     pub fn design(self) -> &'p Design {
+//         self.cref.design()
+//     }
 
-    pub fn input_name(&self) -> Option<&'p str> {
-        match self.cref().get() {
-            std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-    pub fn output_name(&self) -> Option<&str> {
-        match self.cref().get() {
-            std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-}
+//     pub fn input_name(&self) -> Option<&'p str> {
+//         match self.cref().get() {
+//             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+//             _ => None,
+//         }
+//     }
+//     pub fn output_name(&self) -> Option<&str> {
+//         match self.cref().get() {
+//             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+//             _ => None,
+//         }
+//     }
+// }
 
-impl<'a> From<CellWrapper<'a>> for CellRefWrapper<'a> {
-    fn from(wrapper: CellWrapper<'a>) -> Self {
-        wrapper.cref
-    }
-}
+// impl<'a> From<CellWrapper<'a>> for CellRefWrapper<'a> {
+//     fn from(wrapper: CellWrapper<'a>) -> Self {
+//         wrapper.cref
+//     }
+// }
 
-impl std::fmt::Debug for CellRefWrapper<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let index: usize = self.cref.debug_index();
-        let metadata: MetaItemRef = self.cref.metadata();
+// impl std::fmt::Debug for CellRefWrapper<'_> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         let index: usize = self.cref.debug_index();
+//         let metadata: MetaItemRef = self.cref.metadata();
 
-        f.debug_struct("CellRefWrapper")
-            .field("index", &index)
-            .field("meta", &metadata)
-            .field("cell", self.cref.get().as_ref())
-            .finish()
-    }
-}
+//         f.debug_struct("CellRefWrapper")
+//             .field("index", &index)
+//             .field("meta", &metadata)
+//             .field("cell", self.cref.get().as_ref())
+//             .finish()
+//     }
+// }
 
-impl<'p> From<CellRef<'p>> for CellRefWrapper<'p> {
-    fn from(cref: CellRef<'p>) -> Self {
-        CellRefWrapper { cref }
-    }
-}
+// impl<'p> From<CellRef<'p>> for CellRefWrapper<'p> {
+//     fn from(cref: CellRef<'p>) -> Self {
+//         CellRefWrapper { cref }
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct CellWrapper<'p> {
-    pub(crate) cref: CellRefWrapper<'p>,
+    pub(crate) cref: CellRef<'p>,
     pub(crate) pins: Vec<Source<'p>>,
     pub(crate) kind: CellKind,
 }
@@ -224,48 +224,7 @@ impl<'p> CellWrapper<'p> {
         CellWrapper { cref, pins, kind }
     }
     pub(crate) fn cref(&self) -> CellRef<'p> {
-        self.cref.cref
-    }
-    pub(crate) fn cref_wrapper(&self) -> CellRefWrapper<'p> {
         self.cref
-    }
-    pub(crate) fn debug_index(&self) -> usize {
-        self.cref.cref.debug_index()
-    }
-    pub(crate) fn get(self) -> Cow<'p, Cell> {
-        self.cref.cref.get()
-    }
-
-    pub(crate) fn metadata(&self) -> MetaItemRef<'p> {
-        self.cref.cref.metadata()
-    }
-
-    pub(crate) fn output_len(&self) -> usize {
-        self.cref.cref.output_len()
-    }
-
-    pub(crate) fn output(&self) -> Value {
-        self.cref.cref.output()
-    }
-
-    pub(crate) fn visit(&self, f: impl FnMut(Net)) {
-        self.cref.cref.visit(f)
-    }
-
-    pub(crate) fn replace(&self, to_cell: Cell) {
-        self.cref.cref.replace(to_cell)
-    }
-
-    pub(crate) fn append_metadata(&self, metadata: MetaItemRef<'p>) {
-        self.cref.cref.append_metadata(metadata)
-    }
-
-    pub(crate) fn unalive(&self) {
-        self.cref.cref.unalive()
-    }
-
-    pub(crate) fn design(self) -> &'p Design {
-        self.cref.cref.design()
     }
 
     pub(crate) fn input_name(&self) -> Option<&'p str> {
@@ -288,16 +247,10 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
     }
 }
 
-impl<'a> From<CellRefWrapper<'a>> for CellWrapper<'a> {
-    fn from(wrapper: CellRefWrapper<'a>) -> Self {
-        CellWrapper::new(wrapper.cref())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Source<'a> {
-    Gate(CellRefWrapper<'a>, usize),
-    Io(CellRefWrapper<'a>, usize),
+    Gate(CellRef<'a>, usize),
+    Io(CellRef<'a>, usize),
     Const(Trit),
 }
 

@@ -554,6 +554,27 @@ pub struct CellRef<'a> {
     index: usize,
 }
 
+// ########
+// TEMP
+// ########
+
+impl std::fmt::Debug for CellRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let index: usize = self.debug_index();
+        let metadata: MetaItemRef = self.metadata();
+
+        f.debug_struct("CellRefWrapper")
+            .field("index", &index)
+            .field("meta", &metadata)
+            .field("cell", self.get().as_ref())
+            .finish()
+    }
+}
+
+// ########
+// END TEMP
+// ########
+
 impl PartialEq<CellRef<'_>> for CellRef<'_> {
     fn eq(&self, other: &CellRef<'_>) -> bool {
         std::ptr::eq(self.design, other.design) && self.index == other.index
