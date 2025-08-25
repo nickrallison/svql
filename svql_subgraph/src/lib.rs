@@ -1,41 +1,41 @@
-// mod dedupe;
 mod index;
+mod mapping;
 mod model;
-mod search;
-// mod state;
 
-pub use model::CellWrapper;
+pub use model::CellRefWrapper;
+
+use index::Index;
+use mapping::CellMapping;
+use prjunnamed_netlist::Design;
+use std::collections::{HashMap, VecDeque};
 use svql_common::Config;
 
-use crate::index::{Index, NodeId};
-use crate::search::rarest_gate_heuristic;
-
-use core::panic;
-use std::cell;
-use std::collections::{HashMap, HashSet};
-
-use prjunnamed_netlist::Design;
+use crate::model::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
-    /// Gate mapping (pattern gate -> design gate)
-    pub cell_mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
-    /// pattern input name -> design cell that feeds it
-    pub input_binding_by_name: HashMap<&'p str, Vec<(CellWrapper<'d>, usize)>>,
-    /// pattern output name -> design cell that drives it
-    pub output_driver_by_name: HashMap<&'p str, Vec<(CellWrapper<'d>, usize)>>,
+    /// Cell Mapping
+    mapping: CellMapping<'p, 'd>,
+    /// pattern input name -> pattern cell that feeds it
+    input_binding_by_name: HashMap<String, Vec<(CellRefWrapper<'p>, usize)>>,
+    /// pattern output name -> pattern cell that drives it
+    output_driver_by_name: HashMap<String, Vec<(CellRefWrapper<'p>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
     pub fn len(&self) -> usize {
-        self.cell_mapping.len()
+        self.mapping.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.cell_mapping.is_empty()
+        self.mapping.is_empty()
     }
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, CellWrapper<'p>, CellWrapper<'d>> {
-        self.cell_mapping.iter()
-    }
+
+    // pub fn pattern_mapping(&self) -> &HashMap<&'p CellWrapper<'p>, &'d CellWrapper<'d>> {
+    //     self.mapping.pattern_mapping()
+    // }
+    // pub fn design_mapping(&self) -> &HashMap<&'d CellWrapper<'d>, &'p CellWrapper<'p>> {
+    //     self.mapping.design_mapping()
+    // }
 }
 
 pub fn find_subgraphs<'p, 'd>(
@@ -50,65 +50,120 @@ pub fn find_subgraphs<'p, 'd>(
         return Vec::new();
     }
 
-    let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
-
     // in topological_order, only gates & inputs
-    let p_mapping_queue: Vec<&CellWrapper<'p>> = p_index
+    let p_mapping_queue: VecDeque<&CellWrapper<'p>> = p_index
         .get_cells_topo()
         .into_iter()
         .filter(|c| !matches!(c.kind, model::CellKind::Output))
         .collect();
 
-    panic!("{:#?}", p_mapping_queue);
+    let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
+
+    let results = find_subgraphs_recursive(
+        &p_index,
+        &d_index,
+        config,
+        initial_cell_mapping,
+        p_mapping_queue,
+    );
 
     return results;
-
-    // for &d_a in &des_anchors {
-    //     let empty_state = State::<'p, 'd>::new(p_index.gate_count());
-    //     if !cells_compatible(
-    //         p_a,
-    //         d_a,
-    //         &p_index,
-    //         &d_index,
-    //         &empty_state,
-    //         config.match_length,
-    //     ) {
-    //         continue;
-    //     }
-
-    //     let mut st = State::new(p_index.gate_count());
-    //     st.map(p_a, d_a);
-    //     let added = search::add_bindings_from_pair(p_a, d_a, &p_index, &d_index, &mut st, config);
-
-    //     backtrack(
-    //         &p_index,
-    //         &d_index,
-    //         &mut st,
-    //         &mut results,
-    //         &pat_inputs,
-    //         &pat_outputs,
-    //         config,
-    //     );
-
-    //     search::remove_bindings(added, &mut st);
-    //     st.unmap(p_a, d_a);
-    // }
-
-    // if config.dedupe == DedupeMode::AutoMorph {
-    //     let mut seen = std::collections::HashSet::new();
-    //     results.retain(|m| seen.insert(signature_mapped_gate_set(m)));
-    // }
-
-    // AllSubgraphMatches { matches: results }
-    todo!()
 }
 
-fn recursive_search<'p, 'd>(
+fn find_subgraphs_recursive<'p, 'd>(
+    p_index: &'p Index<'p>,
+    d_index: &'d Index<'d>,
+    config: &Config,
+    cell_mapping: CellMapping<'p, 'd>,
+    mut p_mapping_queue: VecDeque<&'p CellWrapper<'p>>,
+) -> Vec<SubgraphMatch<'p, 'd>> {
+    // 1. Pop the first element of mapping queue
+    let Some(current) = p_mapping_queue.pop_front() else {
+        // Base Case: If there are no more cells to be mapped, construct a match from the given cell_mapping
+
+        let input_cells = todo!();
+        let output_cells = todo!();
+
+        todo!()
+    };
+
+    // 2. Find All Possible Mappings
+    //     - Must not be already mapped
+    //     - Must be compatible
+    //     - Design must share the same connectivity as the pattern
+    //         - See pins field of CellWrapper
+
+    let all_possible_matches = d_index.get_by_kind(current.kind).into_iter();
+
+    let not_already_mapped = all_possible_matches.filter(|&d_cell| {
+        !cell_mapping
+            .design_mapping()
+            .contains_key(&d_cell.cref_wrapper())
+    });
+
+    let compatible = not_already_mapped
+        .filter(|&d_cell| cells_compatible(current, d_cell, p_index, d_index, config));
+
+    let shares_connectivity = compatible.filter(|&d_cell| {
+        cells_share_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping)
+    });
+
+    // 3. For each valid cell, create a new mapping and try to call self recursively and put together all the results
+    //     - This looks like a lot, but the `cells_share_connectivity` function should heavily cut down the number of recursions
+    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = shares_connectivity
+        .map(|d_cell| {
+            let mut new_cell_mapping = cell_mapping.clone();
+            new_cell_mapping.insert(current.cref_wrapper(), d_cell.cref_wrapper());
+            new_cell_mapping
+        })
+        .collect();
+
+    let results: Vec<SubgraphMatch<'p, 'd>> = {
+        let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
+            .into_iter()
+            .flat_map(|new_cell_mapping| {
+                find_subgraphs_recursive(
+                    p_index,
+                    d_index,
+                    config,
+                    new_cell_mapping,
+                    p_mapping_queue.clone(),
+                )
+            })
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.sig()));
+
+        results
+    };
+
+    results
+}
+
+fn cells_compatible<'p, 'd>(
+    p_cell: &CellWrapper<'p>,
+    d_cell: &CellWrapper<'d>,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     config: &Config,
-    mapping: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
-    mapping_queue: Vec<CellWrapper<'p>>,
-) -> Vec<SubgraphMatch<'p, 'd>> {
+) -> bool {
+    // Check if the cells share the same kind
+    if p_cell.kind != d_cell.kind {
+        return false;
+    }
+
+    // later check config for size compatibility
+
+    true
+}
+
+fn cells_share_connectivity<'p, 'd>(
+    p_cell: &CellWrapper<'p>,
+    d_cell: &CellWrapper<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    config: &Config,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
     todo!()
 }
