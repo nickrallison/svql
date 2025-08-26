@@ -25,7 +25,7 @@ pub(super) struct Index<'a> {
 impl<'a> Index<'a> {
     #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Index::build: start. design cells={}",
             design.iter_cells().count()
         );
@@ -40,7 +40,7 @@ impl<'a> Index<'a> {
             })
             .collect();
 
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Index::build: cells_topo len={} (excluding Name). gate_count={}",
             cells_topo.len(),
             cells_topo
@@ -55,7 +55,7 @@ impl<'a> Index<'a> {
         }
 
         for (k, v) in by_kind.iter() {
-            trace!("Index::build: by_kind {:?} -> {}", k, v.len());
+            tracing::event!(tracing::Level::TRACE, "Index::build: by_kind {:?} -> {}", k, v.len());
         }
 
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
@@ -100,11 +100,11 @@ impl<'a> Index<'a> {
             }
         }
 
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Index::build: reverse_cell_lookup keys={} (drivers).",
             reverse_cell_lookup.len()
         );
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Index::build: fanout_map keys={} (drivers).",
             fanout_map.len()
         );
@@ -127,7 +127,7 @@ impl<'a> Index<'a> {
 
     pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellRef<'a>] {
         let slice = self.by_kind.get(&kind).map(|v| v.as_slice()).unwrap_or(&[]);
-        trace!("Index::get_by_kind: {:?} -> {}", kind, slice.len());
+        tracing::event!(tracing::Level::TRACE, "Index::get_by_kind: {:?} -> {}", kind, slice.len());
         slice
     }
 
@@ -141,7 +141,7 @@ impl<'a> Index<'a> {
             .get(&cell)
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Index::get_fanouts: driver #{} -> {} sinks",
             cell.debug_index(),
             slice.len()

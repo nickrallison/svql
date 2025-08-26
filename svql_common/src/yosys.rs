@@ -119,7 +119,7 @@ pub fn import_design_yosys(
             .read_to_end(&mut stderr_buf)
             .expect("Failed to read stderr");
         let stderr_str = String::from_utf8_lossy(&stderr_buf);
-        error!(
+        tracing::event!(tracing::Level::ERROR, 
             "Yosys process failed with status: {:?}\nStderr: {}",
             exit_status, stderr_str
         );

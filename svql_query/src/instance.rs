@@ -14,7 +14,7 @@ impl Instance {
     pub fn root(inst_in: String) -> Self {
         let inst: Arc<str> = Arc::from(inst_in.clone());
         let path = vec![inst.clone()];
-        trace!("Creating root instance: {}", inst_in);
+        tracing::event!(tracing::Level::TRACE, "Creating root instance: {}", inst_in);
         Self {
             inst: inst.clone(),
             path,
@@ -28,7 +28,7 @@ impl Instance {
         let child: Arc<str> = Arc::from(child);
         let mut new_path = self.path.clone();
         new_path.push(child.clone());
-        trace!("Creating child instance: {}", child);
+        tracing::event!(tracing::Level::TRACE, "Creating child instance: {}", child);
         let new = Self {
             inst: child.clone(),
             path: new_path,

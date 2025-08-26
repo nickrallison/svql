@@ -81,13 +81,13 @@ impl Driver {
         {
             let registry = self.registry.read().unwrap();
             if registry.contains_key(&key) {
-                debug!("Design already loaded: {:?}", key);
+                tracing::event!(tracing::Level::DEBUG, "Design already loaded: {:?}", key);
                 return Ok(key);
             }
         }
 
         // Load the design
-        info!(
+        tracing::event!(tracing::Level::INFO, 
             "Loading design: {} ({})",
             absolute_path.display(),
             module_name
@@ -98,7 +98,7 @@ impl Driver {
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), Arc::new(design));
-            debug!("Design stored in registry: {:?}", key);
+            tracing::event!(tracing::Level::DEBUG, "Design stored in registry: {:?}", key);
         }
 
         Ok(key)
@@ -124,13 +124,13 @@ impl Driver {
         {
             let registry = self.registry.read().unwrap();
             if let Some(design) = registry.get(&key) {
-                debug!("Design found in registry: {:?}", key);
+                tracing::event!(tracing::Level::DEBUG, "Design found in registry: {:?}", key);
                 return Ok((key, design.clone()));
             }
         }
 
         // Load and store
-        info!(
+        tracing::event!(tracing::Level::INFO, 
             "Loading design: {} ({})",
             absolute_path.display(),
             module_name
@@ -141,7 +141,7 @@ impl Driver {
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), design_arc.clone());
-            debug!("Design stored in registry: {:?}", key);
+            tracing::event!(tracing::Level::DEBUG, "Design stored in registry: {:?}", key);
         }
 
         Ok((key, design_arc))
@@ -152,9 +152,9 @@ impl Driver {
         let registry = self.registry.read().unwrap();
         let result = registry.get(key).cloned();
         if result.is_some() {
-            debug!("Design retrieved from registry: {:?}", key);
+            tracing::event!(tracing::Level::DEBUG, "Design retrieved from registry: {:?}", key);
         } else {
-            warn!("Design not found in registry: {:?}", key);
+            tracing::event!(tracing::Level::WARN, "Design not found in registry: {:?}", key);
         }
         result
     }
@@ -178,9 +178,9 @@ impl Driver {
         for key in keys {
             if let Some(design) = registry.get(key) {
                 context.insert(key.clone(), design.clone());
-                debug!("Design added to context: {:?}", key);
+                tracing::event!(tracing::Level::DEBUG, "Design added to context: {:?}", key);
             } else {
-                warn!("Design not found in registry: {:?}", key);
+                tracing::event!(tracing::Level::WARN, "Design not found in registry: {:?}", key);
                 return Err(DriverError::DesignLoading(format!(
                     "Design not found for key: {:?}",
                     key
@@ -193,14 +193,14 @@ impl Driver {
 
     /// Create a context with a single design
     pub fn create_context_single(&self, key: &DriverKey) -> Result<Context, DriverError> {
-        debug!("Creating context with single design: {:?}", key);
+        tracing::event!(tracing::Level::DEBUG, "Creating context with single design: {:?}", key);
         self.create_context(&[key.clone()])
     }
 
     /// Get all currently loaded designs
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<Design>> {
         let registry = self.registry.read().unwrap();
-        debug!(
+        tracing::event!(tracing::Level::DEBUG, 
             "Retrieved all designs from registry (count: {})",
             registry.len()
         );
@@ -213,7 +213,7 @@ impl Driver {
         design_path: &Path,
         module_name: &str,
     ) -> Result<Design, DriverError> {
-        debug!(
+        tracing::event!(tracing::Level::DEBUG, 
             "Loading design from path: {} ({})",
             design_path.display(),
             module_name

@@ -155,7 +155,7 @@ mod tests {
         let hits = AndAny::<Search>::query(&haystack_key, &context, root, &config);
 
         for h in &hits {
-            trace!("Found match: {:#?}", h);
+            tracing::event!(tracing::Level::TRACE, "Found match: {:#?}", h);
         }
 
         let mut gate_cnt = 0usize;
@@ -170,7 +170,7 @@ mod tests {
             }
         }
 
-        trace!(
+        tracing::event!(tracing::Level::TRACE, 
             "Found {} gate matches, {} mux matches, {} nor matches",
             gate_cnt, mux_cnt, nor_cnt
         );
