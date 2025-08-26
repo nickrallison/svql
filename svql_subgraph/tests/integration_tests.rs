@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use log::trace;
     use svql_common::{ALL_TEST_CASES, Pattern, import_design};
 
     #[test]
@@ -46,6 +47,8 @@ mod tests {
         let actual_matches = matches.len();
 
         if actual_matches != expected_matches {
+            trace!("Test case '{}' failed", test_case.name);
+            panic!("DEBUGGING");
             return Err(format!(
                 "Test case '{}' failed: expected {} matches, got {}",
                 test_case.name, expected_matches, actual_matches

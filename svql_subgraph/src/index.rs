@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use prjunnamed_netlist::{CellRef, Design};
 
 use crate::model::{CellKind, CellWrapper, Source};
+use log::trace;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
@@ -15,6 +16,11 @@ pub(super) struct Index<'a> {
 impl<'a> Index<'a> {
     #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
+        trace!(
+            "Index::build: start. design cells={}",
+            design.iter_cells().count()
+        );
+
         let mut by_kind: HashMap<CellKind, Vec<CellWrapper<'a>>> = HashMap::new();
         let cells_topo: Vec<CellWrapper<'a>> = design
             .iter_cells_topo()
@@ -22,17 +28,22 @@ impl<'a> Index<'a> {
             .map(CellWrapper::new)
             .filter(|cell| !matches!(cell.kind, CellKind::Name))
             .collect();
-        let gates: Vec<CellWrapper<'a>> = cells_topo
-            .iter()
-            .filter(|cell| cell.kind.is_gate())
-            .cloned()
-            .collect();
+        trace!(
+            "Index::build: cells_topo len={} (excluding Name). gate_count={}",
+            cells_topo.len(),
+            cells_topo.iter().filter(|c| c.kind.is_gate()).count()
+        );
 
-        for cell_wrapper in gates.into_iter() {
+        // IMPORTANT: index ALL non-Name kinds (Inputs, Outputs, Gates, etc.)
+        for cell_wrapper in cells_topo.iter().cloned() {
             by_kind
                 .entry(cell_wrapper.kind)
                 .or_default()
                 .push(cell_wrapper);
+        }
+
+        for (k, v) in by_kind.iter() {
+            trace!("Index::build: by_kind {:?} -> {}", k, v.len());
         }
 
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
@@ -56,6 +67,11 @@ impl<'a> Index<'a> {
             }
         }
 
+        trace!(
+            "Index::build: reverse_cell_lookup keys={} (drivers).",
+            reverse_cell_lookup.len()
+        );
+
         Index {
             cells_topo,
             by_kind,
@@ -64,7 +80,9 @@ impl<'a> Index<'a> {
     }
 
     pub(super) fn of_kind(&self, k: CellKind) -> &[CellWrapper<'a>] {
-        self.by_kind.get(&k).map(|v| v.as_slice()).unwrap_or(&[])
+        let slice = self.by_kind.get(&k).map(|v| v.as_slice()).unwrap_or(&[]);
+        trace!("Index::of_kind: {:?} -> {}", k, slice.len());
+        slice
     }
 
     pub(super) fn gate_count(&self) -> usize {
@@ -84,24 +102,37 @@ impl<'a> Index<'a> {
     }
 
     pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellWrapper<'a>] {
-        self.by_kind.get(&kind).map(|v| v.as_slice()).unwrap_or(&[])
+        let slice = self.by_kind.get(&kind).map(|v| v.as_slice()).unwrap_or(&[]);
+        trace!("Index::get_by_kind: {:?} -> {}", kind, slice.len());
+        slice
     }
 
     pub(super) fn get_cells_topo(&self) -> &[CellWrapper<'a>] {
         &self.cells_topo
     }
+
     pub(super) fn get_outputs(&self) -> Vec<CellWrapper<'a>> {
-        self.cells_topo
+        let v: Vec<CellWrapper<'a>> = self
+            .cells_topo
             .iter()
             .filter(|c| c.kind.is_output())
             .cloned()
-            .collect()
+            .collect();
+        trace!("Index::get_outputs -> {}", v.len());
+        v
     }
 
     pub(super) fn get_fanouts(&self, cell: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
-        self.reverse_cell_lookup
+        let slice = self
+            .reverse_cell_lookup
             .get(&cell)
             .map(|v| v.as_slice())
-            .unwrap_or(&[])
+            .unwrap_or(&[]);
+        trace!(
+            "Index::get_fanouts: driver #{} -> {} sinks",
+            cell.debug_index(),
+            slice.len()
+        );
+        slice
     }
 }

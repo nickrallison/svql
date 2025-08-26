@@ -116,96 +116,6 @@ impl From<&Cell> for CellKind {
     }
 }
 
-// #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct CellRefWrapper<'a> {
-//     pub cref: CellRef<'a>,
-// }
-
-// impl<'p> CellRefWrapper<'p> {
-//     pub fn new(cref: CellRef<'p>) -> Self {
-//         CellRefWrapper { cref }
-//     }
-//     pub fn cref(&self) -> CellRef<'p> {
-//         self.cref
-//     }
-//     pub fn debug_index(&self) -> usize {
-//         self.cref.debug_index()
-//     }
-//     pub fn get(self) -> Cow<'p, Cell> {
-//         self.cref.get()
-//     }
-
-//     pub fn metadata(&self) -> MetaItemRef<'p> {
-//         self.cref.metadata()
-//     }
-
-//     pub fn output_len(&self) -> usize {
-//         self.cref.output_len()
-//     }
-
-//     pub fn output(&self) -> Value {
-//         self.cref.output()
-//     }
-
-//     pub fn visit(&self, f: impl FnMut(Net)) {
-//         self.cref.visit(f)
-//     }
-
-//     pub fn replace(&self, to_cell: Cell) {
-//         self.cref.replace(to_cell)
-//     }
-
-//     pub fn append_metadata(&self, metadata: MetaItemRef<'p>) {
-//         self.cref.append_metadata(metadata)
-//     }
-
-//     pub fn unalive(&self) {
-//         self.cref.unalive()
-//     }
-
-//     pub fn design(self) -> &'p Design {
-//         self.cref.design()
-//     }
-
-//     pub fn input_name(&self) -> Option<&'p str> {
-//         match self.cref().get() {
-//             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-//             _ => None,
-//         }
-//     }
-//     pub fn output_name(&self) -> Option<&str> {
-//         match self.cref().get() {
-//             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-//             _ => None,
-//         }
-//     }
-// }
-
-// impl<'a> From<CellWrapper<'a>> for CellRefWrapper<'a> {
-//     fn from(wrapper: CellWrapper<'a>) -> Self {
-//         wrapper.cref
-//     }
-// }
-
-// impl std::fmt::Debug for CellRefWrapper<'_> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let index: usize = self.cref.debug_index();
-//         let metadata: MetaItemRef = self.cref.metadata();
-
-//         f.debug_struct("CellRefWrapper")
-//             .field("index", &index)
-//             .field("meta", &metadata)
-//             .field("cell", self.cref.get().as_ref())
-//             .finish()
-//     }
-// }
-
-// impl<'p> From<CellRef<'p>> for CellRefWrapper<'p> {
-//     fn from(cref: CellRef<'p>) -> Self {
-//         CellRefWrapper { cref }
-//     }
-// }
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct CellWrapper<'p> {
     pub(crate) cref: CellRef<'p>,
@@ -225,6 +135,21 @@ impl<'p> CellWrapper<'p> {
     }
     pub(crate) fn cref(&self) -> CellRef<'p> {
         self.cref
+    }
+
+    pub(crate) fn debug_index(&self) -> usize {
+        self.cref.debug_index()
+    }
+
+    pub(crate) fn summary(&self) -> String {
+        let iname = self.input_name().unwrap_or("");
+        let oname = self.output_name().unwrap_or("");
+        let n = if !iname.is_empty() { iname } else { oname };
+        if n.is_empty() {
+            format!("#{} {:?}", self.cref.debug_index(), self.kind)
+        } else {
+            format!("#{} {:?}({})", self.cref.debug_index(), self.kind, n)
+        }
     }
 
     pub(crate) fn input_name(&self) -> Option<&'p str> {
