@@ -3,7 +3,7 @@ mod mapping;
 mod model;
 
 use index::Index;
-use log::trace;
+use log::{info, trace};
 use mapping::CellMapping;
 use prjunnamed_netlist::Design;
 use std::collections::VecDeque;
@@ -74,7 +74,12 @@ pub fn find_subgraphs<'p, 'd>(
         0, // depth
     );
 
-    trace!("find_subgraphs: results={}", results.len());
+    info!(
+        "find_subgraphs: results={} unique_sigs={:?}",
+        results.len(),
+        results.iter().map(|m| m.mapping.sig()).collect::<Vec<_>>()
+    );
+
     results
 }
 
@@ -108,12 +113,6 @@ fn find_subgraphs_recursive<'p, 'd>(
         p_mapping_queue.len(),
         cell_mapping.len()
     );
-
-    // 2. Find All Possible Mappings
-    //     - Must not be already mapped
-    //     - Must be compatible
-    //     - Design must share the same connectivity as the pattern
-    //         - See pins field of CellWrapper
 
     let mut new_cell_mappings: Vec<CellMapping<'p, 'd>> = Vec::new();
 
@@ -271,11 +270,102 @@ fn cells_share_connectivity<'p, 'd>(
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
 ) -> bool {
-    // For each already-mapped fanout (sink) of the pattern cell, ensure the design cell
-    // also drives the mapped sink at the same pin index.
+    // 1) Enforce fanin: every already-mapped driver of the pattern cell must match
+    //    the corresponding design driver on the same pin index (and constant pins must match).
+    let fanin_ok = p_cell
+        .pins
+        .iter()
+        .enumerate()
+        .all(|(pin_idx, p_src)| {
+            let d_src_opt = d_cell.pins.get(pin_idx);
+            let Some(d_src) = d_src_opt else {
+                trace!(
+                    "cells_share_connectivity: P {} pin {} has no corresponding D pin",
+                    p_cell.summary(),
+                    pin_idx
+                );
+                return false;
+            };
 
+            match p_src {
+                // Constants must match exactly.
+                crate::model::Source::Const(pt) => {
+                    let ok = matches!(d_src, crate::model::Source::Const(dt) if dt == pt);
+                    if !ok {
+                        trace!(
+                            "cells_share_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
+                            pin_idx,
+                            p_src,
+                            d_src
+                        );
+                    }
+                    ok
+                }
+                // Pattern Io source may map to either an Io or a Gate in the design.
+                crate::model::Source::Io(p_src_cell, p_bit) => {
+                    if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
+                        let ok = match d_src {
+                            crate::model::Source::Io(d_cell, d_bit) => {
+                                *d_cell == d_src_cell && d_bit == p_bit
+                            }
+                            crate::model::Source::Gate(d_cell, d_bit) => {
+                                *d_cell == d_src_cell && d_bit == p_bit
+                            }
+                            crate::model::Source::Const(_) => false,
+                        };
+                        if !ok {
+                            trace!(
+                                "cells_share_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
+                                pin_idx,
+                                p_src,
+                                d_src_cell.debug_index(),
+                                d_src
+                            );
+                        }
+                        ok
+                    } else {
+                        // If the Io driver is not yet mapped, we cannot constrain it now.
+                        true
+                    }
+                }
+                // Pattern Gate source must map to the same Gate in design on same bit.
+                crate::model::Source::Gate(p_src_cell, p_bit) => {
+                    if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
+                        let ok = matches!(
+                            d_src,
+                            crate::model::Source::Gate(d_cell, d_bit)
+                            if *d_cell == d_src_cell && d_bit == p_bit
+                        );
+                        if !ok {
+                            trace!(
+                                "cells_share_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
+                                pin_idx,
+                                p_src,
+                                d_src_cell.debug_index(),
+                                d_src
+                            );
+                        }
+                        ok
+                    } else {
+                        // Source not mapped yet; cannot constrain now.
+                        true
+                    }
+                }
+            }
+        });
+
+    if !fanin_ok {
+        trace!(
+            "cells_share_connectivity: P {} vs D {} -> fanin check FAILED",
+            p_cell.summary(),
+            d_cell.summary()
+        );
+        return false;
+    }
+
+    // 2) Enforce fanout: any already-mapped sink of the pattern cell must also appear
+    //    as a sink of the candidate design cell, on the same pin index.
     let d_fanouts = d_index.get_fanouts(d_cell.cref());
-
     let p_fanouts = p_index.get_fanouts(p_cell.cref());
     trace!(
         "cells_share_connectivity: P {} fanouts={} | D {} fanouts={}",
@@ -285,7 +375,7 @@ fn cells_share_connectivity<'p, 'd>(
         d_fanouts.len()
     );
 
-    let result = p_fanouts
+    let fanout_ok = p_fanouts
         .iter()
         .filter_map(|(p_sink_cell, pin_idx)| {
             mapping
@@ -304,6 +394,8 @@ fn cells_share_connectivity<'p, 'd>(
             );
             ok
         });
+
+    let result = fanin_ok && fanout_ok;
 
     trace!(
         "cells_share_connectivity: P {} vs D {} -> {}",
