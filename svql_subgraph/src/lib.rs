@@ -58,7 +58,8 @@ pub fn find_subgraphs<'p, 'd>(
     config: &Config,
 ) -> Vec<SubgraphMatch<'p, 'd>> {
     if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs: start. pattern cells={} design cells={}",
             pattern.iter_cells().count(),
             design.iter_cells().count()
@@ -69,7 +70,8 @@ pub fn find_subgraphs<'p, 'd>(
     let d_index = Index::build(design);
 
     if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs: gate counts: pattern={} design={}",
             p_index.gate_count(),
             d_index.gate_count()
@@ -77,7 +79,10 @@ pub fn find_subgraphs<'p, 'd>(
     }
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
-        tracing::event!(tracing::Level::TRACE, "find_subgraphs: early return (empty gate count)");
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_subgraphs: early return (empty gate count)"
+        );
         return Vec::new();
     }
 
@@ -105,7 +110,8 @@ pub fn find_subgraphs<'p, 'd>(
         .collect();
 
     if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs: initial pattern mapping queue size={}",
             p_mapping_queue.len()
         );
@@ -124,7 +130,8 @@ pub fn find_subgraphs<'p, 'd>(
         0, // depth
     );
 
-    tracing::event!(tracing::Level::INFO, 
+    tracing::event!(
+        tracing::Level::INFO,
         "find_subgraphs: results={} unique_sigs={:?}",
         results.len(),
         results.iter().map(|m| m.mapping.sig()).collect::<Vec<_>>()
@@ -213,7 +220,8 @@ fn find_subgraphs_recursive<'p, 'd>(
 ) -> Vec<SubgraphMatch<'p, 'd>> {
     let Some(current) = p_mapping_queue.pop_front() else {
         if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(tracing::Level::TRACE, 
+            tracing::event!(
+                tracing::Level::TRACE,
                 "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
                 depth,
                 cell_mapping.len()
@@ -227,7 +235,8 @@ fn find_subgraphs_recursive<'p, 'd>(
     };
 
     if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
             depth,
             current.debug_index(),
@@ -298,7 +307,8 @@ fn find_subgraphs_recursive<'p, 'd>(
         .collect();
 
     if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
             depth,
             total_candidates,
@@ -332,9 +342,12 @@ fn find_subgraphs_recursive<'p, 'd>(
         let after_dedup = results.len();
 
         if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(tracing::Level::TRACE, 
+            tracing::event!(
+                tracing::Level::TRACE,
                 "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-                depth, before_dedup, after_dedup
+                depth,
+                before_dedup,
+                after_dedup
             );
         }
     }
@@ -350,7 +363,8 @@ fn d_cell_already_mapped(
 ) -> bool {
     if cell_mapping.design_mapping().contains_key(&d_cell) {
         *already_mapped += 1;
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "find_subgraphs_recursive[depth={}]: skip D #{} (already mapped)",
             depth,
             d_cell.debug_index()
@@ -367,9 +381,11 @@ fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind, incompatibility: &mut u
     }
     if p_kind != d_kind {
         *incompatibility += 1;
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "cells incompatible: kind mismatch P {:?} vs D {:?}",
-            p_kind, d_kind
+            p_kind,
+            d_kind
         );
         return false;
     }
@@ -379,9 +395,12 @@ fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind, incompatibility: &mut u
 fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'d>) -> bool {
     let ok = matches!(d_src, Source::Const(dt) if matches!(p_src, Source::Const(pt) if dt == pt));
     if !ok {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "d_cell_valid_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
-            pin_idx, p_src, d_src
+            pin_idx,
+            p_src,
+            d_src
         );
     }
     ok
@@ -406,7 +425,8 @@ fn source_matches_mapped_io<'p, 'd>(
     };
 
     if !ok {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
             pin_idx,
             Source::Io(p_src_cell, p_bit),
@@ -434,7 +454,8 @@ fn source_matches_mapped_gate<'p, 'd>(
         matches!(d_src, Source::Gate(d_cell, d_bit) if *d_cell == d_src_cell && *d_bit == p_bit);
 
     if !ok {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
             pin_idx,
             Source::Gate(p_src_cell, p_bit),
@@ -475,7 +496,8 @@ fn check_fanin<'p, 'd>(
 
     p_sources.iter().enumerate().all(|(pin_idx, p_src)| {
         let Some(d_src) = d_sources.get(pin_idx) else {
-            tracing::event!(tracing::Level::TRACE, 
+            tracing::event!(
+                tracing::Level::TRACE,
                 "d_cell_valid_connectivity: P {} pin {} has no corresponding D pin",
                 p_cell.debug_index(),
                 pin_idx
@@ -501,7 +523,8 @@ fn fanout_edge_ok<'d>(
         d_index.has_fanout_to_pin(d_driver, d_sink_cell, pin_idx)
     };
 
-    tracing::event!(tracing::Level::TRACE, 
+    tracing::event!(
+        tracing::Level::TRACE,
         "d_cell_valid_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
         d_sink_cell.debug_index(),
         pin_idx,
@@ -544,7 +567,8 @@ fn d_cell_valid_connectivity<'p, 'd>(
     let valid_fanin = check_fanin(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanin {
         if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(tracing::Level::TRACE, 
+            tracing::event!(
+                tracing::Level::TRACE,
                 "d_cell_valid_connectivity: P #{} vs D #{} -> fanin check FAILED",
                 p_cell.debug_index(),
                 d_cell.debug_index(),
@@ -557,7 +581,8 @@ fn d_cell_valid_connectivity<'p, 'd>(
     let valid_fanout = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanout {
         if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(tracing::Level::TRACE, 
+            tracing::event!(
+                tracing::Level::TRACE,
                 "d_cell_valid_connectivity: P #{} vs D #{} -> fanout check FAILED",
                 p_cell.debug_index(),
                 d_cell.debug_index(),
@@ -567,7 +592,8 @@ fn d_cell_valid_connectivity<'p, 'd>(
         return false;
     }
 
-    tracing::event!(tracing::Level::TRACE, 
+    tracing::event!(
+        tracing::Level::TRACE,
         "d_cell_valid_connectivity: P #{} vs D #{} -> {}",
         p_cell.debug_index(),
         d_cell.debug_index(),
