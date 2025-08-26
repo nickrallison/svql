@@ -9,7 +9,6 @@ use crate::{
 };
 use svql_common::Config;
 use svql_driver::{Context, Driver, DriverKey};
-
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
 where
@@ -110,9 +109,17 @@ impl SearchableEnumComposite for AndAny<Search> {
 
 #[cfg(test)]
 mod tests {
-    use log::trace;
     use svql_common::{Config, DedupeMode};
     use svql_driver::Driver;
+    use tracing::trace;
+    use tracing_subscriber;
+
+    fn init_test_logger() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
+    }
 
     use crate::{
         Search, composite::SearchableEnumComposite, instance::Instance,
@@ -121,6 +128,7 @@ mod tests {
 
     #[test]
     fn test_and_any() {
+        init_test_logger();
         let driver = Driver::new_workspace().expect("Failed to create driver");
 
         let context =

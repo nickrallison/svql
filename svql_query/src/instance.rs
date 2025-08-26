@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tracing::trace;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {
@@ -13,6 +14,7 @@ impl Instance {
     pub fn root(inst_in: String) -> Self {
         let inst: Arc<str> = Arc::from(inst_in.clone());
         let path = vec![inst.clone()];
+        trace!("Creating root instance: {}", inst_in);
         Self {
             inst: inst.clone(),
             path,
@@ -26,6 +28,7 @@ impl Instance {
         let child: Arc<str> = Arc::from(child);
         let mut new_path = self.path.clone();
         new_path.push(child.clone());
+        trace!("Creating child instance: {}", child);
         let new = Self {
             inst: child.clone(),
             path: new_path,
@@ -63,9 +66,18 @@ impl Instance {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing_subscriber;
+
+    fn init_test_logger() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
+    }
 
     #[test]
     fn instance_paths_and_heights() {
+        init_test_logger();
         let r = Instance::root("root".to_string());
         assert_eq!(r.height(), 0);
         assert_eq!(r.inst_path(), "root");

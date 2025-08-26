@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use prjunnamed_netlist::Design;
 use thiserror::Error;
+use tracing::{debug, info, warn};
 
 use crate::{Context, DriverKey};
 
@@ -80,17 +81,24 @@ impl Driver {
         {
             let registry = self.registry.read().unwrap();
             if registry.contains_key(&key) {
+                debug!("Design already loaded: {:?}", key);
                 return Ok(key);
             }
         }
 
         // Load the design
+        info!(
+            "Loading design: {} ({})",
+            absolute_path.display(),
+            module_name
+        );
         let design = self.load_design_from_path(&absolute_path, &module_name)?;
 
         // Store in registry
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), Arc::new(design));
+            debug!("Design stored in registry: {:?}", key);
         }
 
         Ok(key)
@@ -116,17 +124,24 @@ impl Driver {
         {
             let registry = self.registry.read().unwrap();
             if let Some(design) = registry.get(&key) {
+                debug!("Design found in registry: {:?}", key);
                 return Ok((key, design.clone()));
             }
         }
 
         // Load and store
+        info!(
+            "Loading design: {} ({})",
+            absolute_path.display(),
+            module_name
+        );
         let design = self.load_design_from_path(&absolute_path, &module_name)?;
         let design_arc = Arc::new(design);
 
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), design_arc.clone());
+            debug!("Design stored in registry: {:?}", key);
         }
 
         Ok((key, design_arc))
@@ -135,7 +150,13 @@ impl Driver {
     /// Get a design from the registry (returns None if not loaded)
     pub fn get_design(&self, key: &DriverKey) -> Option<Arc<Design>> {
         let registry = self.registry.read().unwrap();
-        registry.get(key).cloned()
+        let result = registry.get(key).cloned();
+        if result.is_some() {
+            debug!("Design retrieved from registry: {:?}", key);
+        } else {
+            warn!("Design not found in registry: {:?}", key);
+        }
+        result
     }
 
     /// Get a design by path and module name
@@ -157,7 +178,9 @@ impl Driver {
         for key in keys {
             if let Some(design) = registry.get(key) {
                 context.insert(key.clone(), design.clone());
+                debug!("Design added to context: {:?}", key);
             } else {
+                warn!("Design not found in registry: {:?}", key);
                 return Err(DriverError::DesignLoading(format!(
                     "Design not found for key: {:?}",
                     key
@@ -170,12 +193,17 @@ impl Driver {
 
     /// Create a context with a single design
     pub fn create_context_single(&self, key: &DriverKey) -> Result<Context, DriverError> {
+        debug!("Creating context with single design: {:?}", key);
         self.create_context(&[key.clone()])
     }
 
     /// Get all currently loaded designs
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<Design>> {
         let registry = self.registry.read().unwrap();
+        debug!(
+            "Retrieved all designs from registry (count: {})",
+            registry.len()
+        );
         registry.clone()
     }
 
@@ -185,6 +213,11 @@ impl Driver {
         design_path: &Path,
         module_name: &str,
     ) -> Result<Design, DriverError> {
+        debug!(
+            "Loading design from path: {} ({})",
+            design_path.display(),
+            module_name
+        );
         svql_common::import_design_yosys(&self.yosys_path, design_path.to_path_buf(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))
     }
@@ -193,9 +226,18 @@ impl Driver {
 #[cfg(test)]
 mod tests {
     use crate::{Driver, DriverError, DriverKey};
+    use tracing_subscriber;
+
+    fn init_test_logger() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
+    }
 
     #[test]
     fn driver_create_workspace() {
+        init_test_logger();
         let d = Driver::new_workspace().expect("workspace driver");
         // registry should be empty initially
         assert_eq!(d.get_all_designs().len(), 0);
@@ -203,6 +245,7 @@ mod tests {
 
     #[test]
     fn driver_create_context_missing_key() {
+        init_test_logger();
         let d = Driver::new_workspace().expect("workspace driver");
         // Make a key that won't be in the registry
         let k = DriverKey::new("nonexistent.v", "missing_top".to_string());

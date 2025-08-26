@@ -5,6 +5,7 @@ use std::sync::Arc;
 use prjunnamed_netlist::Design;
 
 use crate::DriverKey;
+use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct Context {
@@ -27,6 +28,7 @@ impl Context {
     #[contracts::debug_ensures(ret.get(&key).is_some())]
     pub fn with_design(mut self, key: DriverKey, design: Arc<Design>) -> Self {
         self.designs.insert(key.clone(), design);
+        debug!("Design added to context: {:?}", key);
         self
     }
 
@@ -62,6 +64,7 @@ impl Context {
     #[contracts::debug_ensures(self.get(&key).is_some())]
     pub(crate) fn insert(&mut self, key: DriverKey, design: Arc<Design>) {
         self.designs.insert(key.clone(), design);
+        debug!("Design inserted into context: {:?}", key);
     }
 
     #[contracts::debug_ensures(ret.len() >= self.len())]
@@ -69,6 +72,7 @@ impl Context {
         for (key, design) in other.designs {
             self.designs.insert(key, design);
         }
+        debug!("Context merged, new size: {}", self.designs.len());
         self.clone()
     }
 
@@ -77,6 +81,7 @@ impl Context {
     pub fn from_single(key: DriverKey, design: Arc<Design>) -> Self {
         let mut ctx = Self::new();
         ctx.designs.insert(key, design);
+        debug!("Single design context created");
         ctx
     }
 }

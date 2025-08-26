@@ -125,12 +125,21 @@ where
 mod tests {
     use super::*;
     use std::sync::Arc;
+    use tracing_subscriber;
+
+    fn init_test_logger() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
+    }
 
     // ###############
     // Instance Tests
     // ###############
     #[test]
     fn test_instance() {
+        init_test_logger();
         let inst = Instance::root("test".to_string());
         let child1 = inst.child("child1".to_string());
         let child2 = child1.child("child2".to_string());

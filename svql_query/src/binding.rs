@@ -1,5 +1,6 @@
 use crate::Match;
 use svql_subgraph::SubgraphMatch;
+use tracing::trace;
 
 // Macro‑friendly helpers that bind a single bit of a named input or output
 // into our `Match<'p, 'd>` payload. A codegen macro can call these for each
@@ -7,6 +8,7 @@ use svql_subgraph::SubgraphMatch;
 // supported at the query layer).
 
 pub fn bind_input<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, name: &str, bit: usize) -> Match<'ctx> {
+    trace!("Binding input: {} bit {}", name, bit);
     let pat = m.input_by_name.get(name).cloned();
     let des = m.design_source_of_input_bit(name, bit).map(|(c, _b)| c);
     Match {
@@ -16,6 +18,7 @@ pub fn bind_input<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, name: &str, bit: usize) -
 }
 
 pub fn bind_output<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, name: &str, bit: usize) -> Match<'ctx> {
+    trace!("Binding output: {} bit {}", name, bit);
     let pat = m.output_by_name.get(name).cloned();
     let des = m.design_driver_of_output_bit(name, bit).map(|(c, _b)| c);
     Match {

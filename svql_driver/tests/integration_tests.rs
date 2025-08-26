@@ -1,2 +1,4 @@
-// Delegate entirely to the generated test harness (one #[test] per TestCase).
-include!(concat!(env!("OUT_DIR"), "/svql_driver_generated_tests.rs"));
+#[cfg(test)]
+mod generated_tests {
+    include!(concat!(env!("OUT_DIR"), "/svql_driver_generated_tests.rs"));
+}

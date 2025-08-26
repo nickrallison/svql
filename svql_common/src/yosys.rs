@@ -4,7 +4,7 @@ use std::{
     process::Stdio,
 };
 
-use log::error;
+use tracing::error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum DesignPath {

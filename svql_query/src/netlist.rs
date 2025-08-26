@@ -1,6 +1,7 @@
 use svql_common::Config;
 use svql_driver::{Driver, DriverKey, context::Context};
 use svql_subgraph::{SubgraphMatch, find_subgraphs};
+use tracing::{debug, trace};
 
 use crate::instance::Instance;
 
@@ -22,6 +23,7 @@ pub trait NetlistMeta {
     const PORTS: &'static [PortSpec];
 
     fn driver_key() -> DriverKey {
+        debug!("Creating driver key for netlist");
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 }
@@ -39,6 +41,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
+        trace!("Querying netlist with haystack key: {:?}", haystack_key);
         let needle = context
             .get(&Self::driver_key())
             .expect("Pattern design not found in context")
@@ -56,6 +59,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     #[contracts::debug_ensures(ret.as_ref().map(|c| c.len()).unwrap_or(1) == 1, "Context for a single pattern only")]
     fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
+        trace!("Creating context for netlist");
         let key = Self::driver_key();
         let design = driver
             .get_or_load_design(key.path(), key.module_name().to_string())?

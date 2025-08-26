@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use prjunnamed_netlist::{CellRef, Design};
 
 use crate::cell::{CellKind, CellWrapper, Source};
-use log::trace;
+use tracing::trace;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {

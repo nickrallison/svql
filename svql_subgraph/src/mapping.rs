@@ -1,4 +1,4 @@
-use log::trace;
+use tracing::trace;
 // svql_subgraph/src/mapping.rs
 use prjunnamed_netlist::CellRef;
 use std::collections::HashMap;

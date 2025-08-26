@@ -3,11 +3,11 @@ mod index;
 mod mapping;
 
 use index::Index;
-use log::{info, trace};
 use mapping::CellMapping;
 use prjunnamed_netlist::Design;
 use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
+use tracing::{info, trace};
 
 use crate::cell::{CellKind, Source};
 

@@ -10,7 +10,7 @@ rust-version.workspace = true
 [dependencies]
 lazy_static.workspace = true
 tempfile.workspace = true
-log.workspace = true
+tracing.workspace = true
 which.workspace = true
 contracts.workspace = true
 
