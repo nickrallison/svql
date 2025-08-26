@@ -117,7 +117,16 @@ fn find_subgraphs_recursive<'p, 'd>(
     let mut incompatible = 0usize;
     let mut connectivity_fail = 0usize;
 
-    for d_cell in d_index.get_by_kind(current.kind).iter() {
+    // IMPORTANT: If the current pattern node is an Input, allow it to map to ANY design node.
+    // This permits pattern inputs to bind to DFF outputs, gate outputs, etc., not only top-level inputs.
+    // For other kinds, keep the kind-based filtering for performance.
+    let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind, CellKind::Input) {
+        d_index.get_cells_topo().iter().collect()
+    } else {
+        d_index.get_by_kind(current.kind).iter().collect()
+    };
+
+    for d_cell in d_candidates {
         total_candidates += 1;
 
         if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {

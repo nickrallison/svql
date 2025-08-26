@@ -48,7 +48,7 @@ mod tests {
 
         if actual_matches != expected_matches {
             trace!("Test case '{}' failed", test_case.name);
-            panic!("DEBUGGING");
+            // panic!("DEBUGGING");
             return Err(format!(
                 "Test case '{}' failed: expected {} matches, got {}",
                 test_case.name, expected_matches, actual_matches

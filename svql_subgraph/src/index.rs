@@ -34,7 +34,6 @@ impl<'a> Index<'a> {
             cells_topo.iter().filter(|c| c.kind.is_gate()).count()
         );
 
-        // IMPORTANT: index ALL non-Name kinds (Inputs, Outputs, Gates, etc.)
         for cell_wrapper in cells_topo.iter().cloned() {
             by_kind
                 .entry(cell_wrapper.kind)
@@ -49,20 +48,19 @@ impl<'a> Index<'a> {
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
             HashMap::new();
 
-        // reverse cell_lookup
-        for cell_wrapper in cells_topo.iter() {
-            let pins = &cell_wrapper.pins;
-            for pin in pins {
-                let pin_driver = match pin {
-                    Source::Gate(cell_ref, id) => Some((cell_ref, id)),
-                    Source::Io(cell_ref, id) => Some((cell_ref, id)),
+        for sink_wrapper in cells_topo.iter() {
+            for (sink_pin_idx, pin) in sink_wrapper.pins.iter().enumerate() {
+                let driver = match pin {
+                    Source::Gate(cell_ref, _src_bit) => Some(*cell_ref),
+                    Source::Io(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Const(_trit) => None,
                 };
-                if let Some((pin_driver, id)) = pin_driver {
+                if let Some(driver_cell) = driver {
+                    // Store the SINK'S input pin index (sink_pin_idx), not the source bit index.
                     reverse_cell_lookup
-                        .entry(*pin_driver)
+                        .entry(driver_cell)
                         .or_default()
-                        .push((cell_wrapper.cref(), *id));
+                        .push((sink_wrapper.cref(), sink_pin_idx));
                 }
             }
         }

@@ -23,6 +23,8 @@ mkdir -p generated
 # cargo expand --package svql_query queries::netlist > generated/expanded_netlist.rs
 
 python3 scripts/md_tree.py --root . \
+    --include 'prjunnamed/netlist/src/design.rs' \
+    --include 'prjunnamed/netlist/src/cell.rs' \
     --include 'svql_subgraph/**.rs' \
     --include 'examples/**.v' \
     --include 'Cargo.toml' \
