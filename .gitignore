@@ -8,4 +8,6 @@ target
 *.dot
 *.pdf
 out.md
+perf.data*
+flamegraph.svg
 ##
