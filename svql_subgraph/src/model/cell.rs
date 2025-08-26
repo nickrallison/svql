@@ -74,6 +74,12 @@ impl CellKind {
     pub fn is_output(&self) -> bool {
         matches!(self, CellKind::Output)
     }
+    pub fn is_commutative_inputs(&self) -> bool {
+        matches!(
+            self,
+            CellKind::And | CellKind::Or | CellKind::Xor | CellKind::Aig
+        )
+    }
 }
 
 impl From<&Cell> for CellKind {

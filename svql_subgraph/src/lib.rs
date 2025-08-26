@@ -7,7 +7,7 @@ use log::{info, trace};
 use mapping::CellMapping;
 use prjunnamed_netlist::Design;
 use std::collections::VecDeque;
-use svql_common::Config;
+use svql_common::{Config, DedupeMode};
 
 use crate::model::{CellKind, CellWrapper};
 
@@ -217,15 +217,19 @@ fn find_subgraphs_recursive<'p, 'd>(
         })
         .collect();
 
-    let before_dedup = results.len();
-    let mut seen = std::collections::HashSet::new();
-    results.retain(|m| seen.insert(m.mapping.sig()));
-    let after_dedup = results.len();
+    if matches!(config.dedupe, DedupeMode::AutoMorph) {
+        let before_dedup = results.len();
+        let mut seen = std::collections::HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.sig()));
+        let after_dedup = results.len();
 
-    trace!(
-        "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-        depth, before_dedup, after_dedup
-    );
+        trace!(
+            "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
+            depth, before_dedup, after_dedup
+        );
+    } else {
+        // panic!("DEBUG")
+    }
 
     results
 }
@@ -270,8 +274,7 @@ fn cells_share_connectivity<'p, 'd>(
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
 ) -> bool {
-    // 1) Enforce fanin: every already-mapped driver of the pattern cell must match
-    //    the corresponding design driver on the same pin index (and constant pins must match).
+    // 1) Enforce fanin...
     let fanin_ok = p_cell
         .pins
         .iter()
@@ -288,7 +291,6 @@ fn cells_share_connectivity<'p, 'd>(
             };
 
             match p_src {
-                // Constants must match exactly.
                 crate::model::Source::Const(pt) => {
                     let ok = matches!(d_src, crate::model::Source::Const(dt) if dt == pt);
                     if !ok {
@@ -301,7 +303,6 @@ fn cells_share_connectivity<'p, 'd>(
                     }
                     ok
                 }
-                // Pattern Io source may map to either an Io or a Gate in the design.
                 crate::model::Source::Io(p_src_cell, p_bit) => {
                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
                         let ok = match d_src {
@@ -324,11 +325,9 @@ fn cells_share_connectivity<'p, 'd>(
                         }
                         ok
                     } else {
-                        // If the Io driver is not yet mapped, we cannot constrain it now.
                         true
                     }
                 }
-                // Pattern Gate source must map to the same Gate in design on same bit.
                 crate::model::Source::Gate(p_src_cell, p_bit) => {
                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
                         let ok = matches!(
@@ -347,7 +346,6 @@ fn cells_share_connectivity<'p, 'd>(
                         }
                         ok
                     } else {
-                        // Source not mapped yet; cannot constrain now.
                         true
                     }
                 }
@@ -363,8 +361,7 @@ fn cells_share_connectivity<'p, 'd>(
         return false;
     }
 
-    // 2) Enforce fanout: any already-mapped sink of the pattern cell must also appear
-    //    as a sink of the candidate design cell, on the same pin index.
+    // 2) Enforce fanout...
     let d_fanouts = d_index.get_fanouts(d_cell.cref());
     let p_fanouts = p_index.get_fanouts(p_cell.cref());
     trace!(
@@ -383,13 +380,21 @@ fn cells_share_connectivity<'p, 'd>(
                 .map(|d_sink_cell| (d_sink_cell, *pin_idx))
         })
         .all(|(d_sink_cell, pin_idx)| {
-            let ok = d_fanouts
-                .iter()
-                .any(|(s, i)| *s == d_sink_cell && *i == pin_idx);
+            // Allow any input pin index for commutative sinks
+            let sink_commutative =
+                CellKind::from(d_sink_cell.get().as_ref()).is_commutative_inputs();
+            let ok = if sink_commutative {
+                d_fanouts.iter().any(|(s, _)| *s == d_sink_cell)
+            } else {
+                d_fanouts
+                    .iter()
+                    .any(|(s, i)| *s == d_sink_cell && *i == pin_idx)
+            };
             trace!(
-                "cells_share_connectivity: check mapped sink D#{} @pin={} -> {}",
+                "cells_share_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
                 d_sink_cell.debug_index(),
                 pin_idx,
+                sink_commutative,
                 ok
             );
             ok
