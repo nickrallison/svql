@@ -63,15 +63,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - AndNor instances: {}", nor_count);
 
     // You could also iterate through hits to examine specific matches
-    for (i, hit) in hits.iter().enumerate() {
-        // For enum variants, we need to get the path from each variant
-        let path_str = match hit {
-            AndAny::Gate(g) => g.path().inst_path(),
-            AndAny::Mux(m) => m.path().inst_path(),
-            AndAny::Nor(n) => n.path().inst_path(),
-        };
-        println!("Match {}: {}", i, path_str);
-    }
+    // for (i, hit) in hits.iter().enumerate() {
+    //     // For enum variants, we need to get the path from each variant
+    //     let path_str = match hit {
+    //         AndAny::Gate(g) => g.path().inst_path(),
+    //         AndAny::Mux(m) => m.path().inst_path(),
+    //         AndAny::Nor(n) => n.path().inst_path(),
+    //     };
+    //     println!("Match {}: {}", i, path_str);
+    // }
 
     Ok(())
 }
