@@ -33,6 +33,14 @@ fn main() {
 
 use svql_common::{{ALL_TEST_CASES, Pattern}};
 use svql_driver::Driver;
+use tracing_subscriber;
+
+fn init_test_logger() {{
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
+}}
 "#
     )
     .unwrap();
@@ -48,7 +56,7 @@ use svql_driver::Driver;
 #[test]
 fn {fn_name}() {{
     // Initialize test logger (captured by the test harness)
-    let _ = env_logger::builder().is_test(true).try_init();
+    init_test_logger();
 
     // Find the TestCase by name
     let tc = ALL_TEST_CASES
