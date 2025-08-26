@@ -1,4 +1,4 @@
 #[cfg(test)]
-mod generated_tests {
+mod svql_driver_generated_tests {
     include!(concat!(env!("OUT_DIR"), "/svql_driver_generated_tests.rs"));
 }

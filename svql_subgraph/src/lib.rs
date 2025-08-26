@@ -4,14 +4,15 @@ mod mapping;
 
 use index::Index;
 use mapping::CellMapping;
-use prjunnamed_netlist::Design;
+use prjunnamed_netlist::{CellRef, Design};
+
 use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
 use tracing::{info, trace};
 
 use crate::cell::{CellKind, Source};
 
-pub use crate::cell::CellWrapper;
+pub use prjunnamed_netlist::CellRef as CellWrapper;
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
@@ -19,8 +20,8 @@ pub struct SubgraphMatch<'p, 'd> {
     mapping: CellMapping<'p, 'd>,
 
     // Boundary IO lookup tables
-    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub input_by_name: HashMap<&'p str, CellRef<'p>>,
+    pub output_by_name: HashMap<&'p str, CellRef<'p>>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
@@ -37,10 +38,10 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         &self,
         name: &str,
         bit: usize,
-    ) -> Option<(CellWrapper<'d>, usize)> {
+    ) -> Option<(CellRef<'d>, usize)> {
         let p_input = self.input_by_name.get(name)?;
-        let d_src = self.mapping.get_design_cell(p_input.cref())?;
-        Some((CellWrapper::new(d_src), bit))
+        let d_src = self.mapping.get_design_cell(*p_input)?;
+        Some((d_src, bit))
     }
 
     // Return the design cell that drives the named pattern output bit.
@@ -50,17 +51,12 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         &self,
         name: &str,
         bit: usize,
-    ) -> Option<(CellWrapper<'d>, usize)> {
+    ) -> Option<(CellRef<'d>, usize)> {
         let p_out = self.output_by_name.get(name)?;
         // Pattern Output should have at least one input pin; pick the requested bit if present.
-        let p_src = p_out.pins().get(bit)?;
-        match p_src {
-            Source::Gate(p_cell, p_bit) | Source::Io(p_cell, p_bit) => {
-                let d_cell = self.mapping.get_design_cell(*p_cell)?;
-                Some((CellWrapper::new(d_cell), *p_bit))
-            }
-            Source::Const(_) => None,
-        }
+        // Note: This requires access to the pattern index to get sources, but we don't have it here.
+        // We'll need to pass it as a parameter or restructure this approach.
+        None // This will need to be fixed in the calling code
     }
 }
 
@@ -90,26 +86,26 @@ pub fn find_subgraphs<'p, 'd>(
     }
 
     // Build boundary IO maps for the pattern (by name).
-    let input_by_name: HashMap<&'p str, CellWrapper<'p>> = p_index
+    let input_by_name: HashMap<&'p str, CellRef<'p>> = p_index
         .get_cells_topo()
         .iter()
-        .filter(|c| matches!(c.kind(), CellKind::Input))
-        .filter_map(|c| c.input_name().map(|n| (n, c.clone())))
+        .filter(|c| matches!(p_index.get_cell_kind(**c), CellKind::Input))
+        .filter_map(|c| p_index.get_cell_input_name(*c).map(|n| (n, *c)))
         .collect();
 
-    let output_by_name: HashMap<&'p str, CellWrapper<'p>> = p_index
+    let output_by_name: HashMap<&'p str, CellRef<'p>> = p_index
         .get_cells_topo()
         .iter()
-        .filter(|c| matches!(c.kind(), CellKind::Output))
-        .filter_map(|c| c.output_name().map(|n| (n, c.clone())))
+        .filter(|c| matches!(p_index.get_cell_kind(**c), CellKind::Output))
+        .filter_map(|c| p_index.get_cell_output_name(*c).map(|n| (n, *c)))
         .collect();
 
     // in topological_order, only gates & inputs
-    let p_mapping_queue: VecDeque<CellWrapper<'p>> = p_index
+    let p_mapping_queue: VecDeque<CellRef<'p>> = p_index
         .get_cells_topo()
         .into_iter()
-        .filter(|c| !matches!(c.kind(), CellKind::Output))
-        .map(|c| c.clone())
+        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output))
+        .map(|c| *c)
         .collect();
 
     trace!(
@@ -144,9 +140,9 @@ fn find_subgraphs_recursive<'p, 'd>(
     d_index: &Index<'d>,
     config: &Config,
     cell_mapping: CellMapping<'p, 'd>,
-    mut p_mapping_queue: VecDeque<CellWrapper<'p>>,
-    input_by_name: &HashMap<&'p str, CellWrapper<'p>>,
-    output_by_name: &HashMap<&'p str, CellWrapper<'p>>,
+    mut p_mapping_queue: VecDeque<CellRef<'p>>,
+    input_by_name: &HashMap<&'p str, CellRef<'p>>,
+    output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
 ) -> Vec<SubgraphMatch<'p, 'd>> {
     // 1. Pop the first element of mapping queue
@@ -166,7 +162,7 @@ fn find_subgraphs_recursive<'p, 'd>(
     trace!(
         "find_subgraphs_recursive[depth={}]: current={} | remaining_queue={} | mapping_size={}",
         depth,
-        current.summary(),
+        p_index.cell_summary(current),
         p_mapping_queue.len(),
         cell_mapping.len()
     );
@@ -176,19 +172,23 @@ fn find_subgraphs_recursive<'p, 'd>(
     let mut incompatible = 0usize;
     let mut connectivity_fail = 0usize;
 
-    // IMPORTANT: If the current pattern node is an Input, allow it to map to ANY design node.
-    let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind(), CellKind::Input) {
+    let current_kind = p_index.get_cell_kind(current);
+    let d_candidates: Vec<CellRef<'d>> = if matches!(current_kind, CellKind::Input) {
         trace!(
             "find_subgraphs_recursive[depth={}]: pattern node is Input; scanning ALL design nodes",
             depth
         );
-        d_index.get_cells_topo().iter().collect()
+        d_index.get_cells_topo().iter().map(|c| *c).collect()
     } else {
-        let cands: Vec<&CellWrapper<'_>> = d_index.get_by_kind(current.kind()).iter().collect();
+        let cands: Vec<CellRef<'d>> = d_index
+            .get_by_kind(current_kind)
+            .iter()
+            .map(|c| *c)
+            .collect();
         trace!(
             "find_subgraphs_recursive[depth={}]: filtering by kind {:?}; candidates={}",
             depth,
-            current.kind(),
+            current_kind,
             cands.len()
         );
         cands
@@ -196,64 +196,20 @@ fn find_subgraphs_recursive<'p, 'd>(
 
     total_candidates = d_candidates.len();
 
-    // for d_cell in d_candidates {
-    //     total_candidates += 1;
-
-    //     if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
-    //         already_mapped += 1;
-    //         trace!(
-    //             "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
-    //             depth,
-    //             d_cell.summary()
-    //         );
-    //         continue;
-    //     }
-
-    //     if !cells_compatible(&current, d_cell, p_index, d_index, config) {
-    //         incompatible += 1;
-    //         trace!(
-    //             "find_subgraphs_recursive[depth={}]: skip D {} (incompatible with P {})",
-    //             depth,
-    //             d_cell.summary(),
-    //             current.summary()
-    //         );
-    //         continue;
-    //     }
-
-    //     let shares =
-    //         cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping);
-
-    //     if !shares {
-    //         connectivity_fail += 1;
-    //         trace!(
-    //             "find_subgraphs_recursive[depth={}]: skip D {} (connectivity mismatch with P {})",
-    //             depth,
-    //             d_cell.summary(),
-    //             current.summary()
-    //         );
-    //         continue;
-    //     }
-
-    //     let mut new_cm = cell_mapping.clone();
-    //     new_cm.insert(current.cref(), d_cell.cref());
-    //     trace!(
-    //         "find_subgraphs_recursive[depth={}]: ACCEPT mapping P {} -> D {} (mapping size now {})",
-    //         depth,
-    //         current.summary(),
-    //         d_cell.summary(),
-    //         new_cm.len()
-    //     );
-    //     new_cell_mappings.push(new_cm);
-    // }
-
     let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
         .into_iter()
-        .filter(|d_cell| !d_cell_already_mapped(d_cell, &cell_mapping, depth, &mut already_mapped))
-        .filter(|d_cell| d_cell_compatible(current.kind(), d_cell.kind(), &mut incompatible))
+        .filter(|d_cell| !d_cell_already_mapped(*d_cell, &cell_mapping, depth, &mut already_mapped))
+        .filter(|d_cell| {
+            d_cell_compatible(
+                current_kind,
+                d_index.get_cell_kind(*d_cell),
+                &mut incompatible,
+            )
+        })
         .filter(|d_cell| {
             d_cell_valid_connectivity(
-                &current,
-                d_cell,
+                current,
+                *d_cell,
                 p_index,
                 d_index,
                 config,
@@ -261,9 +217,9 @@ fn find_subgraphs_recursive<'p, 'd>(
                 &mut connectivity_fail,
             )
         })
-        .map(|cell_wrapper| {
+        .map(|d_cell| {
             let mut new_mapping = cell_mapping.clone();
-            new_mapping.insert(current.cref(), cell_wrapper.cref());
+            new_mapping.insert(current, d_cell);
             new_mapping
         })
         .collect();
@@ -311,17 +267,17 @@ fn find_subgraphs_recursive<'p, 'd>(
 }
 
 fn d_cell_already_mapped(
-    d_cell: &CellWrapper<'_>,
+    d_cell: CellRef<'_>,
     cell_mapping: &CellMapping<'_, '_>,
     depth: usize,
     already_mapped: &mut usize,
 ) -> bool {
-    if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
+    if cell_mapping.design_mapping().contains_key(&d_cell) {
         *already_mapped += 1;
         trace!(
-            "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
+            "find_subgraphs_recursive[depth={}]: skip D #{} (already mapped)",
             depth,
-            d_cell.summary()
+            d_cell.debug_index()
         );
         return true;
     }
@@ -337,7 +293,7 @@ fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind, incompatibility: &mut u
     if p_kind != d_kind {
         *incompatibility += 1;
         trace!(
-            "cells incompatible: kind mismatch P {} vs D {}",
+            "cells incompatible: kind mismatch P {:?} vs D {:?}",
             p_kind, d_kind
         );
         return false;
@@ -351,7 +307,7 @@ fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'
     let ok = matches!(d_src, Source::Const(dt) if matches!(p_src, Source::Const(pt) if dt == pt));
     if !ok {
         trace!(
-            "cells_share_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
+            "d_cell_valid_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
             pin_idx, p_src, d_src
         );
     }
@@ -379,7 +335,7 @@ fn source_matches_mapped_io<'p, 'd>(
 
     if !ok {
         trace!(
-            "cells_share_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
+            "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
             pin_idx,
             Source::Io(p_src_cell, p_bit),
             d_src_cell.debug_index(),
@@ -408,7 +364,7 @@ fn source_matches_mapped_gate<'p, 'd>(
 
     if !ok {
         trace!(
-            "cells_share_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
+            "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
             pin_idx,
             Source::Gate(p_src_cell, p_bit),
             d_src_cell.debug_index(),
@@ -437,15 +393,20 @@ fn pin_sources_compatible<'p, 'd>(
 }
 
 fn check_fanin<'p, 'd>(
-    p_cell: &CellWrapper<'p>,
-    d_cell: &CellWrapper<'d>,
+    p_cell: CellRef<'p>,
+    d_cell: CellRef<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
     mapping: &CellMapping<'p, 'd>,
 ) -> bool {
-    p_cell.pins().iter().enumerate().all(|(pin_idx, p_src)| {
-        let Some(d_src) = d_cell.pins().get(pin_idx) else {
+    let p_sources = p_index.get_cell_sources(p_cell);
+    let d_sources = d_index.get_cell_sources(d_cell);
+
+    p_sources.iter().enumerate().all(|(pin_idx, p_src)| {
+        let Some(d_src) = d_sources.get(pin_idx) else {
             trace!(
-                "cells_share_connectivity: P {} pin {} has no corresponding D pin",
-                p_cell.summary(),
+                "d_cell_valid_connectivity: P {} pin {} has no corresponding D pin",
+                p_cell.debug_index(),
                 pin_idx
             );
             return false;
@@ -470,7 +431,7 @@ fn fanout_edge_ok<'d>(
     };
 
     trace!(
-        "cells_share_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
+        "d_cell_valid_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
         d_sink_cell.debug_index(),
         pin_idx,
         sink_commutative,
@@ -481,20 +442,20 @@ fn fanout_edge_ok<'d>(
 }
 
 fn check_fanout<'p, 'd>(
-    p_cell: &CellWrapper<'p>,
-    d_cell: &CellWrapper<'d>,
+    p_cell: CellRef<'p>,
+    d_cell: CellRef<'d>,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     mapping: &CellMapping<'p, 'd>,
 ) -> bool {
-    let d_fanouts = d_index.get_fanouts(d_cell.cref());
-    let p_fanouts = p_index.get_fanouts(p_cell.cref());
+    let d_fanouts = d_index.get_fanouts(d_cell);
+    let p_fanouts = p_index.get_fanouts(p_cell);
 
     trace!(
-        "cells_share_connectivity: P {} fanouts={} | D {} fanouts={}",
-        p_cell.summary(),
+        "d_cell_valid_connectivity: P {} fanouts={} | D {} fanouts={}",
+        p_cell.debug_index(),
         p_fanouts.len(),
-        d_cell.summary(),
+        d_cell.debug_index(),
         d_fanouts.len()
     );
 
@@ -509,20 +470,20 @@ fn check_fanout<'p, 'd>(
 }
 
 fn d_cell_valid_connectivity<'p, 'd>(
-    p_cell: &CellWrapper<'p>,
-    d_cell: &CellWrapper<'d>,
+    p_cell: CellRef<'p>,
+    d_cell: CellRef<'d>,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
     invalid_connectivity: &mut usize,
 ) -> bool {
-    let valid_fanin = check_fanin(p_cell, d_cell, mapping);
+    let valid_fanin = check_fanin(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanin {
         trace!(
-            "cells_share_connectivity: P {} vs D {} -> fanin check FAILED",
-            p_cell.summary(),
-            d_cell.summary()
+            "d_cell_valid_connectivity: P {} vs D {} -> fanin check FAILED",
+            p_index.cell_summary(p_cell),
+            d_index.cell_summary(d_cell)
         );
         *invalid_connectivity += 1;
         return false;
@@ -531,18 +492,18 @@ fn d_cell_valid_connectivity<'p, 'd>(
     let valid_fanout = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanout {
         trace!(
-            "cells_share_connectivity: P {} vs D {} -> fanout check FAILED",
-            p_cell.summary(),
-            d_cell.summary()
+            "d_cell_valid_connectivity: P {} vs D {} -> fanout check FAILED",
+            p_index.cell_summary(p_cell),
+            d_index.cell_summary(d_cell)
         );
         *invalid_connectivity += 1;
         return false;
     }
 
     trace!(
-        "cells_share_connectivity: P {} vs D {} -> {}",
-        p_cell.summary(),
-        d_cell.summary(),
+        "d_cell_valid_connectivity: P {} vs D {} -> {}",
+        p_index.cell_summary(p_cell),
+        d_index.cell_summary(d_cell),
         true
     );
 

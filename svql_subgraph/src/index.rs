@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 
-use prjunnamed_netlist::{CellRef, Design};
+use prjunnamed_netlist::{Cell, CellRef, Design};
 
-use crate::cell::{CellKind, CellWrapper, Source};
+use crate::cell::{CellKind, Source, net_to_source};
 use tracing::trace;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
     /// Cells of design in topological order
-    cells_topo: Vec<CellWrapper<'a>>,
-    by_kind: HashMap<CellKind, Vec<CellWrapper<'a>>>,
+    cells_topo: Vec<CellRef<'a>>,
+    by_kind: HashMap<CellKind, Vec<CellRef<'a>>>,
     reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>>,
+    /// Pre-computed source information for each cell
+    cell_sources: HashMap<CellRef<'a>, Vec<Source<'a>>>,
 }
 
 impl<'a> Index<'a> {
@@ -21,24 +23,27 @@ impl<'a> Index<'a> {
             design.iter_cells().count()
         );
 
-        let mut by_kind: HashMap<CellKind, Vec<CellWrapper<'a>>> = HashMap::new();
-        let cells_topo: Vec<CellWrapper<'a>> = design
+        let mut by_kind: HashMap<CellKind, Vec<CellRef<'a>>> = HashMap::new();
+        let cells_topo: Vec<CellRef<'a>> = design
             .iter_cells_topo()
             .rev()
-            .map(CellWrapper::new)
-            .filter(|cell| !matches!(cell.kind(), CellKind::Name))
+            .filter(|cell_ref| {
+                let kind = CellKind::from(cell_ref.get().as_ref());
+                !matches!(kind, CellKind::Name)
+            })
             .collect();
         trace!(
             "Index::build: cells_topo len={} (excluding Name). gate_count={}",
             cells_topo.len(),
-            cells_topo.iter().filter(|c| c.kind().is_gate()).count()
+            cells_topo
+                .iter()
+                .filter(|c| CellKind::from(c.get().as_ref()).is_gate())
+                .count()
         );
 
-        for cell_wrapper in cells_topo.iter().cloned() {
-            by_kind
-                .entry(cell_wrapper.kind())
-                .or_default()
-                .push(cell_wrapper);
+        for cell_ref in cells_topo.iter().cloned() {
+            let kind = CellKind::from(cell_ref.get().as_ref());
+            by_kind.entry(kind).or_default().push(cell_ref);
         }
 
         for (k, v) in by_kind.iter() {
@@ -47,10 +52,22 @@ impl<'a> Index<'a> {
 
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
             HashMap::new();
+        let mut cell_sources: HashMap<CellRef<'a>, Vec<Source<'a>>> = HashMap::new();
 
-        for sink_wrapper in cells_topo.iter() {
-            for (sink_pin_idx, pin) in sink_wrapper.pins().iter().enumerate() {
-                let driver = match pin {
+        // Pre-compute source information for all cells
+        for cell_ref in cells_topo.iter() {
+            let mut sources: Vec<Source<'a>> = Vec::new();
+            cell_ref.visit(|net| {
+                sources.push(net_to_source(design, net));
+            });
+            cell_sources.insert(*cell_ref, sources);
+        }
+
+        // Build reverse lookup based on pre-computed sources
+        for sink_ref in cells_topo.iter() {
+            let sources = cell_sources.get(sink_ref).unwrap();
+            for (sink_pin_idx, source) in sources.iter().enumerate() {
+                let driver = match source {
                     Source::Gate(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Io(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Const(_trit) => None,
@@ -60,7 +77,7 @@ impl<'a> Index<'a> {
                     reverse_cell_lookup
                         .entry(driver_cell)
                         .or_default()
-                        .push((sink_wrapper.cref(), sink_pin_idx));
+                        .push((*sink_ref, sink_pin_idx));
                 }
             }
         }
@@ -74,23 +91,24 @@ impl<'a> Index<'a> {
             cells_topo,
             by_kind,
             reverse_cell_lookup,
+            cell_sources,
         }
     }
 
     pub(super) fn gate_count(&self) -> usize {
         self.cells_topo
             .iter()
-            .filter(|c| c.kind().is_gate())
+            .filter(|c| CellKind::from(c.get().as_ref()).is_gate())
             .count()
     }
 
-    pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellWrapper<'a>] {
+    pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellRef<'a>] {
         let slice = self.by_kind.get(&kind).map(|v| v.as_slice()).unwrap_or(&[]);
         trace!("Index::get_by_kind: {:?} -> {}", kind, slice.len());
         slice
     }
 
-    pub(super) fn get_cells_topo(&self) -> &[CellWrapper<'a>] {
+    pub(super) fn get_cells_topo(&self) -> &[CellRef<'a>] {
         &self.cells_topo
     }
 
@@ -106,5 +124,42 @@ impl<'a> Index<'a> {
             slice.len()
         );
         slice
+    }
+
+    pub(super) fn get_cell_sources(&self, cell: CellRef<'a>) -> &[Source<'a>] {
+        self.cell_sources
+            .get(&cell)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub(super) fn get_cell_kind(&self, cell: CellRef<'a>) -> CellKind {
+        CellKind::from(cell.get().as_ref())
+    }
+
+    pub(super) fn get_cell_input_name(&self, cell: CellRef<'a>) -> Option<&'a str> {
+        match cell.get() {
+            std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub(super) fn get_cell_output_name(&self, cell: CellRef<'a>) -> Option<&'a str> {
+        match cell.get() {
+            std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub(super) fn cell_summary(&self, cell: CellRef<'a>) -> String {
+        let kind = self.get_cell_kind(cell);
+        let iname = self.get_cell_input_name(cell).unwrap_or("");
+        let oname = self.get_cell_output_name(cell).unwrap_or("");
+        let n = if !iname.is_empty() { iname } else { oname };
+        if n.is_empty() {
+            format!("#{} {:?}", cell.debug_index(), kind)
+        } else {
+            format!("#{} {:?}({})", cell.debug_index(), kind, n)
+        }
     }
 }

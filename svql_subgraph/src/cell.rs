@@ -129,76 +129,13 @@ impl std::fmt::Display for CellKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CellWrapper<'p> {
-    cref: CellRef<'p>,
-    pins: Vec<Source<'p>>,
-    kind: CellKind,
-}
-
-impl<'p> CellWrapper<'p> {
-    pub fn new(cref: CellRef<'p>) -> Self {
-        let mut pins: Vec<Source<'p>> = Vec::new();
-        cref.visit(|net| {
-            pins.push(net_to_source(cref.design(), net));
-        });
-        let kind = CellKind::from(cref.get().as_ref());
-        let cref = cref.into();
-        CellWrapper { cref, pins, kind }
-    }
-    pub fn cref(&self) -> CellRef<'p> {
-        self.cref
-    }
-
-    pub fn debug_index(&self) -> usize {
-        self.cref.debug_index()
-    }
-
-    pub fn summary(&self) -> String {
-        let iname = self.input_name().unwrap_or("");
-        let oname = self.output_name().unwrap_or("");
-        let n = if !iname.is_empty() { iname } else { oname };
-        if n.is_empty() {
-            format!("#{} {:?}", self.cref.debug_index(), self.kind)
-        } else {
-            format!("#{} {:?}({})", self.cref.debug_index(), self.kind, n)
-        }
-    }
-
-    pub fn input_name(&self) -> Option<&'p str> {
-        match self.cref().get() {
-            std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-    pub fn output_name(&self) -> Option<&'p str> {
-        match self.cref().get() {
-            std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn kind(&self) -> CellKind {
-        self.kind
-    }
-    pub fn pins(&self) -> &[Source<'p>] {
-        &self.pins
-    }
-}
-
-impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
-    fn from(cref: CellRef<'a>) -> Self {
-        CellWrapper::new(cref)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Source<'a> {
     Gate(CellRef<'a>, usize),
     Io(CellRef<'a>, usize),
     Const(Trit),
 }
 
-fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
+pub fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
     match design.find_cell(net) {
         Ok((src, bit)) => {
             if CellKind::from(src.get().as_ref()).is_gate() {
