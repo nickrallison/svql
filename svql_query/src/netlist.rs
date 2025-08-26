@@ -40,7 +40,11 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
-        tracing::event!(tracing::Level::TRACE, "Querying netlist with haystack key: {:?}", haystack_key);
+        tracing::event!(
+            tracing::Level::TRACE,
+            "Querying netlist with haystack key: {:?}",
+            haystack_key
+        );
         let needle = context
             .get(&Self::driver_key())
             .expect("Pattern design not found in context")

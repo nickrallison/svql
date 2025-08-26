@@ -180,7 +180,7 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
         return None;
     }
 
-    // Intersect all sets
+    // Intersect all sets; avoid an extra allocation for the final output
     let mut acc = sets.remove(0);
     acc.sort_by_key(|c| c.debug_index());
     acc.dedup();
@@ -236,88 +236,77 @@ fn find_subgraphs_recursive<'p, 'd>(
         cell_mapping.len()
     );
 
-    let mut total_candidates = 0usize;
-    let mut already_mapped = 0usize;
-    let mut incompatible = 0usize;
-    let mut connectivity_fail = 0usize;
-
     let current_kind = p_index.get_cell_kind(current);
 
-    // New: drastically prune candidates for pattern Inputs using mapped fanout neighbors
+    // Prefer narrowed candidates for pattern Inputs using mapped fanout neighbors
     let narrowed_candidates = if matches!(current_kind, CellKind::Input) {
         candidate_drivers_for_pattern_input(current, p_index, d_index, &cell_mapping)
     } else {
         None
     };
 
-    let d_candidates: Vec<CellRef<'d>> = match narrowed_candidates {
-        Some(vec) if !vec.is_empty() => vec,
+    // We avoid allocating a Vec for candidates here. Instead, we create
+    // an iterator over either:
+    // - the narrowed candidate vector (owned), or
+    // - a cloned iterator over slices from the index.
+    enum CandIter<'a, 'd> {
+        Owned(std::vec::IntoIter<CellRef<'d>>),
+        Slice(std::iter::Cloned<std::slice::Iter<'a, CellRef<'d>>>),
+    }
+
+    let candidates = match narrowed_candidates {
+        Some(vec) if !vec.is_empty() => CandIter::Owned(vec.into_iter()),
         _ => {
             if matches!(current_kind, CellKind::Input) {
-                // Worst case fallback: all nodes (previous behavior)
-                d_index.get_cells_topo().to_vec()
+                CandIter::Slice(d_index.get_cells_topo().iter().cloned())
             } else {
-                d_index.get_by_kind(current_kind).to_vec()
+                CandIter::Slice(d_index.get_by_kind(current_kind).iter().cloned())
             }
         }
     };
 
-    total_candidates = d_candidates.len();
+    // Process candidates on the fly (no intermediate Vec of new mappings).
+    let mut results: Vec<SubgraphMatch<'p, 'd>> = Vec::new();
 
-    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
-        .into_iter()
-        .filter(|d_cell| !d_cell_already_mapped(*d_cell, &cell_mapping, depth, &mut already_mapped))
-        .filter(|d_cell| {
-            d_cell_compatible(
-                current_kind,
-                d_index.get_cell_kind(*d_cell),
-                &mut incompatible,
-            )
-        })
-        .filter(|d_cell| {
-            d_cell_valid_connectivity(
-                current,
-                *d_cell,
-                p_index,
-                d_index,
-                config,
-                &cell_mapping,
-                &mut connectivity_fail,
-            )
-        })
-        .map(|d_cell| {
-            let mut new_mapping = cell_mapping.clone();
-            new_mapping.insert(current, d_cell);
-            new_mapping
-        })
-        .collect();
+    let mut process_candidate = |d_cell: CellRef<'d>| {
+        if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
+            return;
+        }
+        if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
+            return;
+        }
+        if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
+            return;
+        }
 
-    tracing::event!(
-        tracing::Level::TRACE,
-        "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
-        depth,
-        total_candidates,
-        already_mapped,
-        incompatible,
-        connectivity_fail,
-        new_cell_mappings.len()
-    );
+        // Accepted candidate; recurse immediately.
+        let mut new_cell_mapping = cell_mapping.clone();
+        new_cell_mapping.insert(current, d_cell);
 
-    let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
-        .into_iter()
-        .flat_map(|new_cell_mapping| {
-            find_subgraphs_recursive(
-                p_index,
-                d_index,
-                config,
-                new_cell_mapping,
-                p_mapping_queue.clone(),
-                input_by_name,
-                output_by_name,
-                depth + 1,
-            )
-        })
-        .collect();
+        results.extend(find_subgraphs_recursive(
+            p_index,
+            d_index,
+            config,
+            new_cell_mapping,
+            p_mapping_queue.clone(),
+            input_by_name,
+            output_by_name,
+            depth + 1,
+        ));
+    };
+
+    match candidates {
+        CandIter::Owned(iter) => {
+            for d_cell in iter {
+                process_candidate(d_cell);
+            }
+        }
+        CandIter::Slice(iter) => {
+            for d_cell in iter {
+                process_candidate(d_cell);
+            }
+        }
+    }
 
     if matches!(config.dedupe, DedupeMode::AutoMorph) {
         let before_dedup = results.len();
@@ -341,10 +330,8 @@ fn d_cell_already_mapped(
     d_cell: CellRef<'_>,
     cell_mapping: &CellMapping<'_, '_>,
     depth: usize,
-    already_mapped: &mut usize,
 ) -> bool {
     if cell_mapping.design_mapping().contains_key(&d_cell) {
-        *already_mapped += 1;
         tracing::event!(
             tracing::Level::TRACE,
             "find_subgraphs_recursive[depth={}]: skip D #{} (already mapped)",
@@ -356,13 +343,12 @@ fn d_cell_already_mapped(
     false
 }
 
-fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind, incompatibility: &mut usize) -> bool {
+fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind) -> bool {
     if matches!(p_kind, CellKind::Input) {
         // Inputs can map to any node; fanin/fanout checks will constrain sufficiently.
         return true;
     }
     if p_kind != d_kind {
-        *incompatibility += 1;
         tracing::event!(
             tracing::Level::TRACE,
             "cells incompatible: kind mismatch P {:?} vs D {:?}",
@@ -544,7 +530,6 @@ fn d_cell_valid_connectivity<'p, 'd>(
     d_index: &Index<'d>,
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
-    invalid_connectivity: &mut usize,
 ) -> bool {
     let valid_fanin = check_fanin(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanin {
@@ -555,7 +540,6 @@ fn d_cell_valid_connectivity<'p, 'd>(
             d_cell.debug_index(),
         );
 
-        *invalid_connectivity += 1;
         return false;
     }
 
@@ -568,7 +552,6 @@ fn d_cell_valid_connectivity<'p, 'd>(
             d_cell.debug_index(),
         );
 
-        *invalid_connectivity += 1;
         return false;
     }
 
