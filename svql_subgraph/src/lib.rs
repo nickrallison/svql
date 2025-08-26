@@ -194,6 +194,8 @@ fn find_subgraphs_recursive<'p, 'd>(
         cands
     };
 
+    total_candidates = d_candidates.len();
+
     // for d_cell in d_candidates {
     //     total_candidates += 1;
 
@@ -246,7 +248,7 @@ fn find_subgraphs_recursive<'p, 'd>(
 
     let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
         .into_iter()
-        .filter(|d_cell| d_cell_already_mapped(d_cell, &cell_mapping, depth, &mut already_mapped))
+        .filter(|d_cell| !d_cell_already_mapped(d_cell, &cell_mapping, depth, &mut already_mapped))
         .filter(|d_cell| d_cell_compatible(current.kind(), d_cell.kind(), &mut incompatible))
         .filter(|d_cell| {
             d_cell_valid_connectivity(
@@ -265,8 +267,6 @@ fn find_subgraphs_recursive<'p, 'd>(
             new_mapping
         })
         .collect();
-
-    total_candidates = new_cell_mappings.len();
 
     trace!(
         "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",

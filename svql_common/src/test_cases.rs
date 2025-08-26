@@ -128,7 +128,7 @@ lazy_static::lazy_static! {
     pub static ref BASIC_TEST_CASES: Vec<TestCase> = vec![
         // AND gate tests
         TestCase {
-            name: "and_gate_self",
+            name: "and_gate_self_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*AND_GATE,
             haystack: &*AND_GATE_SELF,
@@ -142,7 +142,7 @@ lazy_static::lazy_static! {
             expected_matches: 1,
         },
         TestCase {
-            name: "and_gate_in_and_q_double",
+            name: "and_gate_in_and_q_double_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*AND_GATE,
             haystack: &*AND_Q_DOUBLE_SDFFE,
@@ -156,14 +156,14 @@ lazy_static::lazy_static! {
             expected_matches: 2,
         },
         TestCase {
-            name: "and_gate_in_and_tree",
+            name: "and_gate_in_and_tree_auto_morph",
             config: Config::builder().exact_length().auto_morph().build(),
             pattern: &*AND_GATE,
             haystack: &*AND_TREE,
             expected_matches: 7,
         },
         TestCase {
-            name: "and_gate_in_and_seq",
+            name: "and_gate_in_and_seq_auto_morph",
             config: Config::builder().exact_length().auto_morph().build(),
             pattern: &*AND_GATE,
             haystack: &*AND_SEQ,
@@ -172,35 +172,35 @@ lazy_static::lazy_static! {
 
         // DFF tests
         TestCase {
-            name: "sdffe_self",
+            name: "sdffe_self_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE,
             haystack: &*SDFFE_SELF,
             expected_matches: 1,
         },
         TestCase {
-            name: "sdffe_in_comb_d_double",
+            name: "sdffe_in_comb_d_double_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE,
             haystack: &*COMB_D_DOUBLE_SDFFE,
             expected_matches: 2,
         },
         TestCase {
-            name: "sdffe_in_and_q_double",
+            name: "sdffe_in_and_q_double_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE,
             haystack: &*AND_Q_DOUBLE_SDFFE,
             expected_matches: 2,
         },
         TestCase {
-            name: "sdffe_in_par_double",
+            name: "sdffe_in_par_double_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE,
             haystack: &*PAR_DOUBLE_SDFFE,
             expected_matches: 2,
         },
         TestCase {
-            name: "sdffe_in_seq_double",
+            name: "sdffe_in_seq_double_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE,
             haystack: &*SEQ_DOUBLE_SDFFE,
@@ -210,7 +210,7 @@ lazy_static::lazy_static! {
 
     pub static ref DEDUPE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
-            name: "and_nor_dedupe_none",
+            name: "and_nor_dedupe_none_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*AND_NOR,
             haystack: &*MIXED_AND_TREE,
@@ -234,7 +234,7 @@ lazy_static::lazy_static! {
 
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
-            name: "sdffe_then_and_simple",
+            name: "sdffe_then_and_simple_none",
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE_THEN_AND,
             haystack: &*AND_Q_DOUBLE_SDFFE,
@@ -244,7 +244,7 @@ lazy_static::lazy_static! {
 
     pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
-            name: "and_any_in_mixed_tree",
+            name: "and_any_in_mixed_tree_auto_morph",
             config: Config::builder().exact_length().auto_morph().build(),
             pattern: &*AND_ANY,
             haystack: &*MIXED_AND_TREE,
