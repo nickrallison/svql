@@ -1,78 +1,81 @@
 [workspace]
+resolver = "3"
+
 members = [
     "svql_driver",
     "svql_query",
     "svql_subgraph",
     "svql_common",
-    ######
-    "prjunnamed/netlist",
-    "prjunnamed/pattern",
+
+    # PRJUNNAMED
     "prjunnamed/generic",
+    "prjunnamed/graphviz",
     "prjunnamed/lut",
     "prjunnamed/memory",
-    "prjunnamed/yosys_json",
+    "prjunnamed/netlist",
+    "prjunnamed/pattern",
     "prjunnamed/siliconblue",
-    "prjunnamed/graphviz",
+    "prjunnamed/yosys_json",
 ]
+
 default-members = [
     "svql_driver",
     "svql_query",
     "svql_subgraph",
     "svql_common",
 ]
-resolver = "3"
+
+[workspace.package]
+authors = []
+edition = "2024"
+license = "0BSD OR Apache-2.0"
+repository = "https://github.com/nickrallison/svql"
+rust-version = "1.87"
+version = "0.1.0"
 
 [workspace.dependencies]
+###############
+# SVQL
+###############
+svql_common = { path = "svql_common" }
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
 svql_subgraph = { path = "svql_subgraph" }
-svql_common = { path = "svql_common" }
 
-# ---------------------
+###############
+# PRJUNNAMED
+###############
+prjunnamed-generic.path = "prjunnamed/generic"
+prjunnamed-graphviz.path = "prjunnamed/graphviz"
+prjunnamed-lut.path = "prjunnamed/lut"
+prjunnamed-memory.path = "prjunnamed/memory"
+prjunnamed-netlist.path = "prjunnamed/netlist"
+prjunnamed-pattern.path = "prjunnamed/pattern"
+prjunnamed-siliconblue.path = "prjunnamed/siliconblue"
+prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
 
+###############
+# OTHER LIBRARIES
+###############
+argparse = "0.2"
+contracts = "0.6.6"
+easy-smt = "0.3"
+env_logger = "0.11.5"
+indexmap = "2.7.1"
+itertools = "0.14.0"
+jzon = "0.12.5"
 lazy_static = "1.5.0"
+proc-macro2 = "1.0"
+quote = "1.0"
 regex = "1.11.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.104"
+syn = { version = "2.0", features = ["full"] }
+tempfile = "3.20.0"
 thiserror = "2.0"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-env_logger = "0.11.5"
-itertools = "0.14.0"
-tempfile = "3.20.0"
-which = "8.0.0"
-rstest = "0.26.1"
 unstringify = "0.1.4"
 walkdir = "2.5.0"
-contracts = "0.6.6"
-
-# ---------------------
-# PRJUNNAMED
-# ---------------------
-
-prjunnamed-netlist.path = "prjunnamed/netlist"
-prjunnamed-pattern.path = "prjunnamed/pattern"
-prjunnamed-generic.path = "prjunnamed/generic"
-prjunnamed-lut.path = "prjunnamed/lut"
-prjunnamed-memory.path = "prjunnamed/memory"
-prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
-prjunnamed-siliconblue.path = "prjunnamed/siliconblue"
-prjunnamed-graphviz.path = "prjunnamed/graphviz"
-indexmap = "2.7.1"
+which = "8.0.0"
 yap = "0.12.0"
-easy-smt = "0.3"
-argparse = "0.2"
-jzon = "0.12.5"
-
-# Add these for code generation in build scripts
-quote = "1.0"
-proc-macro2 = "1.0"
-syn = { version = "2.0", features = ["full"] }
-
-[workspace.package]
-edition = "2024"
-version = "0.1.0"
-license = "0BSD OR Apache-2.0"
-repository = "https://github.com/nickrallison/svql"
-authors = []
-rust-version = "1.87"
