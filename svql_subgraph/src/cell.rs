@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 
 use prjunnamed_netlist::{Cell, CellRef, Design, Net, Trit};
@@ -119,6 +120,11 @@ impl From<&Cell> for CellKind {
             Cell::Name(..) => CellKind::Name,
             Cell::Debug(..) => CellKind::Debug,
         }
+    }
+}
+impl std::fmt::Display for CellKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

@@ -171,8 +171,6 @@ fn find_subgraphs_recursive<'p, 'd>(
         cell_mapping.len()
     );
 
-    let mut new_cell_mappings: Vec<CellMapping<'p, 'd>> = Vec::new();
-
     let mut total_candidates = 0usize;
     let mut already_mapped = 0usize;
     let mut incompatible = 0usize;
@@ -186,65 +184,89 @@ fn find_subgraphs_recursive<'p, 'd>(
         );
         d_index.get_cells_topo().iter().collect()
     } else {
-        let cands = d_index.get_by_kind(current.kind());
+        let cands: Vec<&CellWrapper<'_>> = d_index.get_by_kind(current.kind()).iter().collect();
         trace!(
             "find_subgraphs_recursive[depth={}]: filtering by kind {:?}; candidates={}",
             depth,
             current.kind(),
             cands.len()
         );
-        cands.iter().collect()
+        cands
     };
 
-    for d_cell in d_candidates {
-        total_candidates += 1;
+    // for d_cell in d_candidates {
+    //     total_candidates += 1;
 
-        if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
-            already_mapped += 1;
-            trace!(
-                "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
-                depth,
-                d_cell.summary()
-            );
-            continue;
-        }
+    //     if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
+    //         already_mapped += 1;
+    //         trace!(
+    //             "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
+    //             depth,
+    //             d_cell.summary()
+    //         );
+    //         continue;
+    //     }
 
-        if !cells_compatible(&current, d_cell, p_index, d_index, config) {
-            incompatible += 1;
-            trace!(
-                "find_subgraphs_recursive[depth={}]: skip D {} (incompatible with P {})",
-                depth,
-                d_cell.summary(),
-                current.summary()
-            );
-            continue;
-        }
+    //     if !cells_compatible(&current, d_cell, p_index, d_index, config) {
+    //         incompatible += 1;
+    //         trace!(
+    //             "find_subgraphs_recursive[depth={}]: skip D {} (incompatible with P {})",
+    //             depth,
+    //             d_cell.summary(),
+    //             current.summary()
+    //         );
+    //         continue;
+    //     }
 
-        let shares =
-            cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping);
+    //     let shares =
+    //         cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping);
 
-        if !shares {
-            connectivity_fail += 1;
-            trace!(
-                "find_subgraphs_recursive[depth={}]: skip D {} (connectivity mismatch with P {})",
-                depth,
-                d_cell.summary(),
-                current.summary()
-            );
-            continue;
-        }
+    //     if !shares {
+    //         connectivity_fail += 1;
+    //         trace!(
+    //             "find_subgraphs_recursive[depth={}]: skip D {} (connectivity mismatch with P {})",
+    //             depth,
+    //             d_cell.summary(),
+    //             current.summary()
+    //         );
+    //         continue;
+    //     }
 
-        let mut new_cm = cell_mapping.clone();
-        new_cm.insert(current.cref(), d_cell.cref());
-        trace!(
-            "find_subgraphs_recursive[depth={}]: ACCEPT mapping P {} -> D {} (mapping size now {})",
-            depth,
-            current.summary(),
-            d_cell.summary(),
-            new_cm.len()
-        );
-        new_cell_mappings.push(new_cm);
-    }
+    //     let mut new_cm = cell_mapping.clone();
+    //     new_cm.insert(current.cref(), d_cell.cref());
+    //     trace!(
+    //         "find_subgraphs_recursive[depth={}]: ACCEPT mapping P {} -> D {} (mapping size now {})",
+    //         depth,
+    //         current.summary(),
+    //         d_cell.summary(),
+    //         new_cm.len()
+    //     );
+    //     new_cell_mappings.push(new_cm);
+    // }
+
+    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
+        .into_iter()
+        .filter(|d_cell| d_cell_already_mapped(d_cell, &cell_mapping, depth, &mut already_mapped))
+        .filter(|d_cell| d_cell_compatible(current.kind(), d_cell.kind(), &mut incompatible))
+        .filter(|d_cell| {
+            d_cell_valid_connectivity(
+                &current,
+                d_cell,
+                p_index,
+                d_index,
+                config,
+                &cell_mapping,
+                &mut connectivity_fail,
+            )
+        })
+        .map(|cell_wrapper| {
+            let mut new_mapping = cell_mapping.clone();
+            new_mapping.insert(current.cref(), cell_wrapper.cref());
+            new_mapping
+        })
+        .collect();
+
+    total_candidates = new_cell_mappings.len();
 
     trace!(
         "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
@@ -288,38 +310,41 @@ fn find_subgraphs_recursive<'p, 'd>(
     results
 }
 
-fn kinds_compatible(p_kind: CellKind, d_kind: CellKind) -> bool {
-    // Inputs in the pattern are allowed to map to any design node.
-    if matches!(p_kind, CellKind::Input) {
+fn d_cell_already_mapped(
+    d_cell: &CellWrapper<'_>,
+    cell_mapping: &CellMapping<'_, '_>,
+    depth: usize,
+    already_mapped: &mut usize,
+) -> bool {
+    if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
+        *already_mapped += 1;
+        trace!(
+            "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
+            depth,
+            d_cell.summary()
+        );
         return true;
     }
-    p_kind == d_kind
+    false
 }
 
-fn cells_compatible<'p, 'd>(
-    p_cell: &CellWrapper<'p>,
-    d_cell: &CellWrapper<'d>,
-    _p_index: &Index<'p>,
-    _d_index: &Index<'d>,
-    _config: &Config,
-) -> bool {
-    let compatible = kinds_compatible(p_cell.kind(), d_cell.kind());
-    if !compatible {
+fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind, incompatibility: &mut usize) -> bool {
+    // Inputs in the pattern are allowed to map to any design node.
+    if matches!(p_kind, CellKind::Input) {
+        trace!("p cell is Input, matching any d cell");
+        return true;
+    }
+    if p_kind != d_kind {
+        *incompatibility += 1;
         trace!(
-            "cells_compatible: kind mismatch P {} vs D {}",
-            p_cell.summary(),
-            d_cell.summary()
+            "cells incompatible: kind mismatch P {} vs D {}",
+            p_kind, d_kind
         );
         return false;
     }
 
     // TODO: later check config for size compatibility
-    trace!(
-        "cells_compatible: OK P {} <-> D {}",
-        p_cell.summary(),
-        d_cell.summary()
-    );
-    true
+    return true;
 }
 
 fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'d>) -> bool {
@@ -483,31 +508,43 @@ fn check_fanout<'p, 'd>(
         .all(|(d_sink_cell, pin_idx)| fanout_edge_ok(d_fanouts, d_sink_cell, pin_idx))
 }
 
-fn cells_share_connectivity<'p, 'd>(
+fn d_cell_valid_connectivity<'p, 'd>(
     p_cell: &CellWrapper<'p>,
     d_cell: &CellWrapper<'d>,
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
+    invalid_connectivity: &mut usize,
 ) -> bool {
-    if !check_fanin(p_cell, d_cell, mapping) {
+    let valid_fanin = check_fanin(p_cell, d_cell, mapping);
+    if !valid_fanin {
         trace!(
             "cells_share_connectivity: P {} vs D {} -> fanin check FAILED",
             p_cell.summary(),
             d_cell.summary()
         );
+        *invalid_connectivity += 1;
         return false;
     }
 
-    let result = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
+    let valid_fanout = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
+    if !valid_fanout {
+        trace!(
+            "cells_share_connectivity: P {} vs D {} -> fanout check FAILED",
+            p_cell.summary(),
+            d_cell.summary()
+        );
+        *invalid_connectivity += 1;
+        return false;
+    }
 
     trace!(
         "cells_share_connectivity: P {} vs D {} -> {}",
         p_cell.summary(),
         d_cell.summary(),
-        result
+        true
     );
 
-    result
+    true
 }
