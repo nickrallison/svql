@@ -3,6 +3,9 @@ name = "svql_driver"
 version = "0.1.0"
 edition = "2024"
 
+[build-dependencies]
+regex.workspace = true
+
 [dev-dependencies]
 lazy_static.workspace = true
 rstest.workspace = true
