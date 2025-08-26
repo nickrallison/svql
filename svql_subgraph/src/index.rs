@@ -77,29 +77,11 @@ impl<'a> Index<'a> {
         }
     }
 
-    pub(super) fn of_kind(&self, k: CellKind) -> &[CellWrapper<'a>] {
-        let slice = self.by_kind.get(&k).map(|v| v.as_slice()).unwrap_or(&[]);
-        trace!("Index::of_kind: {:?} -> {}", k, slice.len());
-        slice
-    }
-
     pub(super) fn gate_count(&self) -> usize {
         self.cells_topo
             .iter()
             .filter(|c| c.kind().is_gate())
             .count()
-    }
-
-    pub(super) fn nodes(&self) -> &[CellWrapper<'a>] {
-        &self.cells_topo
-    }
-
-    /// Deterministic owned iteration over kinds.
-    pub(super) fn by_kind_iter(&self) -> Vec<(CellKind, Vec<CellWrapper<'a>>)> {
-        let mut items: Vec<(CellKind, Vec<CellWrapper<'a>>)> =
-            self.by_kind.iter().map(|(k, v)| (*k, v.clone())).collect();
-        items.sort_by_key(|kn| kn.0);
-        items
     }
 
     pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellWrapper<'a>] {
@@ -110,17 +92,6 @@ impl<'a> Index<'a> {
 
     pub(super) fn get_cells_topo(&self) -> &[CellWrapper<'a>] {
         &self.cells_topo
-    }
-
-    pub(super) fn get_outputs(&self) -> Vec<CellWrapper<'a>> {
-        let v: Vec<CellWrapper<'a>> = self
-            .cells_topo
-            .iter()
-            .filter(|c| c.kind().is_output())
-            .cloned()
-            .collect();
-        trace!("Index::get_outputs -> {}", v.len());
-        v
     }
 
     pub(super) fn get_fanouts(&self, cell: CellRef<'a>) -> &[(CellRef<'a>, usize)] {

@@ -3,7 +3,7 @@ use std::hash::Hash;
 use prjunnamed_netlist::{Cell, CellRef, Design, Net, Trit};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(crate) enum CellKind {
+pub enum CellKind {
     Buf,
     Not,
     And,
@@ -186,7 +186,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum Source<'a> {
+pub enum Source<'a> {
     Gate(CellRef<'a>, usize),
     Io(CellRef<'a>, usize),
     Const(Trit),
