@@ -15,3 +15,16 @@ This crate forms the foundation that other svql components build upon for hardwa
 ## Note
 
 It may be worth noting that this implementation was created vs. using the [Ullman Subgraph Isomorphism Algorithm](https://adriann.github.io/Ullman%20subgraph%20isomorphism.html), which when tested performed significantly worse, the reason is not yet clear, but it was tested using the extract pass of Yosys on a submodule of OpenTitan (otbn) which took about 12 minutes to run a query with a modified version of the extract pass.
+
+## Parallelism
+
+svql_subgraph can optionally parallelize the top-level branching of the subgraph search using Rayon.
+
+- Enable with the crate feature `rayon`:
+  - In your workspace or command line: `cargo test -p svql_subgraph --features svql_subgraph/rayon`
+  - Or within this crate: `cargo test --features rayon`
+
+The parallelization strategy only splits the first branching step, then continues the deeper recursion sequentially. This approach typically delivers strong performance gains without excessive threading overhead.
+
+To control the number of threads Rayon uses, set the environment variable RAYON_NUM_THREADS, for example:
+- `RAYON_NUM_THREADS=8 cargo test --features rayon`

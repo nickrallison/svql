@@ -2,7 +2,6 @@
 
 use svql_common::{Config, DedupeMode};
 use svql_driver::Driver;
-use svql_query::WithPath;
 use svql_query::composite::SearchableEnumComposite;
 use svql_query::instance::Instance;
 use svql_query::queries::enum_composite::and_any::AndAny;

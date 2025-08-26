@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
+
 mod cell;
 mod index;
 mod mapping;
@@ -112,16 +117,40 @@ pub fn find_subgraphs<'p, 'd>(
 
     let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
-    let results = find_subgraphs_recursive(
-        &p_index,
-        &d_index,
-        config,
-        initial_cell_mapping,
-        p_mapping_queue,
-        &input_by_name,
-        &output_by_name,
-        0, // depth
-    );
+    #[cfg(feature = "rayon")]
+    let results = {
+        tracing::event!(
+            tracing::Level::INFO,
+            "find_subgraphs: executing with Rayon parallel top-level branching"
+        );
+        find_subgraphs_parallel_top(
+            &p_index,
+            &d_index,
+            config,
+            initial_cell_mapping,
+            p_mapping_queue,
+            &input_by_name,
+            &output_by_name,
+        )
+    };
+
+    #[cfg(not(feature = "rayon"))]
+    let results = {
+        tracing::event!(
+            tracing::Level::INFO,
+            "find_subgraphs: executing sequential recursion"
+        );
+        find_subgraphs_recursive(
+            &p_index,
+            &d_index,
+            config,
+            initial_cell_mapping,
+            p_mapping_queue,
+            &input_by_name,
+            &output_by_name,
+            0, // depth
+        )
+    };
 
     tracing::event!(
         tracing::Level::INFO,
@@ -129,6 +158,90 @@ pub fn find_subgraphs<'p, 'd>(
         results.len(),
         results.iter().map(|m| m.mapping.sig()).collect::<Vec<_>>()
     );
+
+    results
+}
+
+#[cfg(feature = "rayon")]
+fn find_subgraphs_parallel_top<'p, 'd>(
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    config: &Config,
+    initial_cell_mapping: CellMapping<'p, 'd>,
+    mut p_mapping_queue: VecDeque<CellRef<'p>>,
+    input_by_name: &HashMap<&'p str, CellRef<'p>>,
+    output_by_name: &HashMap<&'p str, CellRef<'p>>,
+) -> Vec<SubgraphMatch<'p, 'd>> {
+    // If no work to do, return an empty mapping as a single result (unlikely but safe)
+    let Some(current) = p_mapping_queue.pop_front() else {
+        return vec![SubgraphMatch {
+            mapping: initial_cell_mapping,
+            input_by_name: input_by_name.clone(),
+            output_by_name: output_by_name.clone(),
+        }];
+    };
+
+    let current_kind = p_index.get_cell_kind(current);
+
+    // Build the candidate vector once for parallel processing.
+    // If the pattern node is an Input, we try to narrow via mapped fanout sinks.
+    let narrowed = if matches!(current_kind, CellKind::Input) {
+        candidate_drivers_for_pattern_input(current, p_index, d_index, &initial_cell_mapping)
+    } else {
+        None
+    };
+
+    let candidate_vec: Vec<CellRef<'d>> = match narrowed {
+        Some(v) if !v.is_empty() => v,
+        _ => {
+            if matches!(current_kind, CellKind::Input) {
+                d_index.get_cells_topo().to_vec()
+            } else {
+                d_index.get_by_kind(current_kind).to_vec()
+            }
+        }
+    };
+
+    // Process candidates in parallel at the top level only.
+    let results = candidate_vec
+        .into_par_iter()
+        .map(|d_cell| {
+            if initial_cell_mapping.design_mapping().contains_key(&d_cell) {
+                return Vec::new();
+            }
+            if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
+                return Vec::new();
+            }
+            if !d_cell_valid_connectivity(
+                current,
+                d_cell,
+                p_index,
+                d_index,
+                config,
+                &initial_cell_mapping,
+            ) {
+                return Vec::new();
+            }
+
+            // Valid candidate: recurse sequentially.
+            let mut new_cell_mapping = initial_cell_mapping.clone();
+            new_cell_mapping.insert(current, d_cell);
+
+            find_subgraphs_recursive(
+                p_index,
+                d_index,
+                config,
+                new_cell_mapping,
+                p_mapping_queue.clone(),
+                input_by_name,
+                output_by_name,
+                1, // depth starts at 1 for the recursive step
+            )
+        })
+        .reduce(Vec::new, |mut a, mut b| {
+            a.append(&mut b);
+            a
+        });
 
     results
 }
