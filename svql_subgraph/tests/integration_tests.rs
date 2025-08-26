@@ -4,6 +4,10 @@ mod tests {
 
     #[test]
     fn test_all_netlist_cases() {
+        env_logger::builder()
+            .filter_level(log::LevelFilter::Trace)
+            .try_init()
+            .expect("Failed to initialize logger");
         let test_cases = ALL_TEST_CASES.iter().filter(|tc| tc.pattern.is_netlist());
         let test_results: Vec<Result<(), Box<dyn std::error::Error>>> = test_cases
             .map(|test_case| run_test_case(test_case))

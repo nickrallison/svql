@@ -233,7 +233,7 @@ impl<'p> CellWrapper<'p> {
             _ => None,
         }
     }
-    pub(crate) fn output_name(&self) -> Option<&str> {
+    pub(crate) fn output_name(&self) -> Option<&'p str> {
         match self.cref().get() {
             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
             _ => None,

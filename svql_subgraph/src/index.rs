@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 
-use prjunnamed_netlist::Design;
+use prjunnamed_netlist::{CellRef, Design};
 
 use crate::model::{CellKind, CellWrapper, Source};
-
-pub(super) type NodeId = u32;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
     /// Cells of design in topological order
     cells_topo: Vec<CellWrapper<'a>>,
     by_kind: HashMap<CellKind, Vec<CellWrapper<'a>>>,
+    reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>>,
 }
 
 impl<'a> Index<'a> {
@@ -36,20 +35,32 @@ impl<'a> Index<'a> {
                 .push(cell_wrapper);
         }
 
+        let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
+            HashMap::new();
+
+        // reverse cell_lookup
+        for cell_wrapper in cells_topo.iter() {
+            let pins = &cell_wrapper.pins;
+            for pin in pins {
+                let pin_driver = match pin {
+                    Source::Gate(cell_ref, id) => Some((cell_ref, id)),
+                    Source::Io(cell_ref, id) => Some((cell_ref, id)),
+                    Source::Const(_trit) => None,
+                };
+                if let Some((pin_driver, id)) = pin_driver {
+                    reverse_cell_lookup
+                        .entry(*pin_driver)
+                        .or_default()
+                        .push((cell_wrapper.cref(), *id));
+                }
+            }
+        }
+
         Index {
             cells_topo,
             by_kind,
+            reverse_cell_lookup,
         }
-    }
-
-    #[contracts::debug_requires((id as usize) < self.cells_topo.len())]
-    pub(super) fn kind(&self, id: NodeId) -> CellKind {
-        self.cells_topo[id as usize].kind
-    }
-
-    #[contracts::debug_requires((id as usize) < self.cells_topo.len())]
-    pub(super) fn pins(&self, id: NodeId) -> &Vec<Source<'a>> {
-        &self.cells_topo[id as usize].pins
     }
 
     pub(super) fn of_kind(&self, k: CellKind) -> &[CellWrapper<'a>] {
@@ -85,5 +96,12 @@ impl<'a> Index<'a> {
             .filter(|c| c.kind.is_output())
             .cloned()
             .collect()
+    }
+
+    pub(super) fn get_fanouts(&self, cell: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
+        self.reverse_cell_lookup
+            .get(&cell)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
