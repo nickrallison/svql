@@ -9,6 +9,10 @@ use crate::{
 };
 use svql_common::Config;
 use svql_driver::{Context, Driver, DriverKey};
+
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
+
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
 where
@@ -67,43 +71,118 @@ impl SearchableEnumComposite for AndAny<Search> {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
-        let and_gate_matches = AndGate::<Search>::query(
-            haystack_key,
-            context,
-            path.child("and_gate".to_string()),
-            config,
-        )
-        .iter()
-        .map(|match_| AndAny::<Match<'ctx>>::Gate(match_.clone()))
-        .collect::<Vec<_>>();
+        // Run individual queries in parallel when Rayon is enabled
+        #[cfg(feature = "rayon")]
+        {
+            tracing::event!(
+                tracing::Level::INFO,
+                "AndAny::query: executing with Rayon parallel queries"
+            );
 
-        let and_mux_matches = AndMux::<Search>::query(
-            haystack_key,
-            context,
-            path.child("and_mux".to_string()),
-            config,
-        )
-        .iter()
-        .map(|match_| AndAny::<Match<'ctx>>::Mux(match_.clone()))
-        .collect::<Vec<_>>();
+            let ((and_gate_matches, and_mux_matches), and_nor_matches) = rayon::join(
+                || {
+                    rayon::join(
+                        || {
+                            AndGate::<Search>::query(
+                                haystack_key,
+                                context,
+                                path.child("and_gate".to_string()),
+                                config,
+                            )
+                        },
+                        || {
+                            AndMux::<Search>::query(
+                                haystack_key,
+                                context,
+                                path.child("and_mux".to_string()),
+                                config,
+                            )
+                        },
+                    )
+                },
+                || {
+                    AndNor::<Search>::query(
+                        haystack_key,
+                        context,
+                        path.child("and_nor".to_string()),
+                        config,
+                    )
+                },
+            );
 
-        let and_nor_matches = AndNor::<Search>::query(
-            haystack_key,
-            context,
-            path.child("and_nor".to_string()),
-            config,
-        )
-        .iter()
-        .map(|match_| AndAny::<Match<'ctx>>::Nor(match_.clone()))
-        .collect::<Vec<_>>();
+            // Convert matches to enum variants
+            let and_gate_results: Vec<Self::Hit<'ctx>> = and_gate_matches
+                .into_par_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Gate(match_))
+                .collect();
 
-        // Create composite instances
+            let and_mux_results: Vec<Self::Hit<'ctx>> = and_mux_matches
+                .into_par_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Mux(match_))
+                .collect();
 
-        and_gate_matches
-            .into_iter()
-            .chain(and_mux_matches)
-            .chain(and_nor_matches)
-            .collect::<Vec<_>>()
+            let and_nor_results: Vec<Self::Hit<'ctx>> = and_nor_matches
+                .into_par_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Nor(match_))
+                .collect();
+
+            and_gate_results
+                .into_iter()
+                .chain(and_mux_results)
+                .chain(and_nor_results)
+                .collect::<Vec<_>>()
+        }
+
+        #[cfg(not(feature = "rayon"))]
+        {
+            tracing::event!(
+                tracing::Level::INFO,
+                "AndAny::query: executing sequential queries"
+            );
+
+            let and_gate_matches = AndGate::<Search>::query(
+                haystack_key,
+                context,
+                path.child("and_gate".to_string()),
+                config,
+            );
+
+            let and_mux_matches = AndMux::<Search>::query(
+                haystack_key,
+                context,
+                path.child("and_mux".to_string()),
+                config,
+            );
+
+            let and_nor_matches = AndNor::<Search>::query(
+                haystack_key,
+                context,
+                path.child("and_nor".to_string()),
+                config,
+            );
+
+            // Convert matches to enum variants
+            let and_gate_results: Vec<Self::Hit<'ctx>> = and_gate_matches
+                .into_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Gate(match_))
+                .collect();
+
+            let and_mux_results: Vec<Self::Hit<'ctx>> = and_mux_matches
+                .into_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Mux(match_))
+                .collect();
+
+            let and_nor_results: Vec<Self::Hit<'ctx>> = and_nor_matches
+                .into_iter()
+                .map(|match_| AndAny::<Match<'ctx>>::Nor(match_))
+                .collect();
+
+            and_gate_results
+                .into_iter()
+                .chain(and_mux_results)
+                .chain(and_nor_results)
+                .collect::<Vec<_>>()
+        }
     }
 }
 

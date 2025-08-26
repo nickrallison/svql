@@ -620,6 +620,7 @@ dependencies = [
  "prjunnamed-netlist",
  "proc-macro2",
  "quote",
+ "rayon",
  "regex",
  "serde",
  "serde_json",
