@@ -8,7 +8,6 @@ use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
-use tracing::Level;
 
 use crate::cell::{CellKind, Source};
 
@@ -56,7 +55,7 @@ pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-) -> impl Iterator<Item = SubgraphMatch<'p, 'd>> {
+) -> Vec<SubgraphMatch<'p, 'd>> {
     tracing::event!(
         tracing::Level::TRACE,
         "find_subgraphs: start. pattern cells={} design cells={}",
@@ -211,7 +210,7 @@ fn find_subgraphs_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> impl Iterator<Item = SubgraphMatch<'p, 'd>> {
+) -> Vec<SubgraphMatch<'p, 'd>> {
     let Some(current) = p_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
@@ -265,7 +264,7 @@ fn find_subgraphs_recursive<'p, 'd>(
 
     total_candidates = d_candidates.len();
 
-    let new_cell_mappings = d_candidates
+    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
         .into_iter()
         .filter(|d_cell| !d_cell_already_mapped(*d_cell, &cell_mapping, depth, &mut already_mapped))
         .filter(|d_cell| {
@@ -290,7 +289,8 @@ fn find_subgraphs_recursive<'p, 'd>(
             let mut new_mapping = cell_mapping.clone();
             new_mapping.insert(current, d_cell);
             new_mapping
-        });
+        })
+        .collect();
 
     tracing::event!(
         tracing::Level::TRACE,

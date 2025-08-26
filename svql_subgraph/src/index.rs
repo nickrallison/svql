@@ -142,8 +142,8 @@ impl<'a> Index<'a> {
         slice
     }
 
-    pub(super) fn get_cells_topo(&self) -> impl Iterator<Item = &CellRef<'a>> {
-        self.cells_topo.iter()
+    pub(super) fn get_cells_topo(&self) -> &[CellRef<'a>] {
+        self.cells_topo.as_slice()
     }
 
     pub(super) fn get_fanouts(&self, cell: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
