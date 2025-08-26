@@ -56,27 +56,23 @@ pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-) -> Vec<SubgraphMatch<'p, 'd>> {
-    if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs: start. pattern cells={} design cells={}",
-            pattern.iter_cells().count(),
-            design.iter_cells().count()
-        );
-    }
+) -> impl Iterator<Item = SubgraphMatch<'p, 'd>> {
+    tracing::event!(
+        tracing::Level::TRACE,
+        "find_subgraphs: start. pattern cells={} design cells={}",
+        pattern.iter_cells().count(),
+        design.iter_cells().count()
+    );
 
     let p_index = Index::build(pattern);
     let d_index = Index::build(design);
 
-    if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs: gate counts: pattern={} design={}",
-            p_index.gate_count(),
-            d_index.gate_count()
-        );
-    }
+    tracing::event!(
+        tracing::Level::TRACE,
+        "find_subgraphs: gate counts: pattern={} design={}",
+        p_index.gate_count(),
+        d_index.gate_count()
+    );
 
     if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
         tracing::event!(
@@ -105,16 +101,15 @@ pub fn find_subgraphs<'p, 'd>(
     let p_mapping_queue: VecDeque<CellRef<'p>> = p_index
         .get_cells_topo()
         .iter()
-        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output)).copied()
+        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output))
+        .copied()
         .collect();
 
-    if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs: initial pattern mapping queue size={}",
-            p_mapping_queue.len()
-        );
-    }
+    tracing::event!(
+        tracing::Level::TRACE,
+        "find_subgraphs: initial pattern mapping queue size={}",
+        p_mapping_queue.len()
+    );
 
     let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
@@ -216,16 +211,15 @@ fn find_subgraphs_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> Vec<SubgraphMatch<'p, 'd>> {
+) -> impl Iterator<Item = SubgraphMatch<'p, 'd>> {
     let Some(current) = p_mapping_queue.pop_front() else {
-        if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
-                depth,
-                cell_mapping.len()
-            );
-        }
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
+            depth,
+            cell_mapping.len()
+        );
+
         return vec![SubgraphMatch {
             mapping: cell_mapping,
             input_by_name: input_by_name.clone(),
@@ -233,17 +227,15 @@ fn find_subgraphs_recursive<'p, 'd>(
         }];
     };
 
-    if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
-            depth,
-            current.debug_index(),
-            p_index.get_cell_kind(current),
-            p_mapping_queue.len(),
-            cell_mapping.len()
-        );
-    }
+    tracing::event!(
+        tracing::Level::TRACE,
+        "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
+        depth,
+        current.debug_index(),
+        p_index.get_cell_kind(current),
+        p_mapping_queue.len(),
+        cell_mapping.len()
+    );
 
     let mut total_candidates = 0usize;
     let mut already_mapped = 0usize;
@@ -266,15 +258,14 @@ fn find_subgraphs_recursive<'p, 'd>(
                 // Worst case fallback: all nodes (previous behavior)
                 d_index.get_cells_topo().to_vec()
             } else {
-                d_index
-                    .get_by_kind(current_kind).to_vec()
+                d_index.get_by_kind(current_kind).to_vec()
             }
         }
     };
 
     total_candidates = d_candidates.len();
 
-    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = d_candidates
+    let new_cell_mappings = d_candidates
         .into_iter()
         .filter(|d_cell| !d_cell_already_mapped(*d_cell, &cell_mapping, depth, &mut already_mapped))
         .filter(|d_cell| {
@@ -299,21 +290,18 @@ fn find_subgraphs_recursive<'p, 'd>(
             let mut new_mapping = cell_mapping.clone();
             new_mapping.insert(current, d_cell);
             new_mapping
-        })
-        .collect();
+        });
 
-    if tracing::level_enabled!(Level::TRACE) {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
-            depth,
-            total_candidates,
-            already_mapped,
-            incompatible,
-            connectivity_fail,
-            new_cell_mappings.len()
-        );
-    }
+    tracing::event!(
+        tracing::Level::TRACE,
+        "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
+        depth,
+        total_candidates,
+        already_mapped,
+        incompatible,
+        connectivity_fail,
+        new_cell_mappings.len()
+    );
 
     let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
         .into_iter()
@@ -337,15 +325,13 @@ fn find_subgraphs_recursive<'p, 'd>(
         results.retain(|m| seen.insert(m.mapping.sig()));
         let after_dedup = results.len();
 
-        if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-                depth,
-                before_dedup,
-                after_dedup
-            );
-        }
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
+            depth,
+            before_dedup,
+            after_dedup
+        );
     }
 
     results
@@ -562,28 +548,26 @@ fn d_cell_valid_connectivity<'p, 'd>(
 ) -> bool {
     let valid_fanin = check_fanin(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanin {
-        if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "d_cell_valid_connectivity: P #{} vs D #{} -> fanin check FAILED",
-                p_cell.debug_index(),
-                d_cell.debug_index(),
-            );
-        }
+        tracing::event!(
+            tracing::Level::TRACE,
+            "d_cell_valid_connectivity: P #{} vs D #{} -> fanin check FAILED",
+            p_cell.debug_index(),
+            d_cell.debug_index(),
+        );
+
         *invalid_connectivity += 1;
         return false;
     }
 
     let valid_fanout = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
     if !valid_fanout {
-        if tracing::level_enabled!(Level::TRACE) {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "d_cell_valid_connectivity: P #{} vs D #{} -> fanout check FAILED",
-                p_cell.debug_index(),
-                d_cell.debug_index(),
-            );
-        }
+        tracing::event!(
+            tracing::Level::TRACE,
+            "d_cell_valid_connectivity: P #{} vs D #{} -> fanout check FAILED",
+            p_cell.debug_index(),
+            d_cell.debug_index(),
+        );
+
         *invalid_connectivity += 1;
         return false;
     }

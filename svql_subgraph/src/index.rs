@@ -15,16 +15,15 @@ pub(super) struct Index<'a> {
     /// Pre-computed source information for each cell: sources[sink][pin_idx] = Source
     cell_sources: HashMap<CellRef<'a>, Vec<Source<'a>>>,
 
-    /// O(1) fanout membership: driver -> (sink -> bitmask_of_pins)
-    ///
-    /// Example: if a driver feeds sink at pins 0 and 1, we store mask = 0b11 (3).
+    /// fanout membership: driver -> (sink -> bitmask_of_pins)
     fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, u32>>,
 }
 
 impl<'a> Index<'a> {
     #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Index::build: start. design cells={}",
             design.iter_cells().count()
         );
@@ -39,7 +38,8 @@ impl<'a> Index<'a> {
             })
             .collect();
 
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Index::build: cells_topo len={} (excluding Name). gate_count={}",
             cells_topo.len(),
             cells_topo
@@ -54,7 +54,12 @@ impl<'a> Index<'a> {
         }
 
         for (k, v) in by_kind.iter() {
-            tracing::event!(tracing::Level::TRACE, "Index::build: by_kind {:?} -> {}", k, v.len());
+            tracing::event!(
+                tracing::Level::TRACE,
+                "Index::build: by_kind {:?} -> {}",
+                k,
+                v.len()
+            );
         }
 
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
@@ -99,11 +104,13 @@ impl<'a> Index<'a> {
             }
         }
 
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Index::build: reverse_cell_lookup keys={} (drivers).",
             reverse_cell_lookup.len()
         );
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Index::build: fanout_map keys={} (drivers).",
             fanout_map.len()
         );
@@ -126,12 +133,17 @@ impl<'a> Index<'a> {
 
     pub(super) fn get_by_kind(&self, kind: CellKind) -> &[CellRef<'a>] {
         let slice = self.by_kind.get(&kind).map(|v| v.as_slice()).unwrap_or(&[]);
-        tracing::event!(tracing::Level::TRACE, "Index::get_by_kind: {:?} -> {}", kind, slice.len());
+        tracing::event!(
+            tracing::Level::TRACE,
+            "Index::get_by_kind: {:?} -> {}",
+            kind,
+            slice.len()
+        );
         slice
     }
 
-    pub(super) fn get_cells_topo(&self) -> &[CellRef<'a>] {
-        &self.cells_topo
+    pub(super) fn get_cells_topo(&self) -> impl Iterator<Item = &CellRef<'a>> {
+        self.cells_topo.iter()
     }
 
     pub(super) fn get_fanouts(&self, cell: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
@@ -140,7 +152,8 @@ impl<'a> Index<'a> {
             .get(&cell)
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Index::get_fanouts: driver #{} -> {} sinks",
             cell.debug_index(),
             slice.len()
