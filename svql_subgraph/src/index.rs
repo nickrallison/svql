@@ -7,12 +7,19 @@ use tracing::trace;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
-    /// Cells of design in topological order
+    /// Cells of design in topological order (Name cells filtered out)
     cells_topo: Vec<CellRef<'a>>,
     by_kind: HashMap<CellKind, Vec<CellRef<'a>>>,
+    /// For each driver (key), the list of (sink, sink_pin_idx)
     reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>>,
-    /// Pre-computed source information for each cell
+
+    /// Pre-computed source information for each cell: sources[sink][pin_idx] = Source
     cell_sources: HashMap<CellRef<'a>, Vec<Source<'a>>>,
+
+    /// O(1) fanout membership: driver -> (sink -> bitmask_of_pins)
+    ///
+    /// Example: if a driver feeds sink at pins 0 and 1, we store mask = 0b11 (3).
+    fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, u32>>,
 }
 
 impl<'a> Index<'a> {
@@ -32,6 +39,7 @@ impl<'a> Index<'a> {
                 !matches!(kind, CellKind::Name)
             })
             .collect();
+
         trace!(
             "Index::build: cells_topo len={} (excluding Name). gate_count={}",
             cells_topo.len(),
@@ -53,8 +61,9 @@ impl<'a> Index<'a> {
         let mut reverse_cell_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
             HashMap::new();
         let mut cell_sources: HashMap<CellRef<'a>, Vec<Source<'a>>> = HashMap::new();
+        let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, u32>> = HashMap::new();
 
-        // Pre-compute source information for all cells
+        // Pre-compute source information for all cells (as sinks)
         for cell_ref in cells_topo.iter() {
             let mut sources: Vec<Source<'a>> = Vec::new();
             cell_ref.visit(|net| {
@@ -63,21 +72,30 @@ impl<'a> Index<'a> {
             cell_sources.insert(*cell_ref, sources);
         }
 
-        // Build reverse lookup based on pre-computed sources
+        // Build reverse lookups and O(1) fanout membership map
         for sink_ref in cells_topo.iter() {
             let sources = cell_sources.get(sink_ref).unwrap();
             for (sink_pin_idx, source) in sources.iter().enumerate() {
-                let driver = match source {
+                let driver_cell = match source {
                     Source::Gate(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Io(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Const(_trit) => None,
                 };
-                if let Some(driver_cell) = driver {
-                    // Store the SINK'S input pin index (sink_pin_idx), not the source bit index.
+
+                if let Some(driver) = driver_cell {
+                    // reverse list (driver -> vec of (sink, pin))
                     reverse_cell_lookup
-                        .entry(driver_cell)
+                        .entry(driver)
                         .or_default()
                         .push((*sink_ref, sink_pin_idx));
+
+                    // fanout_map (driver -> map sink -> bitmask)
+                    let mask = 1u32 << sink_pin_idx;
+                    let entry = fanout_map.entry(driver).or_default();
+                    entry
+                        .entry(*sink_ref)
+                        .and_modify(|m| *m |= mask)
+                        .or_insert(mask);
                 }
             }
         }
@@ -86,12 +104,17 @@ impl<'a> Index<'a> {
             "Index::build: reverse_cell_lookup keys={} (drivers).",
             reverse_cell_lookup.len()
         );
+        trace!(
+            "Index::build: fanout_map keys={} (drivers).",
+            fanout_map.len()
+        );
 
         Index {
             cells_topo,
             by_kind,
             reverse_cell_lookup,
             cell_sources,
+            fanout_map,
         }
     }
 
@@ -161,5 +184,55 @@ impl<'a> Index<'a> {
         } else {
             format!("#{} {:?}({})", cell.debug_index(), kind, n)
         }
+    }
+
+    /// True if `driver` has any fanout edge to `sink` (any input pin).
+    pub(super) fn has_fanout_to(&self, driver: CellRef<'a>, sink: CellRef<'a>) -> bool {
+        self.fanout_map
+            .get(&driver)
+            .and_then(|m| m.get(&sink))
+            .is_some()
+    }
+
+    /// True if `driver` feeds `sink` specifically at `pin_idx`.
+    pub(super) fn has_fanout_to_pin(
+        &self,
+        driver: CellRef<'a>,
+        sink: CellRef<'a>,
+        pin_idx: usize,
+    ) -> bool {
+        self.fanout_map
+            .get(&driver)
+            .and_then(|m| m.get(&sink))
+            .map_or(false, |mask| (mask & (1u32 << pin_idx)) != 0)
+    }
+
+    /// The unique driver of a given sink input pin, if any (Gate/Io sources only).
+    pub(super) fn driver_of_sink_pin(
+        &self,
+        sink: CellRef<'a>,
+        pin_idx: usize,
+    ) -> Option<CellRef<'a>> {
+        let src = self.get_cell_sources(sink).get(pin_idx)?;
+        match src {
+            Source::Gate(c, _) | Source::Io(c, _) => Some(*c),
+            Source::Const(_) => None,
+        }
+    }
+
+    /// All drivers of a sink across all pins (Gate/Io only), duplicates removed.
+    pub(super) fn drivers_of_sink_all_pins(&self, sink: CellRef<'a>) -> Vec<CellRef<'a>> {
+        let mut out: Vec<CellRef<'a>> = self
+            .get_cell_sources(sink)
+            .iter()
+            .filter_map(|src| match src {
+                Source::Gate(c, _) | Source::Io(c, _) => Some(*c),
+                Source::Const(_) => None,
+            })
+            .collect();
+
+        out.sort_by_key(|c| c.debug_index());
+        out.dedup();
+        out
     }
 }
