@@ -64,6 +64,11 @@ easy-smt = "0.3"
 argparse = "0.2"
 jzon = "0.12.5"
 
+# Add these for code generation in build scripts
+quote = "1.0"
+proc-macro2 = "1.0"
+syn = { version = "2.0", features = ["full"] }
+
 [workspace.package]
 edition = "2024"
 version = "0.1.0"

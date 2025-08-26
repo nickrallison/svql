@@ -12,6 +12,10 @@ tracing-subscriber.workspace = true
 [build-dependencies]
 regex.workspace = true
 walkdir.workspace = true
+svql_common.workspace = true
+quote.workspace = true
+proc-macro2.workspace = true
+syn.workspace = true
 
 [dependencies]
 svql_driver.workspace = true
