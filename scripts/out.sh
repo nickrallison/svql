@@ -1,7 +1,9 @@
 #! /usr/bin/env bash
 
+set -e
+
 mkdir -p generated
-cargo expand --package svql_query queries::netlist > generated/expanded_netlist.rs
+cargo expand --lib --package svql_query queries::netlist > generated/expanded_netlist.rs
 cargo build
 
 # Find and copy the most recent version of each generated test file
