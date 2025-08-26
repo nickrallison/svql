@@ -111,7 +111,6 @@ impl SearchableEnumComposite for AndAny<Search> {
 mod tests {
     use svql_common::{Config, DedupeMode};
     use svql_driver::Driver;
-    use tracing::trace;
     use tracing_subscriber;
 
     fn init_test_logger() {
@@ -170,9 +169,12 @@ mod tests {
             }
         }
 
-        tracing::event!(tracing::Level::TRACE, 
+        tracing::event!(
+            tracing::Level::TRACE,
             "Found {} gate matches, {} mux matches, {} nor matches",
-            gate_cnt, mux_cnt, nor_cnt
+            gate_cnt,
+            mux_cnt,
+            nor_cnt
         );
 
         assert_eq!(gate_cnt, 3, "expected 3 and_gate matches");
