@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
 use crate::cell::{CellKind, Source, net_to_source};
-use tracing::trace;
 
 #[derive(Clone, Debug)]
 pub(super) struct Index<'a> {
@@ -204,7 +203,7 @@ impl<'a> Index<'a> {
         self.fanout_map
             .get(&driver)
             .and_then(|m| m.get(&sink))
-            .map_or(false, |mask| (mask & (1u32 << pin_idx)) != 0)
+            .is_some_and(|mask| (mask & (1u32 << pin_idx)) != 0)
     }
 
     /// The unique driver of a given sink input pin, if any (Gate/Io sources only).

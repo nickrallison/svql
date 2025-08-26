@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use tracing::trace;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {

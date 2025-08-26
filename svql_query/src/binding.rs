@@ -1,6 +1,5 @@
 use crate::Match;
 use svql_subgraph::SubgraphMatch;
-use tracing::trace;
 
 // Macro‑friendly helpers that bind a single bit of a named input or output
 // into our `Match<'p, 'd>` payload. A codegen macro can call these for each

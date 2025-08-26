@@ -4,7 +4,7 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use svql_common::{
     TestCase,
-    build_support::{sanitize_ident, test_case_names},
+    build_support::sanitize_ident,
 };
 
 fn main() {

@@ -1,6 +1,5 @@
 use svql_common::Config;
 use svql_driver::{DriverKey, context::Context, driver::Driver};
-use tracing::trace;
 
 use crate::{Connection, Match, Search, State, WithPath, instance::Instance};
 

@@ -24,21 +24,21 @@ impl Config {
     /// Defaults mirror historical behavior:
     /// - exact-length matching
     /// - None dedupe
-    #[contracts::debug_ensures(ret.match_length == true)]
+    #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
 
     /// Convenience: exact-length matching with the provided dedupe mode.
-    #[contracts::debug_ensures(ret.match_length == true)]
+    #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == dedupe)]
     pub fn exact_length(dedupe: DedupeMode) -> Self {
         Self::new(true, dedupe)
     }
 
     /// Convenience: superset-length matching with the provided dedupe mode.
-    #[contracts::debug_ensures(ret.match_length == false)]
+    #[contracts::debug_ensures(!ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == dedupe)]
     pub fn superset_length(dedupe: DedupeMode) -> Self {
         Self::new(false, dedupe)
@@ -48,7 +48,7 @@ impl Config {
 impl Default for Config {
     /// Default configuration mirrors the historical behavior:
     /// exact-length matching and None dedupe.
-    #[contracts::debug_ensures(ret.match_length == true)]
+    #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
     fn default() -> Self {
         Self::new(true, DedupeMode::None)
@@ -76,7 +76,7 @@ pub struct ConfigBuilder {
 }
 
 impl Default for ConfigBuilder {
-    #[contracts::debug_ensures(ret.match_length == true)]
+    #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
     fn default() -> Self {
         Self {
@@ -96,14 +96,14 @@ impl ConfigBuilder {
     }
 
     /// Convenience: request exact-length matching.
-    #[contracts::debug_ensures(ret.match_length == true)]
+    #[contracts::debug_ensures(ret.match_length)]
     pub fn exact_length(mut self) -> Self {
         self.match_length = true;
         self
     }
 
     /// Convenience: request superset-length matching.
-    #[contracts::debug_ensures(ret.match_length == false)]
+    #[contracts::debug_ensures(!ret.match_length)]
     pub fn superset_length(mut self) -> Self {
         self.match_length = false;
         self

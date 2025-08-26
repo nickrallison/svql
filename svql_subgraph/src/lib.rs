@@ -8,7 +8,7 @@ use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
-use tracing::{Level, info, trace};
+use tracing::Level;
 
 use crate::cell::{CellKind, Source};
 
@@ -104,9 +104,8 @@ pub fn find_subgraphs<'p, 'd>(
     // in topological_order, only gates & inputs
     let p_mapping_queue: VecDeque<CellRef<'p>> = p_index
         .get_cells_topo()
-        .into_iter()
-        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output))
-        .map(|c| *c)
+        .iter()
+        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output)).copied()
         .collect();
 
     if tracing::level_enabled!(Level::TRACE) {
@@ -265,13 +264,10 @@ fn find_subgraphs_recursive<'p, 'd>(
         _ => {
             if matches!(current_kind, CellKind::Input) {
                 // Worst case fallback: all nodes (previous behavior)
-                d_index.get_cells_topo().iter().map(|c| *c).collect()
+                d_index.get_cells_topo().to_vec()
             } else {
                 d_index
-                    .get_by_kind(current_kind)
-                    .iter()
-                    .map(|c| *c)
-                    .collect()
+                    .get_by_kind(current_kind).to_vec()
             }
         }
     };

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 use std::hash::Hash;
 
 use prjunnamed_netlist::{Cell, CellRef, Design, Net, Trit};
@@ -139,9 +139,9 @@ pub fn net_to_source<'a>(design: &'a Design, net: Net) -> Source<'a> {
     match design.find_cell(net) {
         Ok((src, bit)) => {
             if CellKind::from(src.get().as_ref()).is_gate() {
-                Source::Gate(src.into(), bit)
+                Source::Gate(src, bit)
             } else {
-                Source::Io(src.into(), bit)
+                Source::Io(src, bit)
             }
         }
         Err(trit) => Source::Const(trit),

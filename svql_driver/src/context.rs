@@ -5,7 +5,6 @@ use std::sync::Arc;
 use prjunnamed_netlist::Design;
 
 use crate::DriverKey;
-use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct Context {

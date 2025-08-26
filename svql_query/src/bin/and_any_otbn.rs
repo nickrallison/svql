@@ -6,7 +6,6 @@ use svql_query::WithPath;
 use svql_query::composite::SearchableEnumComposite;
 use svql_query::instance::Instance;
 use svql_query::queries::enum_composite::and_any::AndAny;
-use tracing_subscriber;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logger

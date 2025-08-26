@@ -1,4 +1,3 @@
-use tracing::trace;
 // svql_subgraph/src/mapping.rs
 use prjunnamed_netlist::CellRef;
 use std::collections::HashMap;
@@ -12,8 +11,8 @@ pub(super) struct CellMapping<'p, 'd> {
 }
 
 impl<'p, 'd> CellMapping<'p, 'd> {
-    #[contracts::debug_ensures(ret.pattern_mapping.len() == 0)]
-    #[contracts::debug_ensures(ret.design_mapping.len() == 0)]
+    #[contracts::debug_ensures(ret.pattern_mapping.is_empty())]
+    #[contracts::debug_ensures(ret.design_mapping.is_empty())]
     pub(super) fn new() -> Self {
         tracing::event!(tracing::Level::TRACE, "CellMapping::new");
         Self {

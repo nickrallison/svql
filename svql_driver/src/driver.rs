@@ -4,7 +4,6 @@ use std::sync::{Arc, RwLock};
 
 use prjunnamed_netlist::Design;
 use thiserror::Error;
-use tracing::{debug, info, warn};
 
 use crate::{Context, DriverKey};
 
