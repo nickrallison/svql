@@ -54,8 +54,8 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
 
                 match (from_match, to_match) {
                     (Some(from_val), Some(to_val)) => {
-                        let from_cell = from_val.design_cell_ref;
-                        let to_cell = to_val.design_cell_ref;
+                        let from_cell = from_val.design_cell_ref.as_ref();
+                        let to_cell = to_val.design_cell_ref.as_ref();
 
                         trace!("From cell present: {:?}", from_cell.is_some());
                         trace!("To cell present: {:?}", to_cell.is_some());

@@ -238,7 +238,7 @@ lazy_static::lazy_static! {
             config: Config::builder().exact_length().none().build(),
             pattern: &*SDFFE_THEN_AND,
             haystack: &*AND_Q_DOUBLE_SDFFE,
-            expected_matches: 2,
+            expected_matches: 4,
         },
     ];
 

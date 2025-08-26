@@ -1,3 +1,5 @@
 mod cell;
 
-pub(crate) use cell::{CellKind, CellWrapper, Source};
+pub(crate) use cell::{CellKind, Source};
+
+pub use cell::CellWrapper;

@@ -1,6 +1,6 @@
-use std::{borrow::Cow, hash::Hash};
+use std::hash::Hash;
 
-use prjunnamed_netlist::{Cell, CellRef, Design, MetaItemRef, Net, Trit, Value};
+use prjunnamed_netlist::{Cell, CellRef, Design, Net, Trit};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum CellKind {
@@ -123,14 +123,14 @@ impl From<&Cell> for CellKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct CellWrapper<'p> {
-    pub(crate) cref: CellRef<'p>,
-    pub(crate) pins: Vec<Source<'p>>,
-    pub(crate) kind: CellKind,
+pub struct CellWrapper<'p> {
+    cref: CellRef<'p>,
+    pins: Vec<Source<'p>>,
+    kind: CellKind,
 }
 
 impl<'p> CellWrapper<'p> {
-    pub(crate) fn new(cref: CellRef<'p>) -> Self {
+    pub fn new(cref: CellRef<'p>) -> Self {
         let mut pins: Vec<Source<'p>> = Vec::new();
         cref.visit(|net| {
             pins.push(net_to_source(cref.design(), net));
@@ -139,15 +139,15 @@ impl<'p> CellWrapper<'p> {
         let cref = cref.into();
         CellWrapper { cref, pins, kind }
     }
-    pub(crate) fn cref(&self) -> CellRef<'p> {
+    pub fn cref(&self) -> CellRef<'p> {
         self.cref
     }
 
-    pub(crate) fn debug_index(&self) -> usize {
+    pub fn debug_index(&self) -> usize {
         self.cref.debug_index()
     }
 
-    pub(crate) fn summary(&self) -> String {
+    pub fn summary(&self) -> String {
         let iname = self.input_name().unwrap_or("");
         let oname = self.output_name().unwrap_or("");
         let n = if !iname.is_empty() { iname } else { oname };
@@ -158,17 +158,24 @@ impl<'p> CellWrapper<'p> {
         }
     }
 
-    pub(crate) fn input_name(&self) -> Option<&'p str> {
+    pub fn input_name(&self) -> Option<&'p str> {
         match self.cref().get() {
             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
             _ => None,
         }
     }
-    pub(crate) fn output_name(&self) -> Option<&'p str> {
+    pub fn output_name(&self) -> Option<&'p str> {
         match self.cref().get() {
             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
             _ => None,
         }
+    }
+
+    pub fn kind(&self) -> CellKind {
+        self.kind
+    }
+    pub fn pins(&self) -> &[Source<'p>] {
+        &self.pins
     }
 }
 

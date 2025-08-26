@@ -6,14 +6,21 @@ use index::Index;
 use log::{info, trace};
 use mapping::CellMapping;
 use prjunnamed_netlist::Design;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
 
-use crate::model::{CellKind, CellWrapper};
+use crate::model::{CellKind, Source};
+
+pub use crate::model::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
+    // Mapping of pattern cells to design cells (and reverse)
     mapping: CellMapping<'p, 'd>,
+
+    // Boundary IO lookup tables
+    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
 }
 
 impl<'p, 'd> SubgraphMatch<'p, 'd> {
@@ -22,6 +29,38 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
     pub fn is_empty(&self) -> bool {
         self.mapping.is_empty()
+    }
+
+    // Return the design cell that corresponds to the named pattern input bit.
+    // For inputs, the design "source" is the cell that the pattern input was mapped to.
+    pub fn design_source_of_input_bit(
+        &self,
+        name: &str,
+        bit: usize,
+    ) -> Option<(CellWrapper<'d>, usize)> {
+        let p_input = self.input_by_name.get(name)?;
+        let d_src = self.mapping.get_design_cell(p_input.cref())?;
+        Some((CellWrapper::new(d_src), bit))
+    }
+
+    // Return the design cell that drives the named pattern output bit.
+    // We look at the pattern output's input pin driver, then translate that driver
+    // through the mapping.
+    pub fn design_driver_of_output_bit(
+        &self,
+        name: &str,
+        bit: usize,
+    ) -> Option<(CellWrapper<'d>, usize)> {
+        let p_out = self.output_by_name.get(name)?;
+        // Pattern Output should have at least one input pin; pick the requested bit if present.
+        let p_src = p_out.pins().get(bit)?;
+        match p_src {
+            Source::Gate(p_cell, p_bit) | Source::Io(p_cell, p_bit) => {
+                let d_cell = self.mapping.get_design_cell(*p_cell)?;
+                Some((CellWrapper::new(d_cell), *p_bit))
+            }
+            Source::Const(_) => None,
+        }
     }
 }
 
@@ -50,11 +89,26 @@ pub fn find_subgraphs<'p, 'd>(
         return Vec::new();
     }
 
+    // Build boundary IO maps for the pattern (by name).
+    let input_by_name: HashMap<&'p str, CellWrapper<'p>> = p_index
+        .get_cells_topo()
+        .iter()
+        .filter(|c| matches!(c.kind(), CellKind::Input))
+        .filter_map(|c| c.input_name().map(|n| (n, c.clone())))
+        .collect();
+
+    let output_by_name: HashMap<&'p str, CellWrapper<'p>> = p_index
+        .get_cells_topo()
+        .iter()
+        .filter(|c| matches!(c.kind(), CellKind::Output))
+        .filter_map(|c| c.output_name().map(|n| (n, c.clone())))
+        .collect();
+
     // in topological_order, only gates & inputs
     let p_mapping_queue: VecDeque<CellWrapper<'p>> = p_index
         .get_cells_topo()
         .into_iter()
-        .filter(|c| !matches!(c.kind, model::CellKind::Output))
+        .filter(|c| !matches!(c.kind(), model::CellKind::Output))
         .map(|c| c.clone())
         .collect();
 
@@ -71,6 +125,8 @@ pub fn find_subgraphs<'p, 'd>(
         config,
         initial_cell_mapping,
         p_mapping_queue,
+        &input_by_name,
+        &output_by_name,
         0, // depth
     );
 
@@ -83,15 +139,14 @@ pub fn find_subgraphs<'p, 'd>(
     results
 }
 
-// The previous version is retained here for context and reference.
-// fn find_subgraphs_recursive<'p, 'd>(...) { ... }
-
 fn find_subgraphs_recursive<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
     config: &Config,
     cell_mapping: CellMapping<'p, 'd>,
     mut p_mapping_queue: VecDeque<CellWrapper<'p>>,
+    input_by_name: &HashMap<&'p str, CellWrapper<'p>>,
+    output_by_name: &HashMap<&'p str, CellWrapper<'p>>,
     depth: usize,
 ) -> Vec<SubgraphMatch<'p, 'd>> {
     // 1. Pop the first element of mapping queue
@@ -103,6 +158,8 @@ fn find_subgraphs_recursive<'p, 'd>(
         );
         return vec![SubgraphMatch {
             mapping: cell_mapping,
+            input_by_name: input_by_name.clone(),
+            output_by_name: output_by_name.clone(),
         }];
     };
 
@@ -122,20 +179,18 @@ fn find_subgraphs_recursive<'p, 'd>(
     let mut connectivity_fail = 0usize;
 
     // IMPORTANT: If the current pattern node is an Input, allow it to map to ANY design node.
-    // This permits pattern inputs to bind to DFF outputs, gate outputs, etc., not only top-level inputs.
-    // For other kinds, keep the kind-based filtering for performance.
-    let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind, CellKind::Input) {
+    let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind(), CellKind::Input) {
         trace!(
             "find_subgraphs_recursive[depth={}]: pattern node is Input; scanning ALL design nodes",
             depth
         );
         d_index.get_cells_topo().iter().collect()
     } else {
-        let cands = d_index.get_by_kind(current.kind);
+        let cands = d_index.get_by_kind(current.kind());
         trace!(
             "find_subgraphs_recursive[depth={}]: filtering by kind {:?}; candidates={}",
             depth,
-            current.kind,
+            current.kind(),
             cands.len()
         );
         cands.iter().collect()
@@ -202,7 +257,6 @@ fn find_subgraphs_recursive<'p, 'd>(
     );
 
     // 3. Recurse on each valid cell and put together all the results, deduplicate at this level.
-    //     - This looks like a lot, but the `cells_share_connectivity` function should heavily cut down the number of recursions
     let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
         .into_iter()
         .flat_map(|new_cell_mapping| {
@@ -212,6 +266,8 @@ fn find_subgraphs_recursive<'p, 'd>(
                 config,
                 new_cell_mapping,
                 p_mapping_queue.clone(),
+                input_by_name,
+                output_by_name,
                 depth + 1,
             )
         })
@@ -227,8 +283,6 @@ fn find_subgraphs_recursive<'p, 'd>(
             "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
             depth, before_dedup, after_dedup
         );
-    } else {
-        // panic!("DEBUG")
     }
 
     results
@@ -242,9 +296,9 @@ fn cells_compatible<'p, 'd>(
     _config: &Config,
 ) -> bool {
     // Check if the cells share the same kind
-    let kind_matches = match (p_cell.kind, d_cell.kind) {
+    let kind_matches = match (p_cell.kind(), d_cell.kind()) {
         (CellKind::Input, _d_cell_kind) => return true,
-        _ => p_cell.kind == d_cell.kind,
+        _ => p_cell.kind() == d_cell.kind(),
     };
 
     if !kind_matches {
@@ -276,11 +330,11 @@ fn cells_share_connectivity<'p, 'd>(
 ) -> bool {
     // 1) Enforce fanin...
     let fanin_ok = p_cell
-        .pins
+        .pins()
         .iter()
         .enumerate()
         .all(|(pin_idx, p_src)| {
-            let d_src_opt = d_cell.pins.get(pin_idx);
+            let d_src_opt = d_cell.pins().get(pin_idx);
             let Some(d_src) = d_src_opt else {
                 trace!(
                     "cells_share_connectivity: P {} pin {} has no corresponding D pin",

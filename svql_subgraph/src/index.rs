@@ -26,17 +26,17 @@ impl<'a> Index<'a> {
             .iter_cells_topo()
             .rev()
             .map(CellWrapper::new)
-            .filter(|cell| !matches!(cell.kind, CellKind::Name))
+            .filter(|cell| !matches!(cell.kind(), CellKind::Name))
             .collect();
         trace!(
             "Index::build: cells_topo len={} (excluding Name). gate_count={}",
             cells_topo.len(),
-            cells_topo.iter().filter(|c| c.kind.is_gate()).count()
+            cells_topo.iter().filter(|c| c.kind().is_gate()).count()
         );
 
         for cell_wrapper in cells_topo.iter().cloned() {
             by_kind
-                .entry(cell_wrapper.kind)
+                .entry(cell_wrapper.kind())
                 .or_default()
                 .push(cell_wrapper);
         }
@@ -49,7 +49,7 @@ impl<'a> Index<'a> {
             HashMap::new();
 
         for sink_wrapper in cells_topo.iter() {
-            for (sink_pin_idx, pin) in sink_wrapper.pins.iter().enumerate() {
+            for (sink_pin_idx, pin) in sink_wrapper.pins().iter().enumerate() {
                 let driver = match pin {
                     Source::Gate(cell_ref, _src_bit) => Some(*cell_ref),
                     Source::Io(cell_ref, _src_bit) => Some(*cell_ref),
@@ -84,7 +84,10 @@ impl<'a> Index<'a> {
     }
 
     pub(super) fn gate_count(&self) -> usize {
-        self.cells_topo.iter().filter(|c| c.kind.is_gate()).count()
+        self.cells_topo
+            .iter()
+            .filter(|c| c.kind().is_gate())
+            .count()
     }
 
     pub(super) fn nodes(&self) -> &[CellWrapper<'a>] {
@@ -113,7 +116,7 @@ impl<'a> Index<'a> {
         let v: Vec<CellWrapper<'a>> = self
             .cells_topo
             .iter()
-            .filter(|c| c.kind.is_output())
+            .filter(|c| c.kind().is_output())
             .cloned()
             .collect();
         trace!("Index::get_outputs -> {}", v.len());
