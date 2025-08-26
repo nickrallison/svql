@@ -288,6 +288,14 @@ fn find_subgraphs_recursive<'p, 'd>(
     results
 }
 
+fn kinds_compatible(p_kind: CellKind, d_kind: CellKind) -> bool {
+    // Inputs in the pattern are allowed to map to any design node.
+    if matches!(p_kind, CellKind::Input) {
+        return true;
+    }
+    p_kind == d_kind
+}
+
 fn cells_compatible<'p, 'd>(
     p_cell: &CellWrapper<'p>,
     d_cell: &CellWrapper<'d>,
@@ -295,13 +303,8 @@ fn cells_compatible<'p, 'd>(
     _d_index: &Index<'d>,
     _config: &Config,
 ) -> bool {
-    // Check if the cells share the same kind
-    let kind_matches = match (p_cell.kind(), d_cell.kind()) {
-        (CellKind::Input, _d_cell_kind) => return true,
-        _ => p_cell.kind() == d_cell.kind(),
-    };
-
-    if !kind_matches {
+    let compatible = kinds_compatible(p_cell.kind(), d_cell.kind());
+    if !compatible {
         trace!(
             "cells_compatible: kind mismatch P {} vs D {}",
             p_cell.summary(),
@@ -316,8 +319,168 @@ fn cells_compatible<'p, 'd>(
         p_cell.summary(),
         d_cell.summary()
     );
-
     true
+}
+
+fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'d>) -> bool {
+    let ok = matches!(d_src, Source::Const(dt) if matches!(p_src, Source::Const(pt) if dt == pt));
+    if !ok {
+        trace!(
+            "cells_share_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
+            pin_idx, p_src, d_src
+        );
+    }
+    ok
+}
+
+fn source_matches_mapped_io<'p, 'd>(
+    pin_idx: usize,
+    p_src_cell: prjunnamed_netlist::CellRef<'p>,
+    p_bit: usize,
+    d_src: &Source<'d>,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
+    let Some(d_src_cell) = mapping.get_design_cell(p_src_cell) else {
+        // Unmapped pattern source; unconstrained at this stage.
+        return true;
+    };
+
+    // For mapped IO, accept either Io or Gate on the design side (same cell + bit).
+    let ok = match d_src {
+        Source::Io(d_cell, d_bit) => *d_cell == d_src_cell && *d_bit == p_bit,
+        Source::Gate(d_cell, d_bit) => *d_cell == d_src_cell && *d_bit == p_bit,
+        Source::Const(_) => false,
+    };
+
+    if !ok {
+        trace!(
+            "cells_share_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
+            pin_idx,
+            Source::Io(p_src_cell, p_bit),
+            d_src_cell.debug_index(),
+            d_src
+        );
+    }
+
+    ok
+}
+
+fn source_matches_mapped_gate<'p, 'd>(
+    pin_idx: usize,
+    p_src_cell: prjunnamed_netlist::CellRef<'p>,
+    p_bit: usize,
+    d_src: &Source<'d>,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
+    let Some(d_src_cell) = mapping.get_design_cell(p_src_cell) else {
+        // Unmapped pattern source; unconstrained at this stage.
+        return true;
+    };
+
+    // For mapped Gate, require Gate on the design side (same cell + bit).
+    let ok =
+        matches!(d_src, Source::Gate(d_cell, d_bit) if *d_cell == d_src_cell && *d_bit == p_bit);
+
+    if !ok {
+        trace!(
+            "cells_share_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
+            pin_idx,
+            Source::Gate(p_src_cell, p_bit),
+            d_src_cell.debug_index(),
+            d_src
+        );
+    }
+
+    ok
+}
+
+fn pin_sources_compatible<'p, 'd>(
+    pin_idx: usize,
+    p_src: &Source<'p>,
+    d_src: &Source<'d>,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
+    match p_src {
+        Source::Const(_) => source_matches_const(pin_idx, p_src, d_src),
+        Source::Io(p_src_cell, p_bit) => {
+            source_matches_mapped_io(pin_idx, *p_src_cell, *p_bit, d_src, mapping)
+        }
+        Source::Gate(p_src_cell, p_bit) => {
+            source_matches_mapped_gate(pin_idx, *p_src_cell, *p_bit, d_src, mapping)
+        }
+    }
+}
+
+fn check_fanin<'p, 'd>(
+    p_cell: &CellWrapper<'p>,
+    d_cell: &CellWrapper<'d>,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
+    p_cell.pins().iter().enumerate().all(|(pin_idx, p_src)| {
+        let Some(d_src) = d_cell.pins().get(pin_idx) else {
+            trace!(
+                "cells_share_connectivity: P {} pin {} has no corresponding D pin",
+                p_cell.summary(),
+                pin_idx
+            );
+            return false;
+        };
+        pin_sources_compatible(pin_idx, p_src, d_src, mapping)
+    })
+}
+
+fn fanout_edge_ok<'d>(
+    d_fanouts: &[(prjunnamed_netlist::CellRef<'d>, usize)],
+    d_sink_cell: prjunnamed_netlist::CellRef<'d>,
+    pin_idx: usize,
+) -> bool {
+    let sink_commutative = CellKind::from(d_sink_cell.get().as_ref()).is_commutative_inputs();
+
+    let ok = if sink_commutative {
+        d_fanouts.iter().any(|(s, _)| *s == d_sink_cell)
+    } else {
+        d_fanouts
+            .iter()
+            .any(|(s, i)| *s == d_sink_cell && *i == pin_idx)
+    };
+
+    trace!(
+        "cells_share_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
+        d_sink_cell.debug_index(),
+        pin_idx,
+        sink_commutative,
+        ok
+    );
+
+    ok
+}
+
+fn check_fanout<'p, 'd>(
+    p_cell: &CellWrapper<'p>,
+    d_cell: &CellWrapper<'d>,
+    p_index: &Index<'p>,
+    d_index: &Index<'d>,
+    mapping: &CellMapping<'p, 'd>,
+) -> bool {
+    let d_fanouts = d_index.get_fanouts(d_cell.cref());
+    let p_fanouts = p_index.get_fanouts(p_cell.cref());
+
+    trace!(
+        "cells_share_connectivity: P {} fanouts={} | D {} fanouts={}",
+        p_cell.summary(),
+        p_fanouts.len(),
+        d_cell.summary(),
+        d_fanouts.len()
+    );
+
+    p_fanouts
+        .iter()
+        .filter_map(|(p_sink_cell, pin_idx)| {
+            mapping
+                .get_design_cell(*p_sink_cell)
+                .map(|d_sink_cell| (d_sink_cell, *pin_idx))
+        })
+        .all(|(d_sink_cell, pin_idx)| fanout_edge_ok(d_fanouts, d_sink_cell, pin_idx))
 }
 
 fn cells_share_connectivity<'p, 'd>(
@@ -328,85 +491,7 @@ fn cells_share_connectivity<'p, 'd>(
     _config: &Config,
     mapping: &CellMapping<'p, 'd>,
 ) -> bool {
-    // 1) Enforce fanin...
-    let fanin_ok = p_cell
-        .pins()
-        .iter()
-        .enumerate()
-        .all(|(pin_idx, p_src)| {
-            let d_src_opt = d_cell.pins().get(pin_idx);
-            let Some(d_src) = d_src_opt else {
-                trace!(
-                    "cells_share_connectivity: P {} pin {} has no corresponding D pin",
-                    p_cell.summary(),
-                    pin_idx
-                );
-                return false;
-            };
-
-            match p_src {
-                crate::cell::Source::Const(pt) => {
-                    let ok = matches!(d_src, crate::cell::Source::Const(dt) if dt == pt);
-                    if !ok {
-                        trace!(
-                            "cells_share_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
-                            pin_idx,
-                            p_src,
-                            d_src
-                        );
-                    }
-                    ok
-                }
-                crate::cell::Source::Io(p_src_cell, p_bit) => {
-                    if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
-                        let ok = match d_src {
-                            crate::cell::Source::Io(d_cell, d_bit) => {
-                                *d_cell == d_src_cell && d_bit == p_bit
-                            }
-                            crate::cell::Source::Gate(d_cell, d_bit) => {
-                                *d_cell == d_src_cell && d_bit == p_bit
-                            }
-                            crate::cell::Source::Const(_) => false,
-                        };
-                        if !ok {
-                            trace!(
-                                "cells_share_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
-                                pin_idx,
-                                p_src,
-                                d_src_cell.debug_index(),
-                                d_src
-                            );
-                        }
-                        ok
-                    } else {
-                        true
-                    }
-                }
-                crate::cell::Source::Gate(p_src_cell, p_bit) => {
-                    if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
-                        let ok = matches!(
-                            d_src,
-                            crate::cell::Source::Gate(d_cell, d_bit)
-                            if *d_cell == d_src_cell && d_bit == p_bit
-                        );
-                        if !ok {
-                            trace!(
-                                "cells_share_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
-                                pin_idx,
-                                p_src,
-                                d_src_cell.debug_index(),
-                                d_src
-                            );
-                        }
-                        ok
-                    } else {
-                        true
-                    }
-                }
-            }
-        });
-
-    if !fanin_ok {
+    if !check_fanin(p_cell, d_cell, mapping) {
         trace!(
             "cells_share_connectivity: P {} vs D {} -> fanin check FAILED",
             p_cell.summary(),
@@ -415,46 +500,7 @@ fn cells_share_connectivity<'p, 'd>(
         return false;
     }
 
-    // 2) Enforce fanout...
-    let d_fanouts = d_index.get_fanouts(d_cell.cref());
-    let p_fanouts = p_index.get_fanouts(p_cell.cref());
-    trace!(
-        "cells_share_connectivity: P {} fanouts={} | D {} fanouts={}",
-        p_cell.summary(),
-        p_fanouts.len(),
-        d_cell.summary(),
-        d_fanouts.len()
-    );
-
-    let fanout_ok = p_fanouts
-        .iter()
-        .filter_map(|(p_sink_cell, pin_idx)| {
-            mapping
-                .get_design_cell(*p_sink_cell)
-                .map(|d_sink_cell| (d_sink_cell, *pin_idx))
-        })
-        .all(|(d_sink_cell, pin_idx)| {
-            // Allow any input pin index for commutative sinks
-            let sink_commutative =
-                CellKind::from(d_sink_cell.get().as_ref()).is_commutative_inputs();
-            let ok = if sink_commutative {
-                d_fanouts.iter().any(|(s, _)| *s == d_sink_cell)
-            } else {
-                d_fanouts
-                    .iter()
-                    .any(|(s, i)| *s == d_sink_cell && *i == pin_idx)
-            };
-            trace!(
-                "cells_share_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
-                d_sink_cell.debug_index(),
-                pin_idx,
-                sink_commutative,
-                ok
-            );
-            ok
-        });
-
-    let result = fanin_ok && fanout_ok;
+    let result = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
 
     trace!(
         "cells_share_connectivity: P {} vs D {} -> {}",
@@ -462,5 +508,6 @@ fn cells_share_connectivity<'p, 'd>(
         d_cell.summary(),
         result
     );
+
     result
 }
