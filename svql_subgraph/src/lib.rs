@@ -71,139 +71,15 @@ pub fn find_subgraphs<'p, 'd>(
         config,
         initial_cell_mapping,
         p_mapping_queue,
+        0, // depth
     );
 
     trace!("find_subgraphs: results={}", results.len());
     results
 }
 
-// fn find_subgraphs_recursive<'p, 'd>(
-//     p_index: &Index<'p>,
-//     d_index: &Index<'d>,
-//     config: &Config,
-//     cell_mapping: CellMapping<'p, 'd>,
-//     mut p_mapping_queue: VecDeque<CellWrapper<'p>>,
-//     depth: usize,
-// ) -> Vec<SubgraphMatch<'p, 'd>> {
-//     let Some(current) = p_mapping_queue.pop_front() else {
-//         trace!(
-//             "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
-//             depth,
-//             cell_mapping.len()
-//         );
-//         return vec![SubgraphMatch {
-//             mapping: cell_mapping,
-//         }];
-//     };
-
-//     trace!(
-//         "find_subgraphs_recursive[depth={}]: current pattern cell {}",
-//         depth,
-//         current.summary()
-//     );
-
-//     // Enumerate candidates with detailed filtering diagnostics.
-//     let mut new_cell_mappings: Vec<CellMapping<'p, 'd>> = Vec::new();
-//     let mut total_candidates = 0usize;
-//     let mut already_mapped = 0usize;
-//     let mut incompatible = 0usize;
-//     let mut connectivity_fail = 0usize;
-
-//     // IMPORTANT: If the current pattern node is an Input, allow it to map to ANY design node.
-//     // This permits pattern inputs to bind to DFF outputs, gate outputs, etc., not only top-level inputs.
-//     // For other kinds, keep the kind-based filtering for performance.
-//     let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind, CellKind::Input) {
-//         d_index.get_cells_topo().iter().collect()
-//     } else {
-//         d_index.get_by_kind(current.kind).iter().collect()
-//     };
-
-//     for d_cell in d_candidates {
-//         total_candidates += 1;
-
-//         if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
-//             already_mapped += 1;
-//             trace!(
-//                 "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
-//                 depth,
-//                 d_cell.summary()
-//             );
-//             continue;
-//         }
-
-//         if !cells_compatible(&current, d_cell, p_index, d_index, config) {
-//             incompatible += 1;
-//             trace!(
-//                 "find_subgraphs_recursive[depth={}]: skip D {} (incompatible with P {})",
-//                 depth,
-//                 d_cell.summary(),
-//                 current.summary()
-//             );
-//             continue;
-//         }
-
-//         let shares =
-//             cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping);
-
-//         if !shares {
-//             connectivity_fail += 1;
-//             trace!(
-//                 "find_subgraphs_recursive[depth={}]: skip D {} (connectivity mismatch with P {})",
-//                 depth,
-//                 d_cell.summary(),
-//                 current.summary()
-//             );
-//             continue;
-//         }
-
-//         let mut new_cm = cell_mapping.clone();
-//         new_cm.insert(current.cref(), d_cell.cref());
-//         trace!(
-//             "find_subgraphs_recursive[depth={}]: ACCEPT mapping P {} -> D {} (mapping size now {})",
-//             depth,
-//             current.summary(),
-//             d_cell.summary(),
-//             new_cm.len()
-//         );
-//         new_cell_mappings.push(new_cm);
-//     }
-
-//     trace!(
-//         "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
-//         depth,
-//         total_candidates,
-//         already_mapped,
-//         incompatible,
-//         connectivity_fail,
-//         new_cell_mappings.len()
-//     );
-
-//     let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
-//         .into_iter()
-//         .flat_map(|new_cell_mapping| {
-//             find_subgraphs_recursive(
-//                 p_index,
-//                 d_index,
-//                 config,
-//                 new_cell_mapping,
-//                 p_mapping_queue.clone(),
-//                 depth + 1,
-//             )
-//         })
-//         .collect();
-
-//     let before_dedup = results.len();
-//     let mut seen = std::collections::HashSet::new();
-//     results.retain(|m| seen.insert(m.mapping.sig()));
-//     let after_dedup = results.len();
-
-//     trace!(
-//         "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-//         depth, before_dedup, after_dedup
-//     );
-
-//     results
-// }
+// The previous version is retained here for context and reference.
+// fn find_subgraphs_recursive<'p, 'd>(...) { ... }
 
 fn find_subgraphs_recursive<'p, 'd>(
     p_index: &Index<'p>,
@@ -211,13 +87,27 @@ fn find_subgraphs_recursive<'p, 'd>(
     config: &Config,
     cell_mapping: CellMapping<'p, 'd>,
     mut p_mapping_queue: VecDeque<CellWrapper<'p>>,
+    depth: usize,
 ) -> Vec<SubgraphMatch<'p, 'd>> {
     // 1. Pop the first element of mapping queue
     let Some(current) = p_mapping_queue.pop_front() else {
+        trace!(
+            "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
+            depth,
+            cell_mapping.len()
+        );
         return vec![SubgraphMatch {
             mapping: cell_mapping,
         }];
     };
+
+    trace!(
+        "find_subgraphs_recursive[depth={}]: current={} | remaining_queue={} | mapping_size={}",
+        depth,
+        current.summary(),
+        p_mapping_queue.len(),
+        cell_mapping.len()
+    );
 
     // 2. Find All Possible Mappings
     //     - Must not be already mapped
@@ -225,46 +115,119 @@ fn find_subgraphs_recursive<'p, 'd>(
     //     - Design must share the same connectivity as the pattern
     //         - See pins field of CellWrapper
 
-    let all_possible_matches = d_index.get_by_kind(current.kind).into_iter();
+    let mut new_cell_mappings: Vec<CellMapping<'p, 'd>> = Vec::new();
 
-    let not_already_mapped = all_possible_matches
-        .filter(|&d_cell| !cell_mapping.design_mapping().contains_key(&d_cell.cref()));
+    let mut total_candidates = 0usize;
+    let mut already_mapped = 0usize;
+    let mut incompatible = 0usize;
+    let mut connectivity_fail = 0usize;
 
-    let compatible = not_already_mapped
-        .filter(|&d_cell| cells_compatible(&current, d_cell, p_index, d_index, config));
+    // IMPORTANT: If the current pattern node is an Input, allow it to map to ANY design node.
+    // This permits pattern inputs to bind to DFF outputs, gate outputs, etc., not only top-level inputs.
+    // For other kinds, keep the kind-based filtering for performance.
+    let d_candidates: Vec<&CellWrapper<'d>> = if matches!(current.kind, CellKind::Input) {
+        trace!(
+            "find_subgraphs_recursive[depth={}]: pattern node is Input; scanning ALL design nodes",
+            depth
+        );
+        d_index.get_cells_topo().iter().collect()
+    } else {
+        let cands = d_index.get_by_kind(current.kind);
+        trace!(
+            "find_subgraphs_recursive[depth={}]: filtering by kind {:?}; candidates={}",
+            depth,
+            current.kind,
+            cands.len()
+        );
+        cands.iter().collect()
+    };
 
-    let shares_connectivity = compatible.filter(|&d_cell| {
-        cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping)
-    });
+    for d_cell in d_candidates {
+        total_candidates += 1;
 
-    // 3. For each valid cell, create a new mapping and try to call self recursively and put together all the results
+        if cell_mapping.design_mapping().contains_key(&d_cell.cref()) {
+            already_mapped += 1;
+            trace!(
+                "find_subgraphs_recursive[depth={}]: skip D {} (already mapped)",
+                depth,
+                d_cell.summary()
+            );
+            continue;
+        }
+
+        if !cells_compatible(&current, d_cell, p_index, d_index, config) {
+            incompatible += 1;
+            trace!(
+                "find_subgraphs_recursive[depth={}]: skip D {} (incompatible with P {})",
+                depth,
+                d_cell.summary(),
+                current.summary()
+            );
+            continue;
+        }
+
+        let shares =
+            cells_share_connectivity(&current, d_cell, p_index, d_index, config, &cell_mapping);
+
+        if !shares {
+            connectivity_fail += 1;
+            trace!(
+                "find_subgraphs_recursive[depth={}]: skip D {} (connectivity mismatch with P {})",
+                depth,
+                d_cell.summary(),
+                current.summary()
+            );
+            continue;
+        }
+
+        let mut new_cm = cell_mapping.clone();
+        new_cm.insert(current.cref(), d_cell.cref());
+        trace!(
+            "find_subgraphs_recursive[depth={}]: ACCEPT mapping P {} -> D {} (mapping size now {})",
+            depth,
+            current.summary(),
+            d_cell.summary(),
+            new_cm.len()
+        );
+        new_cell_mappings.push(new_cm);
+    }
+
+    trace!(
+        "find_subgraphs_recursive[depth={}]: candidate stats: total={} already_mapped={} incompatible={} connectivity_fail={} accepted={}",
+        depth,
+        total_candidates,
+        already_mapped,
+        incompatible,
+        connectivity_fail,
+        new_cell_mappings.len()
+    );
+
+    // 3. Recurse on each valid cell and put together all the results, deduplicate at this level.
     //     - This looks like a lot, but the `cells_share_connectivity` function should heavily cut down the number of recursions
-    let new_cell_mappings: Vec<CellMapping<'p, 'd>> = shares_connectivity
-        .map(|d_cell| {
-            let mut new_cell_mapping = cell_mapping.clone();
-            new_cell_mapping.insert(current.cref(), d_cell.cref());
-            new_cell_mapping
+    let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
+        .into_iter()
+        .flat_map(|new_cell_mapping| {
+            find_subgraphs_recursive(
+                p_index,
+                d_index,
+                config,
+                new_cell_mapping,
+                p_mapping_queue.clone(),
+                depth + 1,
+            )
         })
         .collect();
 
-    let results: Vec<SubgraphMatch<'p, 'd>> = {
-        let mut results: Vec<SubgraphMatch<'p, 'd>> = new_cell_mappings
-            .into_iter()
-            .flat_map(|new_cell_mapping| {
-                find_subgraphs_recursive(
-                    p_index,
-                    d_index,
-                    config,
-                    new_cell_mapping,
-                    p_mapping_queue.clone(),
-                )
-            })
-            .collect();
-        let mut seen = std::collections::HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.sig()));
+    let before_dedup = results.len();
+    let mut seen = std::collections::HashSet::new();
+    results.retain(|m| seen.insert(m.mapping.sig()));
+    let after_dedup = results.len();
 
-        results
-    };
+    trace!(
+        "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
+        depth, before_dedup, after_dedup
+    );
+
     results
 }
 
