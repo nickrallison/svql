@@ -7,6 +7,9 @@ repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
+[build-dependencies]
+regex.workspace = true
+
 [dev-dependencies]
 lazy_static.workspace = true
 rstest.workspace = true

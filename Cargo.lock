@@ -590,6 +590,7 @@ dependencies = [
  "log",
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
+ "regex",
  "rstest",
  "svql_common",
  "tempfile",

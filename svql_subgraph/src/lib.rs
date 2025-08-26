@@ -23,13 +23,6 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     pub fn is_empty(&self) -> bool {
         self.mapping.is_empty()
     }
-
-    // pub fn pattern_mapping(&self) -> &HashMap<&'p CellWrapper<'p>, &'d CellWrapper<'d>> {
-    //     self.mapping.pattern_mapping()
-    // }
-    // pub fn design_mapping(&self) -> &HashMap<&'d CellWrapper<'d>, &'p CellWrapper<'p>> {
-    //     self.mapping.design_mapping()
-    // }
 }
 
 pub fn find_subgraphs<'p, 'd>(
