@@ -1,6 +1,6 @@
+mod cell;
 mod index;
 mod mapping;
-mod model;
 
 use index::Index;
 use log::{info, trace};
@@ -9,9 +9,9 @@ use prjunnamed_netlist::Design;
 use std::collections::{HashMap, VecDeque};
 use svql_common::{Config, DedupeMode};
 
-use crate::model::{CellKind, Source};
+use crate::cell::{CellKind, Source};
 
-pub use crate::model::CellWrapper;
+pub use crate::cell::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphMatch<'p, 'd> {
@@ -108,7 +108,7 @@ pub fn find_subgraphs<'p, 'd>(
     let p_mapping_queue: VecDeque<CellWrapper<'p>> = p_index
         .get_cells_topo()
         .into_iter()
-        .filter(|c| !matches!(c.kind(), model::CellKind::Output))
+        .filter(|c| !matches!(c.kind(), CellKind::Output))
         .map(|c| c.clone())
         .collect();
 
@@ -345,8 +345,8 @@ fn cells_share_connectivity<'p, 'd>(
             };
 
             match p_src {
-                crate::model::Source::Const(pt) => {
-                    let ok = matches!(d_src, crate::model::Source::Const(dt) if dt == pt);
+                crate::cell::Source::Const(pt) => {
+                    let ok = matches!(d_src, crate::cell::Source::Const(dt) if dt == pt);
                     if !ok {
                         trace!(
                             "cells_share_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
@@ -357,16 +357,16 @@ fn cells_share_connectivity<'p, 'd>(
                     }
                     ok
                 }
-                crate::model::Source::Io(p_src_cell, p_bit) => {
+                crate::cell::Source::Io(p_src_cell, p_bit) => {
                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
                         let ok = match d_src {
-                            crate::model::Source::Io(d_cell, d_bit) => {
+                            crate::cell::Source::Io(d_cell, d_bit) => {
                                 *d_cell == d_src_cell && d_bit == p_bit
                             }
-                            crate::model::Source::Gate(d_cell, d_bit) => {
+                            crate::cell::Source::Gate(d_cell, d_bit) => {
                                 *d_cell == d_src_cell && d_bit == p_bit
                             }
-                            crate::model::Source::Const(_) => false,
+                            crate::cell::Source::Const(_) => false,
                         };
                         if !ok {
                             trace!(
@@ -382,11 +382,11 @@ fn cells_share_connectivity<'p, 'd>(
                         true
                     }
                 }
-                crate::model::Source::Gate(p_src_cell, p_bit) => {
+                crate::cell::Source::Gate(p_src_cell, p_bit) => {
                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
                         let ok = matches!(
                             d_src,
-                            crate::model::Source::Gate(d_cell, d_bit)
+                            crate::cell::Source::Gate(d_cell, d_bit)
                             if *d_cell == d_src_cell && d_bit == p_bit
                         );
                         if !ok {

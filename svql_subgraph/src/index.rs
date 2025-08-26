@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use prjunnamed_netlist::{CellRef, Design};
 
-use crate::model::{CellKind, CellWrapper, Source};
+use crate::cell::{CellKind, CellWrapper, Source};
 use log::trace;
 
 #[derive(Clone, Debug)]
