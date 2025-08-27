@@ -143,18 +143,15 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     results
 }
 
-// -------------
-// New helper: narrow candidates for pattern Inputs using mapped neighbors.
-// -------------
-fn find_candidate_drivers_for_pattern_input<'p, 'd>(
-    current: CellRef<'p>,
+fn get_valid_fan_in_candidates<'p, 'd>(
+    pattern_current: CellRef<'p>,
     pattern_index: &GraphIndex<'p>,
     design_index: &GraphIndex<'d>,
     mapping: &NodeMapping<'p, 'd>,
 ) -> Option<Vec<CellRef<'d>>> {
     // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
     let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
-        .get_fanouts(current)
+        .get_fanouts(pattern_current)
         .iter()
         .filter_map(|(p_sink_node, pin_idx)| {
             mapping
@@ -163,6 +160,8 @@ fn find_candidate_drivers_for_pattern_input<'p, 'd>(
         })
         .collect();
 
+    // If no sinks are mapped yet, we can't constrain based on fanout, so return None
+    // This will cause the algorithm to consider all nodes of matching type as candidates
     if mapped_sinks.is_empty() {
         return None;
     }
@@ -186,8 +185,10 @@ fn find_candidate_drivers_for_pattern_input<'p, 'd>(
         .filter(|v| !v.is_empty())
         .collect();
 
+    // If we have mapped sinks but can't gather constraints from them,
+    // it means we can't satisfy the fanout requirements
     if sets.is_empty() {
-        return None;
+        return Some(Vec::new()); // No valid candidates
     }
 
     // Intersect all sets
@@ -208,7 +209,7 @@ fn find_candidate_drivers_for_pattern_input<'p, 'd>(
         }
     }
 
-    if acc.is_empty() { None } else { Some(acc) }
+    Some(acc)
 }
 
 fn find_isomorphisms_recursive<'p, 'd>(
@@ -221,7 +222,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-    let Some(current) = pattern_mapping_queue.pop_front() else {
+    let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
             "find_isomorphisms_recursive[depth={}]: base case reached. mapping size={}",
@@ -240,24 +241,41 @@ fn find_isomorphisms_recursive<'p, 'd>(
         tracing::Level::TRACE,
         "find_isomorphisms_recursive[depth={}]: current=#{} type={:?} | remaining_queue={} | mapping_size={}",
         depth,
-        current.debug_index(),
-        pattern_index.get_node_type(current),
+        pattern_current.debug_index(),
+        pattern_index.get_node_type(pattern_current),
         pattern_mapping_queue.len(),
         node_mapping.len()
     );
 
-    let current_type = pattern_index.get_node_type(current);
+    let current_type = pattern_index.get_node_type(pattern_current);
 
-    // Narrowing Candidates for next level of recursion
-    let candidates: Vec<CellRef<'d>> = match current_type {
-        NodeType::Input => find_candidate_drivers_for_pattern_input(
-            current,
-            pattern_index,
-            design_index,
-            &node_mapping,
-        )
-        .unwrap_or_default(),
-        _ => design_index.get_by_type(current_type).to_vec(),
+    // Lambda to filter out incompatible node types
+    // unless the pattern node type is an input, then be a wild card
+    let node_type_filter = |current_type: NodeType| -> Box<dyn Fn(NodeType) -> bool> {
+        match current_type {
+            NodeType::Input => Box::new(|_other_type: NodeType| true),
+            _ => Box::new(move |other_type: NodeType| current_type == other_type),
+        }
+    };
+
+    // Get narrowing candidates for next level of recursion based on fanout constraints
+    let candidates = {
+        match current_type {
+            NodeType::Input => get_valid_fan_in_candidates(
+                pattern_current,
+                pattern_index,
+                design_index,
+                &node_mapping,
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|d_node| {
+                let d_type = design_index.get_node_type(*d_node);
+                node_type_filter(current_type)(d_type)
+            })
+            .collect(),
+            _ => design_index.get_by_type(current_type).to_vec(),
+        }
     };
 
     // Function to be executed on each possible candidate
@@ -269,7 +287,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
             return Vec::new();
         }
         if !is_node_connectivity_valid(
-            current,
+            pattern_current,
             d_node,
             pattern_index,
             design_index,
@@ -281,7 +299,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
 
         // Accepted candidate; recurse immediately.
         let mut new_node_mapping = node_mapping.clone();
-        new_node_mapping.insert(current, d_node);
+        new_node_mapping.insert(pattern_current, d_node);
 
         find_isomorphisms_recursive(
             pattern_index,

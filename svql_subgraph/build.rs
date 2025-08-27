@@ -2,10 +2,7 @@ use std::{env, fs::File, io::Write, path::PathBuf};
 
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use svql_common::{
-    TestCase,
-    build_support::sanitize_ident,
-};
+use svql_common::{TestCase, build_support::sanitize_ident};
 
 fn main() {
     // Re-run whenever the list of test cases changes
@@ -45,7 +42,7 @@ fn main() {
                         let haystack = import_design(tc.haystack.path.into(), tc.haystack.module)
                             .unwrap_or_else(|e| panic!("Failed to load haystack {}: {}", tc.haystack.path, e));
 
-                        let matches = svql_subgraph::find_subgraphs(&needle, &haystack, &tc.config);
+                        let matches = svql_subgraph::find_subgraph_isomorphisms(&needle, &haystack, &tc.config);
                         assert_eq!(
                             matches.len(),
                             tc.expected_matches,

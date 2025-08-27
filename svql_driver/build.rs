@@ -60,7 +60,7 @@ fn main() {
                         .expect("Haystack design not found in context");
 
                     // Run subgraph search using the design instances
-                    let matches = svql_subgraph::find_subgraphs(
+                    let matches = svql_subgraph::find_subgraph_isomorphisms(
                         pattern_design.as_ref(),
                         haystack_design.as_ref(),
                         &tc.config,
