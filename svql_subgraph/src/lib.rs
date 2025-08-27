@@ -407,23 +407,8 @@ fn find_subgraphs_recursive<'p, 'd>(
             )
         };
 
-    #[cfg(feature = "rayon")]
-    let mut results = candidates
-        .par_iter()
-        .map(|d_cell| process_candidate(*d_cell))
-        .flatten()
-        .collect::<Vec<_>>();
-
-    #[cfg(not(feature = "rayon"))]
-    let mut results = candidates
-        .iter()
-        .map(|d_cell| process_candidate(*d_cell))
-        .flatten()
-        .collect::<Vec<_>>();
-
-
-    if matches!(config.dedupe, DedupeMode::AutoMorph) {
-        let filtered_results = {
+    let filter: Box<dyn Fn(&SubgraphMatch<'p, 'd>) -> bool + Send + Sync> = 
+        if matches!(config.dedupe, DedupeMode::AutoMorph) {
             #[cfg(feature = "rayon")] 
             {
                 use dashmap::DashSet;
@@ -436,13 +421,8 @@ fn find_subgraphs_recursive<'p, 'd>(
                     seen.insert(item.mapping.sig())
                 };
 
-                Box::new(
-                    candidates
-                        .into_par_iter()
-                        .map(process_candidate)
-                        .flatten()
-                        .filter(filter_unique)
-                )
+                Box::new(filter_unique)
+                
             }
             #[cfg(not(feature = "rayon"))]
             {
@@ -453,21 +433,22 @@ fn find_subgraphs_recursive<'p, 'd>(
                     seen.insert(item.mapping.sig())
                 };
 
-                Box::new(
-                    candidates
-                        .into_iter()
-                        .map(process_candidate)
-                        .flatten()
-                        .filter(filter_unique)
-                )
+               Box::new(filter_unique)
+
             }
+        } else {
+            Box::new(|_: &SubgraphMatch<'p, 'd>| true)
         };
-        return filtered_results;
-    } else {
+        
+    #[cfg(feature = "rayon")]
+    let results = candidates.par_iter();
+    #[cfg(not(feature = "rayon"))]
+    let results = candidates.iter();
 
-    }
-
-    return Box::new(std::iter::empty());
+    Box::new(results
+        .map(|d_cell| process_candidate(*d_cell))
+        .flatten()
+        .filter(move |m| filter(m)))
 
 }
 
