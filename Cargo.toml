@@ -59,6 +59,7 @@ prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
 ###############
 argparse = "0.2"
 contracts = "0.6.6"
+dashmap = "6.1.0"
 easy-smt = "0.3"
 env_logger = "0.11.5"
 indexmap = "2.7.1"

@@ -39,20 +39,15 @@ prjunnamed-yosys_json.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
+dashmap.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
-# rayon = { workspace = true, optional = true }
-rayon = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 [features]
 default = []
-# rayon = ["dep:rayon"]
-
-
-# [features]
-# default = []
-# parallel = ["rayon"]
+rayon = ["dep:rayon"]

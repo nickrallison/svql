@@ -313,20 +313,20 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
 //         .flatten()
 //         .collect::<Vec<_>>();
 
-    // if matches!(config.dedupe, DedupeMode::AutoMorph) {
-    //     let before_dedup = results.len();
-    //     let mut seen = std::collections::HashSet::new();
-    //     results.retain(|m| seen.insert(m.mapping.sig()));
-    //     let after_dedup = results.len();
+// if matches!(config.dedupe, DedupeMode::AutoMorph) {
+//     let before_dedup = results.len();
+//     let mut seen = std::collections::HashSet::new();
+//     results.retain(|m| seen.insert(m.mapping.sig()));
+//     let after_dedup = results.len();
 
-    //     tracing::event!(
-    //         tracing::Level::TRACE,
-    //         "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-    //         depth,
-    //         before_dedup,
-    //         after_dedup
-    //     );
-    // }
+//     tracing::event!(
+//         tracing::Level::TRACE,
+//         "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
+//         depth,
+//         before_dedup,
+//         after_dedup
+//     );
+// }
 
 //     results
 // }
@@ -378,38 +378,36 @@ fn find_subgraphs_recursive<'p, 'd>(
     };
 
     // Function to be executed on each possible candidate
-    let process_candidate:  =
-        move |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
-            if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
-                return Box::new(std::iter::empty());
-            }
-            if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
-                return Box::new(std::iter::empty());
-            }
-            if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping)
-            {
-                return Box::new(std::iter::empty());
-            }
+    let process_candidate = move |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
+        if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
+            return Box::new(std::iter::empty());
+        }
+        if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
+            return Box::new(std::iter::empty());
+        }
+        if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
+            return Box::new(std::iter::empty());
+        }
 
-            // Accepted candidate; recurse immediately.
-            let mut new_cell_mapping = cell_mapping.clone();
-            new_cell_mapping.insert(current, d_cell);
+        // Accepted candidate; recurse immediately.
+        let mut new_cell_mapping = cell_mapping.clone();
+        new_cell_mapping.insert(current, d_cell);
 
-            find_subgraphs_recursive(
-                p_index,
-                d_index,
-                config,
-                new_cell_mapping,
-                p_mapping_queue.clone(),
-                input_by_name,
-                output_by_name,
-                depth + 1,
-            )
-        };
+        find_subgraphs_recursive(
+            p_index,
+            d_index,
+            config,
+            new_cell_mapping,
+            p_mapping_queue.clone(),
+            input_by_name,
+            output_by_name,
+            depth + 1,
+        )
+    };
 
-    let filter: Box<dyn Fn(&SubgraphMatch<'p, 'd>) -> bool + Send + Sync> = 
+    let filter: Box<dyn FnMut(&SubgraphMatch<'p, 'd>) -> bool + Send + Sync> =
         if matches!(config.dedupe, DedupeMode::AutoMorph) {
-            #[cfg(feature = "rayon")] 
+            #[cfg(feature = "rayon")]
             {
                 use dashmap::DashSet;
                 use std::sync::Arc;
@@ -417,39 +415,36 @@ fn find_subgraphs_recursive<'p, 'd>(
                 // Inside find_subgraphs_recursive:
                 let seen = Arc::new(DashSet::new());
 
-                let filter_unique = move |item: &SubgraphMatch<'p, 'd>| -> bool {
-                    seen.insert(item.mapping.sig())
-                };
+                let filter_unique =
+                    move |item: &SubgraphMatch<'p, 'd>| -> bool { seen.insert(item.mapping.sig()) };
 
                 Box::new(filter_unique)
-                
             }
             #[cfg(not(feature = "rayon"))]
             {
                 use std::collections::HashSet;
                 let mut seen = HashSet::new();
 
-                let filter_unique = move |item: &SubgraphMatch<'p, 'd>| -> bool {
-                    seen.insert(item.mapping.sig())
-                };
+                let filter_unique =
+                    move |item: &SubgraphMatch<'p, 'd>| -> bool { seen.insert(item.mapping.sig()) };
 
-               Box::new(filter_unique)
-
+                Box::new(filter_unique)
             }
         } else {
             Box::new(|_: &SubgraphMatch<'p, 'd>| true)
         };
-        
+
     #[cfg(feature = "rayon")]
     let results = candidates.par_iter();
     #[cfg(not(feature = "rayon"))]
     let results = candidates.iter();
 
-    Box::new(results
-        .map(|d_cell| process_candidate(*d_cell))
-        .flatten()
-        .filter(move |m| filter(m)))
-
+    Box::new(
+        results
+            .map(|d_cell| process_candidate(*d_cell))
+            .flatten()
+            .filter(move |m| filter(m)),
+    )
 }
 
 fn d_cell_already_mapped(
