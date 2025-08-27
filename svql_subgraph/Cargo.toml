@@ -45,11 +45,12 @@ tracing-subscriber.workspace = true
 tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
-rayon = { workspace = true, optional = true }
+# rayon = { workspace = true, optional = true }
+rayon = { workspace = true }
 
 [features]
 default = []
-rayon = ["dep:rayon"]
+# rayon = ["dep:rayon"]
 
 
 # [features]

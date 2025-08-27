@@ -56,6 +56,8 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
+type BoxedIter<'p, 'd> = Box<dyn Iterator<Item = SubgraphMatch<'p, 'd>> + Send>;
+
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
@@ -213,6 +215,122 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
     if acc.is_empty() { None } else { Some(acc) }
 }
 
+// fn find_subgraphs_recursive<'p, 'd>(
+//     p_index: &Index<'p>,
+//     d_index: &Index<'d>,
+//     config: &Config,
+//     cell_mapping: CellMapping<'p, 'd>,
+//     mut p_mapping_queue: VecDeque<CellRef<'p>>,
+//     input_by_name: &HashMap<&'p str, CellRef<'p>>,
+//     output_by_name: &HashMap<&'p str, CellRef<'p>>,
+//     depth: usize,
+// ) -> BoxedIter<'p, 'd> {
+//     let Some(current) = p_mapping_queue.pop_front() else {
+//         tracing::event!(
+//             tracing::Level::TRACE,
+//             "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
+//             depth,
+//             cell_mapping.len()
+//         );
+
+//         return Box::new(std::iter::once(SubgraphMatch {
+//             mapping: cell_mapping,
+//             input_by_name: input_by_name.clone(),
+//             output_by_name: output_by_name.clone(),
+//         }));
+//     };
+
+//     tracing::event!(
+//         tracing::Level::TRACE,
+//         "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
+//         depth,
+//         current.debug_index(),
+//         p_index.get_cell_kind(current),
+//         p_mapping_queue.len(),
+//         cell_mapping.len()
+//     );
+
+//     let current_kind = p_index.get_cell_kind(current);
+
+//     // Narrowing Candidates for next level of recursion
+
+//     let candidates: Vec<CellRef<'d>> = match current_kind {
+//         CellKind::Input => {
+//             candidate_drivers_for_pattern_input(current, p_index, d_index, &cell_mapping)
+//                 .unwrap_or_default()
+//         }
+//         _ => d_index.get_by_kind(current_kind).to_vec(),
+//     };
+
+//     // function to be executed on each possible candidate
+//     let process_candidate = |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
+//         if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
+//             return Box::new(std::iter::empty());
+//         }
+//         if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
+//             return Box::new(std::iter::empty());
+//         }
+//         if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
+//             return Box::new(std::iter::empty());
+//         }
+
+//         // Accepted candidate; recurse immediately.
+//         let mut new_cell_mapping = cell_mapping.clone();
+//         new_cell_mapping.insert(current, d_cell);
+
+//         let inner_results = find_subgraphs_recursive(
+//             p_index,
+//             d_index,
+//             config,
+//             new_cell_mapping,
+//             p_mapping_queue.clone(),
+//             input_by_name,
+//             output_by_name,
+//             depth + 1,
+//         );
+//         inner_results
+//     };
+
+//     // #[cfg(feature = "rayon")]
+//     // let mut results = candidates
+//     //     .par_iter()
+//     //     .map(|d_cell| process_candidate(*d_cell))
+//     //     .flatten()
+//     //     .collect::<Vec<_>>();
+
+//     // #[cfg(not(feature = "rayon"))]
+//     // let mut results = candidates
+//     //     .iter()
+//     //     .map(|d_cell| process_candidate(*d_cell))
+//     //     .flatten()
+//     //     .collect::<Vec<_>>();
+
+//     // DEBUG
+//     use rayon::prelude::*;
+//     let mut results: BoxedIter<'p, 'd> = candidates
+//         .par_iter()
+//         .map(|d_cell| process_candidate(*d_cell))
+//         .flatten()
+//         .collect::<Vec<_>>();
+
+    // if matches!(config.dedupe, DedupeMode::AutoMorph) {
+    //     let before_dedup = results.len();
+    //     let mut seen = std::collections::HashSet::new();
+    //     results.retain(|m| seen.insert(m.mapping.sig()));
+    //     let after_dedup = results.len();
+
+    //     tracing::event!(
+    //         tracing::Level::TRACE,
+    //         "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
+    //         depth,
+    //         before_dedup,
+    //         after_dedup
+    //     );
+    // }
+
+//     results
+// }
+
 fn find_subgraphs_recursive<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
@@ -222,7 +340,7 @@ fn find_subgraphs_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> Box<dyn Iterator<Item = SubgraphMatch<'p, 'd>>> {
+) -> BoxedIter<'p, 'd> {
     let Some(current) = p_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
@@ -251,7 +369,6 @@ fn find_subgraphs_recursive<'p, 'd>(
     let current_kind = p_index.get_cell_kind(current);
 
     // Narrowing Candidates for next level of recursion
-
     let candidates: Vec<CellRef<'d>> = match current_kind {
         CellKind::Input => {
             candidate_drivers_for_pattern_input(current, p_index, d_index, &cell_mapping)
@@ -260,9 +377,9 @@ fn find_subgraphs_recursive<'p, 'd>(
         _ => d_index.get_by_kind(current_kind).to_vec(),
     };
 
-    // function to be executed on each possible candidate
-    let process_candidate =
-        |d_cell: CellRef<'d>| -> Box<dyn Iterator<Item = SubgraphMatch<'p, 'd>>> {
+    // Function to be executed on each possible candidate
+    let process_candidate:  =
+        move |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
             if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
                 return Box::new(std::iter::empty());
             }
@@ -278,7 +395,7 @@ fn find_subgraphs_recursive<'p, 'd>(
             let mut new_cell_mapping = cell_mapping.clone();
             new_cell_mapping.insert(current, d_cell);
 
-            let inner_results = find_subgraphs_recursive(
+            find_subgraphs_recursive(
                 p_index,
                 d_index,
                 config,
@@ -287,8 +404,7 @@ fn find_subgraphs_recursive<'p, 'd>(
                 input_by_name,
                 output_by_name,
                 depth + 1,
-            );
-            inner_results
+            )
         };
 
     #[cfg(feature = "rayon")]
@@ -305,22 +421,54 @@ fn find_subgraphs_recursive<'p, 'd>(
         .flatten()
         .collect::<Vec<_>>();
 
-    if matches!(config.dedupe, DedupeMode::AutoMorph) {
-        let before_dedup = results.len();
-        let mut seen = std::collections::HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.sig()));
-        let after_dedup = results.len();
 
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-            depth,
-            before_dedup,
-            after_dedup
-        );
+    if matches!(config.dedupe, DedupeMode::AutoMorph) {
+        let filtered_results = {
+            #[cfg(feature = "rayon")] 
+            {
+                use dashmap::DashSet;
+                use std::sync::Arc;
+
+                // Inside find_subgraphs_recursive:
+                let seen = Arc::new(DashSet::new());
+
+                let filter_unique = move |item: &SubgraphMatch<'p, 'd>| -> bool {
+                    seen.insert(item.mapping.sig())
+                };
+
+                Box::new(
+                    candidates
+                        .into_par_iter()
+                        .map(process_candidate)
+                        .flatten()
+                        .filter(filter_unique)
+                )
+            }
+            #[cfg(not(feature = "rayon"))]
+            {
+                use std::collections::HashSet;
+                let mut seen = HashSet::new();
+
+                let filter_unique = move |item: &SubgraphMatch<'p, 'd>| -> bool {
+                    seen.insert(item.mapping.sig())
+                };
+
+                Box::new(
+                    candidates
+                        .into_iter()
+                        .map(process_candidate)
+                        .flatten()
+                        .filter(filter_unique)
+                )
+            }
+        };
+        return filtered_results;
+    } else {
+
     }
 
-    results
+    return Box::new(std::iter::empty());
+
 }
 
 fn d_cell_already_mapped(
