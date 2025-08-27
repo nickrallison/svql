@@ -143,7 +143,44 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     results
 }
 
-fn get_valid_fan_in_candidates<'p, 'd>(
+/// Base candidate set from node type only:
+/// - For pattern Input nodes: all design nodes (Name already excluded by GraphIndex)
+/// - For others: all design nodes of that NodeType
+fn initial_candidates_for_type<'d>(
+    design_index: &GraphIndex<'d>,
+    current_type: NodeType,
+) -> Vec<CellRef<'d>> {
+    match current_type {
+        NodeType::Input => design_index.get_nodes_topo().to_vec(),
+        _ => design_index.get_by_type(current_type).to_vec(),
+    }
+}
+
+/// Intersect base with one or more constraint sets, preserving the
+/// order of `base`. If no extra sets are provided, returns `base`.
+fn intersect_all<'d>(
+    base: Vec<CellRef<'d>>,
+    more_sets: impl IntoIterator<Item = Vec<CellRef<'d>>>,
+) -> Vec<CellRef<'d>> {
+    let constraints: Vec<HashSet<CellRef<'d>>> = more_sets
+        .into_iter()
+        .map(|v| v.into_iter().collect())
+        .collect();
+
+    if constraints.is_empty() {
+        return base;
+    }
+
+    base.into_iter()
+        .filter(|n| constraints.iter().all(|s| s.contains(n)))
+        .collect()
+}
+
+/// Candidates restricted by already-mapped sinks (fan-out constraints).
+/// For each mapped sink of the pattern node, compute the set of possible drivers
+/// in the design and intersect across sinks. If none of the sinks are mapped,
+/// returns None (no restriction).
+fn candidates_from_mapped_sinks<'p, 'd>(
     pattern_current: CellRef<'p>,
     pattern_index: &GraphIndex<'p>,
     design_index: &GraphIndex<'d>,
@@ -160,8 +197,6 @@ fn get_valid_fan_in_candidates<'p, 'd>(
         })
         .collect();
 
-    // If no sinks are mapped yet, we can't constrain based on fanout, so return None
-    // This will cause the algorithm to consider all nodes of matching type as candidates
     if mapped_sinks.is_empty() {
         return None;
     }
@@ -172,7 +207,7 @@ fn get_valid_fan_in_candidates<'p, 'd>(
             let sink_type = design_index.get_node_type(*d_sink);
 
             if sink_type.has_commutative_inputs() {
-                // Either input pin acceptable: take drivers of all pins
+                // Any driver to any pin
                 design_index.drivers_of_sink_all_pins(*d_sink)
             } else {
                 // Specific pin must match
@@ -185,10 +220,76 @@ fn get_valid_fan_in_candidates<'p, 'd>(
         .filter(|v| !v.is_empty())
         .collect();
 
-    // If we have mapped sinks but can't gather constraints from them,
-    // it means we can't satisfy the fanout requirements
     if sets.is_empty() {
-        return Some(Vec::new()); // No valid candidates
+        return Some(Vec::new()); // constraints present but none satisfiable
+    }
+
+    // Intersect all sets (keep small utility local to this function)
+    let mut acc = sets.remove(0);
+    acc.sort_by_key(|c| c.debug_index());
+    acc.dedup();
+
+    for s in sets {
+        let mut next: Vec<CellRef<'d>> = Vec::with_capacity(acc.len().min(s.len()));
+        for c in acc.into_iter() {
+            if s.contains(&c) {
+                next.push(c);
+            }
+        }
+        if next.is_empty() {
+            return Some(next);
+        }
+        acc = next;
+    }
+
+    Some(acc)
+}
+
+/// Candidates restricted by already-mapped sources (fan-in constraints).
+/// For each mapped source of the pattern node, collect the sinks in the design
+/// that are driven by the corresponding mapped design driver, respecting
+/// commutativity of the current node. Intersect across all mapped sources.
+/// If no sources are mapped, returns None (no restriction).
+fn candidates_from_mapped_sources<'p, 'd>(
+    pattern_current: CellRef<'p>,
+    current_type: NodeType,
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
+    mapping: &NodeMapping<'p, 'd>,
+) -> Option<Vec<CellRef<'d>>> {
+    let commutative = current_type.has_commutative_inputs();
+
+    let mapped_sources: Vec<(usize, NodeSource<'p>)> = pattern_index
+        .get_node_sources(pattern_current)
+        .iter()
+        .cloned()
+        .enumerate()
+        .collect();
+
+    let mut sets: Vec<Vec<CellRef<'d>>> = mapped_sources
+        .into_iter()
+        .filter_map(|(pin_idx, p_src)| match p_src {
+            NodeSource::Gate(p_src_node, _pbit) | NodeSource::Io(p_src_node, _pbit) => mapping
+                .get_design_node(p_src_node)
+                .map(|d_src_node| (pin_idx, d_src_node)),
+            NodeSource::Const(_) => None, // leave const handling to full connectivity validation
+        })
+        .map(|(pin_idx, d_src_node)| {
+            // For the mapped source driver, get all its fanouts in the design.
+            // If commutative, any pin is acceptable; otherwise, the exact pin must match.
+            let fanouts = design_index.get_fanouts(d_src_node);
+            let sinks = fanouts
+                .iter()
+                .filter(move |(_, sink_pin)| commutative || *sink_pin == pin_idx)
+                .map(|(sink, _)| *sink)
+                .collect::<Vec<_>>();
+            sinks
+        })
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if sets.is_empty() {
+        return None;
     }
 
     // Intersect all sets
@@ -203,10 +304,10 @@ fn get_valid_fan_in_candidates<'p, 'd>(
                 next.push(c);
             }
         }
-        acc = next;
-        if acc.is_empty() {
-            break;
+        if next.is_empty() {
+            return Some(next);
         }
+        acc = next;
     }
 
     Some(acc)
@@ -249,34 +350,25 @@ fn find_isomorphisms_recursive<'p, 'd>(
 
     let current_type = pattern_index.get_node_type(pattern_current);
 
-    // Lambda to filter out incompatible node types
-    // unless the pattern node type is an input, then be a wild card
-    let node_type_filter = |current_type: NodeType| -> Box<dyn Fn(NodeType) -> bool> {
-        match current_type {
-            NodeType::Input => Box::new(|_other_type: NodeType| true),
-            _ => Box::new(move |other_type: NodeType| current_type == other_type),
-        }
-    };
+    // Base candidates (type-only)
+    let base_candidates = initial_candidates_for_type(design_index, current_type);
 
-    // Get narrowing candidates for next level of recursion based on fanout constraints
-    let candidates = {
-        match current_type {
-            NodeType::Input => get_valid_fan_in_candidates(
-                pattern_current,
-                pattern_index,
-                design_index,
-                &node_mapping,
-            )
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|d_node| {
-                let d_type = design_index.get_node_type(*d_node);
-                node_type_filter(current_type)(d_type)
-            })
-            .collect(),
-            _ => design_index.get_by_type(current_type).to_vec(),
-        }
-    };
+    // Constraint candidates
+    let co_sinks =
+        candidates_from_mapped_sinks(pattern_current, pattern_index, design_index, &node_mapping);
+    let co_sources = candidates_from_mapped_sources(
+        pattern_current,
+        current_type,
+        pattern_index,
+        design_index,
+        &node_mapping,
+    );
+
+    // Intersect all constraints onto the base set
+    let candidates = intersect_all(
+        base_candidates,
+        co_sinks.into_iter().chain(co_sources.into_iter()),
+    );
 
     // Function to be executed on each possible candidate
     let process_candidate = |d_node: CellRef<'d>| -> Vec<SubgraphIsomorphism<'p, 'd>> {
@@ -297,7 +389,6 @@ fn find_isomorphisms_recursive<'p, 'd>(
             return Vec::new();
         }
 
-        // Accepted candidate; recurse immediately.
         let mut new_node_mapping = node_mapping.clone();
         new_node_mapping.insert(pattern_current, d_node);
 
@@ -485,7 +576,6 @@ fn validate_fanin_connections<'p, 'd>(
     })
 }
 
-// Use O(1) membership via design_index instead of scanning a Vec
 fn fanout_edge_ok<'d>(
     design_index: &GraphIndex<'d>,
     d_driver: prjunnamed_netlist::CellRef<'d>,

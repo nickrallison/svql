@@ -12,15 +12,6 @@
       {
         devShell = with pkgs; mkShell {
           buildInputs = [ 
-            ## Project
-            clang 
-            gcc13 
-            cmake
-            ninja
-            pkg-config
-            boost
-            asio
-
             ## Rust
             cargo 
             rustc 
@@ -29,22 +20,10 @@
             rustPackages.clippy 
 
             ## Yosys
-            gtkwave 
-            llvmPackages.bintools 
-            bison 
-            flex 
-            libffi 
-            tcl 
-            tk 
-            readline 
-            python3 
-            zlib 
-            git 
-            gtest 
-            abc-verifier 
-            verilog 
-            boost 
-            python3Packages.boost
+            yosys
+
+            ## Python
+            python314
           ];
         };
       }

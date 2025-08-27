@@ -40,7 +40,7 @@ set -e
 
 #############################################
 
-# mkdir -p generated
+mkdir -p generated
 # cargo expand --lib --package svql_query queries::netlist > generated/expanded_netlist.rs
 # cargo build
 
