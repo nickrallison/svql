@@ -710,7 +710,6 @@ dependencies = [
  "prjunnamed-yosys_json",
  "proc-macro2",
  "quote",
- "rayon",
  "regex",
  "svql_common",
  "tempfile",

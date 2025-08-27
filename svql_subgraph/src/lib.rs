@@ -1,8 +1,4 @@
 #![allow(dead_code)]
-
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
-
 mod cell;
 mod index;
 mod mapping;
@@ -11,7 +7,7 @@ use index::Index;
 use mapping::CellMapping;
 use prjunnamed_netlist::{CellRef, Design};
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
 
 use crate::cell::{CellKind, Source};
@@ -55,8 +51,6 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         None
     }
 }
-
-type BoxedIter<'p, 'd> = Box<dyn Iterator<Item = SubgraphMatch<'p, 'd>> + Send>;
 
 pub fn find_subgraphs<'p, 'd>(
     pattern: &'p Design,
@@ -119,23 +113,21 @@ pub fn find_subgraphs<'p, 'd>(
 
     let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
-    let results: Vec<SubgraphMatch<'p, 'd>> = {
-        tracing::event!(
-            tracing::Level::INFO,
-            "find_subgraphs: executing sequential recursion"
-        );
-        find_subgraphs_recursive(
-            &p_index,
-            &d_index,
-            config,
-            initial_cell_mapping,
-            p_mapping_queue,
-            &input_by_name,
-            &output_by_name,
-            0, // depth
-        )
-        .collect()
-    };
+    tracing::event!(
+        tracing::Level::INFO,
+        "find_subgraphs: executing recursive search"
+    );
+
+    let results = find_subgraphs_recursive(
+        &p_index,
+        &d_index,
+        config,
+        initial_cell_mapping,
+        p_mapping_queue,
+        &input_by_name,
+        &output_by_name,
+        0, // depth
+    );
 
     tracing::event!(
         tracing::Level::INFO,
@@ -194,7 +186,7 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
         return None;
     }
 
-    // Intersect all sets; avoid an extra allocation for the final output
+    // Intersect all sets
     let mut acc = sets.remove(0);
     acc.sort_by_key(|c| c.debug_index());
     acc.dedup();
@@ -215,122 +207,6 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
     if acc.is_empty() { None } else { Some(acc) }
 }
 
-// fn find_subgraphs_recursive<'p, 'd>(
-//     p_index: &Index<'p>,
-//     d_index: &Index<'d>,
-//     config: &Config,
-//     cell_mapping: CellMapping<'p, 'd>,
-//     mut p_mapping_queue: VecDeque<CellRef<'p>>,
-//     input_by_name: &HashMap<&'p str, CellRef<'p>>,
-//     output_by_name: &HashMap<&'p str, CellRef<'p>>,
-//     depth: usize,
-// ) -> BoxedIter<'p, 'd> {
-//     let Some(current) = p_mapping_queue.pop_front() else {
-//         tracing::event!(
-//             tracing::Level::TRACE,
-//             "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
-//             depth,
-//             cell_mapping.len()
-//         );
-
-//         return Box::new(std::iter::once(SubgraphMatch {
-//             mapping: cell_mapping,
-//             input_by_name: input_by_name.clone(),
-//             output_by_name: output_by_name.clone(),
-//         }));
-//     };
-
-//     tracing::event!(
-//         tracing::Level::TRACE,
-//         "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
-//         depth,
-//         current.debug_index(),
-//         p_index.get_cell_kind(current),
-//         p_mapping_queue.len(),
-//         cell_mapping.len()
-//     );
-
-//     let current_kind = p_index.get_cell_kind(current);
-
-//     // Narrowing Candidates for next level of recursion
-
-//     let candidates: Vec<CellRef<'d>> = match current_kind {
-//         CellKind::Input => {
-//             candidate_drivers_for_pattern_input(current, p_index, d_index, &cell_mapping)
-//                 .unwrap_or_default()
-//         }
-//         _ => d_index.get_by_kind(current_kind).to_vec(),
-//     };
-
-//     // function to be executed on each possible candidate
-//     let process_candidate = |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
-//         if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
-//             return Box::new(std::iter::empty());
-//         }
-//         if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
-//             return Box::new(std::iter::empty());
-//         }
-//         if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
-//             return Box::new(std::iter::empty());
-//         }
-
-//         // Accepted candidate; recurse immediately.
-//         let mut new_cell_mapping = cell_mapping.clone();
-//         new_cell_mapping.insert(current, d_cell);
-
-//         let inner_results = find_subgraphs_recursive(
-//             p_index,
-//             d_index,
-//             config,
-//             new_cell_mapping,
-//             p_mapping_queue.clone(),
-//             input_by_name,
-//             output_by_name,
-//             depth + 1,
-//         );
-//         inner_results
-//     };
-
-//     // #[cfg(feature = "rayon")]
-//     // let mut results = candidates
-//     //     .par_iter()
-//     //     .map(|d_cell| process_candidate(*d_cell))
-//     //     .flatten()
-//     //     .collect::<Vec<_>>();
-
-//     // #[cfg(not(feature = "rayon"))]
-//     // let mut results = candidates
-//     //     .iter()
-//     //     .map(|d_cell| process_candidate(*d_cell))
-//     //     .flatten()
-//     //     .collect::<Vec<_>>();
-
-//     // DEBUG
-//     use rayon::prelude::*;
-//     let mut results: BoxedIter<'p, 'd> = candidates
-//         .par_iter()
-//         .map(|d_cell| process_candidate(*d_cell))
-//         .flatten()
-//         .collect::<Vec<_>>();
-
-// if matches!(config.dedupe, DedupeMode::AutoMorph) {
-//     let before_dedup = results.len();
-//     let mut seen = std::collections::HashSet::new();
-//     results.retain(|m| seen.insert(m.mapping.sig()));
-//     let after_dedup = results.len();
-
-//     tracing::event!(
-//         tracing::Level::TRACE,
-//         "find_subgraphs_recursive[depth={}]: results before_dedup={} after_dedup={}",
-//         depth,
-//         before_dedup,
-//         after_dedup
-//     );
-// }
-
-//     results
-// }
-
 fn find_subgraphs_recursive<'p, 'd>(
     p_index: &Index<'p>,
     d_index: &Index<'d>,
@@ -340,7 +216,7 @@ fn find_subgraphs_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> BoxedIter<'p, 'd> {
+) -> Vec<SubgraphMatch<'p, 'd>> {
     let Some(current) = p_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
@@ -349,11 +225,11 @@ fn find_subgraphs_recursive<'p, 'd>(
             cell_mapping.len()
         );
 
-        return Box::new(std::iter::once(SubgraphMatch {
+        return vec![SubgraphMatch {
             mapping: cell_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
-        }));
+        }];
     };
 
     tracing::event!(
@@ -378,15 +254,15 @@ fn find_subgraphs_recursive<'p, 'd>(
     };
 
     // Function to be executed on each possible candidate
-    let process_candidate = move |d_cell: CellRef<'d>| -> BoxedIter<'p, 'd> {
+    let process_candidate = |d_cell: CellRef<'d>| -> Vec<SubgraphMatch<'p, 'd>> {
         if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
-            return Box::new(std::iter::empty());
+            return Vec::new();
         }
         if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
-            return Box::new(std::iter::empty());
+            return Vec::new();
         }
         if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
-            return Box::new(std::iter::empty());
+            return Vec::new();
         }
 
         // Accepted candidate; recurse immediately.
@@ -405,46 +281,23 @@ fn find_subgraphs_recursive<'p, 'd>(
         )
     };
 
-    let filter: Box<dyn FnMut(&SubgraphMatch<'p, 'd>) -> bool + Send + Sync> =
-        if matches!(config.dedupe, DedupeMode::AutoMorph) {
-            #[cfg(feature = "rayon")]
-            {
-                use dashmap::DashSet;
-                use std::sync::Arc;
+    let mut results: Vec<SubgraphMatch<'p, 'd>> = candidates
+        .into_iter()
+        .flat_map(|d_cell| process_candidate(d_cell))
+        .collect();
 
-                // Inside find_subgraphs_recursive:
-                let seen = Arc::new(DashSet::new());
+    if matches!(config.dedupe, DedupeMode::AutoMorph) {
+        let mut seen: HashSet<Vec<usize>> = HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.sig()));
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_subgraphs_recursive[depth={}]: after dedupe -> {}",
+            depth,
+            results.len()
+        );
+    }
 
-                let filter_unique =
-                    move |item: &SubgraphMatch<'p, 'd>| -> bool { seen.insert(item.mapping.sig()) };
-
-                Box::new(filter_unique)
-            }
-            #[cfg(not(feature = "rayon"))]
-            {
-                use std::collections::HashSet;
-                let mut seen = HashSet::new();
-
-                let filter_unique =
-                    move |item: &SubgraphMatch<'p, 'd>| -> bool { seen.insert(item.mapping.sig()) };
-
-                Box::new(filter_unique)
-            }
-        } else {
-            Box::new(|_: &SubgraphMatch<'p, 'd>| true)
-        };
-
-    #[cfg(feature = "rayon")]
-    let results = candidates.par_iter();
-    #[cfg(not(feature = "rayon"))]
-    let results = candidates.iter();
-
-    Box::new(
-        results
-            .map(|d_cell| process_candidate(*d_cell))
-            .flatten()
-            .filter(move |m| filter(m)),
-    )
+    results
 }
 
 fn d_cell_already_mapped(
@@ -597,7 +450,7 @@ fn check_fanin<'p, 'd>(
     })
 }
 
-// Changed: use O(1) membership via d_index instead of scanning a Vec
+// Use O(1) membership via d_index instead of scanning a Vec
 fn fanout_edge_ok<'d>(
     d_index: &Index<'d>,
     d_driver: prjunnamed_netlist::CellRef<'d>,
