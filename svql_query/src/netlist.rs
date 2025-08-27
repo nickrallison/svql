@@ -1,6 +1,6 @@
 use svql_common::Config;
 use svql_driver::{Driver, DriverKey, context::Context};
-use svql_subgraph::{SubgraphMatch, find_subgraphs};
+use svql_subgraph::{SubgraphIsomorphism, find_subgraph_isomorphisms};
 
 use crate::instance::Instance;
 
@@ -30,7 +30,7 @@ pub trait NetlistMeta {
 pub trait SearchableNetlist: NetlistMeta + Sized {
     type Hit<'ctx>;
 
-    fn from_subgraph<'ctx>(m: &SubgraphMatch<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
+    fn from_subgraph<'ctx>(m: &SubgraphIsomorphism<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
 
     #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
     #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
@@ -54,7 +54,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .expect("Haystack design not found in context")
             .as_ref();
 
-        find_subgraphs(needle, haystack, config)
+        find_subgraph_isomorphisms(needle, haystack, config)
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
@@ -142,7 +142,7 @@ macro_rules! netlist {
             type Hit<'ctx> = $name<$crate::Match<'ctx>>;
 
             fn from_subgraph<'ctx>(
-                m: &svql_subgraph::SubgraphMatch<'ctx, 'ctx>,
+                m: &svql_subgraph::SubgraphIsomorphism<'ctx, 'ctx>,
                 path: $crate::instance::Instance
             ) -> Self::Hit<'ctx> {
                 $(

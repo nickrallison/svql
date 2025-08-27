@@ -71,28 +71,28 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
 
                 match (from_match, to_match) {
                     (Some(from_val), Some(to_val)) => {
-                        let from_cell = from_val.design_cell_ref.as_ref();
-                        let to_cell = to_val.design_cell_ref.as_ref();
+                        let from_node = from_val.design_node_ref.as_ref();
+                        let to_node = to_val.design_node_ref.as_ref();
 
                         tracing::event!(
                             tracing::Level::TRACE,
-                            "From cell present: {:?}",
-                            from_cell.is_some()
+                            "From node present: {:?}",
+                            from_node.is_some()
                         );
                         tracing::event!(
                             tracing::Level::TRACE,
-                            "To cell present: {:?}",
-                            to_cell.is_some()
+                            "To node present: {:?}",
+                            to_node.is_some()
                         );
 
-                        if let (Some(from_c), Some(to_c)) = (from_cell, to_cell) {
-                            let result = from_c == to_c;
-                            tracing::event!(tracing::Level::TRACE, "Cells equal: {}", result);
+                        if let (Some(from_n), Some(to_n)) = (from_node, to_node) {
+                            let result = from_n == to_n;
+                            tracing::event!(tracing::Level::TRACE, "Nodes equal: {}", result);
                             result
                         } else {
                             tracing::event!(
                                 tracing::Level::TRACE,
-                                "Connection validation failed - missing cell references"
+                                "Connection validation failed - missing node references"
                             );
                             false
                         }

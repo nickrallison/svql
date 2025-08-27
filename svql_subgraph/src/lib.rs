@@ -1,33 +1,34 @@
 #![allow(dead_code)]
-mod cell;
-mod index;
-mod mapping;
+mod graph_index;
+mod isomorphism;
+mod node;
 
-use index::Index;
-use mapping::CellMapping;
+use graph_index::GraphIndex;
+use isomorphism::NodeMapping;
 use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
 
-use crate::cell::{CellKind, Source};
+use crate::node::{NodeSource, NodeType};
 
-pub use prjunnamed_netlist::CellRef as CellWrapper;
+pub use prjunnamed_netlist::CellRef as NodeWrapper;
 
 #[derive(Clone, Debug, Default)]
-pub struct SubgraphMatch<'p, 'd> {
-    // Mapping of pattern cells to design cells (and reverse)
-    mapping: CellMapping<'p, 'd>,
+pub struct SubgraphIsomorphism<'p, 'd> {
+    // Mapping of pattern nodes to design nodes (and reverse)
+    mapping: NodeMapping<'p, 'd>,
 
     // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellRef<'p>>,
     pub output_by_name: HashMap<&'p str, CellRef<'p>>,
 }
 
-impl<'p, 'd> SubgraphMatch<'p, 'd> {
+impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     pub fn len(&self) -> usize {
         self.mapping.len()
     }
+
     pub fn is_empty(&self) -> bool {
         self.mapping.is_empty()
     }
@@ -38,7 +39,7 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
         bit: usize,
     ) -> Option<(CellRef<'d>, usize)> {
         let p_input = self.input_by_name.get(name)?;
-        let d_src = self.mapping.get_design_cell(*p_input)?;
+        let d_src = self.mapping.get_design_node(*p_input)?;
         Some((d_src, bit))
     }
 
@@ -52,78 +53,78 @@ impl<'p, 'd> SubgraphMatch<'p, 'd> {
     }
 }
 
-pub fn find_subgraphs<'p, 'd>(
+pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-) -> Vec<SubgraphMatch<'p, 'd>> {
+) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     tracing::event!(
         tracing::Level::TRACE,
-        "find_subgraphs: start. pattern cells={} design cells={}",
+        "find_subgraph_isomorphisms: start. pattern cells={} design cells={}",
         pattern.iter_cells().count(),
         design.iter_cells().count()
     );
 
-    let p_index = Index::build(pattern);
-    let d_index = Index::build(design);
+    let pattern_index = GraphIndex::build(pattern);
+    let design_index = GraphIndex::build(design);
 
     tracing::event!(
         tracing::Level::TRACE,
-        "find_subgraphs: gate counts: pattern={} design={}",
-        p_index.gate_count(),
-        d_index.gate_count()
+        "find_subgraph_isomorphisms: node counts: pattern={} design={}",
+        pattern_index.node_count(),
+        design_index.node_count()
     );
 
-    if p_index.gate_count() == 0 || d_index.gate_count() == 0 {
+    if pattern_index.node_count() == 0 || design_index.node_count() == 0 {
         tracing::event!(
             tracing::Level::TRACE,
-            "find_subgraphs: early return (empty gate count)"
+            "find_subgraph_isomorphisms: early return (empty node count)"
         );
         return Vec::new();
     }
 
     // Build boundary IO maps for the pattern (by name).
-    let input_by_name: HashMap<&'p str, CellRef<'p>> = p_index
-        .get_cells_topo()
+    let input_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
+        .get_nodes_topo()
         .iter()
-        .filter(|c| matches!(p_index.get_cell_kind(**c), CellKind::Input))
-        .filter_map(|c| p_index.get_cell_input_name(*c).map(|n| (n, *c)))
+        .filter(|c| matches!(pattern_index.get_node_type(**c), NodeType::Input))
+        .filter_map(|c| pattern_index.get_input_name(*c).map(|n| (n, *c)))
         .collect();
 
-    let output_by_name: HashMap<&'p str, CellRef<'p>> = p_index
-        .get_cells_topo()
+    let output_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
+        .get_nodes_topo()
         .iter()
-        .filter(|c| matches!(p_index.get_cell_kind(**c), CellKind::Output))
-        .filter_map(|c| p_index.get_cell_output_name(*c).map(|n| (n, *c)))
+        .filter(|c| matches!(pattern_index.get_node_type(**c), NodeType::Output))
+        .filter_map(|c| pattern_index.get_output_name(*c).map(|n| (n, *c)))
         .collect();
 
     // in topological_order, only gates & inputs
-    let p_mapping_queue: VecDeque<CellRef<'p>> = p_index
-        .get_cells_topo()
+    let pattern_mapping_queue: VecDeque<CellRef<'p>> = pattern_index
+        .get_nodes_topo()
         .iter()
-        .filter(|c| !matches!(p_index.get_cell_kind(**c), CellKind::Output))
+        .filter(|c| !matches!(pattern_index.get_node_type(**c), NodeType::Output))
         .copied()
         .collect();
 
     tracing::event!(
         tracing::Level::TRACE,
-        "find_subgraphs: initial pattern mapping queue size={}",
-        p_mapping_queue.len()
+        "find_subgraph_isomorphisms: initial pattern mapping queue size={}",
+        pattern_mapping_queue.len()
     );
 
-    let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
+    let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
 
     tracing::event!(
         tracing::Level::INFO,
-        "find_subgraphs: executing recursive search"
+        "find_subgraph_isomorphisms: executing recursive search"
     );
 
-    let results = find_subgraphs_recursive(
-        &p_index,
-        &d_index,
+    let results = find_isomorphisms_recursive(
+        &pattern_index,
+        &design_index,
         config,
-        initial_cell_mapping,
-        p_mapping_queue,
+        initial_node_mapping,
+        pattern_mapping_queue,
         &input_by_name,
         &output_by_name,
         0, // depth
@@ -131,9 +132,12 @@ pub fn find_subgraphs<'p, 'd>(
 
     tracing::event!(
         tracing::Level::INFO,
-        "find_subgraphs: results={} unique_sigs={:?}",
+        "find_subgraph_isomorphisms: results={} unique_sigs={:?}",
         results.len(),
-        results.iter().map(|m| m.mapping.sig()).collect::<Vec<_>>()
+        results
+            .iter()
+            .map(|m| m.mapping.signature())
+            .collect::<Vec<_>>()
     );
 
     results
@@ -142,20 +146,20 @@ pub fn find_subgraphs<'p, 'd>(
 // -------------
 // New helper: narrow candidates for pattern Inputs using mapped neighbors.
 // -------------
-fn candidate_drivers_for_pattern_input<'p, 'd>(
+fn find_candidate_drivers_for_pattern_input<'p, 'd>(
     current: CellRef<'p>,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    mapping: &CellMapping<'p, 'd>,
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> Option<Vec<CellRef<'d>>> {
     // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
-    let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = p_index
+    let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
         .get_fanouts(current)
         .iter()
-        .filter_map(|(p_sink_cell, pin_idx)| {
+        .filter_map(|(p_sink_node, pin_idx)| {
             mapping
-                .get_design_cell(*p_sink_cell)
-                .map(|d_sink_cell| (*p_sink_cell, *pin_idx, d_sink_cell))
+                .get_design_node(*p_sink_node)
+                .map(|d_sink_node| (*p_sink_node, *pin_idx, d_sink_node))
         })
         .collect();
 
@@ -166,14 +170,14 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
     let mut sets: Vec<Vec<CellRef<'d>>> = mapped_sinks
         .iter()
         .map(|(_p_sink, pin_idx, d_sink)| {
-            let sink_kind = d_index.get_cell_kind(*d_sink);
+            let sink_type = design_index.get_node_type(*d_sink);
 
-            if sink_kind.is_commutative_inputs() {
+            if sink_type.has_commutative_inputs() {
                 // Either input pin acceptable: take drivers of all pins
-                d_index.drivers_of_sink_all_pins(*d_sink)
+                design_index.drivers_of_sink_all_pins(*d_sink)
             } else {
                 // Specific pin must match
-                d_index
+                design_index
                     .driver_of_sink_pin(*d_sink, *pin_idx)
                     .into_iter()
                     .collect()
@@ -207,26 +211,26 @@ fn candidate_drivers_for_pattern_input<'p, 'd>(
     if acc.is_empty() { None } else { Some(acc) }
 }
 
-fn find_subgraphs_recursive<'p, 'd>(
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
+fn find_isomorphisms_recursive<'p, 'd>(
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
     config: &Config,
-    cell_mapping: CellMapping<'p, 'd>,
-    mut p_mapping_queue: VecDeque<CellRef<'p>>,
+    node_mapping: NodeMapping<'p, 'd>,
+    mut pattern_mapping_queue: VecDeque<CellRef<'p>>,
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> Vec<SubgraphMatch<'p, 'd>> {
-    let Some(current) = p_mapping_queue.pop_front() else {
+) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    let Some(current) = pattern_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: base case reached. mapping size={}",
+            "find_isomorphisms_recursive[depth={}]: base case reached. mapping size={}",
             depth,
-            cell_mapping.len()
+            node_mapping.len()
         );
 
-        return vec![SubgraphMatch {
-            mapping: cell_mapping,
+        return vec![SubgraphIsomorphism {
+            mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
         }];
@@ -234,64 +238,74 @@ fn find_subgraphs_recursive<'p, 'd>(
 
     tracing::event!(
         tracing::Level::TRACE,
-        "find_subgraphs_recursive[depth={}]: current=#{} kind={:?} | remaining_queue={} | mapping_size={}",
+        "find_isomorphisms_recursive[depth={}]: current=#{} type={:?} | remaining_queue={} | mapping_size={}",
         depth,
         current.debug_index(),
-        p_index.get_cell_kind(current),
-        p_mapping_queue.len(),
-        cell_mapping.len()
+        pattern_index.get_node_type(current),
+        pattern_mapping_queue.len(),
+        node_mapping.len()
     );
 
-    let current_kind = p_index.get_cell_kind(current);
+    let current_type = pattern_index.get_node_type(current);
 
     // Narrowing Candidates for next level of recursion
-    let candidates: Vec<CellRef<'d>> = match current_kind {
-        CellKind::Input => {
-            candidate_drivers_for_pattern_input(current, p_index, d_index, &cell_mapping)
-                .unwrap_or_default()
-        }
-        _ => d_index.get_by_kind(current_kind).to_vec(),
+    let candidates: Vec<CellRef<'d>> = match current_type {
+        NodeType::Input => find_candidate_drivers_for_pattern_input(
+            current,
+            pattern_index,
+            design_index,
+            &node_mapping,
+        )
+        .unwrap_or_default(),
+        _ => design_index.get_by_type(current_type).to_vec(),
     };
 
     // Function to be executed on each possible candidate
-    let process_candidate = |d_cell: CellRef<'d>| -> Vec<SubgraphMatch<'p, 'd>> {
-        if d_cell_already_mapped(d_cell, &cell_mapping, depth) {
+    let process_candidate = |d_node: CellRef<'d>| -> Vec<SubgraphIsomorphism<'p, 'd>> {
+        if is_node_already_mapped(d_node, &node_mapping, depth) {
             return Vec::new();
         }
-        if !d_cell_compatible(current_kind, d_index.get_cell_kind(d_cell)) {
+        if !are_nodes_compatible(current_type, design_index.get_node_type(d_node)) {
             return Vec::new();
         }
-        if !d_cell_valid_connectivity(current, d_cell, p_index, d_index, config, &cell_mapping) {
+        if !is_node_connectivity_valid(
+            current,
+            d_node,
+            pattern_index,
+            design_index,
+            config,
+            &node_mapping,
+        ) {
             return Vec::new();
         }
 
         // Accepted candidate; recurse immediately.
-        let mut new_cell_mapping = cell_mapping.clone();
-        new_cell_mapping.insert(current, d_cell);
+        let mut new_node_mapping = node_mapping.clone();
+        new_node_mapping.insert(current, d_node);
 
-        find_subgraphs_recursive(
-            p_index,
-            d_index,
+        find_isomorphisms_recursive(
+            pattern_index,
+            design_index,
             config,
-            new_cell_mapping,
-            p_mapping_queue.clone(),
+            new_node_mapping,
+            pattern_mapping_queue.clone(),
             input_by_name,
             output_by_name,
             depth + 1,
         )
     };
 
-    let mut results: Vec<SubgraphMatch<'p, 'd>> = candidates
+    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = candidates
         .into_iter()
-        .flat_map(|d_cell| process_candidate(d_cell))
+        .flat_map(|d_node| process_candidate(d_node))
         .collect();
 
     if matches!(config.dedupe, DedupeMode::AutoMorph) {
         let mut seen: HashSet<Vec<usize>> = HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.sig()));
+        results.retain(|m| seen.insert(m.mapping.signature()));
         tracing::event!(
             tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: after dedupe -> {}",
+            "find_isomorphisms_recursive[depth={}]: after dedupe -> {}",
             depth,
             results.len()
         );
@@ -300,46 +314,50 @@ fn find_subgraphs_recursive<'p, 'd>(
     results
 }
 
-fn d_cell_already_mapped(
-    d_cell: CellRef<'_>,
-    cell_mapping: &CellMapping<'_, '_>,
+fn is_node_already_mapped(
+    d_node: CellRef<'_>,
+    node_mapping: &NodeMapping<'_, '_>,
     depth: usize,
 ) -> bool {
-    if cell_mapping.design_mapping().contains_key(&d_cell) {
+    if node_mapping.design_mapping().contains_key(&d_node) {
         tracing::event!(
             tracing::Level::TRACE,
-            "find_subgraphs_recursive[depth={}]: skip D #{} (already mapped)",
+            "find_isomorphisms_recursive[depth={}]: skip D #{} (already mapped)",
             depth,
-            d_cell.debug_index()
+            d_node.debug_index()
         );
         return true;
     }
     false
 }
 
-fn d_cell_compatible(p_kind: CellKind, d_kind: CellKind) -> bool {
-    if matches!(p_kind, CellKind::Input) {
+fn are_nodes_compatible(p_type: NodeType, d_type: NodeType) -> bool {
+    if matches!(p_type, NodeType::Input) {
         // Inputs can map to any node; fanin/fanout checks will constrain sufficiently.
         return true;
     }
-    if p_kind != d_kind {
+    if p_type != d_type {
         tracing::event!(
             tracing::Level::TRACE,
-            "cells incompatible: kind mismatch P {:?} vs D {:?}",
-            p_kind,
-            d_kind
+            "nodes incompatible: type mismatch P {:?} vs D {:?}",
+            p_type,
+            d_type
         );
         return false;
     }
     true
 }
 
-fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'d>) -> bool {
-    let ok = matches!(d_src, Source::Const(dt) if matches!(p_src, Source::Const(pt) if dt == pt));
+fn source_matches_const<'d>(
+    pin_idx: usize,
+    p_src: &NodeSource<'_>,
+    d_src: &NodeSource<'d>,
+) -> bool {
+    let ok = matches!(d_src, NodeSource::Const(dt) if matches!(p_src, NodeSource::Const(pt) if dt == pt));
     if !ok {
         tracing::event!(
             tracing::Level::TRACE,
-            "d_cell_valid_connectivity: const mismatch on pin {}: P {:?} vs D {:?}",
+            "is_node_connectivity_valid: const mismatch on pin {}: P {:?} vs D {:?}",
             pin_idx,
             p_src,
             d_src
@@ -350,29 +368,29 @@ fn source_matches_const<'d>(pin_idx: usize, p_src: &Source<'_>, d_src: &Source<'
 
 fn source_matches_mapped_io<'p, 'd>(
     pin_idx: usize,
-    p_src_cell: prjunnamed_netlist::CellRef<'p>,
+    p_src_node: prjunnamed_netlist::CellRef<'p>,
     p_bit: usize,
-    d_src: &Source<'d>,
-    mapping: &CellMapping<'p, 'd>,
+    d_src: &NodeSource<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
-    let Some(d_src_cell) = mapping.get_design_cell(p_src_cell) else {
+    let Some(d_src_node) = mapping.get_design_node(p_src_node) else {
         // Unmapped pattern source; unconstrained at this stage.
         return true;
     };
 
     let ok = match d_src {
-        Source::Io(d_cell, d_bit) => *d_cell == d_src_cell && *d_bit == p_bit,
-        Source::Gate(d_cell, d_bit) => *d_cell == d_src_cell && *d_bit == p_bit,
-        Source::Const(_) => false,
+        NodeSource::Io(d_node, d_bit) => *d_node == d_src_node && *d_bit == p_bit,
+        NodeSource::Gate(d_node, d_bit) => *d_node == d_src_node && *d_bit == p_bit,
+        NodeSource::Const(_) => false,
     };
 
     if !ok {
         tracing::event!(
             tracing::Level::TRACE,
-            "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
+            "is_node_connectivity_valid: fanin mismatch on pin {}: expected mapped {:?} -> {:?}, got {:?}",
             pin_idx,
-            Source::Io(p_src_cell, p_bit),
-            d_src_cell.debug_index(),
+            NodeSource::Io(p_src_node, p_bit),
+            d_src_node.debug_index(),
             d_src
         );
     }
@@ -382,26 +400,25 @@ fn source_matches_mapped_io<'p, 'd>(
 
 fn source_matches_mapped_gate<'p, 'd>(
     pin_idx: usize,
-    p_src_cell: prjunnamed_netlist::CellRef<'p>,
+    p_src_node: prjunnamed_netlist::CellRef<'p>,
     p_bit: usize,
-    d_src: &Source<'d>,
-    mapping: &CellMapping<'p, 'd>,
+    d_src: &NodeSource<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
-    let Some(d_src_cell) = mapping.get_design_cell(p_src_cell) else {
+    let Some(d_src_node) = mapping.get_design_node(p_src_node) else {
         // Unmapped pattern source; unconstrained at this stage.
         return true;
     };
 
-    let ok =
-        matches!(d_src, Source::Gate(d_cell, d_bit) if *d_cell == d_src_cell && *d_bit == p_bit);
+    let ok = matches!(d_src, NodeSource::Gate(d_node, d_bit) if *d_node == d_src_node && *d_bit == p_bit);
 
     if !ok {
         tracing::event!(
             tracing::Level::TRACE,
-            "d_cell_valid_connectivity: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
+            "is_node_connectivity_valid: fanin mismatch on pin {}: expected mapped gate {:?} -> {:?}, got {:?}",
             pin_idx,
-            Source::Gate(p_src_cell, p_bit),
-            d_src_cell.debug_index(),
+            NodeSource::Gate(p_src_node, p_bit),
+            d_src_node.debug_index(),
             d_src
         );
     }
@@ -411,37 +428,37 @@ fn source_matches_mapped_gate<'p, 'd>(
 
 fn pin_sources_compatible<'p, 'd>(
     pin_idx: usize,
-    p_src: &Source<'p>,
-    d_src: &Source<'d>,
-    mapping: &CellMapping<'p, 'd>,
+    p_src: &NodeSource<'p>,
+    d_src: &NodeSource<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
     match p_src {
-        Source::Const(_) => source_matches_const(pin_idx, p_src, d_src),
-        Source::Io(p_src_cell, p_bit) => {
-            source_matches_mapped_io(pin_idx, *p_src_cell, *p_bit, d_src, mapping)
+        NodeSource::Const(_) => source_matches_const(pin_idx, p_src, d_src),
+        NodeSource::Io(p_src_node, p_bit) => {
+            source_matches_mapped_io(pin_idx, *p_src_node, *p_bit, d_src, mapping)
         }
-        Source::Gate(p_src_cell, p_bit) => {
-            source_matches_mapped_gate(pin_idx, *p_src_cell, *p_bit, d_src, mapping)
+        NodeSource::Gate(p_src_node, p_bit) => {
+            source_matches_mapped_gate(pin_idx, *p_src_node, *p_bit, d_src, mapping)
         }
     }
 }
 
-fn check_fanin<'p, 'd>(
-    p_cell: CellRef<'p>,
-    d_cell: CellRef<'d>,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    mapping: &CellMapping<'p, 'd>,
+fn validate_fanin_connections<'p, 'd>(
+    p_node: CellRef<'p>,
+    d_node: CellRef<'d>,
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
-    let p_sources = p_index.get_cell_sources(p_cell);
-    let d_sources = d_index.get_cell_sources(d_cell);
+    let p_sources = pattern_index.get_node_sources(p_node);
+    let d_sources = design_index.get_node_sources(d_node);
 
     p_sources.iter().enumerate().all(|(pin_idx, p_src)| {
         let Some(d_src) = d_sources.get(pin_idx) else {
             tracing::event!(
                 tracing::Level::TRACE,
-                "d_cell_valid_connectivity: P {} pin {} has no corresponding D pin",
-                p_cell.debug_index(),
+                "is_node_connectivity_valid: P {} pin {} has no corresponding D pin",
+                p_node.debug_index(),
                 pin_idx
             );
             return false;
@@ -450,25 +467,27 @@ fn check_fanin<'p, 'd>(
     })
 }
 
-// Use O(1) membership via d_index instead of scanning a Vec
+// Use O(1) membership via design_index instead of scanning a Vec
 fn fanout_edge_ok<'d>(
-    d_index: &Index<'d>,
+    design_index: &GraphIndex<'d>,
     d_driver: prjunnamed_netlist::CellRef<'d>,
-    d_sink_cell: prjunnamed_netlist::CellRef<'d>,
+    d_sink_node: prjunnamed_netlist::CellRef<'d>,
     pin_idx: usize,
 ) -> bool {
-    let sink_commutative = d_index.get_cell_kind(d_sink_cell).is_commutative_inputs();
+    let sink_commutative = design_index
+        .get_node_type(d_sink_node)
+        .has_commutative_inputs();
 
     let ok = if sink_commutative {
-        d_index.has_fanout_to(d_driver, d_sink_cell)
+        design_index.has_fanout_to(d_driver, d_sink_node)
     } else {
-        d_index.has_fanout_to_pin(d_driver, d_sink_cell, pin_idx)
+        design_index.has_fanout_to_pin(d_driver, d_sink_node, pin_idx)
     };
 
     tracing::event!(
         tracing::Level::TRACE,
-        "d_cell_valid_connectivity: check mapped sink D#{} @pin={} (commutative={}) -> {}",
-        d_sink_cell.debug_index(),
+        "is_node_connectivity_valid: check mapped sink D#{} @pin={} (commutative={}) -> {}",
+        d_sink_node.debug_index(),
         pin_idx,
         sink_commutative,
         ok
@@ -477,53 +496,55 @@ fn fanout_edge_ok<'d>(
     ok
 }
 
-fn check_fanout<'p, 'd>(
-    p_cell: CellRef<'p>,
-    d_cell: CellRef<'d>,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
-    mapping: &CellMapping<'p, 'd>,
+fn validate_fanout_connections<'p, 'd>(
+    p_node: CellRef<'p>,
+    d_node: CellRef<'d>,
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
-    let p_fanouts = p_index.get_fanouts(p_cell);
+    let p_fanouts = pattern_index.get_fanouts(p_node);
 
     // Only need to validate edges to already-mapped sinks.
     p_fanouts
         .iter()
-        .filter_map(|(p_sink_cell, pin_idx)| {
+        .filter_map(|(p_sink_node, pin_idx)| {
             mapping
-                .get_design_cell(*p_sink_cell)
-                .map(|d_sink_cell| (d_sink_cell, *pin_idx))
+                .get_design_node(*p_sink_node)
+                .map(|d_sink_node| (d_sink_node, *pin_idx))
         })
-        .all(|(d_sink_cell, pin_idx)| fanout_edge_ok(d_index, d_cell, d_sink_cell, pin_idx))
+        .all(|(d_sink_node, pin_idx)| fanout_edge_ok(design_index, d_node, d_sink_node, pin_idx))
 }
 
-fn d_cell_valid_connectivity<'p, 'd>(
-    p_cell: CellRef<'p>,
-    d_cell: CellRef<'d>,
-    p_index: &Index<'p>,
-    d_index: &Index<'d>,
+fn is_node_connectivity_valid<'p, 'd>(
+    p_node: CellRef<'p>,
+    d_node: CellRef<'d>,
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
     _config: &Config,
-    mapping: &CellMapping<'p, 'd>,
+    mapping: &NodeMapping<'p, 'd>,
 ) -> bool {
-    let valid_fanin = check_fanin(p_cell, d_cell, p_index, d_index, mapping);
+    let valid_fanin =
+        validate_fanin_connections(p_node, d_node, pattern_index, design_index, mapping);
     if !valid_fanin {
         tracing::event!(
             tracing::Level::TRACE,
-            "d_cell_valid_connectivity: P #{} vs D #{} -> fanin check FAILED",
-            p_cell.debug_index(),
-            d_cell.debug_index(),
+            "is_node_connectivity_valid: P #{} vs D #{} -> fanin check FAILED",
+            p_node.debug_index(),
+            d_node.debug_index(),
         );
 
         return false;
     }
 
-    let valid_fanout = check_fanout(p_cell, d_cell, p_index, d_index, mapping);
+    let valid_fanout =
+        validate_fanout_connections(p_node, d_node, pattern_index, design_index, mapping);
     if !valid_fanout {
         tracing::event!(
             tracing::Level::TRACE,
-            "d_cell_valid_connectivity: P #{} vs D #{} -> fanout check FAILED",
-            p_cell.debug_index(),
-            d_cell.debug_index(),
+            "is_node_connectivity_valid: P #{} vs D #{} -> fanout check FAILED",
+            p_node.debug_index(),
+            d_node.debug_index(),
         );
 
         return false;
@@ -531,9 +552,9 @@ fn d_cell_valid_connectivity<'p, 'd>(
 
     tracing::event!(
         tracing::Level::TRACE,
-        "d_cell_valid_connectivity: P #{} vs D #{} -> {}",
-        p_cell.debug_index(),
-        d_cell.debug_index(),
+        "is_node_connectivity_valid: P #{} vs D #{} -> {}",
+        p_node.debug_index(),
+        d_node.debug_index(),
         true
     );
 
