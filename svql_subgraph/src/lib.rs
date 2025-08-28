@@ -133,7 +133,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         "find_subgraph_isomorphisms: executing recursive search"
     );
 
-    let mut results = find_isomorphisms_recursive(
+    let mut results: Vec<SubgraphIsomorphism> = find_isomorphisms_recursive(
         &pattern_index,
         &design_index,
         config,
@@ -142,7 +142,8 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         &input_by_name,
         &output_by_name,
         0, // depth
-    );
+    )
+    .collect();
 
     // Dedupe ONCE at the top-level; avoid per-depth overhead in the hot path.
     if matches!(config.dedupe, DedupeMode::AutoMorph) {
@@ -286,7 +287,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+) -> impl Iterator<Item = SubgraphIsomorphism<'p, 'd>> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
         tracing::event!(
             tracing::Level::TRACE,
@@ -295,11 +296,11 @@ fn find_isomorphisms_recursive<'p, 'd>(
             node_mapping.len()
         );
 
-        return vec![SubgraphIsomorphism {
+        return std::iter::once(SubgraphIsomorphism {
             mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
-        }];
+        });
     };
 
     tracing::event!(
@@ -346,24 +347,20 @@ fn find_isomorphisms_recursive<'p, 'd>(
 
     // Accumulate results locally (no &mut parameters). This keeps a simple path
     // to change candidates_it.into_par_iter() and reduce results with Rayon later.
-    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = candidates
-        .flat_map(|d_candidate| {
-            let mut new_node_mapping = node_mapping.clone();
-            new_node_mapping.insert(pattern_current, d_candidate);
+    candidates.flat_map(|d_candidate| {
+        let mut new_node_mapping = node_mapping.clone();
+        new_node_mapping.insert(pattern_current, d_candidate);
 
-            // Recurse; extend the single result Vec (no per-branch Vec flattening).
-            find_isomorphisms_recursive(
-                pattern_index,
-                design_index,
-                config,
-                new_node_mapping,
-                pattern_mapping_queue.clone(),
-                input_by_name,
-                output_by_name,
-                depth + 1,
-            )
-        })
-        .collect();
-
-    results
+        // Recurse; extend the single result Vec (no per-branch Vec flattening).
+        find_isomorphisms_recursive(
+            pattern_index,
+            design_index,
+            config,
+            new_node_mapping,
+            pattern_mapping_queue.clone(),
+            input_by_name,
+            output_by_name,
+            depth + 1,
+        )
+    })
 }
