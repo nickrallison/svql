@@ -255,10 +255,6 @@ fn candidates_from_mapped_sources<'p, 'd>(
         .enumerate()
         .collect();
 
-    if mapped_sources.is_empty() {
-        return None;
-    }
-
     let sets = mapped_sources
         .into_iter()
         .filter_map(|(pin_idx, p_src)| match p_src {
@@ -279,7 +275,13 @@ fn candidates_from_mapped_sources<'p, 'd>(
             sinks
         })
         .filter(|v| !v.is_empty())
-        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>());
+        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
+        .collect::<Vec<_>>();
+
+    if sets.is_empty() {
+        return None;
+    }
+
 
     Some(intersect(sets))
 }
