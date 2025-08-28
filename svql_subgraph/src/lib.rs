@@ -10,7 +10,7 @@ use isomorphism::NodeMapping;
 
 use prjunnamed_netlist::{CellRef, Design};
 
-use crate::candidates::Candidates;
+use crate::candidates::{BaseIter, FilteredCandidates};
 use crate::constraints::{
     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
     NotAlreadyMappedConstraint,
@@ -71,15 +71,14 @@ struct SubgraphSearch<'a, 'p, 'd> {
     output_by_name: HashMap<&'p str, CellRef<'p>>,
 
     // DFS stack
-    stack: Vec<Frame<'p, 'd>>,
+    stack: Vec<Frame<'a, 'p, 'd>>,
 }
 
-struct Frame<'p, 'd> {
+struct Frame<'a, 'p, 'd> {
     p_current: CellRef<'p>,
     mapping: NodeMapping<'p, 'd>,
     queue: VecDeque<CellRef<'p>>,
-    candidates: Vec<CellRef<'d>>,
-    next_idx: usize,
+    candidates: FilteredCandidates<'a, 'p, 'd>,
 }
 
 impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
@@ -112,7 +111,7 @@ impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
         &self,
         mapping: NodeMapping<'p, 'd>,
         mut queue: VecDeque<CellRef<'p>>,
-    ) -> Option<Frame<'p, 'd>> {
+    ) -> Option<Frame<'a, 'p, 'd>> {
         let p_current = queue.pop_front()?;
         let current_type = NodeType::from(p_current.get().as_ref());
 
@@ -135,6 +134,7 @@ impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
             design_sinks_constraints.intersect(sources_constraints)
         };
 
+        // Build constraints; they are owned by the iterator to avoid self-referential borrows.
         let already_mapped_constraint = NotAlreadyMappedConstraint::new(mapping.clone());
         let connectivity_constraint = ConnectivityConstraint::new(
             p_current,
@@ -144,24 +144,29 @@ impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
             mapping.clone(),
         );
 
-        let base_candidates: Candidates<'_, 'd> = match node_constraints.get_candidates_owned() {
-            Some(set) => Candidates::Constrained(set),
-            None => initial_candidates(self.design_index, current_type),
+        // Choose base iterator lazily (no collect).
+        let base = match node_constraints.get_candidates_owned() {
+            Some(set) => BaseIter::Constrained(set.into_iter()),
+            None => {
+                let slice: &'a [CellRef<'d>] = match current_type {
+                    NodeType::Input => self.design_index.get_nodes_topo(),
+                    _ => self.design_index.get_by_type(current_type),
+                };
+                BaseIter::Unconstrained(slice.iter())
+            }
         };
 
-        // Fully filter candidates now; store as a Vec in the frame
-        let candidates = base_candidates
-            .iter()
-            .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
-            .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node))
-            .collect::<Vec<_>>();
+        let candidates = FilteredCandidates {
+            base,
+            already_mapped: already_mapped_constraint,
+            connectivity: connectivity_constraint,
+        };
 
         Some(Frame {
             p_current,
             mapping,
             queue,
             candidates,
-            next_idx: 0,
         })
     }
 
@@ -183,14 +188,11 @@ impl<'a, 'p, 'd> Iterator for SubgraphSearch<'a, 'p, 'd> {
                 return None;
             };
 
-            if top.next_idx >= top.candidates.len() {
+            let Some(d_candidate) = top.candidates.next() else {
                 // Exhausted this frame; backtrack.
                 self.stack.pop();
                 continue;
-            }
-
-            let d_candidate = top.candidates[top.next_idx];
-            top.next_idx += 1;
+            };
 
             // Create new mapping by assigning p_current -> d_candidate
             let mut new_mapping = top.mapping.clone();
@@ -211,15 +213,6 @@ impl<'a, 'p, 'd> Iterator for SubgraphSearch<'a, 'p, 'd> {
         }
     }
 }
-
-// impl<'a, 'p, 'd> IntoIterator for SubgraphSearch<'a, 'p, 'd> {
-//     type Item = SubgraphIsomorphism<'p, 'd>;
-//     type IntoIter = Self;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         self
-//     }
-// }
 
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
@@ -294,10 +287,10 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 fn initial_candidates<'d, 'a>(
     design_index: &'a GraphIndex<'d>,
     current_type: NodeType,
-) -> Candidates<'a, 'd> {
+) -> BaseIter<'a, 'd> {
     let slice: &'a [CellRef<'d>] = match current_type {
         NodeType::Input => design_index.get_nodes_topo(),
         _ => design_index.get_by_type(current_type),
     };
-    Candidates::Unconstrained(slice)
+    BaseIter::Unconstrained(slice.iter())
 }
