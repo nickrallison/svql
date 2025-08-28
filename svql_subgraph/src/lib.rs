@@ -8,6 +8,7 @@ use isomorphism::NodeMapping;
 use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::Hash;
 use svql_common::{Config, DedupeMode};
 
 use crate::node::{NodeSource, NodeType};
@@ -98,13 +99,24 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         .filter_map(|c| pattern_index.get_output_name(*c).map(|n| (n, *c)))
         .collect();
 
-    // in topological_order, only gates & inputs
-    let pattern_mapping_queue: VecDeque<CellRef<'p>> = pattern_index
-        .get_nodes_topo()
-        .iter()
-        .filter(|c| !matches!(pattern_index.get_node_type(**c), NodeType::Output))
-        .copied()
-        .collect();
+    let pattern_mapping_queue: VecDeque<CellRef<'p>> = {
+        // in topological_order, only gates & inputs
+        let mut initial_pattern_mapping: Vec<CellRef<'p>> = pattern_index
+            .get_nodes_topo()
+            .iter()
+            .filter(|c| !matches!(pattern_index.get_node_type(**c), NodeType::Output))
+            .copied()
+            .collect();
+
+        // stable sort inputs to back
+        initial_pattern_mapping.sort_by(|a, b| {
+            let a_is_input = matches!(pattern_index.get_node_type(*a), NodeType::Input);
+            let b_is_input = matches!(pattern_index.get_node_type(*b), NodeType::Input);
+            a_is_input.cmp(&b_is_input)
+        });
+
+        initial_pattern_mapping.into()
+    };
 
     tracing::event!(
         tracing::Level::TRACE,
@@ -149,31 +161,30 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 fn initial_candidates_for_type<'d>(
     design_index: &GraphIndex<'d>,
     current_type: NodeType,
-) -> Vec<CellRef<'d>> {
+) -> HashSet<CellRef<'d>> {
     match current_type {
-        NodeType::Input => design_index.get_nodes_topo().to_vec(),
-        _ => design_index.get_by_type(current_type).to_vec(),
+        NodeType::Input => design_index.get_nodes_topo().iter().copied().collect(),
+        _ => design_index
+            .get_by_type(current_type)
+            .iter()
+            .copied()
+            .collect(),
     }
 }
 
-/// Intersect base with one or more constraint sets, preserving the
-/// order of `base`. If no extra sets are provided, returns `base`.
-fn intersect_all<'d>(
-    base: Vec<CellRef<'d>>,
-    more_sets: impl IntoIterator<Item = Vec<CellRef<'d>>>,
-) -> Vec<CellRef<'d>> {
-    let constraints: Vec<HashSet<CellRef<'d>>> = more_sets
-        .into_iter()
-        .map(|v| v.into_iter().collect())
-        .collect();
-
-    if constraints.is_empty() {
-        return base;
+fn intersect<T>(sets: impl IntoIterator<Item = HashSet<T>>) -> HashSet<T>
+where
+    T: Eq + Hash + Clone,
+{
+    let mut iter = sets.into_iter();
+    let mut acc = match iter.next() {
+        Some(set) => set,
+        None => return HashSet::new(),
+    };
+    for set in iter {
+        acc = acc.intersection(&set).cloned().collect();
     }
-
-    base.into_iter()
-        .filter(|n| constraints.iter().all(|s| s.contains(n)))
-        .collect()
+    acc
 }
 
 /// Candidates restricted by already-mapped sinks (fan-out constraints).
@@ -185,7 +196,7 @@ fn candidates_from_mapped_sinks<'p, 'd>(
     pattern_index: &GraphIndex<'p>,
     design_index: &GraphIndex<'d>,
     mapping: &NodeMapping<'p, 'd>,
-) -> Option<Vec<CellRef<'d>>> {
+) -> Option<HashSet<CellRef<'d>>> {
     // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
     let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
         .get_fanouts(pattern_current)
@@ -201,7 +212,7 @@ fn candidates_from_mapped_sinks<'p, 'd>(
         return None;
     }
 
-    let mut sets: Vec<Vec<CellRef<'d>>> = mapped_sinks
+    let sets = mapped_sinks
         .iter()
         .map(|(_p_sink, pin_idx, d_sink)| {
             let sink_type = design_index.get_node_type(*d_sink);
@@ -218,31 +229,9 @@ fn candidates_from_mapped_sinks<'p, 'd>(
             }
         })
         .filter(|v| !v.is_empty())
-        .collect();
+        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>());
 
-    if sets.is_empty() {
-        return Some(Vec::new()); // constraints present but none satisfiable
-    }
-
-    // Intersect all sets (keep small utility local to this function)
-    let mut acc = sets.remove(0);
-    acc.sort_by_key(|c| c.debug_index());
-    acc.dedup();
-
-    for s in sets {
-        let mut next: Vec<CellRef<'d>> = Vec::with_capacity(acc.len().min(s.len()));
-        for c in acc.into_iter() {
-            if s.contains(&c) {
-                next.push(c);
-            }
-        }
-        if next.is_empty() {
-            return Some(next);
-        }
-        acc = next;
-    }
-
-    Some(acc)
+    Some(intersect(sets))
 }
 
 /// Candidates restricted by already-mapped sources (fan-in constraints).
@@ -256,7 +245,7 @@ fn candidates_from_mapped_sources<'p, 'd>(
     pattern_index: &GraphIndex<'p>,
     design_index: &GraphIndex<'d>,
     mapping: &NodeMapping<'p, 'd>,
-) -> Option<Vec<CellRef<'d>>> {
+) -> Option<HashSet<CellRef<'d>>> {
     let commutative = current_type.has_commutative_inputs();
 
     let mapped_sources: Vec<(usize, NodeSource<'p>)> = pattern_index
@@ -266,7 +255,11 @@ fn candidates_from_mapped_sources<'p, 'd>(
         .enumerate()
         .collect();
 
-    let mut sets: Vec<Vec<CellRef<'d>>> = mapped_sources
+    if mapped_sources.is_empty() {
+        return None;
+    }
+
+    let sets = mapped_sources
         .into_iter()
         .filter_map(|(pin_idx, p_src)| match p_src {
             NodeSource::Gate(p_src_node, _pbit) | NodeSource::Io(p_src_node, _pbit) => mapping
@@ -286,31 +279,9 @@ fn candidates_from_mapped_sources<'p, 'd>(
             sinks
         })
         .filter(|v| !v.is_empty())
-        .collect();
+        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>());
 
-    if sets.is_empty() {
-        return None;
-    }
-
-    // Intersect all sets
-    let mut acc = sets.remove(0);
-    acc.sort_by_key(|c| c.debug_index());
-    acc.dedup();
-
-    for s in sets {
-        let mut next: Vec<CellRef<'d>> = Vec::with_capacity(acc.len().min(s.len()));
-        for c in acc.into_iter() {
-            if s.contains(&c) {
-                next.push(c);
-            }
-        }
-        if next.is_empty() {
-            return Some(next);
-        }
-        acc = next;
-    }
-
-    Some(acc)
+    Some(intersect(sets))
 }
 
 fn find_isomorphisms_recursive<'p, 'd>(
@@ -351,7 +322,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
     let current_type = pattern_index.get_node_type(pattern_current);
 
     // Base candidates (type-only)
-    let base_candidates = initial_candidates_for_type(design_index, current_type);
+    // let base_candidates = initial_candidates_for_type(design_index, current_type);
 
     // Constraint candidates
     let co_sinks =
@@ -364,11 +335,77 @@ fn find_isomorphisms_recursive<'p, 'd>(
         &node_mapping,
     );
 
-    // Intersect all constraints onto the base set
-    let candidates = intersect_all(
-        base_candidates,
-        co_sinks.into_iter().chain(co_sources.into_iter()),
-    );
+    // If this is an Input with no constraints yet and there are still other nodes to map,
+    // defer it by pushing it to the back and move on. This prevents wildcard blow-up.
+    if matches!(current_type, NodeType::Input)
+        && co_sinks.is_none()
+        && co_sources.is_none()
+        && !pattern_mapping_queue.is_empty()
+    {
+        pattern_mapping_queue.push_back(pattern_current);
+        return find_isomorphisms_recursive(
+            pattern_index,
+            design_index,
+            config,
+            node_mapping,
+            pattern_mapping_queue,
+            input_by_name,
+            output_by_name,
+            depth,
+        );
+    }
+
+    let mut constraints: Vec<HashSet<CellRef<'d>>> = Vec::new();
+
+    match co_sinks {
+        Some(sinks) => {
+            tracing::event!(
+                tracing::Level::TRACE,
+                "find_isomorphisms_recursive[depth={}]: co_sinks constraint size={}",
+                depth,
+                sinks.len()
+            );
+            constraints.push(sinks);
+        }
+        None => {}
+    }
+
+    match co_sources {
+        Some(sources) => {
+            tracing::event!(
+                tracing::Level::TRACE,
+                "find_isomorphisms_recursive[depth={}]: co_sources constraint size={}",
+                depth,
+                sources.len()
+            );
+            constraints.push(sources);
+        }
+        None => {}
+    }
+
+    if !matches!(current_type, NodeType::Input) {
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_isomorphisms_recursive[depth={}]: pushing default for gate type",
+            depth
+        );
+        constraints.push(initial_candidates_for_type(design_index, current_type));
+    }
+
+    if constraints.is_empty() {
+        tracing::event!(
+            tracing::Level::TRACE,
+            "find_isomorphisms_recursive[depth={}]: no constraints found, pushing default for input",
+            depth
+        );
+        constraints.push(initial_candidates_for_type(design_index, current_type));
+    }
+
+    // Candidate selection:
+    // - For Input nodes: when constraints exist, start from the constraint set(s) only.
+    //   Avoid building the "all design nodes" base.
+    // - For non-Input nodes: start from the type-based base and intersect constraints.
+    let candidates = intersect(constraints);
 
     // Function to be executed on each possible candidate
     let process_candidate = |d_node: CellRef<'d>| -> Vec<SubgraphIsomorphism<'p, 'd>> {
