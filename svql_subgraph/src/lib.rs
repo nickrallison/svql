@@ -1,19 +1,21 @@
 #![allow(dead_code)]
+mod constraints;
 mod graph_index;
 mod isomorphism;
 mod node;
-mod constraints;
 
 use graph_index::GraphIndex;
 use isomorphism::NodeMapping;
 
 use prjunnamed_netlist::{CellRef, Design};
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use itertools::Either;
-use svql_common::{Config, DedupeMode};
-use crate::constraints::{ConnectivityConstraint, Constraint, NodeConstraints, NotAlreadyMappedConstraint};
+use crate::constraints::{
+    ConnectivityConstraint, Constraint, NodeConstraints, NotAlreadyMappedConstraint,
+};
 use crate::node::{NodeSource, NodeType};
+use itertools::Either;
+use std::collections::{HashMap, HashSet, VecDeque};
+use svql_common::{Config, DedupeMode};
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
@@ -160,7 +162,6 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 
     results
 }
-
 
 /// Base candidate set from node type only:
 /// - For pattern Input nodes: all design nodes (Name already excluded by GraphIndex)
@@ -312,7 +313,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
     );
 
     let current_type = pattern_index.get_node_type(pattern_current);
-    
+
     let base_candidates = initial_candidates(design_index, current_type);
 
     // Constraint candidates
@@ -325,7 +326,8 @@ fn find_isomorphisms_recursive<'p, 'd>(
         design_index,
         &node_mapping,
     );
-    let node_constraints = NodeConstraints::intersect_many(vec![sinks_constraints, sources_constraints]);
+    let node_constraints =
+        NodeConstraints::intersect_many(vec![sinks_constraints, sources_constraints]);
     let already_mapped_constraint = NotAlreadyMappedConstraint::new(&node_mapping);
     let connectivity_constraint = ConnectivityConstraint::new(
         pattern_current,
@@ -335,37 +337,33 @@ fn find_isomorphisms_recursive<'p, 'd>(
         &node_mapping,
     );
 
-
     let candidates = match node_constraints.get_candidates_owned() {
         Some(set) => Either::Left(set.into_iter()),
         None => Either::Right(base_candidates.copied()),
     }
-        .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
-        .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
+    .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
+    .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
 
     // Accumulate results locally (no &mut parameters). This keeps a simple path
     // to change candidates_it.into_par_iter() and reduce results with Rayon later.
-    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = candidates.flat_map(|d_candidate| {
+    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = candidates
+        .flat_map(|d_candidate| {
+            let mut new_node_mapping = node_mapping.clone();
+            new_node_mapping.insert(pattern_current, d_candidate);
 
-        let mut new_node_mapping = node_mapping.clone();
-        new_node_mapping.insert(pattern_current, d_candidate);
-
-        // Recurse; extend the single result Vec (no per-branch Vec flattening).
-        find_isomorphisms_recursive(
-            pattern_index,
-            design_index,
-            config,
-            new_node_mapping,
-            pattern_mapping_queue.clone(),
-            input_by_name,
-            output_by_name,
-            depth + 1,
-        )
-    })
-    .collect();
-
-
+            // Recurse; extend the single result Vec (no per-branch Vec flattening).
+            find_isomorphisms_recursive(
+                pattern_index,
+                design_index,
+                config,
+                new_node_mapping,
+                pattern_mapping_queue.clone(),
+                input_by_name,
+                output_by_name,
+                depth + 1,
+            )
+        })
+        .collect();
 
     results
 }
-
