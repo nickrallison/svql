@@ -82,11 +82,11 @@ struct SubgraphRecurse<'a, 'p, 'd> {
     connectivity_constraint: ConnectivityConstraint<'a, 'p, 'd>,
 }
 
-impl<'a, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
-    fn flat_map_candidates(self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'a> {
+impl<'a, 'b, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
+    fn flat_map_candidates(&'b self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'b> {
         let filtered_candidates = self
             .candidates
-            .into_iter()
+            .iter()
             .filter(|d_node| self.already_mapped_constraint.d_candidate_is_valid(d_node))
             .filter(|d_node| self.connectivity_constraint.d_candidate_is_valid(d_node));
 
@@ -116,8 +116,8 @@ enum SubgraphRecurseEnum<'a, 'p, 'd> {
     Base(SubgraphIsomorphism<'p, 'd>),
 }
 
-impl<'a, 'p, 'd> SubgraphRecurseEnum<'a, 'p, 'd> {
-    fn flat_map_candidates(self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'a> {
+impl<'a, 'b, 'p, 'd> SubgraphRecurseEnum<'a, 'p, 'd> {
+    fn flat_map_candidates(&'b self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'b> {
         match self {
             SubgraphRecurseEnum::Rec(rec) => rec.flat_map_candidates(),
             SubgraphRecurseEnum::Base(base) => {
