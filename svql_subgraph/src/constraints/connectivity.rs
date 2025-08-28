@@ -10,7 +10,7 @@ pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
     _config: &'a Config,
-    mapping: &'a NodeMapping<'p, 'd>,
+    mapping: NodeMapping<'p, 'd>,
 }
 
 impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
@@ -19,7 +19,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         pattern_index: &'a GraphIndex<'p>,
         design_index: &'a GraphIndex<'d>,
         config: &'a Config,
-        mapping: &'a NodeMapping<'p, 'd>,
+        mapping: NodeMapping<'p, 'd>,
     ) -> Self {
         ConnectivityConstraint {
             p_node,
