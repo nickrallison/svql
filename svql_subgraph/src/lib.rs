@@ -18,7 +18,6 @@ use crate::constraints::{
 use crate::node::NodeType;
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::iter::Once;
 use svql_common::{Config, DedupeMode};
 
 #[derive(Clone, Debug, Default)]
@@ -60,73 +59,167 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-struct SubgraphRecurse<'a, 'p, 'd> {
-    // Owned Values
-    depth: usize,
-    p_current: CellRef<'p>,
-    node_mapping: NodeMapping<'p, 'd>,
-    pattern_mapping_queue: VecDeque<CellRef<'p>>,
-
-    // Reference to Top Caller Values
+/// An explicit, stack-based DFS iterator over all subgraph isomorphisms.
+/// It yields owned SubgraphIsomorphism values lazily.
+struct SubgraphSearch<'a, 'p, 'd> {
+    // Shared, read-only context
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
     config: &'a Config,
-    input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
 
-    // Candidates iterator
-    candidates: Candidates<'a, 'd>,
+    input_by_name: HashMap<&'p str, CellRef<'p>>,
+    output_by_name: HashMap<&'p str, CellRef<'p>>,
 
-    // Constraints
-    already_mapped_constraint: NotAlreadyMappedConstraint<'p, 'd>,
-    connectivity_constraint: ConnectivityConstraint<'a, 'p, 'd>,
+    // DFS stack
+    stack: Vec<Frame<'p, 'd>>,
 }
 
-impl<'a, 'b, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
-    fn flat_map_candidates(&'b self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'b> {
-        let filtered_candidates = self
-            .candidates
-            .iter()
-            .filter(|d_node| self.already_mapped_constraint.d_candidate_is_valid(d_node))
-            .filter(|d_node| self.connectivity_constraint.d_candidate_is_valid(d_node));
+struct Frame<'p, 'd> {
+    p_current: CellRef<'p>,
+    mapping: NodeMapping<'p, 'd>,
+    queue: VecDeque<CellRef<'p>>,
+    candidates: Vec<CellRef<'d>>,
+    next_idx: usize,
+}
 
-        let results = filtered_candidates.flat_map(|d_candidate| {
-            let mut new_node_mapping = self.node_mapping.clone();
-            new_node_mapping.insert(self.p_current, d_candidate);
+impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
+    fn new(
+        pattern_index: &'a GraphIndex<'p>,
+        design_index: &'a GraphIndex<'d>,
+        config: &'a Config,
+        input_by_name: HashMap<&'p str, CellRef<'p>>,
+        output_by_name: HashMap<&'p str, CellRef<'p>>,
+        initial_queue: VecDeque<CellRef<'p>>,
+        initial_mapping: NodeMapping<'p, 'd>,
+    ) -> Self {
+        let mut this = Self {
+            pattern_index,
+            design_index,
+            config,
+            input_by_name,
+            output_by_name,
+            stack: Vec::new(),
+        };
 
-            // Recurse; extend the single result Vec (no per-branch Vec flattening).
-            find_isomorphisms_recursive(
+        if let Some(frame) = this.make_frame(initial_mapping, initial_queue) {
+            this.stack.push(frame);
+        }
+
+        this
+    }
+
+    fn make_frame(
+        &self,
+        mapping: NodeMapping<'p, 'd>,
+        mut queue: VecDeque<CellRef<'p>>,
+    ) -> Option<Frame<'p, 'd>> {
+        let p_current = queue.pop_front()?;
+        let current_type = NodeType::from(p_current.get().as_ref());
+
+        // Build node candidate constraints (source/sink) based on already-mapped neighbors.
+        let node_constraints = {
+            let design_sinks_constraints = DesignSinkConstraint::new(
+                p_current,
                 self.pattern_index,
                 self.design_index,
-                self.config,
-                new_node_mapping,
-                self.pattern_mapping_queue.clone(),
-                self.input_by_name,
-                self.output_by_name,
-                self.depth + 1,
+                &mapping,
             )
-            .flat_map_candidates()
-        });
-        Box::new(results)
+            .get_candidates_owned();
+            let sources_constraints = DesignSourceConstraint::new(
+                p_current,
+                self.pattern_index,
+                self.design_index,
+                &mapping,
+            )
+            .get_candidates_owned();
+            design_sinks_constraints.intersect(sources_constraints)
+        };
+
+        let already_mapped_constraint = NotAlreadyMappedConstraint::new(mapping.clone());
+        let connectivity_constraint = ConnectivityConstraint::new(
+            p_current,
+            self.pattern_index,
+            self.design_index,
+            self.config,
+            mapping.clone(),
+        );
+
+        let base_candidates: Candidates<'_, 'd> = match node_constraints.get_candidates_owned() {
+            Some(set) => Candidates::Constrained(set),
+            None => initial_candidates(self.design_index, current_type),
+        };
+
+        // Fully filter candidates now; store as a Vec in the frame
+        let candidates = base_candidates
+            .iter()
+            .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
+            .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node))
+            .collect::<Vec<_>>();
+
+        Some(Frame {
+            p_current,
+            mapping,
+            queue,
+            candidates,
+            next_idx: 0,
+        })
+    }
+
+    fn finish_mapping(&self, mapping: NodeMapping<'p, 'd>) -> SubgraphIsomorphism<'p, 'd> {
+        SubgraphIsomorphism {
+            mapping,
+            input_by_name: self.input_by_name.clone(),
+            output_by_name: self.output_by_name.clone(),
+        }
     }
 }
 
-enum SubgraphRecurseEnum<'a, 'p, 'd> {
-    Rec(SubgraphRecurse<'a, 'p, 'd>),
-    Base(SubgraphIsomorphism<'p, 'd>),
-}
+impl<'a, 'p, 'd> Iterator for SubgraphSearch<'a, 'p, 'd> {
+    type Item = SubgraphIsomorphism<'p, 'd>;
 
-impl<'a, 'b, 'p, 'd> SubgraphRecurseEnum<'a, 'p, 'd> {
-    fn flat_map_candidates(&'b self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'b> {
-        match self {
-            SubgraphRecurseEnum::Rec(rec) => rec.flat_map_candidates(),
-            SubgraphRecurseEnum::Base(base) => {
-                let iter = std::iter::once(base);
-                Box::new(iter)
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let Some(top) = self.stack.last_mut() else {
+                return None;
+            };
+
+            if top.next_idx >= top.candidates.len() {
+                // Exhausted this frame; backtrack.
+                self.stack.pop();
+                continue;
+            }
+
+            let d_candidate = top.candidates[top.next_idx];
+            top.next_idx += 1;
+
+            // Create new mapping by assigning p_current -> d_candidate
+            let mut new_mapping = top.mapping.clone();
+            new_mapping.insert(top.p_current, d_candidate);
+
+            // Advance the queue for the next frame
+            let next_queue = top.queue.clone();
+
+            // If there is no more pattern node to map, we have a full isomorphism.
+            if next_queue.is_empty() {
+                return Some(self.finish_mapping(new_mapping));
+            }
+
+            // Otherwise, descend by creating a new frame for the next pattern node.
+            if let Some(frame) = self.make_frame(new_mapping, next_queue) {
+                self.stack.push(frame);
             }
         }
     }
 }
+
+// impl<'a, 'p, 'd> IntoIterator for SubgraphSearch<'a, 'p, 'd> {
+//     type Item = SubgraphIsomorphism<'p, 'd>;
+//     type IntoIter = Self;
+
+//     fn into_iter(self) -> Self::IntoIter {
+//         self
+//     }
+// }
 
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
@@ -173,20 +266,21 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 
         initial_pattern_mapping.into()
     };
+
     let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
 
-    let mut results: Vec<SubgraphIsomorphism> = find_isomorphisms_recursive(
+    // Lazy, stack-based DFS iterator
+    let search = SubgraphSearch::new(
         &pattern_index,
         &design_index,
         config,
-        initial_node_mapping,
+        input_by_name,
+        output_by_name,
         pattern_mapping_queue,
-        &input_by_name,
-        &output_by_name,
-        0, // depth
-    )
-    .flat_map_candidates()
-    .collect();
+        initial_node_mapping,
+    );
+
+    let mut results: Vec<SubgraphIsomorphism> = search.collect();
 
     // Dedupe ONCE at the top-level; avoid per-depth overhead in the hot path.
     if matches!(config.dedupe, DedupeMode::AutoMorph) {
@@ -206,103 +300,4 @@ fn initial_candidates<'d, 'a>(
         _ => design_index.get_by_type(current_type),
     };
     Candidates::Unconstrained(slice)
-}
-
-fn find_isomorphisms_recursive<'a, 'p, 'd>(
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
-    config: &'a Config,
-    node_mapping: NodeMapping<'p, 'd>,
-    mut pattern_mapping_queue: VecDeque<CellRef<'p>>,
-    input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    depth: usize,
-) -> SubgraphRecurseEnum<'a, 'p, 'd> {
-    let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
-        return SubgraphRecurseEnum::Base(SubgraphIsomorphism {
-            mapping: node_mapping,
-            input_by_name: input_by_name.clone(),
-            output_by_name: output_by_name.clone(),
-        });
-    };
-
-    let current_type = NodeType::from(pattern_current.get().as_ref());
-
-    let node_constraints = {
-        let design_sinks_constraints =
-            DesignSinkConstraint::new(pattern_current, pattern_index, design_index, &node_mapping)
-                .get_candidates_owned();
-        let sources_constraints = DesignSourceConstraint::new(
-            pattern_current,
-            pattern_index,
-            design_index,
-            &node_mapping,
-        )
-        .get_candidates_owned();
-        design_sinks_constraints.intersect(sources_constraints)
-    };
-    let already_mapped_constraint = NotAlreadyMappedConstraint::new(node_mapping.clone());
-    let connectivity_constraint = ConnectivityConstraint::new(
-        pattern_current,
-        pattern_index,
-        design_index,
-        config,
-        node_mapping.clone(),
-    );
-
-    // let candidates = match node_constraints.get_candidates_owned() {
-    //     Some(set) => Either::Left(set.into_iter()),
-    //     None => Either::Right(initial_candidates(design_index, current_type).copied()),
-    // }
-    // .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
-    // .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
-
-    let candidates: Candidates<'a, 'd> = match node_constraints.get_candidates_owned() {
-        Some(set) => Candidates::Constrained(set),
-        None => initial_candidates(design_index, current_type),
-    };
-
-    let recurse_iter: SubgraphRecurse<'a, 'p, 'd> = SubgraphRecurse {
-        // Owned
-        depth,
-        p_current: pattern_current,
-        node_mapping,
-        pattern_mapping_queue,
-
-        // References
-        pattern_index,
-        design_index,
-        config,
-        input_by_name,
-        output_by_name,
-
-        // Candidates Iter
-        candidates,
-        already_mapped_constraint,
-        connectivity_constraint,
-    };
-
-    SubgraphRecurseEnum::Rec(recurse_iter)
-
-    // Accumulate results locally (no &mut parameters). This keeps a simple path
-    // to change candidates_it.into_par_iter() and reduce results with Rayon later.
-
-    // let results = candidates.flat_map(|d_candidate| {
-    //     let mut new_node_mapping = node_mapping.clone();
-    //     new_node_mapping.insert(pattern_current, d_candidate);
-
-    //     // Recurse; extend the single result Vec (no per-branch Vec flattening).
-    //     find_isomorphisms_recursive(
-    //         pattern_index,
-    //         design_index,
-    //         config,
-    //         new_node_mapping,
-    //         pattern_mapping_queue.clone(),
-    //         input_by_name,
-    //         output_by_name,
-    //         depth + 1,
-    //     )
-    // });
-
-    // Either::Right(results)
 }

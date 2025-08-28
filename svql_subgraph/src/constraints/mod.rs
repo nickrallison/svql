@@ -11,8 +11,7 @@ pub(crate) use already_mapped::NotAlreadyMappedConstraint;
 pub(crate) use connectivity::ConnectivityConstraint;
 pub(crate) use design_sink::DesignSinkConstraint;
 pub(crate) use design_source::DesignSourceConstraint;
-pub(crate) use node::NodeConstraint;
-// pub(crate) use ty::TypeConstraint;
+// pub(crate) use node::NodeConstraint;
 
 pub(super) trait Constraint<'d> {
     fn d_candidate_is_valid(&self, node: &CellRef<'d>) -> bool;
