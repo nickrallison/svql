@@ -11,9 +11,9 @@ use prjunnamed_netlist::{CellRef, Design};
 
 use crate::constraints::{
     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
-    NotAlreadyMappedConstraint,
+    NodeConstraint, NotAlreadyMappedConstraint,
 };
-use crate::node::{NodeSource, NodeType};
+use crate::node::NodeType;
 use itertools::Either;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::Once;
@@ -58,33 +58,45 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
+struct SubgraphRecurse<'a, 'p, 'd> {
+    // Owned Values
+    depth: usize,
+    node_mapping: NodeMapping<'p, 'd>,
+    pattern_mapping_queue: VecDeque<CellRef<'p>>,
+
+    // Reference to Top Caller Values
+    pattern_index: &'a GraphIndex<'p>,
+    design_index: &'a GraphIndex<'d>,
+    config: &'a Config,
+    input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
+    output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
+
+    // Candidates iterator
+    // candidates: Box<dyn Iterator<Item = CellRef<'d>> + 'd>,
+    candidates: Either<
+        std::collections::hash_set::IntoIter<CellRef<'d>>,
+        std::iter::Copied<std::slice::Iter<'a, CellRef<'d>>>,
+    >,
+
+    // Constraints
+    already_mapped_constraint: NotAlreadyMappedConstraint<'p, 'd>,
+    connectivity_constraint: ConnectivityConstraint<'a, 'p, 'd>,
+}
+
+enum SubgraphRecurseEnum<'a, 'p, 'd> {
+    Rec(SubgraphRecurse<'a, 'p, 'd>),
+    Base(Once<SubgraphIsomorphism<'p, 'd>>),
+}
+
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-    tracing::event!(
-        tracing::Level::TRACE,
-        "find_subgraph_isomorphisms: start. pattern cells={} design cells={}",
-        pattern.iter_cells().count(),
-        design.iter_cells().count()
-    );
-
     let pattern_index = GraphIndex::build(pattern);
     let design_index = GraphIndex::build(design);
 
-    tracing::event!(
-        tracing::Level::TRACE,
-        "find_subgraph_isomorphisms: node counts: pattern={} design={}",
-        pattern_index.node_count(),
-        design_index.node_count()
-    );
-
     if pattern_index.node_count() == 0 || design_index.node_count() == 0 {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_subgraph_isomorphisms: early return (empty node count)"
-        );
         return Vec::new();
     }
 
@@ -121,19 +133,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 
         initial_pattern_mapping.into()
     };
-
-    tracing::event!(
-        tracing::Level::TRACE,
-        "find_subgraph_isomorphisms: initial pattern mapping queue size={}",
-        pattern_mapping_queue.len()
-    );
-
     let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
-
-    tracing::event!(
-        tracing::Level::INFO,
-        "find_subgraph_isomorphisms: executing recursive search"
-    );
 
     let mut results: Vec<SubgraphIsomorphism> = find_isomorphisms_recursive(
         &pattern_index,
@@ -156,9 +156,6 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     results
 }
 
-/// Base candidate set from node type only:
-/// - For pattern Input nodes: all design nodes (Name already excluded by GraphIndex)
-/// - For others: all design nodes of that NodeType
 fn initial_candidates<'d, 'a>(
     design_index: &'a GraphIndex<'d>,
     current_type: NodeType,
@@ -169,108 +166,7 @@ fn initial_candidates<'d, 'a>(
     }
 }
 
-/// Candidates restricted by already-mapped sinks (fan-out constraints).
-/// For each mapped sink of the pattern node, compute the set of possible drivers
-/// in the design and intersect across sinks. If none of the sinks are mapped,
-/// returns None (no restriction).
-// fn design_sinks_constraints<'p, 'd>(
-//     pattern_current: CellRef<'p>,
-//     pattern_index: &GraphIndex<'p>,
-//     design_index: &GraphIndex<'d>,
-//     mapping: &NodeMapping<'p, 'd>,
-// ) -> NodeConstraints<'d> {
-//     // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
-//     let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
-//         .get_fanouts(pattern_current)
-//         .iter()
-//         .filter_map(|(p_sink_node, pin_idx)| {
-//             mapping
-//                 .get_design_node(*p_sink_node)
-//                 .map(|d_sink_node| (*p_sink_node, *pin_idx, d_sink_node))
-//         })
-//         .collect();
-
-//     if mapped_sinks.is_empty() {
-//         return NodeConstraints::new(None);
-//     }
-
-//     let sets = mapped_sinks
-//         .iter()
-//         .map(|(_p_sink, pin_idx, d_sink)| {
-//             let sink_type = design_index.get_node_type(*d_sink);
-
-//             if sink_type.has_commutative_inputs() {
-//                 // Any driver to any pin
-//                 design_index.drivers_of_sink_all_pins(*d_sink)
-//             } else {
-//                 // Specific pin must match
-//                 design_index
-//                     .driver_of_sink_pin(*d_sink, *pin_idx)
-//                     .into_iter()
-//                     .collect()
-//             }
-//         })
-//         .filter(|v| !v.is_empty())
-//         .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-//         .map(|s| NodeConstraints::new(Some(s)));
-
-//     NodeConstraints::intersect_many(sets)
-// }
-
-/// Candidates restricted by already-mapped sources (fan-in constraints).
-/// For each mapped source of the pattern node, collect the sinks in the design
-/// that are driven by the corresponding mapped design driver, respecting
-/// commutativity of the current node. Intersect across all mapped sources.
-/// If no sources are mapped, returns None (no restriction).
-// fn design_sources_constraints<'p, 'd>(
-//     pattern_current: CellRef<'p>,
-//     current_type: NodeType,
-//     pattern_index: &GraphIndex<'p>,
-//     design_index: &GraphIndex<'d>,
-//     mapping: &NodeMapping<'p, 'd>,
-// ) -> NodeConstraints<'d> {
-//     let commutative = current_type.has_commutative_inputs();
-
-//     let mapped_sources: Vec<(usize, NodeSource<'p>)> = pattern_index
-//         .get_node_sources(pattern_current)
-//         .iter()
-//         .cloned()
-//         .enumerate()
-//         .collect();
-
-//     let sets = mapped_sources
-//         .into_iter()
-//         .filter_map(|(pin_idx, p_src)| match p_src {
-//             NodeSource::Gate(p_src_node, _pbit) | NodeSource::Io(p_src_node, _pbit) => mapping
-//                 .get_design_node(p_src_node)
-//                 .map(|d_src_node| (pin_idx, d_src_node)),
-//             NodeSource::Const(_) => None, // leave const handling to full connectivity validation
-//         })
-//         .map(|(pin_idx, d_src_node)| {
-//             // For the mapped source driver, get all its fanouts in the design.
-//             // If commutative, any pin is acceptable; otherwise, the exact pin must match.
-//             let fanouts = design_index.get_fanouts(d_src_node);
-//             let sinks = fanouts
-//                 .iter()
-//                 .filter(move |(_, sink_pin)| commutative || *sink_pin == pin_idx)
-//                 .map(|(sink, _)| *sink)
-//                 .collect::<Vec<_>>();
-//             sinks
-//         })
-//         .filter(|v| !v.is_empty())
-//         .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-//         .map(|s| NodeConstraints::new(Some(s)));
-
-//     NodeConstraints::intersect_many(sets)
-
-//     // if sets.is_empty() {
-//     //     return None;
-//     // }
-
-//     // Some(intersect(sets))
-// }
-
-fn find_isomorphisms_recursive<'p, 'd>(
+fn find_isomorphisms_recursive<'a, 'p, 'd>(
     pattern_index: &GraphIndex<'p>,
     design_index: &GraphIndex<'d>,
     config: &Config,
@@ -279,9 +175,9 @@ fn find_isomorphisms_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> Either<Once<SubgraphIsomorphism<'p, 'd>>, impl Iterator<Item = SubgraphIsomorphism<'p, 'd>>> {
+) -> SubgraphRecurseEnum<'a, 'p, 'd> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
-        return Either::Left(std::iter::once(SubgraphIsomorphism {
+        return SubgraphRecurseEnum::Base(std::iter::once(SubgraphIsomorphism {
             mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
@@ -289,8 +185,6 @@ fn find_isomorphisms_recursive<'p, 'd>(
     };
 
     let current_type = NodeType::from(pattern_current.get().as_ref());
-
-    let base_candidates = initial_candidates(design_index, current_type);
 
     let node_constraints = {
         let design_sinks_constraints =
@@ -305,40 +199,67 @@ fn find_isomorphisms_recursive<'p, 'd>(
         .get_candidates_owned();
         design_sinks_constraints.intersect(sources_constraints)
     };
-    let already_mapped_constraint = NotAlreadyMappedConstraint::new(&node_mapping);
+    let already_mapped_constraint = NotAlreadyMappedConstraint::new(node_mapping.clone());
     let connectivity_constraint = ConnectivityConstraint::new(
         pattern_current,
         pattern_index,
         design_index,
         config,
-        &node_mapping,
+        node_mapping.clone(),
     );
+
+    // let candidates = match node_constraints.get_candidates_owned() {
+    //     Some(set) => Either::Left(set.into_iter()),
+    //     None => Either::Right(initial_candidates(design_index, current_type).copied()),
+    // }
+    // .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
+    // .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
 
     let candidates = match node_constraints.get_candidates_owned() {
         Some(set) => Either::Left(set.into_iter()),
-        None => Either::Right(base_candidates.copied()),
-    }
-    .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
-    .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
+        None => Either::Right(initial_candidates(design_index, current_type).copied()),
+    };
+
+    let recurse_iter: SubgraphRecurse<'a, 'p, 'd> = SubgraphRecurse {
+        // Owned
+        depth,
+        node_mapping,
+        pattern_mapping_queue,
+
+        // References
+        pattern_index,
+        design_index,
+        config,
+        input_by_name,
+        output_by_name,
+
+        // Candidates Iter
+        candidates,
+        already_mapped_constraint,
+        connectivity_constraint,
+    };
+
+    SubgraphRecurseEnum::Rec(recurse_iter)
 
     // Accumulate results locally (no &mut parameters). This keeps a simple path
     // to change candidates_it.into_par_iter() and reduce results with Rayon later.
-    let results = candidates.flat_map(|d_candidate| {
-        let mut new_node_mapping = node_mapping.clone();
-        new_node_mapping.insert(pattern_current, d_candidate);
 
-        // Recurse; extend the single result Vec (no per-branch Vec flattening).
-        find_isomorphisms_recursive(
-            pattern_index,
-            design_index,
-            config,
-            new_node_mapping,
-            pattern_mapping_queue.clone(),
-            input_by_name,
-            output_by_name,
-            depth + 1,
-        )
-    });
+    // let results = candidates.flat_map(|d_candidate| {
+    //     let mut new_node_mapping = node_mapping.clone();
+    //     new_node_mapping.insert(pattern_current, d_candidate);
 
-    Either::Right(results)
+    //     // Recurse; extend the single result Vec (no per-branch Vec flattening).
+    //     find_isomorphisms_recursive(
+    //         pattern_index,
+    //         design_index,
+    //         config,
+    //         new_node_mapping,
+    //         pattern_mapping_queue.clone(),
+    //         input_by_name,
+    //         output_by_name,
+    //         depth + 1,
+    //     )
+    // });
+
+    // Either::Right(results)
 }

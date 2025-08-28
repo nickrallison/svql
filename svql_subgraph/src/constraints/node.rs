@@ -4,27 +4,27 @@ use prjunnamed_netlist::CellRef;
 
 use crate::Constraint;
 
-pub(crate) struct NodeConstraints<'d> {
+pub(crate) struct NodeConstraint<'d> {
     // Some -> The intersection of these nodes and another set of nodes will be a valid constraint
     // None -> No restriction, any node is valid
     nodes: Option<HashSet<CellRef<'d>>>,
 }
 
-impl<'d> NodeConstraints<'d> {
+impl<'d> NodeConstraint<'d> {
     pub(crate) fn new(nodes: Option<HashSet<CellRef<'d>>>) -> Self {
-        NodeConstraints { nodes }
+        NodeConstraint { nodes }
     }
     pub(crate) fn intersect(self, other: Self) -> Self {
         match (self.nodes, other.nodes) {
-            (Some(a), Some(b)) => NodeConstraints::new(Some(a.intersection(&b).cloned().collect())),
-            (Some(a), None) => NodeConstraints::new(Some(a)),
-            (None, Some(b)) => NodeConstraints::new(Some(b)),
-            (None, None) => NodeConstraints::new(None),
+            (Some(a), Some(b)) => NodeConstraint::new(Some(a.intersection(&b).cloned().collect())),
+            (Some(a), None) => NodeConstraint::new(Some(a)),
+            (None, Some(b)) => NodeConstraint::new(Some(b)),
+            (None, None) => NodeConstraint::new(None),
         }
     }
     pub(crate) fn intersect_many(sets: impl IntoIterator<Item = Self>) -> Self {
         sets.into_iter()
-            .fold(NodeConstraints::new(None), |acc, set| acc.intersect(set))
+            .fold(NodeConstraint::new(None), |acc, set| acc.intersect(set))
     }
     pub(crate) fn is_none(&self) -> bool {
         self.nodes.is_none()
@@ -37,7 +37,7 @@ impl<'d> NodeConstraints<'d> {
     }
 }
 
-impl<'d> Constraint<'d> for NodeConstraints<'d> {
+impl<'d> Constraint<'d> for NodeConstraint<'d> {
     fn d_candidate_is_valid(&self, node: &CellRef<'d>) -> bool {
         match &self.nodes {
             Some(set) => set.contains(node),

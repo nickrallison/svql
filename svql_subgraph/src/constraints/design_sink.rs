@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use crate::constraints::node::NodeConstraints;
+use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::NodeType;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
 pub(crate) struct DesignSinkConstraint<'d> {
-    node_constraints: NodeConstraints<'d>,
+    node_constraints: NodeConstraint<'d>,
 }
 
 impl<'d> DesignSinkConstraint<'d> {
@@ -30,7 +30,7 @@ impl<'d> DesignSinkConstraint<'d> {
 
         if mapped_sinks.is_empty() {
             return DesignSinkConstraint {
-                node_constraints: NodeConstraints::new(None),
+                node_constraints: NodeConstraint::new(None),
             };
         }
 
@@ -52,16 +52,16 @@ impl<'d> DesignSinkConstraint<'d> {
             })
             .filter(|v| !v.is_empty())
             .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-            .map(|s| NodeConstraints::new(Some(s)));
+            .map(|s| NodeConstraint::new(Some(s)));
 
         DesignSinkConstraint {
-            node_constraints: NodeConstraints::intersect_many(sets),
+            node_constraints: NodeConstraint::intersect_many(sets),
         }
     }
-    pub(crate) fn get_candidates(&self) -> &NodeConstraints<'d> {
+    pub(crate) fn get_candidates(&self) -> &NodeConstraint<'d> {
         &self.node_constraints
     }
-    pub(crate) fn get_candidates_owned(self) -> NodeConstraints<'d> {
+    pub(crate) fn get_candidates_owned(self) -> NodeConstraint<'d> {
         self.node_constraints
     }
 }

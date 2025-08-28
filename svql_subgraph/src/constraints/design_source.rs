@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use crate::constraints::node::NodeConstraints;
+use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeSource, NodeType};
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
 pub(crate) struct DesignSourceConstraint<'d> {
-    node_constraints: NodeConstraints<'d>,
+    node_constraints: NodeConstraint<'d>,
 }
 
 impl<'d> DesignSourceConstraint<'d> {
@@ -48,16 +48,16 @@ impl<'d> DesignSourceConstraint<'d> {
             })
             .filter(|v| !v.is_empty())
             .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-            .map(|s| NodeConstraints::new(Some(s)));
+            .map(|s| NodeConstraint::new(Some(s)));
 
         DesignSourceConstraint {
-            node_constraints: NodeConstraints::intersect_many(sets),
+            node_constraints: NodeConstraint::intersect_many(sets),
         }
     }
-    pub(crate) fn get_candidates(&self) -> &NodeConstraints<'d> {
+    pub(crate) fn get_candidates(&self) -> &NodeConstraint<'d> {
         &self.node_constraints
     }
-    pub(crate) fn get_candidates_owned(self) -> NodeConstraints<'d> {
+    pub(crate) fn get_candidates_owned(self) -> NodeConstraint<'d> {
         self.node_constraints
     }
 }
