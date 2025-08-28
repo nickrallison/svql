@@ -105,6 +105,7 @@ impl<'a, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
                 self.output_by_name,
                 self.depth + 1,
             )
+            .flat_map_candidates()
         });
         Box::new(results)
     }
@@ -184,6 +185,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         &output_by_name,
         0, // depth
     )
+    .flat_map_candidates()
     .collect();
 
     // Dedupe ONCE at the top-level; avoid per-depth overhead in the hot path.
@@ -217,11 +219,11 @@ fn find_isomorphisms_recursive<'a, 'p, 'd>(
     depth: usize,
 ) -> SubgraphRecurseEnum<'a, 'p, 'd> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
-        return SubgraphRecurseEnum::Base(std::iter::once(SubgraphIsomorphism {
+        return SubgraphRecurseEnum::Base(SubgraphIsomorphism {
             mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
-        }));
+        });
     };
 
     let current_type = NodeType::from(pattern_current.get().as_ref());
@@ -255,11 +257,10 @@ fn find_isomorphisms_recursive<'a, 'p, 'd>(
     // .filter(|d_node| already_mapped_constraint.d_candidate_is_valid(d_node))
     // .filter(|d_node| connectivity_constraint.d_candidate_is_valid(d_node));
 
-    let candidates: Box<dyn Iterator<Item = CellRef<'d>>> =
-        match node_constraints.get_candidates_owned() {
-            Some(set) => Box::new(set.into_iter()),
-            None => Box::new(initial_candidates(design_index, current_type).copied()),
-        };
+    let candidates: Candidates<'a, 'd> = match node_constraints.get_candidates_owned() {
+        Some(set) => Candidates::Constrained(set),
+        None => initial_candidates(design_index, current_type),
+    };
 
     let recurse_iter: SubgraphRecurse<'a, 'p, 'd> = SubgraphRecurse {
         // Owned
