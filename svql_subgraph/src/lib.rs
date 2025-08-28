@@ -8,6 +8,7 @@ use isomorphism::NodeMapping;
 use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use itertools::Either;
 use svql_common::{Config, DedupeMode};
 
 use crate::node::{NodeSource, NodeType};
@@ -128,7 +129,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         "find_subgraph_isomorphisms: executing recursive search"
     );
 
-    let results = find_isomorphisms_recursive(
+    let mut results = find_isomorphisms_recursive(
         &pattern_index,
         &design_index,
         config,
@@ -138,6 +139,12 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         &output_by_name,
         0, // depth
     );
+
+    // Dedupe ONCE at the top-level; avoid per-depth overhead in the hot path.
+    if matches!(config.dedupe, DedupeMode::AutoMorph) {
+        let mut seen: HashSet<Vec<usize>> = HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.signature()));
+    }
 
     tracing::event!(
         tracing::Level::INFO,
@@ -151,6 +158,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 
     results
 }
+
 
 trait Constraint<'d> {
     fn candidate_is_valid(&self, node: &CellRef<'d>) -> bool;
@@ -383,20 +391,25 @@ fn find_isomorphisms_recursive<'p, 'd>(
         &node_mapping,
     );
 
+    // Intersect constraints once. If a constraint set exists, iterate that directly
+    // (avoid scanning the whole design for Input nodes).
     let constraints = NodeConstraints::intersect_many(vec![sinks_constraints, sources_constraints]);
 
-    // Candidate selection:
-    // - For Input nodes: when constraints exist, start from the constraint set(s) only.
-    //   Avoid building the "all design nodes" base.
-    // - For non-Input nodes: start from the type-based base and intersect constraints.
-    let candidates = base_candidates.filter(|d_node| constraints.candidate_is_valid(d_node));
+    let candidates_it = match constraints.get_candidates_owned() {
+        Some(set) => Either::Left(set.into_iter()),
+        None => Either::Right(base_candidates.copied()),
+    };
 
-    let process_candidate = |d_node: CellRef<'d>| -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    // Accumulate results locally (no &mut parameters). This keeps a simple path
+    // to change candidates_it.into_par_iter() and reduce results with Rayon later.
+    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = Vec::new();
+
+    for d_node in candidates_it {
         if is_node_already_mapped(d_node, &node_mapping, depth) {
-            return Vec::new();
+            continue;
         }
         if !are_nodes_compatible(current_type, design_index.get_node_type(d_node)) {
-            return Vec::new();
+            continue;
         }
         if !is_node_connectivity_valid(
             pattern_current,
@@ -406,13 +419,14 @@ fn find_isomorphisms_recursive<'p, 'd>(
             config,
             &node_mapping,
         ) {
-            return Vec::new();
+            continue;
         }
 
         let mut new_node_mapping = node_mapping.clone();
         new_node_mapping.insert(pattern_current, d_node);
 
-        find_isomorphisms_recursive(
+        // Recurse; extend the single result Vec (no per-branch Vec flattening).
+        let child_results = find_isomorphisms_recursive(
             pattern_index,
             design_index,
             config,
@@ -421,22 +435,9 @@ fn find_isomorphisms_recursive<'p, 'd>(
             input_by_name,
             output_by_name,
             depth + 1,
-        )
-    };
-
-    let mut results: Vec<SubgraphIsomorphism<'p, 'd>> = candidates
-        .flat_map(|d_node| process_candidate(*d_node))
-        .collect();
-
-    if matches!(config.dedupe, DedupeMode::AutoMorph) {
-        let mut seen: HashSet<Vec<usize>> = HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.signature()));
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_isomorphisms_recursive[depth={}]: after dedupe -> {}",
-            depth,
-            results.len()
         );
+
+        results.extend(child_results);
     }
 
     results

@@ -705,6 +705,7 @@ version = "0.1.0"
 dependencies = [
  "contracts",
  "dashmap",
+ "itertools",
  "lazy_static",
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
