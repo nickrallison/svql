@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+mod candidates;
 mod constraints;
 mod graph_index;
 mod isomorphism;
@@ -9,11 +10,13 @@ use isomorphism::NodeMapping;
 
 use prjunnamed_netlist::{CellRef, Design};
 
+use crate::candidates::Candidates;
 use crate::constraints::{
     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
     NotAlreadyMappedConstraint,
 };
 use crate::node::NodeType;
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::Once;
 use svql_common::{Config, DedupeMode};
@@ -57,11 +60,6 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-enum Candidates<'a, 'd> {
-    Constrained(HashSet<CellRef<'d>>),
-    Unconstrained(&'a [CellRef<'d>]),
-}
-
 struct SubgraphRecurse<'a, 'p, 'd> {
     // Owned Values
     depth: usize,
@@ -85,9 +83,10 @@ struct SubgraphRecurse<'a, 'p, 'd> {
 }
 
 impl<'a, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
-    fn flat_map_candidates(self) -> Box<dyn Iterator<Item = CellRef<'d>> + 'a> {
+    fn flat_map_candidates(self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'a> {
         let filtered_candidates = self
             .candidates
+            .into_iter()
             .filter(|d_node| self.already_mapped_constraint.d_candidate_is_valid(d_node))
             .filter(|d_node| self.connectivity_constraint.d_candidate_is_valid(d_node));
 
@@ -111,59 +110,21 @@ impl<'a, 'p, 'd> SubgraphRecurse<'a, 'p, 'd> {
     }
 }
 
-// impl<'a, 'b, 'p, 'd> Iterator for SubgraphRecurse<'a, 'p, 'd> {
-//     type Item = SubgraphIsomorphism<'p, 'd>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         while let Some(d_candidate) = self.candidates.next() {
-//             if !self
-//                 .already_mapped_constraint
-//                 .d_candidate_is_valid(&d_candidate)
-//             {
-//                 continue;
-//             }
-//             if !self
-//                 .connectivity_constraint
-//                 .d_candidate_is_valid(&d_candidate)
-//             {
-//                 continue;
-//             }
-
-//             let mut new_node_mapping = self.node_mapping.clone();
-//             new_node_mapping.insert(self.p_current, d_candidate);
-
-//             // Recurse; extend the single result Vec (no per-branch Vec flattening).
-//             let mut recurse_iter = find_isomorphisms_recursive(
-//                 self.pattern_index,
-//                 self.design_index,
-//                 self.config,
-//                 new_node_mapping,
-//                 self.pattern_mapping_queue.clone(),
-//                 self.input_by_name,
-//                 self.output_by_name,
-//                 self.depth + 1,
-//             );
-
-//             match recurse_iter {
-//                 SubgraphRecurseEnum::Rec(ref mut iter: SubgraphRecurse<'a, 'p, 'd>) => {
-//                     if let Some(result) = iter.next() {
-//                         return Some(result);
-//                     }
-//                 }
-//                 SubgraphRecurseEnum::Base(mut base_iter) => {
-//                     if let Some(result) = base_iter.next() {
-//                         return Some(result);
-//                     }
-//                 }
-//             }
-//         }
-//         None
-//     }
-// }
-
 enum SubgraphRecurseEnum<'a, 'p, 'd> {
     Rec(SubgraphRecurse<'a, 'p, 'd>),
-    Base(Once<SubgraphIsomorphism<'p, 'd>>),
+    Base(SubgraphIsomorphism<'p, 'd>),
+}
+
+impl<'a, 'p, 'd> SubgraphRecurseEnum<'a, 'p, 'd> {
+    fn flat_map_candidates(self) -> Box<dyn Iterator<Item = SubgraphIsomorphism<'p, 'd>> + 'a> {
+        match self {
+            SubgraphRecurseEnum::Rec(rec) => rec.flat_map_candidates(),
+            SubgraphRecurseEnum::Base(base) => {
+                let iter = std::iter::once(base);
+                Box::new(iter)
+            }
+        }
+    }
 }
 
 pub fn find_subgraph_isomorphisms<'p, 'd>(
