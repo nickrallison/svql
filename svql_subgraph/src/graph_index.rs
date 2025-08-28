@@ -96,10 +96,7 @@ impl<'a> GraphIndex<'a> {
 
                     // fanout_map (driver -> map sink -> set_of_pins)
                     let entry = fanout_map.entry(driver).or_default();
-                    entry
-                        .entry(*sink_ref)
-                        .or_default()
-                        .insert(sink_pin_idx);
+                    entry.entry(*sink_ref).or_default().insert(sink_pin_idx);
                 }
             }
         }
@@ -172,9 +169,9 @@ impl<'a> GraphIndex<'a> {
             .unwrap_or(&[])
     }
 
-    pub(super) fn get_node_type(&self, node: CellRef<'a>) -> NodeType {
-        NodeType::from(node.get().as_ref())
-    }
+    // pub(super) fn get_node_type(&self, node: CellRef<'a>) -> NodeType {
+    //     NodeType::from(node.get().as_ref())
+    // }
 
     pub(super) fn get_input_name(&self, node: CellRef<'a>) -> Option<&'a str> {
         match node.get() {
@@ -191,7 +188,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     pub(super) fn node_summary(&self, node: CellRef<'a>) -> String {
-        let node_type = self.get_node_type(node);
+        let node_type = NodeType::from(node.get().as_ref());
         let iname = self.get_input_name(node).unwrap_or("");
         let oname = self.get_output_name(node).unwrap_or("");
         let n = if !iname.is_empty() { iname } else { oname };

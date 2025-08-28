@@ -1,7 +1,7 @@
 use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
-use crate::node::NodeSource;
+use crate::node::{NodeSource, NodeType};
 use prjunnamed_netlist::CellRef;
 use svql_common::Config;
 
@@ -57,10 +57,8 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         d_sink_node: prjunnamed_netlist::CellRef<'d>,
         pin_idx: usize,
     ) -> bool {
-        let sink_commutative = self
-            .design_index
-            .get_node_type(d_sink_node)
-            .has_commutative_inputs();
+        let d_sink_node_type = NodeType::from(d_sink_node.get().as_ref());
+        let sink_commutative = d_sink_node_type.has_commutative_inputs();
 
         let ok = if sink_commutative {
             self.design_index.has_fanout_to(d_driver, d_sink_node)

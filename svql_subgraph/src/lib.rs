@@ -10,7 +10,8 @@ use isomorphism::NodeMapping;
 use prjunnamed_netlist::{CellRef, Design};
 
 use crate::constraints::{
-    ConnectivityConstraint, Constraint, NodeConstraints, NotAlreadyMappedConstraint,
+    ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
+    NotAlreadyMappedConstraint,
 };
 use crate::node::{NodeSource, NodeType};
 use itertools::Either;
@@ -91,14 +92,14 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     let input_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
         .get_nodes_topo()
         .iter()
-        .filter(|c| matches!(pattern_index.get_node_type(**c), NodeType::Input))
+        .filter(|c| matches!(NodeType::from(c.get().as_ref()), NodeType::Input))
         .filter_map(|c| pattern_index.get_input_name(*c).map(|n| (n, *c)))
         .collect();
 
     let output_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
         .get_nodes_topo()
         .iter()
-        .filter(|c| matches!(pattern_index.get_node_type(**c), NodeType::Output))
+        .filter(|c| matches!(NodeType::from(c.get().as_ref()), NodeType::Output))
         .filter_map(|c| pattern_index.get_output_name(*c).map(|n| (n, *c)))
         .collect();
 
@@ -107,14 +108,14 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         let mut initial_pattern_mapping: Vec<CellRef<'p>> = pattern_index
             .get_nodes_topo()
             .iter()
-            .filter(|c| !matches!(pattern_index.get_node_type(**c), NodeType::Output))
+            .filter(|c| !matches!(NodeType::from(c.get().as_ref()), NodeType::Output))
             .copied()
             .collect();
 
         // stable sort inputs to back
         initial_pattern_mapping.sort_by(|a, b| {
-            let a_is_input = matches!(pattern_index.get_node_type(*a), NodeType::Input);
-            let b_is_input = matches!(pattern_index.get_node_type(*b), NodeType::Input);
+            let a_is_input = matches!(NodeType::from(a.get().as_ref()), NodeType::Input);
+            let b_is_input = matches!(NodeType::from(b.get().as_ref()), NodeType::Input);
             a_is_input.cmp(&b_is_input)
         });
 
@@ -152,16 +153,6 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         results.retain(|m| seen.insert(m.mapping.signature()));
     }
 
-    tracing::event!(
-        tracing::Level::INFO,
-        "find_subgraph_isomorphisms: results={} unique_sigs={:?}",
-        results.len(),
-        results
-            .iter()
-            .map(|m| m.mapping.signature())
-            .collect::<Vec<_>>()
-    );
-
     results
 }
 
@@ -182,102 +173,102 @@ fn initial_candidates<'d, 'a>(
 /// For each mapped sink of the pattern node, compute the set of possible drivers
 /// in the design and intersect across sinks. If none of the sinks are mapped,
 /// returns None (no restriction).
-fn design_sinks_constraints<'p, 'd>(
-    pattern_current: CellRef<'p>,
-    pattern_index: &GraphIndex<'p>,
-    design_index: &GraphIndex<'d>,
-    mapping: &NodeMapping<'p, 'd>,
-) -> NodeConstraints<'d> {
-    // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
-    let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
-        .get_fanouts(pattern_current)
-        .iter()
-        .filter_map(|(p_sink_node, pin_idx)| {
-            mapping
-                .get_design_node(*p_sink_node)
-                .map(|d_sink_node| (*p_sink_node, *pin_idx, d_sink_node))
-        })
-        .collect();
+// fn design_sinks_constraints<'p, 'd>(
+//     pattern_current: CellRef<'p>,
+//     pattern_index: &GraphIndex<'p>,
+//     design_index: &GraphIndex<'d>,
+//     mapping: &NodeMapping<'p, 'd>,
+// ) -> NodeConstraints<'d> {
+//     // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
+//     let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
+//         .get_fanouts(pattern_current)
+//         .iter()
+//         .filter_map(|(p_sink_node, pin_idx)| {
+//             mapping
+//                 .get_design_node(*p_sink_node)
+//                 .map(|d_sink_node| (*p_sink_node, *pin_idx, d_sink_node))
+//         })
+//         .collect();
 
-    if mapped_sinks.is_empty() {
-        return NodeConstraints::new(None);
-    }
+//     if mapped_sinks.is_empty() {
+//         return NodeConstraints::new(None);
+//     }
 
-    let sets = mapped_sinks
-        .iter()
-        .map(|(_p_sink, pin_idx, d_sink)| {
-            let sink_type = design_index.get_node_type(*d_sink);
+//     let sets = mapped_sinks
+//         .iter()
+//         .map(|(_p_sink, pin_idx, d_sink)| {
+//             let sink_type = design_index.get_node_type(*d_sink);
 
-            if sink_type.has_commutative_inputs() {
-                // Any driver to any pin
-                design_index.drivers_of_sink_all_pins(*d_sink)
-            } else {
-                // Specific pin must match
-                design_index
-                    .driver_of_sink_pin(*d_sink, *pin_idx)
-                    .into_iter()
-                    .collect()
-            }
-        })
-        .filter(|v| !v.is_empty())
-        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-        .map(|s| NodeConstraints::new(Some(s)));
+//             if sink_type.has_commutative_inputs() {
+//                 // Any driver to any pin
+//                 design_index.drivers_of_sink_all_pins(*d_sink)
+//             } else {
+//                 // Specific pin must match
+//                 design_index
+//                     .driver_of_sink_pin(*d_sink, *pin_idx)
+//                     .into_iter()
+//                     .collect()
+//             }
+//         })
+//         .filter(|v| !v.is_empty())
+//         .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
+//         .map(|s| NodeConstraints::new(Some(s)));
 
-    NodeConstraints::intersect_many(sets)
-}
+//     NodeConstraints::intersect_many(sets)
+// }
 
 /// Candidates restricted by already-mapped sources (fan-in constraints).
 /// For each mapped source of the pattern node, collect the sinks in the design
 /// that are driven by the corresponding mapped design driver, respecting
 /// commutativity of the current node. Intersect across all mapped sources.
 /// If no sources are mapped, returns None (no restriction).
-fn design_sources_constraints<'p, 'd>(
-    pattern_current: CellRef<'p>,
-    current_type: NodeType,
-    pattern_index: &GraphIndex<'p>,
-    design_index: &GraphIndex<'d>,
-    mapping: &NodeMapping<'p, 'd>,
-) -> NodeConstraints<'d> {
-    let commutative = current_type.has_commutative_inputs();
+// fn design_sources_constraints<'p, 'd>(
+//     pattern_current: CellRef<'p>,
+//     current_type: NodeType,
+//     pattern_index: &GraphIndex<'p>,
+//     design_index: &GraphIndex<'d>,
+//     mapping: &NodeMapping<'p, 'd>,
+// ) -> NodeConstraints<'d> {
+//     let commutative = current_type.has_commutative_inputs();
 
-    let mapped_sources: Vec<(usize, NodeSource<'p>)> = pattern_index
-        .get_node_sources(pattern_current)
-        .iter()
-        .cloned()
-        .enumerate()
-        .collect();
+//     let mapped_sources: Vec<(usize, NodeSource<'p>)> = pattern_index
+//         .get_node_sources(pattern_current)
+//         .iter()
+//         .cloned()
+//         .enumerate()
+//         .collect();
 
-    let sets = mapped_sources
-        .into_iter()
-        .filter_map(|(pin_idx, p_src)| match p_src {
-            NodeSource::Gate(p_src_node, _pbit) | NodeSource::Io(p_src_node, _pbit) => mapping
-                .get_design_node(p_src_node)
-                .map(|d_src_node| (pin_idx, d_src_node)),
-            NodeSource::Const(_) => None, // leave const handling to full connectivity validation
-        })
-        .map(|(pin_idx, d_src_node)| {
-            // For the mapped source driver, get all its fanouts in the design.
-            // If commutative, any pin is acceptable; otherwise, the exact pin must match.
-            let fanouts = design_index.get_fanouts(d_src_node);
-            let sinks = fanouts
-                .iter()
-                .filter(move |(_, sink_pin)| commutative || *sink_pin == pin_idx)
-                .map(|(sink, _)| *sink)
-                .collect::<Vec<_>>();
-            sinks
-        })
-        .filter(|v| !v.is_empty())
-        .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
-        .map(|s| NodeConstraints::new(Some(s)));
+//     let sets = mapped_sources
+//         .into_iter()
+//         .filter_map(|(pin_idx, p_src)| match p_src {
+//             NodeSource::Gate(p_src_node, _pbit) | NodeSource::Io(p_src_node, _pbit) => mapping
+//                 .get_design_node(p_src_node)
+//                 .map(|d_src_node| (pin_idx, d_src_node)),
+//             NodeSource::Const(_) => None, // leave const handling to full connectivity validation
+//         })
+//         .map(|(pin_idx, d_src_node)| {
+//             // For the mapped source driver, get all its fanouts in the design.
+//             // If commutative, any pin is acceptable; otherwise, the exact pin must match.
+//             let fanouts = design_index.get_fanouts(d_src_node);
+//             let sinks = fanouts
+//                 .iter()
+//                 .filter(move |(_, sink_pin)| commutative || *sink_pin == pin_idx)
+//                 .map(|(sink, _)| *sink)
+//                 .collect::<Vec<_>>();
+//             sinks
+//         })
+//         .filter(|v| !v.is_empty())
+//         .map(|v| v.into_iter().collect::<HashSet<CellRef<'d>>>())
+//         .map(|s| NodeConstraints::new(Some(s)));
 
-    NodeConstraints::intersect_many(sets)
+//     NodeConstraints::intersect_many(sets)
 
-    // if sets.is_empty() {
-    //     return None;
-    // }
+//     // if sets.is_empty() {
+//     //     return None;
+//     // }
 
-    // Some(intersect(sets))
-}
+//     // Some(intersect(sets))
+// }
 
 fn find_isomorphisms_recursive<'p, 'd>(
     pattern_index: &GraphIndex<'p>,
@@ -297,22 +288,23 @@ fn find_isomorphisms_recursive<'p, 'd>(
         }));
     };
 
-    let current_type = pattern_index.get_node_type(pattern_current);
+    let current_type = NodeType::from(pattern_current.get().as_ref());
 
     let base_candidates = initial_candidates(design_index, current_type);
 
-    // Constraint candidates
-    let sinks_constraints =
-        design_sinks_constraints(pattern_current, pattern_index, design_index, &node_mapping);
-    let sources_constraints = design_sources_constraints(
-        pattern_current,
-        current_type,
-        pattern_index,
-        design_index,
-        &node_mapping,
-    );
-    let node_constraints =
-        NodeConstraints::intersect_many(vec![sinks_constraints, sources_constraints]);
+    let node_constraints = {
+        let design_sinks_constraints =
+            DesignSinkConstraint::new(pattern_current, pattern_index, design_index, &node_mapping)
+                .get_candidates_owned();
+        let sources_constraints = DesignSourceConstraint::new(
+            pattern_current,
+            pattern_index,
+            design_index,
+            &node_mapping,
+        )
+        .get_candidates_owned();
+        design_sinks_constraints.intersect(sources_constraints)
+    };
     let already_mapped_constraint = NotAlreadyMappedConstraint::new(&node_mapping);
     let connectivity_constraint = ConnectivityConstraint::new(
         pattern_current,
