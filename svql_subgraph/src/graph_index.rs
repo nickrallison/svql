@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
@@ -15,8 +15,8 @@ pub(super) struct GraphIndex<'a> {
     /// Pre-computed source information for each node: sources[sink][pin_idx] = NodeSource
     node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>>,
 
-    /// fanout membership: driver -> (sink -> bitmask_of_pins)
-    fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, u32>>,
+    /// fanout membership: driver -> (sink -> set_of_pins)
+    fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>>,
 }
 
 impl<'a> GraphIndex<'a> {
@@ -65,7 +65,8 @@ impl<'a> GraphIndex<'a> {
         let mut reverse_node_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
             HashMap::new();
         let mut node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>> = HashMap::new();
-        let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, u32>> = HashMap::new();
+        let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>> =
+            HashMap::new();
 
         // Pre-compute source information for all nodes (as sinks)
         for node_ref in nodes_topo.iter() {
@@ -93,13 +94,12 @@ impl<'a> GraphIndex<'a> {
                         .or_default()
                         .push((*sink_ref, sink_pin_idx));
 
-                    // fanout_map (driver -> map sink -> bitmask)
-                    let mask = 1u32 << sink_pin_idx;
+                    // fanout_map (driver -> map sink -> set_of_pins)
                     let entry = fanout_map.entry(driver).or_default();
                     entry
                         .entry(*sink_ref)
-                        .and_modify(|m| *m |= mask)
-                        .or_insert(mask);
+                        .or_default()
+                        .insert(sink_pin_idx);
                 }
             }
         }
@@ -220,7 +220,7 @@ impl<'a> GraphIndex<'a> {
         self.fanout_map
             .get(&driver)
             .and_then(|m| m.get(&sink))
-            .is_some_and(|mask| (mask & (1u32 << pin_idx)) != 0)
+            .is_some_and(|pins| pins.contains(&pin_idx))
     }
 
     /// The unique driver of a given sink input pin, if any (Gate/Io sources only).

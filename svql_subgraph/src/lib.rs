@@ -385,25 +385,6 @@ fn find_isomorphisms_recursive<'p, 'd>(
 
     let constraints = NodeConstraints::intersect_many(vec![sinks_constraints, sources_constraints]);
 
-    // If this is an Input with no constraints yet and there are still other nodes to map,
-    // defer it by pushing it to the back and move on. This prevents wildcard blow-up.
-    if matches!(current_type, NodeType::Input)
-        && constraints.is_none()
-        && !pattern_mapping_queue.is_empty()
-    {
-        pattern_mapping_queue.push_back(pattern_current);
-        return find_isomorphisms_recursive(
-            pattern_index,
-            design_index,
-            config,
-            node_mapping,
-            pattern_mapping_queue,
-            input_by_name,
-            output_by_name,
-            depth,
-        );
-    }
-
     // Candidate selection:
     // - For Input nodes: when constraints exist, start from the constraint set(s) only.
     //   Avoid building the "all design nodes" base.
