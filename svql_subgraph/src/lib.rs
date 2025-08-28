@@ -15,6 +15,7 @@ use crate::constraints::{
 use crate::node::{NodeSource, NodeType};
 use itertools::Either;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::iter::Once;
 use svql_common::{Config, DedupeMode};
 
 #[derive(Clone, Debug, Default)]
@@ -287,31 +288,14 @@ fn find_isomorphisms_recursive<'p, 'd>(
     input_by_name: &HashMap<&'p str, CellRef<'p>>,
     output_by_name: &HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-) -> impl Iterator<Item = SubgraphIsomorphism<'p, 'd>> {
+) -> Either<Once<SubgraphIsomorphism<'p, 'd>>, impl Iterator<Item = SubgraphIsomorphism<'p, 'd>>> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "find_isomorphisms_recursive[depth={}]: base case reached. mapping size={}",
-            depth,
-            node_mapping.len()
-        );
-
-        return std::iter::once(SubgraphIsomorphism {
+        return Either::Left(std::iter::once(SubgraphIsomorphism {
             mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
-        });
+        }));
     };
-
-    tracing::event!(
-        tracing::Level::TRACE,
-        "find_isomorphisms_recursive[depth={}]: current=#{} type={:?} | remaining_queue={} | mapping_size={}",
-        depth,
-        pattern_current.debug_index(),
-        pattern_index.get_node_type(pattern_current),
-        pattern_mapping_queue.len(),
-        node_mapping.len()
-    );
 
     let current_type = pattern_index.get_node_type(pattern_current);
 
@@ -347,7 +331,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
 
     // Accumulate results locally (no &mut parameters). This keeps a simple path
     // to change candidates_it.into_par_iter() and reduce results with Rayon later.
-    candidates.flat_map(|d_candidate| {
+    let results = candidates.flat_map(|d_candidate| {
         let mut new_node_mapping = node_mapping.clone();
         new_node_mapping.insert(pattern_current, d_candidate);
 
@@ -362,5 +346,7 @@ fn find_isomorphisms_recursive<'p, 'd>(
             output_by_name,
             depth + 1,
         )
-    })
+    });
+
+    Either::Right(results)
 }
