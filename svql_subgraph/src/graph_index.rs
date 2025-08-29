@@ -2,7 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
-use crate::node::{NodeSource, NodeType, net_to_source};
+use crate::{
+    node::{NodeSource, NodeType, net_to_source},
+    profiling::Timer,
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct GraphIndex<'a> {
@@ -17,16 +20,14 @@ pub(super) struct GraphIndex<'a> {
 
     /// fanout membership: driver -> (sink -> set_of_pins)
     fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>>,
+
+    gate_count: usize,
 }
 
 impl<'a> GraphIndex<'a> {
-    #[contracts::debug_ensures(ret.node_count() <= design.iter_cells().count())]
+    #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::build: start. design cells={}",
-            design.iter_cells().count()
-        );
+        let _t = Timer::new("GraphIndex::build");
 
         let mut by_type: HashMap<NodeType, Vec<CellRef<'a>>> = HashMap::new();
         let nodes_topo: Vec<CellRef<'a>> = design
@@ -38,28 +39,9 @@ impl<'a> GraphIndex<'a> {
             })
             .collect();
 
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::build: nodes_topo len={} (excluding Name). gate_count={}",
-            nodes_topo.len(),
-            nodes_topo
-                .iter()
-                .filter(|c| NodeType::from(c.get().as_ref()).is_logic_gate())
-                .count()
-        );
-
         for node_ref in nodes_topo.iter().cloned() {
             let node_type = NodeType::from(node_ref.get().as_ref());
             by_type.entry(node_type).or_default().push(node_ref);
-        }
-
-        for (k, v) in by_type.iter() {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "GraphIndex::build: by_type {:?} -> {}",
-                k,
-                v.len()
-            );
         }
 
         let mut reverse_node_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
@@ -67,6 +49,11 @@ impl<'a> GraphIndex<'a> {
         let mut node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>> = HashMap::new();
         let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>> =
             HashMap::new();
+
+        let gate_count = nodes_topo
+            .iter()
+            .filter(|c| NodeType::from(c.get().as_ref()).is_logic_gate())
+            .count();
 
         // Pre-compute source information for all nodes (as sinks)
         for node_ref in nodes_topo.iter() {
@@ -101,46 +88,26 @@ impl<'a> GraphIndex<'a> {
             }
         }
 
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::build: reverse_node_lookup keys={} (drivers).",
-            reverse_node_lookup.len()
-        );
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::build: fanout_map keys={} (drivers).",
-            fanout_map.len()
-        );
-
         GraphIndex {
             nodes_topo,
             by_type,
             reverse_node_lookup,
             node_sources,
             fanout_map,
+            gate_count,
         }
     }
 
-    pub(super) fn node_count(&self) -> usize {
-        self.nodes_topo
-            .iter()
-            .filter(|c| NodeType::from(c.get().as_ref()).is_logic_gate())
-            .count()
+    pub(super) fn gate_count(&self) -> usize {
+        self.gate_count
     }
 
     pub(super) fn get_by_type(&self, node_type: NodeType) -> &[CellRef<'a>] {
-        let slice = self
-            .by_type
+        let _t = Timer::new("GraphIndex::get_by_type");
+        self.by_type
             .get(&node_type)
             .map(|v| v.as_slice())
-            .unwrap_or(&[]);
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::get_by_type: {:?} -> {}",
-            node_type,
-            slice.len()
-        );
-        slice
+            .unwrap_or(&[])
     }
 
     pub(super) fn get_nodes_topo(&self) -> &[CellRef<'a>] {
@@ -148,32 +115,25 @@ impl<'a> GraphIndex<'a> {
     }
 
     pub(super) fn get_fanouts(&self, node: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
+        let _t = Timer::new("GraphIndex::get_fanouts");
         let slice = self
             .reverse_node_lookup
             .get(&node)
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
-        tracing::event!(
-            tracing::Level::TRACE,
-            "GraphIndex::get_fanouts: driver #{} -> {} sinks",
-            node.debug_index(),
-            slice.len()
-        );
         slice
     }
 
     pub(super) fn get_node_sources(&self, node: CellRef<'a>) -> &[NodeSource<'a>] {
+        let _t = Timer::new("GraphIndex::get_node_sources");
         self.node_sources
             .get(&node)
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
 
-    // pub(super) fn get_node_type(&self, node: CellRef<'a>) -> NodeType {
-    //     NodeType::from(node.get().as_ref())
-    // }
-
     pub(super) fn get_input_name(&self, node: CellRef<'a>) -> Option<&'a str> {
+        let _t = Timer::new("GraphIndex::get_input_name");
         match node.get() {
             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
             _ => None,
@@ -181,6 +141,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     pub(super) fn get_output_name(&self, node: CellRef<'a>) -> Option<&'a str> {
+        let _t = Timer::new("GraphIndex::get_output_name");
         match node.get() {
             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
             _ => None,
@@ -188,6 +149,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     pub(super) fn node_summary(&self, node: CellRef<'a>) -> String {
+        let _t = Timer::new("GraphIndex::node_summary");
         let node_type = NodeType::from(node.get().as_ref());
         let iname = self.get_input_name(node).unwrap_or("");
         let oname = self.get_output_name(node).unwrap_or("");
@@ -201,6 +163,7 @@ impl<'a> GraphIndex<'a> {
 
     /// True if `driver` has any fanout edge to `sink` (any input pin).
     pub(super) fn has_fanout_to(&self, driver: CellRef<'a>, sink: CellRef<'a>) -> bool {
+        let _t = Timer::new("GraphIndex::has_fanout_to");
         self.fanout_map
             .get(&driver)
             .and_then(|m| m.get(&sink))
@@ -214,6 +177,7 @@ impl<'a> GraphIndex<'a> {
         sink: CellRef<'a>,
         pin_idx: usize,
     ) -> bool {
+        let _t = Timer::new("GraphIndex::has_fanout_to_pin");
         self.fanout_map
             .get(&driver)
             .and_then(|m| m.get(&sink))
@@ -226,6 +190,7 @@ impl<'a> GraphIndex<'a> {
         sink: CellRef<'a>,
         pin_idx: usize,
     ) -> Option<CellRef<'a>> {
+        let _t = Timer::new("GraphIndex::driver_of_sink_pin");
         let src = self.get_node_sources(sink).get(pin_idx)?;
         match src {
             NodeSource::Gate(c, _) | NodeSource::Io(c, _) => Some(*c),
@@ -235,6 +200,7 @@ impl<'a> GraphIndex<'a> {
 
     /// All drivers of a sink across all pins (Gate/Io only), duplicates removed.
     pub(super) fn drivers_of_sink_all_pins(&self, sink: CellRef<'a>) -> Vec<CellRef<'a>> {
+        let _t = Timer::new("GraphIndex::drivers_of_sink_all_pins");
         let mut out: Vec<CellRef<'a>> = self
             .get_node_sources(sink)
             .iter()

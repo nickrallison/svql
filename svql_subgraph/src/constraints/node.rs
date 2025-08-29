@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use prjunnamed_netlist::CellRef;
 
-use crate::Constraint;
+use crate::{Constraint, profiling::Timer};
 
 pub(crate) struct NodeConstraint<'d> {
     // Some -> The intersection of these nodes and another set of nodes will be a valid constraint
@@ -15,6 +15,7 @@ impl<'d> NodeConstraint<'d> {
         NodeConstraint { nodes }
     }
     pub(crate) fn intersect(self, other: Self) -> Self {
+        let _t = Timer::new("NodeConstraint::intersect");
         match (self.nodes, other.nodes) {
             (Some(a), Some(b)) => NodeConstraint::new(Some(a.intersection(&b).cloned().collect())),
             (Some(a), None) => NodeConstraint::new(Some(a)),
@@ -39,6 +40,7 @@ impl<'d> NodeConstraint<'d> {
 
 impl<'d> Constraint<'d> for NodeConstraint<'d> {
     fn d_candidate_is_valid(&self, node: &CellRef<'d>) -> bool {
+        let _t = Timer::new("NodeConstraint::d_candidate_is_valid");
         match &self.nodes {
             Some(set) => set.contains(node),
             None => true,

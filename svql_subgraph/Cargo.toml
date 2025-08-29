@@ -52,3 +52,7 @@ itertools.workspace = true
 # [features]
 # default = []
 # rayon = ["dep:rayon"]
+
+[features]
+default = []
+profiling = []

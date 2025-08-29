@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::NodeType;
+use crate::profiling::Timer;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
@@ -17,6 +18,7 @@ impl<'d> DesignSinkConstraint<'d> {
         design_index: &GraphIndex<'d>,
         mapping: &NodeMapping<'p, 'd>,
     ) -> Self {
+        let _t = Timer::new("DesignSinkConstraint::new");
         // For each mapped fanout sink, gather its possible driver(s), then intersect across sinks.
         let mapped_sinks: Vec<(CellRef<'p>, usize, CellRef<'d>)> = pattern_index
             .get_fanouts(pattern_current)
@@ -68,6 +70,7 @@ impl<'d> DesignSinkConstraint<'d> {
 
 impl<'d> Constraint<'d> for DesignSinkConstraint<'d> {
     fn d_candidate_is_valid(&self, node: &CellRef<'d>) -> bool {
+        let _t = Timer::new("DesignSinkConstraint::d_candidate_is_valid");
         self.node_constraints.d_candidate_is_valid(node)
     }
 }

@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeSource, NodeType};
+use crate::profiling::Timer;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
@@ -17,6 +18,7 @@ impl<'d> DesignSourceConstraint<'d> {
         design_index: &GraphIndex<'d>,
         mapping: &NodeMapping<'p, 'd>,
     ) -> Self {
+        let _t = Timer::new("DesignSourceConstraint::new");
         let current_type = NodeType::from(pattern_current.get().as_ref());
         let commutative = current_type.has_commutative_inputs();
 
@@ -64,6 +66,7 @@ impl<'d> DesignSourceConstraint<'d> {
 
 impl<'d> Constraint<'d> for DesignSourceConstraint<'d> {
     fn d_candidate_is_valid(&self, node: &CellRef<'d>) -> bool {
+        let _t = Timer::new("DesignSourceConstraint::d_candidate_is_valid");
         self.node_constraints.d_candidate_is_valid(node)
     }
 }

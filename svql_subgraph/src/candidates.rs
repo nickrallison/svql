@@ -71,10 +71,10 @@ impl<'a, 'p, 'd> Iterator for FilteredCandidates<'a, 'p, 'd> {
     fn next(&mut self) -> Option<Self::Item> {
         // Pull from the base iterator until a candidate passes all constraints.
         while let Some(d) = self.base.next_cell() {
-            if !self.already_mapped.d_candidate_is_valid(&d) {
+            if !self.connectivity.d_candidate_is_valid(&d) {
                 continue;
             }
-            if !self.connectivity.d_candidate_is_valid(&d) {
+            if !self.already_mapped.d_candidate_is_valid(&d) {
                 continue;
             }
             return Some(d);

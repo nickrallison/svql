@@ -4,6 +4,7 @@ mod constraints;
 mod graph_index;
 mod isomorphism;
 mod node;
+pub mod profiling;
 
 use graph_index::GraphIndex;
 use isomorphism::NodeMapping;
@@ -16,6 +17,7 @@ use crate::constraints::{
     NotAlreadyMappedConstraint,
 };
 use crate::node::NodeType;
+use crate::profiling::Timer;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
@@ -112,6 +114,7 @@ impl<'a, 'p, 'd> SubgraphSearch<'a, 'p, 'd> {
         mapping: NodeMapping<'p, 'd>,
         mut queue: VecDeque<CellRef<'p>>,
     ) -> Option<Frame<'a, 'p, 'd>> {
+        let _t = Timer::new("SubgraphSearch::make_frame");
         let p_current = queue.pop_front()?;
         let current_type = NodeType::from(p_current.get().as_ref());
 
@@ -222,7 +225,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     let pattern_index = GraphIndex::build(pattern);
     let design_index = GraphIndex::build(design);
 
-    if pattern_index.node_count() == 0 || design_index.node_count() == 0 {
+    if pattern_index.gate_count() == 0 || design_index.gate_count() == 0 {
         return Vec::new();
     }
 

@@ -2,6 +2,7 @@ use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeSource, NodeType};
+use crate::profiling::Timer;
 use prjunnamed_netlist::CellRef;
 use svql_common::Config;
 
@@ -31,6 +32,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     }
 
     fn is_node_connectivity_valid(&self, d_node: CellRef<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::is_node_connectivity_valid");
         let valid_fanin = self.validate_fanin_connections(d_node);
         let valid_fanout = self.validate_fanout_connections(d_node);
 
@@ -38,6 +40,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     }
 
     fn validate_fanout_connections(&self, d_node: CellRef<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::validate_fanout_connections");
         let p_fanouts = self.pattern_index.get_fanouts(self.p_node);
 
         // Only need to validate edges to already-mapped sinks.
@@ -57,6 +60,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         d_sink_node: prjunnamed_netlist::CellRef<'d>,
         pin_idx: usize,
     ) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::fanout_edge_ok");
         let d_sink_node_type = NodeType::from(d_sink_node.get().as_ref());
         let sink_commutative = d_sink_node_type.has_commutative_inputs();
 
@@ -67,19 +71,11 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
                 .has_fanout_to_pin(d_driver, d_sink_node, pin_idx)
         };
 
-        tracing::event!(
-            tracing::Level::TRACE,
-            "is_node_connectivity_valid: check mapped sink D#{} @pin={} (commutative={}) -> {}",
-            d_sink_node.debug_index(),
-            pin_idx,
-            sink_commutative,
-            ok
-        );
-
         ok
     }
 
     fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
         let p_sources = self.pattern_index.get_node_sources(self.p_node);
         let d_sources = self.design_index.get_node_sources(d_node);
 
@@ -93,6 +89,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     }
 
     fn pin_sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::pin_sources_compatible");
         match p_src {
             NodeSource::Const(_) => {
                 matches!(d_src, NodeSource::Const(dt) if matches!(p_src, NodeSource::Const(pt) if dt == pt))
@@ -112,6 +109,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         p_bit: usize,
         d_src: &NodeSource<'d>,
     ) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::source_matches_mapped_io");
         let Some(d_src_node) = self.mapping.get_design_node(p_src_node) else {
             // Unmapped pattern source; unconstrained at this stage.
             return true;
@@ -130,6 +128,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         p_bit: usize,
         d_src: &NodeSource<'d>,
     ) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::source_matches_mapped_gate");
         let Some(d_src_node) = self.mapping.get_design_node(p_src_node) else {
             // Unmapped pattern source; unconstrained at this stage.
             return true;
