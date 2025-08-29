@@ -103,13 +103,6 @@
             echo "To use FuseSoC:"
             echo "  fusesoc run --target=pickle openpiton::system:0.1"
             echo ""
-            
-            # Set up FuseSoC library if not already done
-            if [ ! -f ~/.config/fusesoc/fusesoc.conf ]; then
-              echo "Setting up FuseSoC library..."
-              mkdir -p ~/.config/fusesoc
-              fusesoc library add hackatdac21 . > /dev/null 2>&1 || true
-            fi
           '';
 
           # Environment variables

@@ -11,4 +11,5 @@ out.md
 perf.data*
 flamegraph.svg
 /build
+fusesoc.conf
 ##
