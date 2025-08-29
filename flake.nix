@@ -116,8 +116,14 @@
           PYTHON2 = "${python27Env}/bin/python2.7";
           PYTHON3 = "${python3Env}/bin/python3";
           
+          # OpenPiton environment variables
+          PITON_ROOT = "/home/nick/Projects/svql/generated/hackatdac21";
+          DV_ROOT = "/home/nick/Projects/svql/generated/hackatdac21/piton";
+          PROTOSYN_RUNTIME_DESIGN_PATH = "/home/nick/Projects/svql/generated/hackatdac21/piton/verif/env";
+          PROTOSYN_RUNTIME_BOARD = "manycore";
+          
           # Make sure the preprocessor uses Python 2.7
-          PYTHONPATH = "${python27Env}/${python27Env.sitePackages}";
+          PYTHONPATH = "${python27Env}/${python27Env.sitePackages}:/home/nick/Projects/svql/generated/hackatdac21/piton/tools/bin";
         };
 
         # Rust-focused development shell

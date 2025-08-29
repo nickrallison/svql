@@ -63,13 +63,16 @@ if __name__ == "__main__":
     vlnv = config["vlnv"]
 
     # Run PyHP for each input/output pair 
-    cmd = "pyhp.py"
+    # Use Python 2.7 from environment variable or fallback to system python2.7
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pyhp_path = os.path.join(os.path.dirname(os.path.dirname(script_dir)), "bin", "pyhp.py")
+    cmd = os.environ.get('PYTHON2', 'python2.7')
     io_pairs = config["parameters"]["process_me"]
     rtl_files = ""
     for in_f, out_f in io_pairs:
         full_out_f = out_f
         
-        args = [in_f]
+        args = [pyhp_path, in_f]
         #print("input: {}, output: {}".format(in_f, full_out_f))
         with open(full_out_f, "w") as full_out_fp:
             try:
@@ -77,9 +80,9 @@ if __name__ == "__main__":
                                       cwd = cwd,
                                       stdin=subprocess.PIPE,
                                       stdout=full_out_fp)
-            except subprocess.CalledProcessError:
-                self.errormsg = '"{}" exited with an error code. See stderr for details.'
-                raise RuntimeError(self.errormsg.format(str(self)))
+            except subprocess.CalledProcessError as e:
+                errormsg = '"{}" exited with an error code. See stderr for details.'
+                raise RuntimeError(errormsg.format(' '.join([cmd] + args)))
         
         # 
         if out_f[-1] == "h": # Header file
