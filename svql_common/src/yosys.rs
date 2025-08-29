@@ -131,19 +131,14 @@ pub fn import_design_yosys(
 
     if !output.status.success() {
         let stderr_str = String::from_utf8_lossy(&output.stderr);
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        let _stdout_str = String::from_utf8_lossy(&output.stdout);
         tracing::event!(
             tracing::Level::ERROR,
-            "Yosys failed: status={:?}\nSTDERR:\n{}\nSTDOUT:\n{}",
+            "Yosys failed: status={:?}\n{}",
             output.status,
             stderr_str,
-            stdout_str
         );
-        return Err(format!(
-            "Yosys failed: status={:?}\nSTDERR:\n{}\nSTDOUT:\n{}",
-            output.status, stderr_str, stdout_str
-        )
-        .into());
+        return Err(format!("Yosys failed: status={:?}\n{}", output.status, stderr_str).into());
     }
 
     let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
