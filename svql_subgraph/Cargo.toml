@@ -47,12 +47,9 @@ tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
 itertools.workspace = true
-# rayon = { workspace = true, optional = true }
-
-# [features]
-# default = []
-# rayon = ["dep:rayon"]
+rayon = { workspace = true, optional = true }
 
 [features]
 default = []
 profiling = []
+rayon = ["dep:rayon"]
