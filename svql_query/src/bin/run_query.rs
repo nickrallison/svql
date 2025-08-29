@@ -60,6 +60,7 @@ struct Args {
     module: String,
     dedupe: DedupeMode,
     match_length: bool, // true=exact, false=superset
+    flatten: bool,
     show_progress: bool,
 }
 
@@ -70,6 +71,7 @@ fn parse_args() -> Args {
     let mut dedupe = DedupeMode::None;
     let mut match_length = true; // exact by default
     let mut show_progress = false;
+    let mut flatten = false;
 
     let mut it = env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -88,6 +90,7 @@ fn parse_args() -> Args {
                 }
             },
             "--superset" => match_length = false,
+            "--flatten" => flatten = true,
             "--exact" => match_length = true,
             "--progress" | "-p" => show_progress = true,
             "--help" | "-h" => print_usage_and_exit(),
@@ -112,6 +115,7 @@ fn parse_args() -> Args {
         module,
         dedupe,
         match_length,
+        flatten,
         show_progress,
     }
 }
@@ -146,12 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = parse_args();
 
-    let cfg = if args.match_length {
-        Config::exact_length(args.dedupe)
-    } else {
-        Config::superset_length(args.dedupe)
-    };
-
+    let cfg = Config::new(args.match_length, args.dedupe, args.flatten);
     let driver = Driver::new_workspace()?;
 
     if args.show_progress {

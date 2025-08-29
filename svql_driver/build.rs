@@ -39,11 +39,11 @@ fn main() {
 
                     // Load pattern and haystack using the Driver
                     let (pattern_key, pattern_design) = driver
-                        .get_or_load_design(*needle_path, (*needle_module).to_string())
+                        .get_or_load_design(*needle_path, (*needle_module).to_string(), &tc.config)
                         .unwrap_or_else(|e| panic!("Failed to load pattern {}: {}", needle_path, e));
 
                     let (haystack_key, haystack_design) = driver
-                        .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string())
+                        .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string(), &tc.config)
                         .unwrap_or_else(|e| panic!("Failed to load haystack {}: {}", tc.haystack.path, e));
 
                     // Create a context with both designs

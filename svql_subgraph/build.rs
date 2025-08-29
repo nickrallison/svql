@@ -37,9 +37,9 @@ fn main() {
 
                     // Only run for netlist-backed test cases
                     if let Pattern::Netlist { path, module, .. } = tc.pattern {
-                        let needle = import_design(path.into(), module)
+                        let needle = import_design(path.into(), module, &tc.config)
                             .unwrap_or_else(|e| panic!("Failed to load needle {}: {}", path, e));
-                        let haystack = import_design(tc.haystack.path.into(), tc.haystack.module)
+                        let haystack = import_design(tc.haystack.path.into(), tc.haystack.module, &tc.config)
                             .unwrap_or_else(|e| panic!("Failed to load haystack {}: {}", tc.haystack.path, e));
 
                         let matches = svql_subgraph::find_subgraph_isomorphisms(&needle, &haystack, &tc.config);

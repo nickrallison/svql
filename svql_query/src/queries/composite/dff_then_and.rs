@@ -72,9 +72,9 @@ impl<'ctx> MatchedComposite<'ctx> for SdffeThenAnd<Match<'ctx>> {}
 impl SearchableComposite for SdffeThenAnd<Search> {
     type Hit<'ctx> = SdffeThenAnd<Match<'ctx>>;
 
-    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
-        let sdffe_context = Sdffe::<Search>::context(driver)?;
-        let and_context = AndGate::<Search>::context(driver)?;
+    fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {
+        let sdffe_context = Sdffe::<Search>::context(driver, config)?;
+        let and_context = AndGate::<Search>::context(driver, config)?;
         Ok(sdffe_context.merge(and_context))
     }
 

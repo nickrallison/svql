@@ -53,10 +53,10 @@ impl<'ctx> MatchedEnumComposite<'ctx> for AndAny<Match<'ctx>> {}
 impl SearchableEnumComposite for AndAny<Search> {
     type Hit<'ctx> = AndAny<Match<'ctx>>;
 
-    fn context(driver: &Driver) -> Result<Context, Box<dyn std::error::Error>> {
-        let and_gate_context = AndGate::<Search>::context(driver)?;
-        let and_mux_context = AndMux::<Search>::context(driver)?;
-        let and_nor_context = AndNor::<Search>::context(driver)?;
+    fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {
+        let and_gate_context = AndGate::<Search>::context(driver, config)?;
+        let and_mux_context = AndMux::<Search>::context(driver, config)?;
+        let and_nor_context = AndNor::<Search>::context(driver, config)?;
 
         let context = and_gate_context
             .merge(and_mux_context)
@@ -209,22 +209,22 @@ mod tests {
         init_test_logger();
         let driver = Driver::new_workspace().expect("Failed to create driver");
 
-        let context =
-            AndAny::<Search>::context(&driver).expect("Failed to create context for AndAny");
+        let config = Config::builder()
+            .exact_length()
+            .dedupe(DedupeMode::AutoMorph)
+            .build();
+
+        let context = AndAny::<Search>::context(&driver, &config)
+            .expect("Failed to create context for AndAny");
 
         // haystack
         let haystack_path = "examples/fixtures/basic/and/json/mixed_and_tree.json";
         let haystack_module_name = "mixed_and_tree";
         let (haystack_key, haystack) = driver
-            .get_or_load_design(haystack_path, haystack_module_name.to_string())
+            .get_or_load_design(haystack_path, haystack_module_name.to_string(), &config)
             .expect("Failed to get haystack design");
 
         let context = context.with_design(haystack_key.clone(), haystack.clone());
-
-        let config = Config::builder()
-            .exact_length()
-            .dedupe(DedupeMode::AutoMorph)
-            .build();
 
         // root path for the composite
         let root = Instance::root("and_any".to_string());

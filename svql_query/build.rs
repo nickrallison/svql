@@ -83,9 +83,9 @@ fn emit_generated_tests(found: &[Discovered]) {
             if aliases.is_empty() {
                 quote! {
                     #primary => {
-                        let ctx = #ty_path::<Search>::context(driver).map_err(|e| e.to_string())?;
+                        let ctx = #ty_path::<Search>::context(driver, &tc.config).map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string())
+                            .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string(), &tc.config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root(tc.name.to_string());
@@ -96,9 +96,9 @@ fn emit_generated_tests(found: &[Discovered]) {
             } else {
                 quote! {
                     #primary #( | #aliases )* => {
-                        let ctx = #ty_path::<Search>::context(driver).map_err(|e| e.to_string())?;
+                        let ctx = #ty_path::<Search>::context(driver, &tc.config).map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string())
+                            .get_or_load_design(tc.haystack.path, tc.haystack.module.to_string(), &tc.config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root(tc.name.to_string());
@@ -210,19 +210,19 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
             let (ctx_call, query_call): (TokenStream, TokenStream) = match d.kind {
                 QueryKind::Netlist => {
                     (
-                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver)),
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver, config)),
                         quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query(&hk, &ctx, root, config)),
                     )
                 }
                 QueryKind::Composite => {
                     (
-                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver, config)),
                         quote!(<#ty_search as svql_query::composite::SearchableComposite>::query(&hk, &ctx, root, config)),
                     )
                 }
                 QueryKind::EnumComposite => {
                     (
-                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver, config)),
                         quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::query(&hk, &ctx, root, config)),
                     )
                 }
@@ -245,7 +245,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                     #primary => {
                         let ctx = #ctx_call.map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .get_or_load_design(haystack_path, haystack_module.to_string(), config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root("cli_root".to_string());
@@ -258,7 +258,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                     #primary #( | #aliases )* => {
                         let ctx = #ctx_call.map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .get_or_load_design(haystack_path, haystack_module.to_string(), config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root("cli_root".to_string());
@@ -289,19 +289,19 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
             let (ctx_call, query_call): (TokenStream, TokenStream) = match k {
                 Kind::Netlist => {
                     (
-                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver)),
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver, config)),
                         quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query_with_progress(&hk, &ctx, root, config, progress)),
                     )
                 }
                 Kind::Composite => {
                     (
-                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver, config)),
                         quote!(<#ty_search as svql_query::composite::SearchableComposite>::query(&hk, &ctx, root, config)),
                     )
                 }
                 Kind::EnumComposite => {
                     (
-                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver, config)),
                         quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::query(&hk, &ctx, root, config)),
                     )
                 }
@@ -324,7 +324,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                     #primary => {
                         let ctx = #ctx_call.map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .get_or_load_design(haystack_path, haystack_module.to_string(), config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root("cli_root".to_string());
@@ -337,7 +337,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                     #primary #( | #aliases )* => {
                         let ctx = #ctx_call.map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .get_or_load_design(haystack_path, haystack_module.to_string(), config)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root("cli_root".to_string());

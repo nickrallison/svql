@@ -4,6 +4,7 @@ use std::{
     process::Stdio,
 };
 
+use crate::Config;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum DesignPath {
@@ -37,32 +38,55 @@ impl DesignPath {
 }
 
 #[contracts::debug_requires(!module_name.is_empty())]
-fn get_command_args_slice(design: &DesignPath, module_name: &str, json_out: &Path) -> Vec<String> {
+fn get_command_args_slice(
+    design: &DesignPath,
+    module_name: &str,
+    json_out: &Path,
+    config: &Config,
+) -> Vec<String> {
     let read_cmd = match design {
         DesignPath::Verilog(_) => "read_verilog",
         DesignPath::Rtlil(_) => "read_rtlil",
         DesignPath::Json(_) => "read_json",
     };
 
-    vec![
-        "-p".to_string(),
-        format!("{} {}", read_cmd, design.path().display()),
-        "-p".to_string(),
-        format!("hierarchy -top {}", module_name),
-        "-p".to_string(),
-        "proc; flatten; opt_clean".to_string(),
-        "-p".to_string(),
-        format!("write_json {}", json_out.display()),
-    ]
+    let mut args = Vec::new();
+
+    // read command
+    args.push("-p".to_string());
+    args.push(format!("{} {}", read_cmd, design.path().display()));
+    args.push("-p".to_string());
+    args.push(format!("hierarchy -top {}", module_name));
+
+    // proc
+    args.push("-p".to_string());
+    args.push("proc".to_string());
+
+    // flatten
+    if config.flatten {
+        args.push("-p".to_string());
+        args.push("flatten".to_string());
+    }
+
+    // opt clean
+    args.push("-p".to_string());
+    args.push("opt_clean".to_string());
+
+    // write
+    args.push("-p".to_string());
+    args.push(format!("write_json {}", json_out.display()));
+
+    args
 }
 
 #[contracts::debug_requires(!module_name.is_empty())]
 pub fn import_design(
     design_path: PathBuf,
     module_name: &str,
+    config: &Config,
 ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
     let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
-    import_design_yosys(&yosys, design_path, module_name)
+    import_design_yosys(&yosys, design_path, module_name, config)
 }
 
 #[contracts::debug_requires(yosys.exists(), "yosys path must exist")]
@@ -72,6 +96,7 @@ pub fn import_design_yosys(
     yosys: &Path,
     design_path: PathBuf,
     module_name: &str,
+    config: &Config,
 ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
     let json_temp_file = tempfile::Builder::new()
         .prefix("svql_prjunnamed_")
@@ -92,12 +117,17 @@ pub fn import_design_yosys(
 
     let design_path = DesignPath::new(design_path)?;
 
+    let args = get_command_args_slice(&design_path, module_name, json_temp_file.path(), config);
+
+    tracing::event!(
+        tracing::Level::INFO,
+        "Running yosys: {:?} with args: {:?}",
+        yosys,
+        args.join(" ")
+    );
+
     let mut cmd = std::process::Command::new(yosys);
-    cmd.args(get_command_args_slice(
-        &design_path,
-        module_name,
-        json_temp_file.path(),
-    ));
+    cmd.args(args);
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null());
@@ -118,9 +148,11 @@ pub fn import_design_yosys(
             .read_to_end(&mut stderr_buf)
             .expect("Failed to read stderr");
         let stderr_str = String::from_utf8_lossy(&stderr_buf);
-        tracing::event!(tracing::Level::ERROR, 
+        tracing::event!(
+            tracing::Level::ERROR,
             "Yosys process failed with status: {:?}\nStderr: {}",
-            exit_status, stderr_str
+            exit_status,
+            stderr_str
         );
         return Err(format!(
             "Yosys process failed with status: {:?}\nStderr: {}",

@@ -67,6 +67,7 @@ impl Driver {
         &self,
         design_path: P,
         module_name: String,
+        config: &svql_common::Config,
     ) -> Result<DriverKey, DriverError> {
         let design_path = design_path.as_ref();
         let absolute_path = if design_path.is_absolute() {
@@ -86,18 +87,23 @@ impl Driver {
         }
 
         // Load the design
-        tracing::event!(tracing::Level::INFO, 
+        tracing::event!(
+            tracing::Level::INFO,
             "Loading design: {} ({})",
             absolute_path.display(),
             module_name
         );
-        let design = self.load_design_from_path(&absolute_path, &module_name)?;
+        let design = self.load_design_from_path(&absolute_path, &module_name, config)?;
 
         // Store in registry
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), Arc::new(design));
-            tracing::event!(tracing::Level::DEBUG, "Design stored in registry: {:?}", key);
+            tracing::event!(
+                tracing::Level::DEBUG,
+                "Design stored in registry: {:?}",
+                key
+            );
         }
 
         Ok(key)
@@ -109,6 +115,7 @@ impl Driver {
         &self,
         design_path: P,
         module_name: String,
+        config: &svql_common::Config,
     ) -> Result<(DriverKey, Arc<Design>), DriverError> {
         let design_path = design_path.as_ref();
         let absolute_path = if design_path.is_absolute() {
@@ -129,18 +136,23 @@ impl Driver {
         }
 
         // Load and store
-        tracing::event!(tracing::Level::INFO, 
+        tracing::event!(
+            tracing::Level::INFO,
             "Loading design: {} ({})",
             absolute_path.display(),
             module_name
         );
-        let design = self.load_design_from_path(&absolute_path, &module_name)?;
+        let design = self.load_design_from_path(&absolute_path, &module_name, config)?;
         let design_arc = Arc::new(design);
 
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), design_arc.clone());
-            tracing::event!(tracing::Level::DEBUG, "Design stored in registry: {:?}", key);
+            tracing::event!(
+                tracing::Level::DEBUG,
+                "Design stored in registry: {:?}",
+                key
+            );
         }
 
         Ok((key, design_arc))
@@ -151,9 +163,17 @@ impl Driver {
         let registry = self.registry.read().unwrap();
         let result = registry.get(key).cloned();
         if result.is_some() {
-            tracing::event!(tracing::Level::DEBUG, "Design retrieved from registry: {:?}", key);
+            tracing::event!(
+                tracing::Level::DEBUG,
+                "Design retrieved from registry: {:?}",
+                key
+            );
         } else {
-            tracing::event!(tracing::Level::WARN, "Design not found in registry: {:?}", key);
+            tracing::event!(
+                tracing::Level::WARN,
+                "Design not found in registry: {:?}",
+                key
+            );
         }
         result
     }
@@ -179,7 +199,11 @@ impl Driver {
                 context.insert(key.clone(), design.clone());
                 tracing::event!(tracing::Level::DEBUG, "Design added to context: {:?}", key);
             } else {
-                tracing::event!(tracing::Level::WARN, "Design not found in registry: {:?}", key);
+                tracing::event!(
+                    tracing::Level::WARN,
+                    "Design not found in registry: {:?}",
+                    key
+                );
                 return Err(DriverError::DesignLoading(format!(
                     "Design not found for key: {:?}",
                     key
@@ -192,14 +216,19 @@ impl Driver {
 
     /// Create a context with a single design
     pub fn create_context_single(&self, key: &DriverKey) -> Result<Context, DriverError> {
-        tracing::event!(tracing::Level::DEBUG, "Creating context with single design: {:?}", key);
+        tracing::event!(
+            tracing::Level::DEBUG,
+            "Creating context with single design: {:?}",
+            key
+        );
         self.create_context(&[key.clone()])
     }
 
     /// Get all currently loaded designs
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<Design>> {
         let registry = self.registry.read().unwrap();
-        tracing::event!(tracing::Level::DEBUG, 
+        tracing::event!(
+            tracing::Level::DEBUG,
             "Retrieved all designs from registry (count: {})",
             registry.len()
         );
@@ -211,14 +240,21 @@ impl Driver {
         &self,
         design_path: &Path,
         module_name: &str,
+        config: &svql_common::Config,
     ) -> Result<Design, DriverError> {
-        tracing::event!(tracing::Level::DEBUG, 
+        tracing::event!(
+            tracing::Level::DEBUG,
             "Loading design from path: {} ({})",
             design_path.display(),
             module_name
         );
-        svql_common::import_design_yosys(&self.yosys_path, design_path.to_path_buf(), module_name)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))
+        svql_common::import_design_yosys(
+            &self.yosys_path,
+            design_path.to_path_buf(),
+            module_name,
+            config,
+        )
+        .map_err(|e| DriverError::DesignLoading(e.to_string()))
     }
 }
 

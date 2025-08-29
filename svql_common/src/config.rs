@@ -6,16 +6,17 @@ pub struct Config {
     pub match_length: bool,
     /// How to deduplicate matches after search.
     pub dedupe: DedupeMode,
+    /// Whether to flatten the search space (true) or keep it hierarchical (false).
+    pub flatten: bool,
 }
 
 impl Config {
     /// Create a new configuration.
-    #[contracts::debug_ensures(ret.match_length == match_length)]
-    #[contracts::debug_ensures(ret.dedupe == dedupe)]
-    pub fn new(match_length: bool, dedupe: DedupeMode) -> Self {
+    pub fn new(match_length: bool, dedupe: DedupeMode, flatten: bool) -> Self {
         Self {
             match_length,
             dedupe,
+            flatten,
         }
     }
 
@@ -26,6 +27,7 @@ impl Config {
     /// - None dedupe
     #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
+    #[contracts::debug_ensures(!ret.flatten)]
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
@@ -34,14 +36,14 @@ impl Config {
     #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == dedupe)]
     pub fn exact_length(dedupe: DedupeMode) -> Self {
-        Self::new(true, dedupe)
+        Self::new(true, dedupe, false)
     }
 
     /// Convenience: superset-length matching with the provided dedupe mode.
     #[contracts::debug_ensures(!ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == dedupe)]
     pub fn superset_length(dedupe: DedupeMode) -> Self {
-        Self::new(false, dedupe)
+        Self::new(false, dedupe, false)
     }
 }
 
@@ -51,7 +53,7 @@ impl Default for Config {
     #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
     fn default() -> Self {
-        Self::new(true, DedupeMode::None)
+        Self::new(true, DedupeMode::None, false)
     }
 }
 
@@ -73,15 +75,18 @@ pub enum DedupeMode {
 pub struct ConfigBuilder {
     match_length: bool,
     dedupe: DedupeMode,
+    flatten: bool,
 }
 
 impl Default for ConfigBuilder {
     #[contracts::debug_ensures(ret.match_length)]
     #[contracts::debug_ensures(ret.dedupe == DedupeMode::None)]
+    #[contracts::debug_ensures(!ret.flatten)]
     fn default() -> Self {
         Self {
             match_length: true,
             dedupe: DedupeMode::None,
+            flatten: false,
         }
     }
 }
@@ -130,6 +135,16 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn unflatten(mut self) -> Self {
+        self.flatten = false;
+        self
+    }
+
+    pub fn flatten(mut self) -> Self {
+        self.flatten = true;
+        self
+    }
+
     /// Finalize and construct the Config.
     #[contracts::debug_ensures(ret.match_length == self.match_length)]
     #[contracts::debug_ensures(ret.dedupe == self.dedupe)]
@@ -137,6 +152,7 @@ impl ConfigBuilder {
         Config {
             match_length: self.match_length,
             dedupe: self.dedupe,
+            flatten: self.flatten,
         }
     }
 }
