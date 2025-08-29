@@ -44,7 +44,7 @@ pub struct TestCase {
 // NEEDLES (Patterns)
 // #####################
 lazy_static::lazy_static! {
-        static ref AND_GATE: Pattern = Pattern::Netlist {
+    static ref AND_GATE: Pattern = Pattern::Netlist {
         path: "examples/patterns/basic/and/verilog/and_gate.v",
         module: "and_gate",
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndGate"),
@@ -69,7 +69,6 @@ lazy_static::lazy_static! {
 // #####################
 // COMPOSITE NEEDLES
 // #####################
-
 lazy_static::lazy_static! {
     static ref SDFFE_THEN_AND: Pattern = Pattern::Composite {
         pattern_query_type: "svql_query::queries::netlist::composite::SdffeThenAnd",
@@ -115,9 +114,37 @@ lazy_static::lazy_static! {
         path: "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
         module: "seq_double_sdffe",
     };
+    // Mixed tree provided as a yosys JSON (as per your current layout)
     static ref MIXED_AND_TREE: Haystack = Haystack {
         path: "examples/fixtures/basic/and/json/mixed_and_tree.json",
         module: "mixed_and_tree",
+    };
+    // New haystacks for the pure-submodule trees
+    static ref AND_NOR_TREE: Haystack = Haystack {
+        path: "examples/fixtures/basic/and/verilog/and_nor_tree.v",
+        module: "and_nor_tree",
+    };
+    static ref AND_MUX_TREE: Haystack = Haystack {
+        path: "examples/fixtures/basic/and/verilog/and_mux_tree.v",
+        module: "and_mux_tree",
+    };
+    // Self haystacks for direct self-matching
+    static ref AND_NOR_SELF: Haystack = Haystack {
+        path: "examples/patterns/basic/and/verilog/and_nor.v",
+        module: "and_nor",
+    };
+    static ref AND_MUX_SELF: Haystack = Haystack {
+        path: "examples/patterns/basic/and/verilog/and_mux.v",
+        module: "and_mux",
+    };
+    // New haystacks for constant checking on and_mux
+    static ref AND_MUX_CONST_VARIANTS: Haystack = Haystack {
+        path: "examples/fixtures/basic/and/verilog/and_mux_const_variants.v",
+        module: "and_mux_const_variants",
+    };
+    static ref AND_MUX_CONST_BAD: Haystack = Haystack {
+        path: "examples/fixtures/basic/and/verilog/and_mux_const_bad.v",
+        module: "and_mux_const_bad",
     };
 }
 
@@ -205,6 +232,94 @@ lazy_static::lazy_static! {
             pattern: &SDFFE,
             haystack: &SEQ_DOUBLE_SDFFE,
             expected_matches: 2,
+        },
+
+        // =========================
+        // and_nor — positive cases
+        // =========================
+        TestCase {
+            name: "and_nor_self_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_NOR,
+            haystack: &AND_NOR_SELF,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "and_nor_in_and_nor_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_NOR,
+            haystack: &AND_NOR_TREE,
+            expected_matches: 7, // 7 submodule instances
+        },
+        TestCase {
+            name: "and_nor_in_mixed_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_NOR,
+            haystack: &MIXED_AND_TREE,
+            expected_matches: 2, // two and_nor instances in mixed tree
+        },
+
+        // =========================
+        // and_nor — negative cases
+        // =========================
+        TestCase {
+            name: "and_nor_in_and_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_NOR,
+            haystack: &AND_TREE,
+            expected_matches: 0,
+        },
+
+        // =========================
+        // and_mux — positive cases
+        // =========================
+        TestCase {
+            name: "and_mux_self_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &AND_MUX_SELF,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "and_mux_in_and_mux_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &AND_MUX_TREE,
+            expected_matches: 7, // 7 submodule instances
+        },
+        TestCase {
+            name: "and_mux_in_mixed_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &MIXED_AND_TREE,
+            expected_matches: 2, // two and_mux instances in mixed tree
+        },
+        // Constant correctness: one correct + two incorrect in same haystack
+        TestCase {
+            name: "and_mux_const_variants_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &AND_MUX_CONST_VARIANTS,
+            expected_matches: 1, // only the arm with 1'b0 on false branch must match
+        },
+
+        // =========================
+        // and_mux — negative cases
+        // =========================
+        TestCase {
+            name: "and_mux_in_and_tree_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &AND_TREE,
+            expected_matches: 0,
+        },
+        // Constant correctness: only incorrect variants present
+        TestCase {
+            name: "and_mux_const_bad_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &AND_MUX,
+            haystack: &AND_MUX_CONST_BAD,
+            expected_matches: 0,
         },
     ];
 
