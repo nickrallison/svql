@@ -1,7 +1,6 @@
 use std::{
     fs::File,
     path::{Path, PathBuf},
-    process::Stdio,
 };
 
 use crate::Config;
@@ -91,7 +90,6 @@ pub fn import_design(
 
 #[contracts::debug_requires(yosys.exists(), "yosys path must exist")]
 #[contracts::debug_requires(!module_name.is_empty())]
-
 pub fn import_design_yosys(
     yosys: &Path,
     design_path: PathBuf,
@@ -117,46 +115,33 @@ pub fn import_design_yosys(
 
     let design_path = DesignPath::new(design_path)?;
 
-    let args = get_command_args_slice(&design_path, module_name, json_temp_file.path(), config);
-
-    tracing::event!(
-        tracing::Level::INFO,
-        "Running yosys: {:?} with args: {:?}",
-        yosys,
-        args.join(" ")
-    );
-
     let mut cmd = std::process::Command::new(yosys);
-    cmd.args(args);
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::null());
+    cmd.args(get_command_args_slice(
+        &design_path,
+        module_name,
+        json_temp_file.path(),
+        config,
+    ))
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped());
 
-    let mut yosys_process = cmd.spawn().expect("Failed to start yosys process");
-    let exit_status = yosys_process
-        .wait()
-        .expect("Failed to wait for yosys process");
+    // Use `output()` to read both stdout and stderr concurrently.
+    let output = cmd.output()?;
 
-    if !exit_status.success() {
-        let mut stderr = yosys_process
-            .stderr
-            .take()
-            .expect("Failed to capture stderr");
-        let mut stderr_buf = Vec::new();
-        use std::io::Read;
-        stderr
-            .read_to_end(&mut stderr_buf)
-            .expect("Failed to read stderr");
-        let stderr_str = String::from_utf8_lossy(&stderr_buf);
+    if !output.status.success() {
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
         tracing::event!(
             tracing::Level::ERROR,
-            "Yosys process failed with status: {:?}\nStderr: {}",
-            exit_status,
-            stderr_str
+            "Yosys failed: status={:?}\nSTDERR:\n{}\nSTDOUT:\n{}",
+            output.status,
+            stderr_str,
+            stdout_str
         );
         return Err(format!(
-            "Yosys process failed with status: {:?}\nStderr: {}",
-            exit_status, stderr_str
+            "Yosys failed: status={:?}\nSTDERR:\n{}\nSTDOUT:\n{}",
+            output.status, stderr_str, stdout_str
         )
         .into());
     }
