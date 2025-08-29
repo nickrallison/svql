@@ -6,6 +6,7 @@ mod isomorphism;
 mod node;
 
 pub mod profiling;
+pub mod progress;
 
 use graph_index::GraphIndex;
 use isomorphism::NodeMapping;
@@ -58,38 +59,26 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
         _name: &str,
         _bit: usize,
     ) -> Option<(CellRef<'d>, usize)> {
-        // Not implemented yet; left untouched for now.
         None
     }
 }
 
-// struct SubgraphRecurse<'a, 'p, 'd> {
-//     // Owned Values
-//     depth: usize,
-//     p_current: CellRef<'p>,
-//     node_mapping: NodeMapping<'p, 'd>,
-//     pattern_mapping_queue: VecDeque<CellRef<'p>>,
-
-//     // Reference to Top Caller Values
-//     pattern_index: &'a GraphIndex<'p>,
-//     design_index: &'a GraphIndex<'d>,
-//     config: &'a Config,
-//     input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-//     output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-
-//     // Candidates iterator
-//     candidates: FilteredCandidates<'a, 'p, 'd>,
-// }
-
-// enum SubgraphRecurseEnum<'a, 'p, 'd> {
-//     Rec(SubgraphRecurse<'a, 'p, 'd>),
-//     Base(SubgraphIsomorphism<'p, 'd>),
-// }
-
+/// Backward‑compatible API (no progress handle returned).
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
+) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    let progress = progress::Progress::new();
+    find_subgraph_isomorphisms_with_progress(pattern, design, config, &progress)
+}
+
+/// New API that updates the provided `progress` atomically as the search proceeds.
+pub fn find_subgraph_isomorphisms_with_progress<'p, 'd>(
+    pattern: &'p Design,
+    design: &'d Design,
+    config: &Config,
+    progress: &progress::Progress,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     let pattern_index = GraphIndex::build(pattern);
     let design_index = GraphIndex::build(design);
@@ -131,6 +120,10 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         q.into()
     };
 
+    // Estimate total candidates up‑front: sum initial candidate counts per pattern node.
+    let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
+    progress.set_total_candidates(total_candidates as u64);
+
     let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
 
     let mut results = find_isomorphisms_recursive_collect(
@@ -142,15 +135,31 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         &input_by_name,
         &output_by_name,
         0, // depth
+        Some(progress),
     );
 
-    // Dedupe ONCE at the top-level; avoid per-depth overhead in the hot path.
     if matches!(config.dedupe, DedupeMode::AutoMorph) {
         let mut seen: HashSet<Vec<usize>> = HashSet::new();
         results.retain(|m| seen.insert(m.mapping.signature()));
     }
 
     results
+}
+
+fn estimate_total_candidates<'p, 'd>(
+    pattern_queue: &VecDeque<CellRef<'p>>,
+    design_index: &GraphIndex<'d>,
+) -> usize {
+    pattern_queue
+        .iter()
+        .map(|p_node| {
+            let ty = NodeType::from(p_node.get().as_ref());
+            match ty {
+                NodeType::Input => design_index.get_nodes_topo().len(),
+                _ => design_index.get_by_type(ty).len(),
+            }
+        })
+        .sum()
 }
 
 fn initial_candidates<'d, 'a>(
@@ -164,13 +173,14 @@ fn initial_candidates<'d, 'a>(
     BaseIter::Unconstrained(slice.iter())
 }
 
-fn build_filtered_candidates<'a, 'p, 'd>(
+fn build_filtered_candidates<'a, 'p, 'd, 'g>(
     pattern_current: CellRef<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
     config: &'a Config,
     node_mapping: &NodeMapping<'p, 'd>,
-) -> FilteredCandidates<'a, 'p, 'd> {
+    progress: Option<&'g progress::Progress>,
+) -> FilteredCandidates<'a, 'p, 'd, 'g> {
     let current_type = NodeType::from(pattern_current.get().as_ref());
 
     let node_constraints = {
@@ -201,6 +211,7 @@ fn build_filtered_candidates<'a, 'p, 'd>(
         base,
         already_mapped: already_mapped_constraint,
         connectivity: connectivity_constraint,
+        progress,
     }
 }
 
@@ -213,6 +224,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
     output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
     depth: usize,
+    progress: Option<&'a progress::Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
         return vec![SubgraphIsomorphism {
@@ -228,6 +240,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         design_index,
         config,
         &node_mapping,
+        progress,
     );
 
     #[cfg(feature = "rayon")]
@@ -236,7 +249,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     #[cfg(not(feature = "rayon"))]
     let cand_iter = candidates_iter.collect::<Vec<_>>().into_iter();
 
-    return cand_iter
+    cand_iter
         .flat_map(|d_candidate| {
             let mut nm = node_mapping.clone();
             nm.insert(pattern_current, d_candidate);
@@ -249,7 +262,8 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
                 input_by_name,
                 output_by_name,
                 depth + 1,
+                progress,
             )
         })
-        .collect();
+        .collect()
 }

@@ -1,5 +1,6 @@
 use svql_common::Config;
 use svql_driver::{Driver, DriverKey, context::Context};
+use svql_subgraph::progress::Progress;
 use svql_subgraph::{SubgraphIsomorphism, find_subgraph_isomorphisms};
 
 use crate::instance::Instance;
@@ -55,6 +56,31 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .as_ref();
 
         find_subgraph_isomorphisms(needle, haystack, config)
+            .into_iter()
+            .map(|m| Self::from_subgraph(&m, path.clone()))
+            .collect()
+    }
+
+    /// Same as `query`, but also updates the provided `progress` as the subgraph search proceeds.
+    #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
+    #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
+    fn query_with_progress<'ctx>(
+        haystack_key: &DriverKey,
+        context: &'ctx Context,
+        path: Instance,
+        config: &Config,
+        progress: &Progress,
+    ) -> Vec<Self::Hit<'ctx>> {
+        let needle = context
+            .get(&Self::driver_key())
+            .expect("Pattern design not found in context")
+            .as_ref();
+        let haystack = context
+            .get(haystack_key)
+            .expect("Haystack design not found in context")
+            .as_ref();
+
+        svql_subgraph::find_subgraph_isomorphisms_with_progress(needle, haystack, config, progress)
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()

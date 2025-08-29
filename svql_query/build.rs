@@ -8,7 +8,7 @@ use std::{
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use regex::Regex;
-use syn::{parse_str, LitStr, Path as SynPath};
+use syn::{LitStr, Path as SynPath, parse_str};
 use walkdir::WalkDir;
 
 use svql_common::build_support::{sanitize_ident, test_case_names};
@@ -47,13 +47,20 @@ fn main() {
         a.kind == b.kind && a.type_name == b.type_name && a.module_path == b.module_path
     });
 
+    // Generate tests over ALL_TEST_CASES
+    emit_generated_tests(&found);
+
+    // Generate dispatch used by the CLI
+    emit_generated_query_dispatch(&found);
+}
+
+fn emit_generated_tests(found: &[Discovered]) {
     let test_case_names = test_case_names();
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out_file = out_dir.join("svql_query_generated_tests.rs");
     let mut f = File::create(&out_file).expect("Failed to create generated tests file");
 
-    // Build match arms for run_count_by_type_name
     let arms: Vec<TokenStream> = found
         .iter()
         .map(|d| {
@@ -73,7 +80,6 @@ fn main() {
 
             let primary = LitStr::new(&full_path_str, Span::call_site());
 
-            // Pattern list supports either a single literal or primary | legacy
             if aliases.is_empty() {
                 quote! {
                     #primary => {
@@ -186,6 +192,136 @@ fn main() {
 
     f.write_all(file_tokens.to_string().as_bytes())
         .expect("write generated tests");
+}
+
+fn emit_generated_query_dispatch(found: &[Discovered]) {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_file = out_dir.join("svql_query_query_dispatch.rs");
+    let mut f = File::create(&out_file).expect("Failed to create dispatch file");
+
+    // Arms for dispatch using UFCS with the correct trait per kind
+    let arms: Vec<TokenStream> = found
+        .iter()
+        .map(|d| {
+            let full_path_str = format!("{}::{}", d.module_path, d.type_name);
+            let ty_path: SynPath = parse_str(&full_path_str).expect("parse discovered type path");
+
+            // fully qualified Search type applied to the query type
+            let ty_search = quote!(#ty_path::<svql_query::Search>);
+
+            // Choose the trait for UFCS calls
+            let (ctx_call, query_call): (TokenStream, TokenStream) = match d.kind {
+                QueryKind::Netlist => {
+                    (
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver)),
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query(&hk, &ctx, root, config)),
+                    )
+                }
+                QueryKind::Composite => {
+                    (
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::query(&hk, &ctx, root, config)),
+                    )
+                }
+                QueryKind::EnumComposite => {
+                    (
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::query(&hk, &ctx, root, config)),
+                    )
+                }
+            };
+
+            // Legacy alias for composites to match older paths
+            let aliases: Vec<LitStr> = match d.kind {
+                QueryKind::Composite | QueryKind::EnumComposite => {
+                    vec![LitStr::new(
+                        &format!("svql_query::queries::netlist::composite::{}", d.type_name),
+                        Span::call_site(),
+                    )]
+                }
+                _ => vec![],
+            };
+
+            let primary = LitStr::new(&full_path_str, Span::call_site());
+
+            if aliases.is_empty() {
+                quote! {
+                    #primary => {
+                        let ctx = #ctx_call.map_err(|e| e.to_string())?;
+                        let (hk, hd) = driver
+                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .map_err(|e| e.to_string())?;
+                        let ctx = ctx.with_design(hk.clone(), hd);
+                        let root = svql_query::instance::Instance::root("cli_root".to_string());
+                        let hits = #query_call;
+                        Ok(hits.len())
+                    }
+                }
+            } else {
+                quote! {
+                    #primary #( | #aliases )* => {
+                        let ctx = #ctx_call.map_err(|e| e.to_string())?;
+                        let (hk, hd) = driver
+                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .map_err(|e| e.to_string())?;
+                        let ctx = ctx.with_design(hk.clone(), hd);
+                        let root = svql_query::instance::Instance::root("cli_root".to_string());
+                        let hits = #query_call;
+                        Ok(hits.len())
+                    }
+                }
+            }
+        })
+        .collect();
+
+    // Known names for help text (include aliases too)
+    let mut names: Vec<String> = Vec::new();
+    for d in found {
+        let p = format!("{}::{}", d.module_path, d.type_name);
+        names.push(p);
+        if matches!(d.kind, QueryKind::Composite | QueryKind::EnumComposite) {
+            names.push(format!(
+                "svql_query::queries::netlist::composite::{}",
+                d.type_name
+            ));
+        }
+    }
+    names.sort();
+    names.dedup();
+
+    let names_lits: Vec<LitStr> = names
+        .iter()
+        .map(|s| LitStr::new(s, Span::call_site()))
+        .collect();
+
+    let file_tokens = quote! {
+        // Auto-generated by build.rs. Do not edit by hand.
+
+        use svql_common::Config;
+        use svql_driver::Driver;
+
+        pub fn run_count_for_type_name(
+            name: &str,
+            driver: &Driver,
+            haystack_path: &str,
+            haystack_module: &str,
+            config: &Config,
+        ) -> Result<usize, String> {
+            match name {
+                #(#arms,)*
+                _ => Err(format!("Unknown query type: {}", name)),
+            }
+        }
+
+        pub fn known_query_type_names() -> &'static [&'static str] {
+            &[
+                #(#names_lits),*
+            ]
+        }
+    };
+
+    f.write_all(file_tokens.to_string().as_bytes())
+        .expect("write generated dispatch");
 }
 
 fn discover_query_types(src_queries: &Path) -> Vec<Discovered> {
