@@ -63,28 +63,28 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-struct SubgraphRecurse<'a, 'p, 'd> {
-    // Owned Values
-    depth: usize,
-    p_current: CellRef<'p>,
-    node_mapping: NodeMapping<'p, 'd>,
-    pattern_mapping_queue: VecDeque<CellRef<'p>>,
+// struct SubgraphRecurse<'a, 'p, 'd> {
+//     // Owned Values
+//     depth: usize,
+//     p_current: CellRef<'p>,
+//     node_mapping: NodeMapping<'p, 'd>,
+//     pattern_mapping_queue: VecDeque<CellRef<'p>>,
 
-    // Reference to Top Caller Values
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
-    config: &'a Config,
-    input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
+//     // Reference to Top Caller Values
+//     pattern_index: &'a GraphIndex<'p>,
+//     design_index: &'a GraphIndex<'d>,
+//     config: &'a Config,
+//     input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
+//     output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
 
-    // Candidates iterator
-    candidates: FilteredCandidates<'a, 'p, 'd>,
-}
+//     // Candidates iterator
+//     candidates: FilteredCandidates<'a, 'p, 'd>,
+// }
 
-enum SubgraphRecurseEnum<'a, 'p, 'd> {
-    Rec(SubgraphRecurse<'a, 'p, 'd>),
-    Base(SubgraphIsomorphism<'p, 'd>),
-}
+// enum SubgraphRecurseEnum<'a, 'p, 'd> {
+//     Rec(SubgraphRecurse<'a, 'p, 'd>),
+//     Base(SubgraphIsomorphism<'p, 'd>),
+// }
 
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
@@ -230,66 +230,26 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         &node_mapping,
     );
 
-    let cand_vec: Vec<CellRef<'d>> = candidates_iter.collect();
-
     #[cfg(feature = "rayon")]
-    {
-        return cand_vec
-            .par_iter()
-            .flat_map(|&d_candidate| {
-                let mut nm = node_mapping.clone();
-                nm.insert(pattern_current, d_candidate);
-                find_isomorphisms_recursive_collect(
-                    pattern_index,
-                    design_index,
-                    config,
-                    nm,
-                    pattern_mapping_queue.clone(),
-                    input_by_name,
-                    output_by_name,
-                    depth + 1,
-                )
-            })
-            .collect();
-    }
+    let cand_iter = candidates_iter.collect::<Vec<_>>().into_par_iter();
 
     #[cfg(not(feature = "rayon"))]
-    {
-        return cand_vec
-            .iter()
-            .flat_map(|&d_candidate| {
-                let mut nm = node_mapping.clone();
-                nm.insert(pattern_current, d_candidate);
-                find_isomorphisms_recursive_collect(
-                    pattern_index,
-                    design_index,
-                    config,
-                    nm,
-                    pattern_mapping_queue.clone(),
-                    input_by_name,
-                    output_by_name,
-                    depth + 1,
-                )
-            })
-            .collect();
+    let cand_iter = candidates_iter.collect::<Vec<_>>().into_iter();
 
-        // // Non-rayon sequential path
-        // let mut out = Vec::new();
-        // for d_candidate in cand_vec {
-        //     let mut nm = node_mapping.clone();
-        //     nm.insert(pattern_current, d_candidate);
-        //     let vec = find_isomorphisms_recursive_collect(
-        //         pattern_index,
-        //         design_index,
-        //         config,
-        //         nm,
-        //         pattern_mapping_queue.clone(),
-        //         input_by_name,
-        //         output_by_name,
-        //         depth + 1,
-        //     );
-        //     out.extend(vec);
-        // }
-        // return out;
-    }
+    return cand_iter
+        .flat_map(|d_candidate| {
+            let mut nm = node_mapping.clone();
+            nm.insert(pattern_current, d_candidate);
+            find_isomorphisms_recursive_collect(
+                pattern_index,
+                design_index,
+                config,
+                nm,
+                pattern_mapping_queue.clone(),
+                input_by_name,
+                output_by_name,
+                depth + 1,
+            )
+        })
+        .collect();
 }
