@@ -249,7 +249,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     #[cfg(not(feature = "rayon"))]
     let cand_iter = candidates_iter.collect::<Vec<_>>().into_iter();
 
-    cand_iter
+    let results = cand_iter
         .flat_map(|d_candidate| {
             let mut nm = node_mapping.clone();
             nm.insert(pattern_current, d_candidate);
@@ -265,5 +265,6 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
                 progress,
             )
         })
-        .collect()
+        .collect();
+    results
 }

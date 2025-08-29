@@ -193,23 +193,20 @@ fn emit_generated_tests(found: &[Discovered]) {
     f.write_all(file_tokens.to_string().as_bytes())
         .expect("write generated tests");
 }
-
 fn emit_generated_query_dispatch(found: &[Discovered]) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out_file = out_dir.join("svql_query_query_dispatch.rs");
     let mut f = File::create(&out_file).expect("Failed to create dispatch file");
 
     // Arms for dispatch using UFCS with the correct trait per kind
-    let arms: Vec<TokenStream> = found
+    let arms_plain: Vec<TokenStream> = found
         .iter()
         .map(|d| {
             let full_path_str = format!("{}::{}", d.module_path, d.type_name);
             let ty_path: SynPath = parse_str(&full_path_str).expect("parse discovered type path");
 
-            // fully qualified Search type applied to the query type
             let ty_search = quote!(#ty_path::<svql_query::Search>);
 
-            // Choose the trait for UFCS calls
             let (ctx_call, query_call): (TokenStream, TokenStream) = match d.kind {
                 QueryKind::Netlist => {
                     (
@@ -231,7 +228,6 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                 }
             };
 
-            // Legacy alias for composites to match older paths
             let aliases: Vec<LitStr> = match d.kind {
                 QueryKind::Composite | QueryKind::EnumComposite => {
                     vec![LitStr::new(
@@ -274,7 +270,85 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
         })
         .collect();
 
-    // Known names for help text (include aliases too)
+    // Arms for the progress-aware dispatch. For now, only netlists feed Progress into subgraph;
+    // composites fallback to plain query (no updates).
+    let arms_with_progress: Vec<TokenStream> = found
+        .iter()
+        .map(|d| {
+            let full_path_str = format!("{}::{}", d.module_path, d.type_name);
+            let ty_path: SynPath = parse_str(&full_path_str).expect("parse discovered type path");
+            let ty_search = quote!(#ty_path::<svql_query::Search>);
+
+            enum Kind { Netlist, Composite, EnumComposite }
+            let k = match d.kind {
+                QueryKind::Netlist => Kind::Netlist,
+                QueryKind::Composite => Kind::Composite,
+                QueryKind::EnumComposite => Kind::EnumComposite,
+            };
+
+            let (ctx_call, query_call): (TokenStream, TokenStream) = match k {
+                Kind::Netlist => {
+                    (
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver)),
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query_with_progress(&hk, &ctx, root, config, progress)),
+                    )
+                }
+                Kind::Composite => {
+                    (
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableComposite>::query(&hk, &ctx, root, config)),
+                    )
+                }
+                Kind::EnumComposite => {
+                    (
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::context(driver)),
+                        quote!(<#ty_search as svql_query::composite::SearchableEnumComposite>::query(&hk, &ctx, root, config)),
+                    )
+                }
+            };
+
+            let aliases: Vec<LitStr> = match d.kind {
+                QueryKind::Composite | QueryKind::EnumComposite => {
+                    vec![LitStr::new(
+                        &format!("svql_query::queries::netlist::composite::{}", d.type_name),
+                        Span::call_site(),
+                    )]
+                }
+                _ => vec![],
+            };
+
+            let primary = LitStr::new(&full_path_str, Span::call_site());
+
+            if aliases.is_empty() {
+                quote! {
+                    #primary => {
+                        let ctx = #ctx_call.map_err(|e| e.to_string())?;
+                        let (hk, hd) = driver
+                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .map_err(|e| e.to_string())?;
+                        let ctx = ctx.with_design(hk.clone(), hd);
+                        let root = svql_query::instance::Instance::root("cli_root".to_string());
+                        let hits = #query_call;
+                        Ok(hits.len())
+                    }
+                }
+            } else {
+                quote! {
+                    #primary #( | #aliases )* => {
+                        let ctx = #ctx_call.map_err(|e| e.to_string())?;
+                        let (hk, hd) = driver
+                            .get_or_load_design(haystack_path, haystack_module.to_string())
+                            .map_err(|e| e.to_string())?;
+                        let ctx = ctx.with_design(hk.clone(), hd);
+                        let root = svql_query::instance::Instance::root("cli_root".to_string());
+                        let hits = #query_call;
+                        Ok(hits.len())
+                    }
+                }
+            }
+        })
+        .collect();
+
     let mut names: Vec<String> = Vec::new();
     for d in found {
         let p = format!("{}::{}", d.module_path, d.type_name);
@@ -299,6 +373,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
 
         use svql_common::Config;
         use svql_driver::Driver;
+        use svql_subgraph::progress::Progress;
 
         pub fn run_count_for_type_name(
             name: &str,
@@ -308,7 +383,21 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
             config: &Config,
         ) -> Result<usize, String> {
             match name {
-                #(#arms,)*
+                #(#arms_plain,)*
+                _ => Err(format!("Unknown query type: {}", name)),
+            }
+        }
+
+        pub fn run_count_for_type_name_with_progress(
+            name: &str,
+            driver: &Driver,
+            haystack_path: &str,
+            haystack_module: &str,
+            config: &Config,
+            progress: &Progress,
+        ) -> Result<usize, String> {
+            match name {
+                #(#arms_with_progress,)*
                 _ => Err(format!("Unknown query type: {}", name)),
             }
         }
