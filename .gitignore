@@ -13,3 +13,4 @@ flamegraph.svg
 /build
 fusesoc.conf
 ##
+examples/fixtures/larger_designs/verilog/openpiton_system.v
