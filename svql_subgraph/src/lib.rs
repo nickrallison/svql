@@ -16,7 +16,7 @@ use crate::constraints::{
     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
     NotAlreadyMappedConstraint,
 };
-use crate::node::NodeType;
+use crate::node::{NodeSource, NodeType};
 use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -33,6 +33,10 @@ pub struct SubgraphIsomorphism<'p, 'd> {
     // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellRef<'p>>,
     pub output_by_name: HashMap<&'p str, CellRef<'p>>,
+
+    // For each named output in the pattern, the driver cell/bit in the design for each bit
+    // index of that output (usually single-bit in our patterns). Indexed by output name, then bit.
+    output_driver_by_name: HashMap<&'p str, Vec<(CellRef<'d>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
@@ -56,10 +60,12 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
 
     pub fn design_driver_of_output_bit(
         &self,
-        _name: &str,
-        _bit: usize,
+        name: &str,
+        bit: usize,
     ) -> Option<(CellRef<'d>, usize)> {
-        None
+        self.output_driver_by_name
+            .get(name)
+            .and_then(|v| v.get(bit).copied())
     }
 }
 
@@ -215,6 +221,42 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
     }
 }
 
+fn compute_output_drivers<'p, 'd>(
+    pattern_index: &GraphIndex<'p>,
+    design_index: &GraphIndex<'d>,
+    output_by_name: &HashMap<&'p str, CellRef<'p>>,
+    mapping: &NodeMapping<'p, 'd>,
+) -> HashMap<&'p str, Vec<(CellRef<'d>, usize)>> {
+    let mut result: HashMap<&'p str, Vec<(CellRef<'d>, usize)>> = HashMap::new();
+
+    for (&name, &p_out) in output_by_name.iter() {
+        // For each bit of the pattern output, find its source in the pattern,
+        // map that source node to the design node, and record (design_node, bit).
+        let sources = pattern_index.get_node_sources(p_out);
+        let mut vec_bits: Vec<(CellRef<'d>, usize)> = Vec::with_capacity(sources.len());
+
+        for (bit_idx, src) in sources.iter().enumerate() {
+            match src {
+                NodeSource::Gate(p_src_node, p_bit) | NodeSource::Io(p_src_node, p_bit) => {
+                    if let Some(d_src_node) = mapping.get_design_node(*p_src_node) {
+                        vec_bits.push((d_src_node, *p_bit));
+                    } else {
+                        // Unmapped source — should not happen for complete mapping; skip.
+                    }
+                }
+                NodeSource::Const(_t) => {
+                    // Outputs driven by consts are not used by current patterns; skip.
+                }
+            }
+        }
+
+        // If there are no sources (shouldn't happen for normal outputs), leave empty.
+        result.insert(name, vec_bits);
+    }
+
+    result
+}
+
 fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
@@ -227,10 +269,15 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     progress: Option<&'a progress::Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
+        // Complete assignment: compute output drivers for boundary lookup
+        let output_driver_by_name =
+            compute_output_drivers(pattern_index, design_index, output_by_name, &node_mapping);
+
         return vec![SubgraphIsomorphism {
             mapping: node_mapping,
             input_by_name: input_by_name.clone(),
             output_by_name: output_by_name.clone(),
+            output_driver_by_name,
         }];
     };
 
