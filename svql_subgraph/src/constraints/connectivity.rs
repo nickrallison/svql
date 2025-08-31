@@ -1,7 +1,7 @@
 use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
-use crate::node::{NodeSource, NodeType};
+use crate::node::{NodeFanin, NodeSource, NodeType};
 use crate::profiling::Timer;
 use prjunnamed_netlist::CellRef;
 use svql_common::Config;
@@ -64,77 +64,61 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         let d_sink_node_type = NodeType::from(d_sink_node.get().as_ref());
         let sink_commutative = d_sink_node_type.has_commutative_inputs();
 
-        let ok = if sink_commutative {
+        if sink_commutative {
             self.design_index.has_fanout_to(d_driver, d_sink_node)
         } else {
             self.design_index
                 .has_fanout_to_pin(d_driver, d_sink_node, pin_idx)
-        };
-
-        ok
+        }
     }
 
+    // NEW: Named-port fan-in validation
     fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
-        let p_sources = self.pattern_index.get_node_sources(self.p_node);
-        let d_sources = self.design_index.get_node_sources(d_node);
 
-        p_sources
-            .iter()
-            .enumerate()
-            .all(|(pin_idx, p_src)| match d_sources.get(pin_idx) {
-                Some(d_src) => self.pin_sources_compatible(p_src, d_src),
-                None => false,
-            })
+        let p_fanin: &NodeFanin<'p> = self.pattern_index.get_node_fanin_named(self.p_node);
+        let d_fanin: &NodeFanin<'d> = self.design_index.get_node_fanin_named(d_node);
+
+        // All named ports in the pattern must exist in the candidate, with the same bit widths.
+        for (p_name, p_sources) in p_fanin.map.iter() {
+            let Some(d_sources) = d_fanin.map.get(p_name) else {
+                return false;
+            };
+            if d_sources.len() != p_sources.len() {
+                return false;
+            }
+
+            // Bit-by-bit compatibility using existing mapping (unmapped pattern sources are unconstrained)
+            for (p_src, d_src) in p_sources.iter().zip(d_sources.iter()) {
+                if !self.sources_compatible(p_src, d_src) {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
-    fn pin_sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::pin_sources_compatible");
+    fn sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::sources_compatible");
         match p_src {
-            NodeSource::Const(_) => {
-                matches!(d_src, NodeSource::Const(dt) if matches!(p_src, NodeSource::Const(pt) if dt == pt))
-            }
-            NodeSource::Io(p_src_node, p_bit) => {
-                self.source_matches_mapped_io(*p_src_node, *p_bit, d_src)
-            }
-            NodeSource::Gate(p_src_node, p_bit) => {
-                self.source_matches_mapped_gate(*p_src_node, *p_bit, d_src)
+            NodeSource::Const(pt) => matches!(d_src, NodeSource::Const(dt) if dt == pt),
+
+            // Gate/Io sources must map to the mapped design node (if mapping exists yet).
+            NodeSource::Gate(p_node, p_bit) | NodeSource::Io(p_node, p_bit) => {
+                if let Some(d_expected) = self.mapping.get_design_node(*p_node) {
+                    match d_src {
+                        NodeSource::Gate(d_node, d_bit) | NodeSource::Io(d_node, d_bit) => {
+                            *d_node == d_expected && *d_bit == *p_bit
+                        }
+                        NodeSource::Const(_) => false,
+                    }
+                } else {
+                    // If the pattern source isn't mapped yet, we don't constrain it here.
+                    true
+                }
             }
         }
-    }
-
-    fn source_matches_mapped_io(
-        &self,
-        p_src_node: prjunnamed_netlist::CellRef<'p>,
-        p_bit: usize,
-        d_src: &NodeSource<'d>,
-    ) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::source_matches_mapped_io");
-        let Some(d_src_node) = self.mapping.get_design_node(p_src_node) else {
-            // Unmapped pattern source; unconstrained at this stage.
-            return true;
-        };
-
-        match d_src {
-            NodeSource::Io(d_node, d_bit) => *d_node == d_src_node && *d_bit == p_bit,
-            NodeSource::Gate(d_node, d_bit) => *d_node == d_src_node && *d_bit == p_bit,
-            NodeSource::Const(_) => false,
-        }
-    }
-
-    fn source_matches_mapped_gate(
-        &self,
-        p_src_node: prjunnamed_netlist::CellRef<'p>,
-        p_bit: usize,
-        d_src: &NodeSource<'d>,
-    ) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::source_matches_mapped_gate");
-        let Some(d_src_node) = self.mapping.get_design_node(p_src_node) else {
-            // Unmapped pattern source; unconstrained at this stage.
-            return true;
-        };
-
-        matches!(d_src, NodeSource::Gate(d_node, d_bit) if *d_node == d_src_node && *d_bit == p_bit)
     }
 }
 

@@ -3,7 +3,8 @@ mod candidates;
 mod constraints;
 mod graph_index;
 mod isomorphism;
-mod node;
+
+pub(crate) mod node;
 
 pub mod profiling;
 pub mod progress;

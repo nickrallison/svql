@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
 use crate::{
-    node::{NodeSource, NodeType, net_to_source},
+    node::{NodeFanin, NodeSource, NodeType, fanin_named, net_to_source},
     profiling::Timer,
 };
 
@@ -20,6 +20,9 @@ pub(super) struct GraphIndex<'a> {
 
     /// fanout membership: driver -> (sink -> set_of_pins)
     fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>>,
+
+    /// Named fan-in (by port name) for each node.
+    fanin_named: HashMap<CellRef<'a>, NodeFanin<'a>>,
 
     gate_count: usize,
 }
@@ -49,19 +52,25 @@ impl<'a> GraphIndex<'a> {
         let mut node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>> = HashMap::new();
         let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>> =
             HashMap::new();
+        let mut fanin_named_map: HashMap<CellRef<'a>, NodeFanin<'a>> = HashMap::new();
 
         let gate_count = nodes_topo
             .iter()
             .filter(|c| NodeType::from(c.get().as_ref()).is_logic_gate())
             .count();
 
-        // Pre-compute source information for all nodes (as sinks)
+        // Pre-compute source information for all nodes (as sinks) and named fan-in.
         for node_ref in nodes_topo.iter() {
+            // positional sources (kept for existing constraints and fanout_map)
             let mut sources: Vec<NodeSource<'a>> = Vec::new();
             node_ref.visit(|net| {
                 sources.push(net_to_source(design, net));
             });
             node_sources.insert(*node_ref, sources);
+
+            // named fan-in
+            let cell = node_ref.get();
+            fanin_named_map.insert(*node_ref, fanin_named(design, cell.as_ref()));
         }
 
         // Build reverse lookups and O(1) fanout membership map
@@ -94,6 +103,7 @@ impl<'a> GraphIndex<'a> {
             reverse_node_lookup,
             node_sources,
             fanout_map,
+            fanin_named: fanin_named_map,
             gate_count,
         }
     }
@@ -159,6 +169,14 @@ impl<'a> GraphIndex<'a> {
         } else {
             format!("#{} {:?}({})", node.debug_index(), node_type, n)
         }
+    }
+
+    /// Named fan‑in accessor: returns a named port -> sources map (by bit).
+    pub(super) fn get_node_fanin_named(&self, node: CellRef<'a>) -> &NodeFanin<'a> {
+        // Constructed for all nodes in build(); unwrap is safe.
+        self.fanin_named
+            .get(&node)
+            .expect("missing NodeFanin for node")
     }
 
     /// True if `driver` has any fanout edge to `sink` (any input pin).
