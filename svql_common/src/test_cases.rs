@@ -66,6 +66,30 @@ lazy_static::lazy_static! {
     };
 }
 
+// SECURITY: locked_reg (RTLIL patterns)
+lazy_static::lazy_static! {
+    static ref ASYNC_EN_IL: Pattern = Pattern::Netlist {
+        path: "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
+        module: "async_en",
+        pattern_query_type: None,
+    };
+    static ref ASYNC_MUX_IL: Pattern = Pattern::Netlist {
+        path: "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
+        module: "async_mux",
+        pattern_query_type: None,
+    };
+    static ref SYNC_EN_IL: Pattern = Pattern::Netlist {
+        path: "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
+        module: "sync_en",
+        pattern_query_type: None,
+    };
+    static ref SYNC_MUX_IL: Pattern = Pattern::Netlist {
+        path: "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
+        module: "sync_mux",
+        pattern_query_type: None,
+    };
+}
+
 // #####################
 // COMPOSITE NEEDLES
 // #####################
@@ -145,6 +169,14 @@ lazy_static::lazy_static! {
     static ref AND_MUX_CONST_BAD: Haystack = Haystack {
         path: "examples/fixtures/basic/and/verilog/and_mux_const_bad.v",
         module: "and_mux_const_bad",
+    };
+}
+
+// SECURITY: locked_reg (RTLIL haystack)
+lazy_static::lazy_static! {
+    static ref MANY_LOCKED_REGS_IL: Haystack = Haystack {
+        path: "examples/fixtures/security/access_control/locked_reg/rtlil/many_locked_regs.il",
+        module: "many_locked_regs",
     };
 }
 
@@ -347,6 +379,41 @@ lazy_static::lazy_static! {
         },
     ];
 
+        pub static ref SECURITY_TEST_CASES: Vec<TestCase> = vec![
+        // From many_locked_regs.v there are exactly 2 instances of each:
+        // 2 × async_en, 2 × async_mux, 2 × sync_en, 2 × sync_mux
+
+        TestCase {
+            name: "async_en_in_many_locked_regs_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &ASYNC_EN_IL,
+            haystack: &MANY_LOCKED_REGS_IL,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "async_mux_in_many_locked_regs_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &ASYNC_MUX_IL,
+            haystack: &MANY_LOCKED_REGS_IL,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "sync_en_in_many_locked_regs_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &SYNC_EN_IL,
+            haystack: &MANY_LOCKED_REGS_IL,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "sync_mux_in_many_locked_regs_auto_morph",
+            config: Config::builder().exact_length().auto_morph().flatten().build(),
+            pattern: &SYNC_MUX_IL,
+            haystack: &MANY_LOCKED_REGS_IL,
+            expected_matches: 2,
+        },
+    ];
+
+
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
             name: "sdffe_then_and_simple_none",
@@ -370,6 +437,7 @@ lazy_static::lazy_static! {
     pub static ref ALL_TEST_CASES: Vec<TestCase> = {
         let mut all = BASIC_TEST_CASES.clone();
         all.extend(DEDUPE_TEST_CASES.clone());
+        all.extend(SECURITY_TEST_CASES.clone());
         all.extend(COMPOSITE_TEST_CASES.clone());
         all.extend(ENUM_COMPOSITE_TEST_CASES.clone());
         all
