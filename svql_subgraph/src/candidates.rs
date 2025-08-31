@@ -34,7 +34,7 @@ impl<'a, 'p, 'd, 'g> Iterator for FilteredCandidates<'a, 'p, 'd, 'g> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut rejected_count = 0;
-        
+
         while let Some(d) = self.base.next_cell() {
             // Count every candidate we consider (even if later rejected).
             if let Some(p) = self.progress {
@@ -51,15 +51,21 @@ impl<'a, 'p, 'd, 'g> Iterator for FilteredCandidates<'a, 'p, 'd, 'g> {
                 trace!("Candidate {:?} rejected by already_mapped constraint", d);
                 continue;
             }
-            
+
             if rejected_count > 0 {
-                trace!("Accepted candidate {:?} after rejecting {} candidates", d, rejected_count);
+                trace!(
+                    "Accepted candidate {:?} after rejecting {} candidates",
+                    d, rejected_count
+                );
             }
             return Some(d);
         }
-        
+
         if rejected_count > 0 {
-            trace!("Iterator exhausted after rejecting {} candidates", rejected_count);
+            trace!(
+                "Iterator exhausted after rejecting {} candidates",
+                rejected_count
+            );
         }
         None
     }
