@@ -60,7 +60,7 @@ lazy_static::lazy_static! {
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndMux"),
     };
     static ref SDFFE: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/ff/verilog/sdffe.v",
+        path: "examples/patterns/basic/ff/rtlil/sdffe.il",
         module: "sdffe",
         pattern_query_type: Some("svql_query::queries::netlist::basic::dff::Sdffe"),
     };
