@@ -164,7 +164,7 @@ pub fn net_to_source<'a>(design: &'a Design, net: Net) -> NodeSource<'a> {
 pub fn fanin_named<'a>(design: &'a Design, cell: &Cell) -> NodeFanin<'a> {
     let mut map: HashMap<String, Vec<NodeSource<'a>>> = HashMap::new();
 
-    let mut push_value = |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, v: &Value| {
+    let push_value = |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, v: &Value| {
         let e = map.entry(name.to_string()).or_default();
         for i in 0..v.len() {
             e.push(net_to_source(design, v[i]));
@@ -172,25 +172,24 @@ pub fn fanin_named<'a>(design: &'a Design, cell: &Cell) -> NodeFanin<'a> {
         return map;
     };
 
-    let mut push_net = |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, n: Net| {
+    let push_net = |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, n: Net| {
         map.entry(name.to_string())
             .or_default()
             .push(net_to_source(design, n));
         return map;
     };
 
-    let mut push_ctrl =
-        |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, c: &ControlNet| {
-            // Extract underlying net (ignoring polarity for connectivity match)
-            let mut found: Option<Net> = None;
-            c.visit(|n| {
-                found = Some(n);
-            });
-            if let Some(n) = found {
-                map = push_net(map, name, n);
-            }
-            return map;
-        };
+    let push_ctrl = |mut map: HashMap<String, Vec<NodeSource<'a>>>, name: &str, c: &ControlNet| {
+        // Extract underlying net (ignoring polarity for connectivity match)
+        let mut found: Option<Net> = None;
+        c.visit(|n| {
+            found = Some(n);
+        });
+        if let Some(n) = found {
+            map = push_net(map, name, n);
+        }
+        return map;
+    };
 
     match cell {
         Cell::Buf(v) => {
