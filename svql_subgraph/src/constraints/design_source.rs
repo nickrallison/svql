@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use tracing::trace;
 
 use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
@@ -28,6 +29,9 @@ impl<'d> DesignSourceConstraint<'d> {
             .cloned()
             .enumerate()
             .collect();
+
+        trace!("DesignSourceConstraint for pattern node {:?} of type {:?}, commutative: {}, {} sources", 
+               pattern_current, current_type, commutative, mapped_sources.len());
 
         let sets = mapped_sources
             .into_iter()
