@@ -139,11 +139,11 @@ lazy_static::lazy_static! {
         module: "seq_double_sdffe",
     };
     static ref SEQ_2_WIDTH_2_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/seq_2_width_2_sdffe.v",
+        path: "examples/fixtures/basic/ff/rtlil/seq_2_width_2_sdffe.il",
         module: "seq_2_width_2_sdffe",
     };
     static ref SEQ_1_WIDTH_2_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/seq_1_width_2_sdffe.v",
+        path: "examples/fixtures/basic/ff/rtlil/seq_1_width_2_sdffe.il",
         module: "seq_1_width_2_sdffe",
     };
     // Mixed tree provided as a yosys JSON (as per your current layout)
