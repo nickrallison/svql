@@ -278,14 +278,14 @@ lazy_static::lazy_static! {
             config: Config::builder().superset_length().none().flatten().build(),
             pattern: &SDFFE,
             haystack: &SEQ_1_WIDTH_2_SDFFE,
-            expected_matches: 2,
+            expected_matches: 1,
         },
         TestCase {
             name: "sdffe_in_seq_2_width_2_none_superset_length",
             config: Config::builder().superset_length().none().flatten().build(),
             pattern: &SDFFE,
             haystack: &SEQ_2_WIDTH_2_SDFFE,
-            expected_matches: 4,
+            expected_matches: 2,
         },
         TestCase {
             name: "sdffe_in_seq_1_width_2_none_exact_length",

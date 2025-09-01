@@ -112,65 +112,6 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         result
     }
 
-    // NEW: Named-port fan-in validation
-    // fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
-    //     let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
-
-    //     let p_fanin: &NodeFanin<'p> = self.pattern_index.get_node_fanin_named(self.p_node);
-    //     let d_fanin: &NodeFanin<'d> = self.design_index.get_node_fanin_named(d_node);
-
-    //     trace!(
-    //         "Validating fanin for design node {:?}, pattern has {} fanin ports",
-    //         d_node,
-    //         p_fanin.map.len()
-    //     );
-
-    //     // All named ports in the pattern must exist in the candidate, with the same bit widths.
-    //     for (p_name, p_sources) in p_fanin.map.iter() {
-    //         let Some(d_sources) = d_fanin.map.get(p_name) else {
-    //             debug!(
-    //                 "Fanin validation failed: design node {:?} missing port {}",
-    //                 d_node, p_name
-    //             );
-    //             return false;
-    //         };
-    //         if d_sources.len() != p_sources.len() && self.config.match_length {
-    //             debug!(
-    //                 "Fanin validation failed: design node {:?} port {} width mismatch on exact length match (\npattern: {}\ndesign: {})",
-    //                 d_node,
-    //                 p_name,
-    //                 p_sources.len(),
-    //                 d_sources.len()
-    //             );
-    //             return false;
-    //         }
-
-    //         if d_sources.len() < p_sources.len() && !self.config.match_length {
-    //             debug!(
-    //                 "Fanin validation failed: design node {:?} port {} width mismatch on superset length match (\npattern: {}\ndesign: {})",
-    //                 d_node,
-    //                 p_name,
-    //                 p_sources.len(),
-    //                 d_sources.len()
-    //             );
-    //             return false;
-    //         }
-
-    //         // Bit-by-bit compatibility using existing mapping (unmapped pattern sources are unconstrained)
-    //         for (i, (p_src, d_src)) in p_sources.iter().zip(d_sources.iter()).enumerate() {
-    //             if !self.sources_compatible(p_src, d_src) {
-    //                 debug!(
-    //                     "Fanin validation failed: design node {:?} port {} bit {} source incompatible",
-    //                     d_node, p_name, i
-    //                 );
-    //                 return false;
-    //             }
-    //         }
-    //     }
-
-    //     true
-    // }
-
     fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
 
@@ -224,64 +165,243 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
                 };
                 value_matches
             }
-            (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value),
+            (Not(p_value), Not(d_value)) => {
+                let value_matches = self.values_match_fan_in(p_value, d_value);
+                match value_matches {
+                    true => trace!("Not values match fan-in: {:?} and {:?}", p_value, d_value),
+                    false => trace!(
+                        "Not values do NOT match fan-in: {:?} and {:?}",
+                        p_value, d_value
+                    ),
+                };
+                value_matches
+            }
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
-                self.values_match_fan_in(p_a_value, d_a_value)
-                    && self.values_match_fan_in(p_b_value, d_b_value)
+                let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
+                let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "And values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "And values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (Or(p_a_value, p_b_value), Or(d_a_value, d_b_value)) => {
-                self.values_match_fan_in(p_a_value, d_a_value)
-                    && self.values_match_fan_in(p_b_value, d_b_value)
+                let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
+                let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "Or values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "Or values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (Xor(p_a_value, p_b_value), Xor(d_a_value, d_b_value)) => {
-                self.values_match_fan_in(p_a_value, d_a_value)
-                    && self.values_match_fan_in(p_b_value, d_b_value)
+                let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
+                let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "Xor values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "Xor values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (Mux(p_a_value, p_b_value, p_c_value), Mux(d_a_value, d_b_value, d_c_value)) => {
-                self.nets_match_fan_in(p_a_value, d_a_value)
-                    && self.values_match_fan_in(p_b_value, d_b_value)
-                    && self.values_match_fan_in(p_c_value, d_c_value)
+                let a_matches = self.nets_match_fan_in(p_a_value, d_a_value);
+                let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
+                let c_matches = self.values_match_fan_in(p_c_value, d_c_value);
+                let result = a_matches && b_matches && c_matches;
+
+                match result {
+                    true => trace!(
+                        "Mux values match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                    false => trace!(
+                        "Mux values do NOT match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                };
+                result
             }
             (Adc(p_a_value, p_b_value, p_ci_net), Adc(d_a_value, d_b_value, d_ci_net)) => {
-                self.values_match_fan_in(p_a_value, d_a_value)
-                    && self.values_match_fan_in(p_b_value, d_b_value)
-                    && self.nets_match_fan_in(p_ci_net, d_ci_net)
+                let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
+                let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
+                let ci_matches = self.nets_match_fan_in(p_ci_net, d_ci_net);
+                let result = a_matches && b_matches && ci_matches;
+
+                match result {
+                    true => trace!(
+                        "Adc values match fan-in: a={:?}, b={:?}, ci={:?}",
+                        a_matches, b_matches, ci_matches
+                    ),
+                    false => trace!(
+                        "Adc values do NOT match fan-in: a={:?}, b={:?}, ci={:?}",
+                        a_matches, b_matches, ci_matches
+                    ),
+                };
+                result
             }
             (Aig(pa_control_net, pb_control_net), Aig(da_control_net, db_control_net)) => {
-                self.control_nets_match_fan_in(pa_control_net, da_control_net)
-                    && self.control_nets_match_fan_in(pb_control_net, db_control_net)
+                let a_matches = self.control_nets_match_fan_in(pa_control_net, da_control_net);
+                let b_matches = self.control_nets_match_fan_in(pb_control_net, db_control_net);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "Aig values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "Aig values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (Eq(pa_value, pb_value), Eq(da_value, db_value)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "Eq values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "Eq values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (ULt(pa_value, pb_value), ULt(da_value, db_value)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "ULt values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "ULt values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (SLt(pa_value, pb_value), SLt(da_value, db_value)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let result = a_matches && b_matches;
+
+                match result {
+                    true => trace!(
+                        "SLt values match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                    false => trace!(
+                        "SLt values do NOT match fan-in: a={:?}, b={:?}",
+                        a_matches, b_matches
+                    ),
+                };
+                result
             }
             (Shl(pa_value, pb_value, pc_u32), Shl(da_value, db_value, dc_u32)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
-                    && pc_u32 == dc_u32
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let c_matches = pc_u32 == dc_u32;
+                let result = a_matches && b_matches && c_matches;
+
+                match result {
+                    true => trace!(
+                        "Shl values match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                    false => trace!(
+                        "Shl values do NOT match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                };
+                result
             }
             (UShr(pa_value, pb_value, pc_u32), UShr(da_value, db_value, dc_u32)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
-                    && pc_u32 == dc_u32
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let c_matches = pc_u32 == dc_u32;
+                let result = a_matches && b_matches && c_matches;
+
+                match result {
+                    true => trace!(
+                        "UShr values match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                    false => trace!(
+                        "UShr values do NOT match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                };
+                result
             }
             (SShr(pa_value, pb_value, pc_u32), SShr(da_value, db_value, dc_u32)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
-                    && pc_u32 == dc_u32
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let c_matches = pc_u32 == dc_u32;
+                let result = a_matches && b_matches && c_matches;
+
+                match result {
+                    true => trace!(
+                        "SShr values match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                    false => trace!(
+                        "SShr values do NOT match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                };
+                result
             }
             (XShr(pa_value, pb_value, pc_u32), XShr(da_value, db_value, dc_u32)) => {
-                self.values_match_fan_in(pa_value, da_value)
-                    && self.values_match_fan_in(pb_value, db_value)
-                    && pc_u32 == dc_u32
+                let a_matches = self.values_match_fan_in(pa_value, da_value);
+                let b_matches = self.values_match_fan_in(pb_value, db_value);
+                let c_matches = pc_u32 == dc_u32;
+                let result = a_matches && b_matches && c_matches;
+
+                match result {
+                    true => trace!(
+                        "XShr values match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                    false => trace!(
+                        "XShr values do NOT match fan-in: a={:?}, b={:?}, c={:?}",
+                        a_matches, b_matches, c_matches
+                    ),
+                };
+                result
             }
             (Mul(pa_value, pb_value), Mul(da_value, db_value)) => {
                 self.values_match_fan_in(pa_value, da_value)
@@ -325,6 +445,13 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             // (Target(pt), Target(dt)) => todo!(),
             // (Other(po), Other(do_)) => todo!(),
             (Input(p_name, p_width), Input(d_name, d_width)) => {
+                // panic!(
+                //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
+                // );
+                return true;
+                todo!("decide how input cells should be matched for fan in")
+            }
+            (Input(p_name, p_width), d_cell) => {
                 // panic!(
                 //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
                 // );
@@ -487,14 +614,24 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         let init_value_matches =
             self.const_match_fan_in(&pattern_dff.init_value, &design_dff.init_value);
 
-        data_matches
+        let value_data_matches = data_matches
             && clock_matches
             && clear_matches
             && reset_matches
             && enable_matches
             && clear_value_matches
             && reset_value_matches
-            && init_value_matches
+            && init_value_matches;
+
+        match value_data_matches {
+            true => {
+                trace!("DFFs match fan-in");
+            }
+            false => {
+                trace!("DFFs do not match fan-in");
+            }
+        }
+        value_data_matches
     }
 }
 
