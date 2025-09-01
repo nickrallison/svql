@@ -67,6 +67,7 @@ python3 scripts/md_tree.py --root . \
     --include 'prjunnamed/netlist/src/design.rs' \
     --include 'prjunnamed/netlist/src/cell.rs' \
     --include 'prjunnamed/netlist/src/cell/flip_flop.rs' \
+    --include 'prjunnamed/netlist/src/value.rs' \
     --include 'svql_subgraph/**.rs' \
     --include 'examples/**.v' \
     --include 'examples/patterns/security/access_control/locked_reg/rtlil/*.il' \
