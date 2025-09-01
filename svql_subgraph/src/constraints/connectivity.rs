@@ -3,7 +3,7 @@ use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeFanin, NodeSource, NodeType};
 use crate::profiling::Timer;
-use prjunnamed_netlist::CellRef;
+use prjunnamed_netlist::{Cell, CellRef};
 use svql_common::Config;
 use tracing::{debug, trace};
 
@@ -189,5 +189,134 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
 impl<'a, 'p, 'd> Constraint<'d> for ConnectivityConstraint<'a, 'p, 'd> {
     fn d_candidate_is_valid(&self, d_node: &CellRef<'d>) -> bool {
         self.is_node_connectivity_valid(*d_node)
+    }
+}
+
+enum Cell {
+    Buf(Value),
+    Not(Value),
+    /// `a & b`.
+    ///
+    /// Has short-circuiting behavior for inputs containing `X` — if the other
+    /// bit is `0`, the output is `0` and the `X` doesn't propagate.
+    And(Value, Value),
+    /// `a | b`.
+    ///
+    /// Has short-circuiting behavior for inputs containing `X` — if the other
+    /// bit is `1`, the output is `1` and the `X` doesn't propagate.
+    Or(Value, Value),
+    Xor(Value, Value),
+    /// `a ? b : c`.
+    ///
+    /// Muxes are glitch free — if `a` is `X`, the bit positions that match
+    /// between `b` and `c` still have a defined value. The `X` propagates
+    /// only at the positions where `b` and `c` differ.
+    Mux(Net, Value, Value),
+    /// `a + b + ci` — add with carry.
+    ///
+    /// Output is one bit wider than `a` and `b` — the most significant bit
+    /// is the carry-out.
+    ///
+    /// `X`s in the input propagate only to the more significant bits, and
+    /// do not affect the less significant bits.
+    Adc(Value, Value, Net), // a + b + ci
+    /// `a & b`, single-bit wide, both inputs freely invertible.
+    ///
+    /// A variant of the `And` cell meant for fine logic optimization.
+    Aig(ControlNet, ControlNet),
+
+    Eq(Value, Value),
+    ULt(Value, Value),
+    SLt(Value, Value),
+
+    /// `a << (b * c)`. The bottom bits are filled with zeros.
+    ///
+    /// General notes for all shift cells:
+    /// - output is the same width as `a`. If you need wider output,
+    ///   zero-extend or sign-extend your input first, as appropriate.
+    /// - the shift count does not wrap. If you shift by more than
+    ///   `a.len() - 1`, you get the same result as if you made an equivalent
+    ///   sequence of 1-bit shifts (i.e. all zeros, all sign bits, or all `X`,
+    ///   as appropriate).
+    /// - shift cells are one of the few cells which *do not* expect their
+    ///   inputs to be of the same width. In fact, that is the expected case.
+    Shl(Value, Value, u32),
+    /// `a >> (b * c)`. The top bits are filled with zeros.
+    ///
+    /// See also [general notes above][Cell::Shl].
+    UShr(Value, Value, u32),
+    /// `a >> (b * c)`. The top bits are filled with copies of the top bit
+    /// of the input.
+    ///
+    /// `a` must be at least one bit wide (as otherwise there would be no sign
+    /// bit to propagate, and while there wouldn't be anywhere to propagate it
+    /// *to*, it's an edge-case it doesn't make sense to bother handling).
+    ///
+    /// See also [general notes above][Cell::Shl].
+    SShr(Value, Value, u32),
+    /// `a >> (b * c)`. The top bits are filled with `X`.
+    ///
+    /// See also [general notes above][Cell::Shl].
+    XShr(Value, Value, u32),
+
+    // future possibilities: popcnt, count leading/trailing zeros, powers
+    Mul(Value, Value),
+    UDiv(Value, Value),
+    UMod(Value, Value),
+    SDivTrunc(Value, Value),
+    SDivFloor(Value, Value),
+    SModTrunc(Value, Value),
+    SModFloor(Value, Value),
+
+    Match(MatchCell),
+    Assign(AssignCell),
+
+    Dff(FlipFlop),
+    Memory(Memory),
+    IoBuf(IoBuffer),
+    Target(TargetCell),
+    Other(Instance),
+
+    /// Design input of a given width.
+    ///
+    /// If synthesizing for a specified target, and not in out-of-context mode,
+    /// an input will be replaced with an [`IoBuffer`] and attached to a pin on
+    /// the target device.
+    Input(String, usize),
+    /// Design output. Attaches a name to a given value.
+    ///
+    /// If synthesizing for a specified target, and not in out-of-context mode,
+    /// an output will be replaced with an [`IoBuffer`] and attached to a pin on
+    /// the target device.
+    Output(String, Value),
+    /// Attaches a name to a given value for debugging.
+    ///
+    /// `Name` keeps a given value alive during optimization and makes it easily
+    /// available to be poked at during simulation.
+    ///
+    /// Do note that the [`unname` pass][unname], which runs during
+    /// target-dependent synthesis, replaces all `Name` cells with [`Debug`]
+    /// cells.
+    ///
+    /// [unname]: ../prjunnamed_generic/fn.unname.html
+    /// [`Debug`]: Cell::Debug
+    Name(String, Value),
+    /// Tentatively attaches a name to a given value.
+    ///
+    /// `Debug` gives a name to a particular value, without insisting on keeping
+    /// it alive during optimization. This helps correlate the output of
+    /// synthesis with the corresponding input logic.
+    ///
+    /// If at any point a value is being kept alive only by a `Debug` cell,
+    /// it will be optimized out and the input to the `Debug` cell will
+    /// be replaced with `X`.
+    ///
+    /// See also: [`Name`][Cell::Name].
+    Debug(String, Value),
+}
+
+fn cells_match(pattern_cell: &Cell, design_cell: &Cell) -> bool {
+    match (pattern_cell, design_cell) {
+        (Cell::Buf(pv), Cell::Buf(dv)) => todo!(),
     }
 }
