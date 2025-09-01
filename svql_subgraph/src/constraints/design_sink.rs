@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 use tracing::trace;
 
+use crate::Timer;
 use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::NodeType;
-use crate::profiling::Timer;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
@@ -31,8 +31,11 @@ impl<'d> DesignSinkConstraint<'d> {
             })
             .collect();
 
-        trace!("DesignSinkConstraint for pattern node {:?} found {} mapped sinks", 
-               pattern_current, mapped_sinks.len());
+        trace!(
+            "DesignSinkConstraint for pattern node {:?} found {} mapped sinks",
+            pattern_current,
+            mapped_sinks.len()
+        );
 
         if mapped_sinks.is_empty() {
             trace!("No mapped sinks, returning unconstrained");

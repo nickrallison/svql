@@ -1,8 +1,8 @@
+use crate::Timer;
 use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeFanin, NodeSource, NodeType};
-use crate::profiling::Timer;
 use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
 use tracing::{debug, trace};

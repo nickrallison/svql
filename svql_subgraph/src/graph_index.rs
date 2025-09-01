@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
 use crate::{
+    Timer,
     node::{NodeFanin, NodeSource, NodeType, fanin_named, net_to_source},
-    profiling::Timer,
 };
 
 // #[derive(Clone, Debug)]

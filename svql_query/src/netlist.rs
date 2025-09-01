@@ -1,6 +1,6 @@
 use svql_common::Config;
 use svql_driver::{Driver, DriverKey, context::Context};
-use svql_subgraph::progress::Progress;
+use svql_subgraph::Progress;
 use svql_subgraph::{SubgraphIsomorphism, find_subgraph_isomorphisms};
 
 use crate::instance::Instance;

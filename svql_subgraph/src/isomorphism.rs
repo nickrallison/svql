@@ -1,7 +1,7 @@
 use prjunnamed_netlist::CellRef;
 use std::collections::HashMap;
 
-use crate::profiling::Timer;
+use crate::Timer;
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct NodeMapping<'p, 'd> {

@@ -2,9 +2,8 @@ use prjunnamed_netlist::CellRef;
 use tracing::trace;
 
 use crate::{
-    Constraint,
+    Constraint, Progress,
     constraints::{ConnectivityConstraint, NotAlreadyMappedConstraint},
-    progress::Progress,
 };
 
 /// A small, owned, enum-based iterator over design candidates, with constraints applied lazily.

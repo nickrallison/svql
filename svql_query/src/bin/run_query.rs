@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use svql_common::{Config, DedupeMode};
 use svql_driver::Driver;
-use svql_subgraph::progress::Progress;
+use svql_subgraph::Progress;
 
 // Generated at build-time. Provides dispatch helpers.
 mod gen_dispatch {
@@ -120,7 +120,7 @@ fn parse_args() -> Args {
     }
 }
 
-fn render_progress_bar(s: svql_subgraph::progress::ProgressSnapshot) -> String {
+fn render_progress_bar(s: svql_subgraph::ProgressSnapshot) -> String {
     let total = s.total_candidates.max(1); // avoid div-by-zero if used standalone
     let scanned = s.scanned_candidates.min(total);
     let pct = (scanned as f64 / total as f64) * 100.0;
@@ -245,7 +245,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // If svql_subgraph "profiling" feature is enabled, print timings
-    svql_subgraph::profiling::report();
+    svql_subgraph::report();
 
     Ok(())
 }

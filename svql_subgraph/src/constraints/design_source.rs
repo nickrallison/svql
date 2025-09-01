@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 use tracing::trace;
 
+use crate::Timer;
 use crate::constraints::node::NodeConstraint;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeSource, NodeType};
-use crate::profiling::Timer;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 
@@ -30,8 +30,13 @@ impl<'d> DesignSourceConstraint<'d> {
             .enumerate()
             .collect();
 
-        trace!("DesignSourceConstraint for pattern node {:?} of type {:?}, commutative: {}, {} sources", 
-               pattern_current, current_type, commutative, mapped_sources.len());
+        trace!(
+            "DesignSourceConstraint for pattern node {:?} of type {:?}, commutative: {}, {} sources",
+            pattern_current,
+            current_type,
+            commutative,
+            mapped_sources.len()
+        );
 
         let sets = mapped_sources
             .into_iter()

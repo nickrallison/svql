@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use prjunnamed_netlist::CellRef;
 
-use crate::{Constraint, profiling::Timer};
+use crate::{Constraint, Timer};
 
 pub(crate) struct NodeConstraint<'d> {
     // Some -> The intersection of these nodes and another set of nodes will be a valid constraint

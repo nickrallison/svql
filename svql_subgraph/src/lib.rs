@@ -3,11 +3,9 @@ mod candidates;
 mod constraints;
 mod graph_index;
 mod isomorphism;
+mod util;
 
 pub(crate) mod node;
-
-pub mod profiling;
-pub mod progress;
 
 use graph_index::GraphIndex;
 use isomorphism::NodeMapping;
@@ -23,6 +21,8 @@ use prjunnamed_netlist::{CellRef, Design};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
+
+pub use util::*;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -76,7 +76,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-    progress: Option<&progress::Progress>,
+    progress: Option<&Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     info!("Starting subgraph isomorphism search");
     trace!("Config: {:?}", config);
@@ -206,7 +206,7 @@ fn build_candidates<'a, 'p, 'd, 'g>(
     design: &'d Design,
     config: &'a Config,
     node_mapping: &NodeMapping<'p, 'd>,
-    progress: Option<&'g progress::Progress>,
+    progress: Option<&'g Progress>,
 ) -> Vec<CellRef<'d>> {
     let current_type = NodeType::from(pattern_current.get().as_ref());
     trace!(
@@ -308,7 +308,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
     output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
     depth: usize,
-    progress: Option<&'a progress::Progress>,
+    progress: Option<&'a Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     trace!(
         "Recursive call at depth {}, queue size: {}, current mapping size: {}",
