@@ -3,8 +3,8 @@ use tracing::trace;
 
 use crate::Timer;
 use crate::constraints::node::NodeConstraint;
-use crate::isomorphism::NodeMapping;
 use crate::node::{NodeSource, NodeType};
+use crate::node_mapping::NodeMapping;
 use crate::{Constraint, GraphIndex};
 use prjunnamed_netlist::CellRef;
 

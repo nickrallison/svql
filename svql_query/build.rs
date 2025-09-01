@@ -373,7 +373,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
 
         use svql_common::Config;
         use svql_driver::Driver;
-        use svql_subgraph::progress::Progress;
+        use svql_subgraph::Progress;
 
         pub fn run_count_for_type_name(
             name: &str,

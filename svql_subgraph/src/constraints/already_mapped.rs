@@ -1,6 +1,6 @@
 use crate::Constraint;
 use crate::Timer;
-use crate::isomorphism::NodeMapping;
+use crate::node_mapping::NodeMapping;
 use prjunnamed_netlist::CellRef;
 use tracing::trace;
 

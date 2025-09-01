@@ -2,16 +2,15 @@
 mod candidates;
 mod constraints;
 mod graph_index;
-mod isomorphism;
+mod node_mapping;
 mod util;
 
 pub(crate) mod node;
 
 use graph_index::GraphIndex;
-use isomorphism::NodeMapping;
+use node_mapping::NodeMapping;
 use tracing::{debug, info, trace};
 
-use crate::candidates::{BaseIter, FilteredCandidates};
 use crate::constraints::{
     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
     NotAlreadyMappedConstraint,
@@ -214,25 +213,25 @@ fn build_candidates<'a, 'p, 'd, 'g>(
         pattern_current, current_type
     );
 
-    let node_constraints = {
-        trace!("Computing design sink constraints");
-        let design_sinks_constraints =
-            DesignSinkConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
-                .get_candidates_owned();
-        trace!("Computing design source constraints");
-        let sources_constraints =
-            DesignSourceConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
-                .get_candidates_owned();
-        let intersection = design_sinks_constraints.intersect(sources_constraints);
-        let candidate_count = intersection
-            .get_candidates()
-            .map_or("unlimited".to_string(), |s| s.len().to_string());
-        trace!(
-            "Node constraints intersection has {} candidates",
-            candidate_count
-        );
-        intersection
-    };
+    // let node_constraints = {
+    //     trace!("Computing design sink constraints");
+    //     let design_sinks_constraints =
+    //         DesignSinkConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
+    //             .get_candidates_owned();
+    //     trace!("Computing design source constraints");
+    //     let sources_constraints =
+    //         DesignSourceConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
+    //             .get_candidates_owned();
+    //     let intersection = design_sinks_constraints.intersect(sources_constraints);
+    //     let candidate_count = intersection
+    //         .get_candidates()
+    //         .map_or("unlimited".to_string(), |s| s.len().to_string());
+    //     trace!(
+    //         "Node constraints intersection has {} candidates",
+    //         candidate_count
+    //     );
+    //     intersection
+    // };
 
     let base = match node_constraints.get_candidates_owned() {
         Some(set) => {

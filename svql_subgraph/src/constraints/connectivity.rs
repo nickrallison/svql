@@ -1,8 +1,8 @@
 use crate::Timer;
 use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
-use crate::isomorphism::NodeMapping;
 use crate::node::{NodeFanin, NodeSource, NodeType};
+use crate::node_mapping::NodeMapping;
 use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
 use tracing::{debug, trace};
@@ -504,9 +504,6 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             self.design.find_cell(*design_net);
         let fan_in_pattern_cell: Result<(CellRef<'p>, usize), Trit> =
             self.pattern.find_cell(*pattern_net);
-
-        println!("{:?}", actual_fan_in_design_cell);
-        println!("{:?}", fan_in_pattern_cell);
 
         let (actual_fan_in_design_cell_ref, d_fan_in_idx, fan_in_pattern_cell_ref, p_fan_in_idx) =
             match (actual_fan_in_design_cell, fan_in_pattern_cell) {
