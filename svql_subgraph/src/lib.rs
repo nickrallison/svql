@@ -71,22 +71,12 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-/// Backward‑compatible API (no progress handle returned).
+/// New API that updates the provided `progress` atomically as the search proceeds.
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-    let progress = progress::Progress::new();
-    find_subgraph_isomorphisms_with_progress(pattern, design, config, &progress)
-}
-
-/// New API that updates the provided `progress` atomically as the search proceeds.
-pub fn find_subgraph_isomorphisms_with_progress<'p, 'd>(
-    pattern: &'p Design,
-    design: &'d Design,
-    config: &Config,
-    progress: &progress::Progress,
+    progress: Option<&progress::Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     info!("Starting subgraph isomorphism search");
     trace!("Config: {:?}", config);
@@ -153,9 +143,13 @@ pub fn find_subgraph_isomorphisms_with_progress<'p, 'd>(
     );
 
     // Estimate total candidates up‑front: sum initial candidate counts per pattern node.
-    let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
-    progress.set_total_candidates(total_candidates as u64);
-    info!("Estimated total candidates: {}", total_candidates);
+    if progress.is_some() {
+        let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
+        progress
+            .unwrap()
+            .set_total_candidates(total_candidates as u64);
+        info!("Estimated total candidates: {}", total_candidates);
+    }
 
     let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
 
@@ -170,7 +164,7 @@ pub fn find_subgraph_isomorphisms_with_progress<'p, 'd>(
         &input_by_name,
         &output_by_name,
         0, // depth
-        Some(progress),
+        progress,
     );
 
     info!(
@@ -204,18 +198,7 @@ fn estimate_total_candidates<'p, 'd>(
         .sum()
 }
 
-fn initial_candidates<'d, 'a>(
-    design_index: &'a GraphIndex<'d>,
-    current_type: NodeType,
-) -> BaseIter<'a, 'd> {
-    let slice: &'a [CellRef<'d>] = match current_type {
-        NodeType::Input => design_index.get_nodes_topo(),
-        _ => design_index.get_by_type(current_type),
-    };
-    BaseIter::Unconstrained(slice.iter())
-}
-
-fn build_filtered_candidates<'a, 'p, 'd, 'g>(
+fn build_candidates<'a, 'p, 'd, 'g>(
     pattern_current: CellRef<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
@@ -224,7 +207,7 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
     config: &'a Config,
     node_mapping: &NodeMapping<'p, 'd>,
     progress: Option<&'g progress::Progress>,
-) -> FilteredCandidates<'a, 'p, 'd, 'g> {
+) -> Vec<CellRef<'d>> {
     let current_type = NodeType::from(pattern_current.get().as_ref());
     trace!(
         "Building filtered candidates for pattern node {:?} of type {:?}",
@@ -257,10 +240,16 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
                 "Using constrained base iterator with {} candidates",
                 set.len()
             );
-            BaseIter::Constrained(set.into_iter())
+            set.into_iter().collect::<Vec<_>>()
         }
         None => {
-            let candidates = initial_candidates(design_index, current_type);
+            let candidates = {
+                let slice: &'a [CellRef<'d>] = match current_type {
+                    NodeType::Input => design_index.get_nodes_topo(),
+                    _ => design_index.get_by_type(current_type),
+                };
+                slice.to_vec()
+            };
             trace!(
                 "Using unconstrained base iterator for type {:?}",
                 current_type
@@ -269,24 +258,7 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
         }
     };
 
-    let already_mapped_constraint = NotAlreadyMappedConstraint::new(node_mapping.clone());
-    let connectivity_constraint = ConnectivityConstraint::new(
-        pattern_current,
-        pattern_index,
-        design_index,
-        pattern,
-        design,
-        config,
-        node_mapping.clone(),
-    );
-
-    trace!("Created filtered candidates iterator");
-    FilteredCandidates {
-        base,
-        already_mapped: already_mapped_constraint,
-        connectivity: connectivity_constraint,
-        progress,
-    }
+    base
 }
 
 fn compute_output_drivers<'p, 'd>(
@@ -369,7 +341,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         pattern_current, pattern_current_type, depth
     );
 
-    let candidates_iter = build_filtered_candidates(
+    let candidates_vec = build_candidates(
         pattern_current,
         pattern_index,
         design_index,
@@ -380,14 +352,30 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         progress,
     );
 
-    let candidates_vec: Vec<_> = candidates_iter.collect();
+    let already_mapped_constraint = NotAlreadyMappedConstraint::new(node_mapping.clone());
+    let connectivity_constraint = ConnectivityConstraint::new(
+        pattern_current,
+        pattern_index,
+        design_index,
+        pattern,
+        design,
+        config,
+        node_mapping.clone(),
+    );
+
+    let filtered_candidates: Vec<_> = candidates_vec
+        .into_iter()
+        .filter(|d_candidate| already_mapped_constraint.d_candidate_is_valid(d_candidate))
+        .filter(|d_candidate| connectivity_constraint.d_candidate_is_valid(d_candidate))
+        .collect();
+
     debug!(
         "Found {} candidates for pattern node {:?}",
-        candidates_vec.len(),
+        filtered_candidates.len(),
         pattern_current
     );
 
-    if candidates_vec.is_empty() {
+    if filtered_candidates.is_empty() {
         debug!(
             "No valid candidates found for pattern node {:?}, backtracking",
             pattern_current
@@ -396,10 +384,10 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     }
 
     #[cfg(feature = "rayon")]
-    let cand_iter = candidates_vec.into_par_iter();
+    let cand_iter = filtered_candidates.into_par_iter();
 
     #[cfg(not(feature = "rayon"))]
-    let cand_iter = candidates_vec.into_iter();
+    let cand_iter = filtered_candidates.into_iter();
 
     let results: Vec<SubgraphIsomorphism<'p, 'd>> = cand_iter
         .flat_map(|d_candidate| {

@@ -64,6 +64,7 @@ fn main() {
                         pattern_design.as_ref(),
                         haystack_design.as_ref(),
                         &tc.config,
+                        None
                     );
 
                     assert_eq!(

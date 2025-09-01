@@ -55,7 +55,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .expect("Haystack design not found in context")
             .as_ref();
 
-        find_subgraph_isomorphisms(needle, haystack, config)
+        find_subgraph_isomorphisms(needle, haystack, config, None)
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
@@ -80,7 +80,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .expect("Haystack design not found in context")
             .as_ref();
 
-        svql_subgraph::find_subgraph_isomorphisms_with_progress(needle, haystack, config, progress)
+        svql_subgraph::find_subgraph_isomorphisms(needle, haystack, config, Some(progress))
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
