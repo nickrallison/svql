@@ -105,62 +105,74 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     }
 
     // NEW: Named-port fan-in validation
+    // fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
+    //     let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
+
+    //     let p_fanin: &NodeFanin<'p> = self.pattern_index.get_node_fanin_named(self.p_node);
+    //     let d_fanin: &NodeFanin<'d> = self.design_index.get_node_fanin_named(d_node);
+
+    //     trace!(
+    //         "Validating fanin for design node {:?}, pattern has {} fanin ports",
+    //         d_node,
+    //         p_fanin.map.len()
+    //     );
+
+    //     // All named ports in the pattern must exist in the candidate, with the same bit widths.
+    //     for (p_name, p_sources) in p_fanin.map.iter() {
+    //         let Some(d_sources) = d_fanin.map.get(p_name) else {
+    //             debug!(
+    //                 "Fanin validation failed: design node {:?} missing port {}",
+    //                 d_node, p_name
+    //             );
+    //             return false;
+    //         };
+    //         if d_sources.len() != p_sources.len() && self.config.match_length {
+    //             debug!(
+    //                 "Fanin validation failed: design node {:?} port {} width mismatch on exact length match (\npattern: {}\ndesign: {})",
+    //                 d_node,
+    //                 p_name,
+    //                 p_sources.len(),
+    //                 d_sources.len()
+    //             );
+    //             return false;
+    //         }
+
+    //         if d_sources.len() < p_sources.len() && !self.config.match_length {
+    //             debug!(
+    //                 "Fanin validation failed: design node {:?} port {} width mismatch on superset length match (\npattern: {}\ndesign: {})",
+    //                 d_node,
+    //                 p_name,
+    //                 p_sources.len(),
+    //                 d_sources.len()
+    //             );
+    //             return false;
+    //         }
+
+    //         // Bit-by-bit compatibility using existing mapping (unmapped pattern sources are unconstrained)
+    //         for (i, (p_src, d_src)) in p_sources.iter().zip(d_sources.iter()).enumerate() {
+    //             if !self.sources_compatible(p_src, d_src) {
+    //                 debug!(
+    //                     "Fanin validation failed: design node {:?} port {} bit {} source incompatible",
+    //                     d_node, p_name, i
+    //                 );
+    //                 return false;
+    //             }
+    //         }
+    //     }
+
+    //     true
+    // }
+
     fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
 
-        let p_fanin: &NodeFanin<'p> = self.pattern_index.get_node_fanin_named(self.p_node);
-        let d_fanin: &NodeFanin<'d> = self.design_index.get_node_fanin_named(d_node);
+        let p_cell_cow = self.p_node.get();
+        let d_cell_cow = d_node.get();
 
-        trace!(
-            "Validating fanin for design node {:?}, pattern has {} fanin ports",
-            d_node,
-            p_fanin.map.len()
-        );
+        let p_cell: &Cell = p_cell_cow.as_ref();
+        let d_cell: &Cell = d_cell_cow.as_ref();
 
-        // All named ports in the pattern must exist in the candidate, with the same bit widths.
-        for (p_name, p_sources) in p_fanin.map.iter() {
-            let Some(d_sources) = d_fanin.map.get(p_name) else {
-                debug!(
-                    "Fanin validation failed: design node {:?} missing port {}",
-                    d_node, p_name
-                );
-                return false;
-            };
-            if d_sources.len() != p_sources.len() && self.config.match_length {
-                debug!(
-                    "Fanin validation failed: design node {:?} port {} width mismatch on exact length match (\npattern: {}\ndesign: {})",
-                    d_node,
-                    p_name,
-                    p_sources.len(),
-                    d_sources.len()
-                );
-                return false;
-            }
-
-            if d_sources.len() < p_sources.len() && !self.config.match_length {
-                debug!(
-                    "Fanin validation failed: design node {:?} port {} width mismatch on superset length match (\npattern: {}\ndesign: {})",
-                    d_node,
-                    p_name,
-                    p_sources.len(),
-                    d_sources.len()
-                );
-                return false;
-            }
-
-            // Bit-by-bit compatibility using existing mapping (unmapped pattern sources are unconstrained)
-            for (i, (p_src, d_src)) in p_sources.iter().zip(d_sources.iter()).enumerate() {
-                if !self.sources_compatible(p_src, d_src) {
-                    debug!(
-                        "Fanin validation failed: design node {:?} port {} bit {} source incompatible",
-                        d_node, p_name, i
-                    );
-                    return false;
-                }
-            }
-        }
-
-        true
+        self.cells_match_fan_in(p_cell, d_cell)
     }
 
     fn sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
@@ -189,36 +201,112 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     fn cells_match_fan_in(&self, pattern_cell: &Cell, design_cell: &Cell) -> bool {
         use Cell::*;
         match (pattern_cell, design_cell) {
-            (Buf(p_value), Buf(d_value)) => todo!(),
-            (Not(p_value), Not(d_value)) => todo!(),
-            (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => todo!(),
-            (Or(p_a_value, p_b_value), Or(d_a_value, d_b_value)) => todo!(),
-            (Xor(p_a_value, p_b_value), Xor(d_a_value, d_b_value)) => todo!(),
-            (Mux(p_a_value, p_b_value, p_c_value), Mux(d_a_value, d_b_value, d_c_value)) => todo!(),
-            (Adc(p_a_value, p_b_value, p_ci_net), Adc(d_a_value, d_b_value, d_ci_net)) => todo!(),
-            (Aig(pa_control_net, pb_control_net), Aig(da_control_net, db_control_net)) => todo!(),
-            (Eq(pa_value, pb_value), Eq(da_value, db_value)) => todo!(),
-            (ULt(pa_value, pb_value), ULt(da_value, db_value)) => todo!(),
-            (SLt(pa_value, pb_value), SLt(da_value, db_value)) => todo!(),
-            (Shl(pa_value, pb_value, pc_u32), Shl(da_value, db_value, dc_u32)) => todo!(),
-            (UShr(pa_value, pb_value, pc_u32), UShr(da_value, db_value, dc_u32)) => todo!(),
-            (SShr(pa_value, pb_value, pc_u32), SShr(da_value, db_value, dc_u32)) => todo!(),
-            (XShr(pa_value, pb_value, pc_u32), XShr(da_value, db_value, dc_u32)) => todo!(),
-            (Mul(pa_value, pb_value), Mul(da_value, db_value)) => todo!(),
-            (UDiv(pa_value, pb_value), UDiv(da_value, db_value)) => todo!(),
-            (UMod(pa_value, pb_value), UMod(da_value, db_value)) => todo!(),
-            (SDivTrunc(pa_value, pb_value), SDivTrunc(da_value, db_value)) => todo!(),
-            (SDivFloor(pa_value, pb_value), SDivFloor(da_value, db_value)) => todo!(),
-            (SModTrunc(pa_value, pb_value), SModTrunc(da_value, db_value)) => todo!(),
-            (SModFloor(pa_value, pb_value), SModFloor(da_value, db_value)) => todo!(),
-            (Match(p_match_cell), Match(d_match_cell)) => todo!(),
-            (Assign(p_assign_cell), Assign(d_assign_cell)) => todo!(),
-            (Dff(p_dff_cell), Dff(d_dff_cell)) => todo!(),
-            (Memory(p_memory_cell), Memory(d_memory_cell)) => todo!(),
+            (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value),
+            (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value),
+            (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
+                self.values_match_fan_in(p_a_value, d_a_value)
+                    && self.values_match_fan_in(p_b_value, d_b_value)
+            }
+            (Or(p_a_value, p_b_value), Or(d_a_value, d_b_value)) => {
+                self.values_match_fan_in(p_a_value, d_a_value)
+                    && self.values_match_fan_in(p_b_value, d_b_value)
+            }
+            (Xor(p_a_value, p_b_value), Xor(d_a_value, d_b_value)) => {
+                self.values_match_fan_in(p_a_value, d_a_value)
+                    && self.values_match_fan_in(p_b_value, d_b_value)
+            }
+            (Mux(p_a_value, p_b_value, p_c_value), Mux(d_a_value, d_b_value, d_c_value)) => {
+                self.nets_match_fan_in(p_a_value, d_a_value)
+                    && self.values_match_fan_in(p_b_value, d_b_value)
+                    && self.values_match_fan_in(p_c_value, d_c_value)
+            }
+            (Adc(p_a_value, p_b_value, p_ci_net), Adc(d_a_value, d_b_value, d_ci_net)) => {
+                self.values_match_fan_in(p_a_value, d_a_value)
+                    && self.values_match_fan_in(p_b_value, d_b_value)
+                    && self.nets_match_fan_in(p_ci_net, d_ci_net)
+            }
+            (Aig(pa_control_net, pb_control_net), Aig(da_control_net, db_control_net)) => {
+                self.control_nets_match_fan_in(pa_control_net, da_control_net)
+                    && self.control_nets_match_fan_in(pb_control_net, db_control_net)
+            }
+            (Eq(pa_value, pb_value), Eq(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (ULt(pa_value, pb_value), ULt(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (SLt(pa_value, pb_value), SLt(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (Shl(pa_value, pb_value, pc_u32), Shl(da_value, db_value, dc_u32)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+                    && pc_u32 == dc_u32
+            }
+            (UShr(pa_value, pb_value, pc_u32), UShr(da_value, db_value, dc_u32)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+                    && pc_u32 == dc_u32
+            }
+            (SShr(pa_value, pb_value, pc_u32), SShr(da_value, db_value, dc_u32)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+                    && pc_u32 == dc_u32
+            }
+            (XShr(pa_value, pb_value, pc_u32), XShr(da_value, db_value, dc_u32)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+                    && pc_u32 == dc_u32
+            }
+            (Mul(pa_value, pb_value), Mul(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (UDiv(pa_value, pb_value), UDiv(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (UMod(pa_value, pb_value), UMod(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (SDivTrunc(pa_value, pb_value), SDivTrunc(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (SDivFloor(pa_value, pb_value), SDivFloor(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (SModTrunc(pa_value, pb_value), SModTrunc(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (SModFloor(pa_value, pb_value), SModFloor(da_value, db_value)) => {
+                self.values_match_fan_in(pa_value, da_value)
+                    && self.values_match_fan_in(pb_value, db_value)
+            }
+            (Match(p_match_cell), Match(d_match_cell)) => {
+                todo!("Make Function to match match cells")
+            }
+            (Assign(p_assign_cell), Assign(d_assign_cell)) => {
+                todo!("Make Function to match assign cells")
+            }
+            (Dff(p_dff_cell), Dff(d_dff_cell)) => {
+                todo!("Make Function to match dff cells")
+            }
+            (Memory(p_memory_cell), Memory(d_memory_cell)) => {
+                todo!("Make Function to match memory cells")
+            }
             // (IoBuf(pi), IoBuf(di)) => todo!(),
             // (Target(pt), Target(dt)) => todo!(),
             // (Other(po), Other(do_)) => todo!(),
-            (Input(p_name, p_width), Input(d_name, d_width)) => todo!(),
+            (Input(p_name, p_width), Input(d_name, d_width)) => {
+                todo!("decide how input cells should be matched for fan in")
+            }
             // (Output(pn, pv), Output(dn, dv)) => todo!(),
             // (Name(pn, pv), Name(dn, dv)) => todo!(),
             // (Debug(pn, pv), Debug(dn, dv)) => todo!(),
@@ -249,6 +337,24 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         design_net: &prjunnamed_netlist::Net,
     ) -> bool {
         todo!("Look up net values in designs & make sure they correspond to mapped cells")
+    }
+
+    fn control_nets_match_fan_in(
+        &self,
+        pattern_c_net: &prjunnamed_netlist::ControlNet,
+        design_c_net: &prjunnamed_netlist::ControlNet,
+    ) -> bool {
+        match (pattern_c_net, design_c_net) {
+            (
+                prjunnamed_netlist::ControlNet::Pos(p_pos_net),
+                prjunnamed_netlist::ControlNet::Pos(d_pos_net),
+            ) => self.nets_match_fan_in(p_pos_net, d_pos_net),
+            (
+                prjunnamed_netlist::ControlNet::Neg(p_neg_net),
+                prjunnamed_netlist::ControlNet::Neg(d_neg_net),
+            ) => self.nets_match_fan_in(p_neg_net, d_neg_net),
+            _ => false,
+        }
     }
 }
 
