@@ -162,6 +162,8 @@ pub fn find_subgraph_isomorphisms_with_progress<'p, 'd>(
     let mut results = find_isomorphisms_recursive_collect(
         &pattern_index,
         &design_index,
+        pattern,
+        design,
         config,
         initial_node_mapping,
         pattern_mapping_queue,
@@ -217,6 +219,8 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
     pattern_current: CellRef<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
+    pattern: &'p Design,
+    design: &'d Design,
     config: &'a Config,
     node_mapping: &NodeMapping<'p, 'd>,
     progress: Option<&'g progress::Progress>,
@@ -270,6 +274,8 @@ fn build_filtered_candidates<'a, 'p, 'd, 'g>(
         pattern_current,
         pattern_index,
         design_index,
+        pattern,
+        design,
         config,
         node_mapping.clone(),
     );
@@ -322,6 +328,8 @@ fn compute_output_drivers<'p, 'd>(
 fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
+    pattern: &'p Design,
+    design: &'d Design,
     config: &'a Config,
     node_mapping: NodeMapping<'p, 'd>,
     mut pattern_mapping_queue: VecDeque<CellRef<'p>>,
@@ -365,6 +373,8 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         pattern_current,
         pattern_index,
         design_index,
+        pattern,
+        design,
         config,
         &node_mapping,
         progress,
@@ -402,6 +412,8 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
             find_isomorphisms_recursive_collect(
                 pattern_index,
                 design_index,
+                pattern,
+                design,
                 config,
                 nm,
                 pattern_mapping_queue.clone(),

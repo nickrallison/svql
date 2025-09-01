@@ -3,7 +3,7 @@ use crate::graph_index::GraphIndex;
 use crate::isomorphism::NodeMapping;
 use crate::node::{NodeFanin, NodeSource, NodeType};
 use crate::profiling::Timer;
-use prjunnamed_netlist::{Cell, CellRef, Value, ValueRepr};
+use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
 use tracing::{debug, trace};
 
@@ -11,6 +11,10 @@ pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
     p_node: CellRef<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
+
+    pattern: &'p Design,
+    design: &'d Design,
+
     config: &'a Config,
     mapping: NodeMapping<'p, 'd>,
 }
@@ -20,6 +24,8 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         p_node: CellRef<'p>,
         pattern_index: &'a GraphIndex<'p>,
         design_index: &'a GraphIndex<'d>,
+        pattern: &'p Design,
+        design: &'d Design,
         config: &'a Config,
         mapping: NodeMapping<'p, 'd>,
     ) -> Self {
@@ -27,6 +33,8 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             p_node,
             pattern_index,
             design_index,
+            pattern,
+            design,
             config,
             mapping,
         }
@@ -295,9 +303,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             (Assign(p_assign_cell), Assign(d_assign_cell)) => {
                 todo!("Make Function to match assign cells")
             }
-            (Dff(p_dff_cell), Dff(d_dff_cell)) => {
-                todo!("Make Function to match dff cells")
-            }
+            (Dff(p_dff_cell), Dff(d_dff_cell)) => self.dffs_match_fan_in(p_dff_cell, d_dff_cell),
             (Memory(p_memory_cell), Memory(d_memory_cell)) => {
                 todo!("Make Function to match memory cells")
             }
@@ -336,7 +342,32 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         pattern_net: &prjunnamed_netlist::Net,
         design_net: &prjunnamed_netlist::Net,
     ) -> bool {
-        todo!("Look up net values in designs & make sure they correspond to mapped cells")
+        let actual_fan_in_design_cell: Result<(CellRef<'d>, usize), Trit> =
+            self.design.find_cell(*design_net);
+        let fan_in_pattern_cell: Result<(CellRef<'p>, usize), Trit> =
+            self.pattern.find_cell(*pattern_net);
+
+        let (actual_fan_in_design_cell_ref, d_fan_in_idx, fan_in_pattern_cell_ref, p_fan_in_idx) =
+            match (actual_fan_in_design_cell, fan_in_pattern_cell) {
+                (Ok((d_fan_in_cell_ref, d_bit_idx)), Ok((p_fan_in_cell_ref, p_bit_idx))) => {
+                    (d_fan_in_cell_ref, d_bit_idx, p_fan_in_cell_ref, p_bit_idx)
+                }
+                (Err(design_trit), Err(pattern_trit)) => return design_trit == pattern_trit,
+                _ => return false,
+            };
+
+        let expected_fan_in_design_cell_opt = self.mapping.get_design_node(fan_in_pattern_cell_ref);
+
+        if expected_fan_in_design_cell_opt.is_none() {
+            // Pattern fan-in cell not mapped yet, so we can't constrain it here.
+            return true;
+        }
+
+        let expected_fan_in_design_cell_ref = expected_fan_in_design_cell_opt.unwrap();
+
+        return expected_fan_in_design_cell_ref == actual_fan_in_design_cell_ref;
+
+        todo!("How to handle expected idx");
     }
 
     fn control_nets_match_fan_in(
@@ -355,6 +386,69 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             ) => self.nets_match_fan_in(p_neg_net, d_neg_net),
             _ => false,
         }
+    }
+
+    fn const_match_fan_in(
+        &self,
+        pattern_const: &prjunnamed_netlist::Const,
+        design_const: &prjunnamed_netlist::Const,
+    ) -> bool {
+        let mut pattern_const_iter = pattern_const.clone().into_iter();
+        let mut design_const_iter = design_const.clone().into_iter();
+
+        while let (Some(p_t), Some(d_t)) = (pattern_const_iter.next(), design_const_iter.next()) {
+            if p_t != d_t {
+                return false;
+            }
+        }
+        true
+    }
+
+    // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    // pub struct FlipFlop {
+    //     pub data: Value,
+    //     /// The clock.  The active edge is rising if it is a [`ControlNet::Pos`], and falling if it is
+    //     /// a [`ControlNet::Neg`].
+    //     pub clock: ControlNet,
+    //     /// Asynchronous reset.
+    //     pub clear: ControlNet,
+    //     /// Synchronous reset.
+    //     pub reset: ControlNet,
+    //     /// Clock enable.
+    //     pub enable: ControlNet,
+    //     /// If true, `reset` has priority over `enable`.  Otherwise, `enable` has priority over `reset`.
+    //     pub reset_over_enable: bool,
+
+    //     /// Must have the same width as `data`.
+    //     pub clear_value: Const,
+    //     /// Must have the same width as `data`.
+    //     pub reset_value: Const,
+    //     /// Must have the same width as `data`.
+    //     pub init_value: Const,
+    // }
+
+    fn dffs_match_fan_in(&self, pattern_dff: &FlipFlop, design_dff: &FlipFlop) -> bool {
+        let data_matches = self.values_match_fan_in(&pattern_dff.data, &design_dff.data);
+        let clock_matches = self.control_nets_match_fan_in(&pattern_dff.clock, &design_dff.clock);
+        let clear_matches = self.control_nets_match_fan_in(&pattern_dff.clear, &design_dff.clear);
+        let reset_matches = self.control_nets_match_fan_in(&pattern_dff.reset, &design_dff.reset);
+        let enable_matches =
+            self.control_nets_match_fan_in(&pattern_dff.enable, &design_dff.enable);
+        let clear_value_matches =
+            self.const_match_fan_in(&pattern_dff.clear_value, &design_dff.clear_value);
+        let reset_value_matches =
+            self.const_match_fan_in(&pattern_dff.reset_value, &design_dff.reset_value);
+        let init_value_matches =
+            self.const_match_fan_in(&pattern_dff.init_value, &design_dff.init_value);
+
+        data_matches
+            && clock_matches
+            && clear_matches
+            && reset_matches
+            && enable_matches
+            && clear_value_matches
+            && reset_value_matches
+            && init_value_matches
     }
 }
 
