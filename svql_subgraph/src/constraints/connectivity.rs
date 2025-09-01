@@ -207,9 +207,23 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
 
     // ####################################
     fn cells_match_fan_in(&self, pattern_cell: &Cell, design_cell: &Cell) -> bool {
+        trace!(
+            "Checking if cells match fan-in: {:?} and {:?}",
+            pattern_cell, design_cell
+        );
         use Cell::*;
         match (pattern_cell, design_cell) {
-            (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value),
+            (Buf(p_value), Buf(d_value)) => {
+                let value_matches = self.values_match_fan_in(p_value, d_value);
+                match value_matches {
+                    true => trace!("Buf values match fan-in: {:?} and {:?}", p_value, d_value),
+                    false => trace!(
+                        "Buf values do NOT match fan-in: {:?} and {:?}",
+                        p_value, d_value
+                    ),
+                };
+                value_matches
+            }
             (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value),
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
                 self.values_match_fan_in(p_a_value, d_a_value)
@@ -311,6 +325,10 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             // (Target(pt), Target(dt)) => todo!(),
             // (Other(po), Other(do_)) => todo!(),
             (Input(p_name, p_width), Input(d_name, d_width)) => {
+                // panic!(
+                //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
+                // );
+                return true;
                 todo!("decide how input cells should be matched for fan in")
             }
             // (Output(pn, pv), Output(dn, dv)) => todo!(),
@@ -321,6 +339,10 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     }
 
     fn values_match_fan_in(&self, pattern_value: &Value, design_value: &Value) -> bool {
+        trace!(
+            "Checking if values match fan-in: {:?} and {:?}",
+            pattern_value, design_value
+        );
         let pattern_value_repr: &ValueRepr = &pattern_value.0;
         let design_value_repr: &ValueRepr = &design_value.0;
         match (pattern_value_repr, design_value_repr) {
@@ -333,7 +355,12 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
                     "Use config to control how nets of different sizes match, then use nets_match_fan_in method"
                 )
             }
-            _ => todo!("Should single pattern match against many design"),
+            (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => {
+                let first_d_net = d_nets.first().unwrap();
+                return self.nets_match_fan_in(&p_net, first_d_net);
+                todo!("Should single pattern match against many design?")
+            }
+            _ => false,
         }
     }
 
@@ -342,10 +369,17 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         pattern_net: &prjunnamed_netlist::Net,
         design_net: &prjunnamed_netlist::Net,
     ) -> bool {
+        trace!(
+            "Checking if nets match fan-in: {:?} and {:?}",
+            pattern_net, design_net
+        );
         let actual_fan_in_design_cell: Result<(CellRef<'d>, usize), Trit> =
             self.design.find_cell(*design_net);
         let fan_in_pattern_cell: Result<(CellRef<'p>, usize), Trit> =
             self.pattern.find_cell(*pattern_net);
+
+        println!("{:?}", actual_fan_in_design_cell);
+        println!("{:?}", fan_in_pattern_cell);
 
         let (actual_fan_in_design_cell_ref, d_fan_in_idx, fan_in_pattern_cell_ref, p_fan_in_idx) =
             match (actual_fan_in_design_cell, fan_in_pattern_cell) {
@@ -375,6 +409,10 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         pattern_c_net: &prjunnamed_netlist::ControlNet,
         design_c_net: &prjunnamed_netlist::ControlNet,
     ) -> bool {
+        trace!(
+            "Checking if control nets match fan-in: {:?} and {:?}",
+            pattern_c_net, design_c_net
+        );
         match (pattern_c_net, design_c_net) {
             (
                 prjunnamed_netlist::ControlNet::Pos(p_pos_net),
@@ -393,6 +431,10 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         pattern_const: &prjunnamed_netlist::Const,
         design_const: &prjunnamed_netlist::Const,
     ) -> bool {
+        trace!(
+            "Checking if consts match fan-in: {:?} and {:?}",
+            pattern_const, design_const
+        );
         let mut pattern_const_iter = pattern_const.clone().into_iter();
         let mut design_const_iter = design_const.clone().into_iter();
 
@@ -428,6 +470,10 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     // }
 
     fn dffs_match_fan_in(&self, pattern_dff: &FlipFlop, design_dff: &FlipFlop) -> bool {
+        trace!(
+            "Checking if DFFs match fan-in: {:?} and {:?}",
+            pattern_dff, design_dff
+        );
         let data_matches = self.values_match_fan_in(&pattern_dff.data, &design_dff.data);
         let clock_matches = self.control_nets_match_fan_in(&pattern_dff.clock, &design_dff.clock);
         let clear_matches = self.control_nets_match_fan_in(&pattern_dff.clear, &design_dff.clear);

@@ -123,7 +123,7 @@ lazy_static::lazy_static! {
         module: "and_seq",
     };
     static ref SDFFE_SELF: Haystack = Haystack {
-        path: "examples/patterns/basic/ff/verilog/sdffe.v",
+        path: "examples/patterns/basic/ff/rtlil/sdffe.il",
         module: "sdffe",
     };
     static ref COMB_D_DOUBLE_SDFFE: Haystack = Haystack {
