@@ -7,18 +7,18 @@ use crate::{
     profiling::Timer,
 };
 
-#[derive(Clone, Debug)]
-struct NodeWrapper<'a> {
-    cell_ref: CellRef<'a>,
+// #[derive(Clone, Debug)]
+// struct NodeWrapper<'a> {
+//     cell_ref: CellRef<'a>,
 
-    todo: !,
+//     todo: !,
 
-    // Get the nodes Fan-In, as a named mapping for each input port on the cell get the corresponding source nodes driving it
-    fanin: HashMap<&'a str, Vec<NodeSource<'a>>>,
+//     // Get the nodes Fan-In, as a named mapping for each input port on the cell get the corresponding source nodes driving it
+//     fanin: HashMap<&'a str, Vec<NodeSource<'a>>>,
 
-    // Get the nodes Fan-Out, with a mapping for each input port the output of this cell is connected to
-    fanout: HashSet<(CellRef<'a>, HashSet<(&'a str, CellRef<'a>, usize)>)>,
-}
+//     // Get the nodes Fan-Out, with a mapping for each input port the output of this cell is connected to
+//     fanout: HashSet<(CellRef<'a>, HashSet<(&'a str, CellRef<'a>, usize)>)>,
+// }
 
 #[derive(Clone, Debug)]
 pub(super) struct GraphIndex<'a> {

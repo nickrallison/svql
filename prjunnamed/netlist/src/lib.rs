@@ -5,39 +5,39 @@
 //! is equally suited for bit-level and word-level netlists, including bit-level cells with multiple
 //! outputs.
 
-mod logic;
-mod value;
-mod param;
-mod io;
 mod cell;
-mod metadata;
 mod design;
-mod print;
+mod io;
+mod logic;
+mod metadata;
+mod param;
 mod parse;
+mod print;
 mod rewrite;
 mod target;
+mod value;
 
 mod isomorphic;
 mod smt;
 
-pub use logic::{Trit, Const};
-pub use value::{Net, ControlNet, Value};
-pub use param::ParamValue;
-pub use io::{IoNet, IoValue};
 pub use cell::{
-    Cell, MatchCell, AssignCell, FlipFlop, IoBuffer, Memory, MemoryWritePort, MemoryReadPort, MemoryReadFlipFlop,
-    MemoryPortRelation, TargetCell, Instance,
+    AssignCell, Cell, FlipFlop, Instance, IoBuffer, MatchCell, Memory, MemoryPortRelation,
+    MemoryReadFlipFlop, MemoryReadPort, MemoryWritePort, TargetCell,
 };
-pub use metadata::{MetaStringRef, MetaItem, MetaItemRef, SourcePosition};
-pub use design::{Design, CellRef, WithMetadataGuard};
-pub use parse::{parse, ParseError};
+pub use design::{CellRef, Design, WithMetadataGuard};
+pub use io::{IoNet, IoValue};
+pub use logic::{Const, Trit};
+pub use metadata::{MetaItem, MetaItemRef, MetaStringRef, SourcePosition};
+pub use param::ParamValue;
+pub use parse::{ParseError, parse};
+pub use rewrite::{RewriteNetSource, RewriteResult, RewriteRuleset, Rewriter};
 pub use target::{
-    Target, TargetParamKind, TargetParam, TargetInput, TargetOutput, TargetIo, TargetCellPurity, TargetPrototype,
-    TargetCellImportError, TargetImportError, register_target, create_target,
+    Target, TargetCellImportError, TargetCellPurity, TargetImportError, TargetInput, TargetIo,
+    TargetOutput, TargetParam, TargetParamKind, TargetPrototype, create_target, register_target,
 };
-pub use rewrite::{Rewriter, RewriteNetSource, RewriteRuleset, RewriteResult};
+pub use value::{ControlNet, Net, Value, ValueRepr};
 
-pub use isomorphic::{isomorphic, NotIsomorphic};
-pub use smt::{SmtEngine, SmtResponse};
+pub use isomorphic::{NotIsomorphic, isomorphic};
 #[cfg(feature = "easy-smt")]
 pub use smt::easy_smt::EasySmtEngine;
+pub use smt::{SmtEngine, SmtResponse};

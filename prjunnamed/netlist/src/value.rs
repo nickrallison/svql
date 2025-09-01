@@ -1,8 +1,8 @@
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
-    ops::{Index, IndexMut},
     hash::Hash,
+    ops::{Index, IndexMut},
     slice::SliceIndex,
 };
 
@@ -38,7 +38,9 @@ impl Net {
 
     pub(crate) fn from_cell_index(cell_index: usize) -> Net {
         assert!(cell_index <= u32::MAX as usize - 3);
-        Net { index: cell_index as u32 + Net::FIRST_CELL }
+        Net {
+            index: cell_index as u32 + Net::FIRST_CELL,
+        }
     }
 
     pub(crate) fn as_cell_index(self) -> Result<usize, Trit> {
@@ -132,7 +134,7 @@ impl Display for Net {
 }
 
 #[derive(Clone)]
-enum ValueRepr {
+pub enum ValueRepr {
     None,
     Some(Net),
     Many(Vec<Net>),
@@ -203,7 +205,7 @@ impl Hash for ValueRepr {
 
 /// A value is a (possibly empty) sequence of [`Net`]s.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Value(ValueRepr);
+pub struct Value(pub ValueRepr);
 
 impl Value {
     /// Creates an empty value.
@@ -243,7 +245,9 @@ impl Value {
         self.0.as_slice().iter().copied()
     }
 
-    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Net> + ExactSizeIterator + '_ {
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = &mut Net> + ExactSizeIterator + '_ {
         self.0.as_slice_mut().iter_mut()
     }
 
@@ -278,7 +282,9 @@ impl Value {
     pub fn as_const(&self) -> Option<Const> {
         let nets = self.0.as_slice();
         if nets.iter().all(|net| net.is_const()) {
-            Some(Const::from_iter(nets.iter().map(|net| net.as_const().unwrap())))
+            Some(Const::from_iter(
+                nets.iter().map(|net| net.as_const().unwrap()),
+            ))
         } else {
             None
         }
@@ -312,7 +318,10 @@ impl Value {
     pub fn sext(&self, width: usize) -> Self {
         assert!(!self.is_empty());
         assert!(width >= self.len());
-        Value::from_iter(self.iter().chain(std::iter::repeat_n(self.msb(), width - self.len())))
+        Value::from_iter(
+            self.iter()
+                .chain(std::iter::repeat_n(self.msb(), width - self.len())),
+        )
     }
 
     fn shift_count(value: &Const, stride: u32) -> usize {
@@ -583,7 +592,10 @@ impl IntoIterator for Value {
     type IntoIter = ValueIntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        ValueIntoIter { repr: self.0, index: 0 }
+        ValueIntoIter {
+            repr: self.0,
+            index: 0,
+        }
     }
 }
 
@@ -746,12 +758,18 @@ mod test {
         assert_eq!(format!("{:?}", Net::ZERO), "Net::ZERO");
         assert_eq!(format!("{:?}", Net::ONE), "Net::ONE");
         assert_eq!(format!("{:?}", Net::UNDEF), "Net::UNDEF");
-        assert_eq!(format!("{:?}", Net::from_cell_index(0)), "Net::from_cell(0)");
+        assert_eq!(
+            format!("{:?}", Net::from_cell_index(0)),
+            "Net::from_cell(0)"
+        );
     }
 
     #[test]
     fn test_value() {
         let v01 = Value::from_iter([Net::ONE, Net::ZERO]);
-        assert_eq!(v01.into_iter().collect::<Vec<_>>(), vec![Net::ONE, Net::ZERO]);
+        assert_eq!(
+            v01.into_iter().collect::<Vec<_>>(),
+            vec![Net::ONE, Net::ZERO]
+        );
     }
 }
