@@ -192,131 +192,165 @@ impl<'a, 'p, 'd> Constraint<'d> for ConnectivityConstraint<'a, 'p, 'd> {
     }
 }
 
-enum Cell {
-    Buf(Value),
-    Not(Value),
-    /// `a & b`.
-    ///
-    /// Has short-circuiting behavior for inputs containing `X` — if the other
-    /// bit is `0`, the output is `0` and the `X` doesn't propagate.
-    And(Value, Value),
-    /// `a | b`.
-    ///
-    /// Has short-circuiting behavior for inputs containing `X` — if the other
-    /// bit is `1`, the output is `1` and the `X` doesn't propagate.
-    Or(Value, Value),
-    Xor(Value, Value),
-    /// `a ? b : c`.
-    ///
-    /// Muxes are glitch free — if `a` is `X`, the bit positions that match
-    /// between `b` and `c` still have a defined value. The `X` propagates
-    /// only at the positions where `b` and `c` differ.
-    Mux(Net, Value, Value),
-    /// `a + b + ci` — add with carry.
-    ///
-    /// Output is one bit wider than `a` and `b` — the most significant bit
-    /// is the carry-out.
-    ///
-    /// `X`s in the input propagate only to the more significant bits, and
-    /// do not affect the less significant bits.
-    Adc(Value, Value, Net), // a + b + ci
-    /// `a & b`, single-bit wide, both inputs freely invertible.
-    ///
-    /// A variant of the `And` cell meant for fine logic optimization.
-    Aig(ControlNet, ControlNet),
+// enum Cell {
+//     Buf(Value),
+//     Not(Value),
+//     /// `a & b`.
+//     ///
+//     /// Has short-circuiting behavior for inputs containing `X` — if the other
+//     /// bit is `0`, the output is `0` and the `X` doesn't propagate.
+//     And(Value, Value),
+//     /// `a | b`.
+//     ///
+//     /// Has short-circuiting behavior for inputs containing `X` — if the other
+//     /// bit is `1`, the output is `1` and the `X` doesn't propagate.
+//     Or(Value, Value),
+//     Xor(Value, Value),
+//     /// `a ? b : c`.
+//     ///
+//     /// Muxes are glitch free — if `a` is `X`, the bit positions that match
+//     /// between `b` and `c` still have a defined value. The `X` propagates
+//     /// only at the positions where `b` and `c` differ.
+//     Mux(Net, Value, Value),
+//     /// `a + b + ci` — add with carry.
+//     ///
+//     /// Output is one bit wider than `a` and `b` — the most significant bit
+//     /// is the carry-out.
+//     ///
+//     /// `X`s in the input propagate only to the more significant bits, and
+//     /// do not affect the less significant bits.
+//     Adc(Value, Value, Net), // a + b + ci
+//     /// `a & b`, single-bit wide, both inputs freely invertible.
+//     ///
+//     /// A variant of the `And` cell meant for fine logic optimization.
+//     Aig(ControlNet, ControlNet),
 
-    Eq(Value, Value),
-    ULt(Value, Value),
-    SLt(Value, Value),
+//     Eq(Value, Value),
+//     ULt(Value, Value),
+//     SLt(Value, Value),
 
-    /// `a << (b * c)`. The bottom bits are filled with zeros.
-    ///
-    /// General notes for all shift cells:
-    /// - output is the same width as `a`. If you need wider output,
-    ///   zero-extend or sign-extend your input first, as appropriate.
-    /// - the shift count does not wrap. If you shift by more than
-    ///   `a.len() - 1`, you get the same result as if you made an equivalent
-    ///   sequence of 1-bit shifts (i.e. all zeros, all sign bits, or all `X`,
-    ///   as appropriate).
-    /// - shift cells are one of the few cells which *do not* expect their
-    ///   inputs to be of the same width. In fact, that is the expected case.
-    Shl(Value, Value, u32),
-    /// `a >> (b * c)`. The top bits are filled with zeros.
-    ///
-    /// See also [general notes above][Cell::Shl].
-    UShr(Value, Value, u32),
-    /// `a >> (b * c)`. The top bits are filled with copies of the top bit
-    /// of the input.
-    ///
-    /// `a` must be at least one bit wide (as otherwise there would be no sign
-    /// bit to propagate, and while there wouldn't be anywhere to propagate it
-    /// *to*, it's an edge-case it doesn't make sense to bother handling).
-    ///
-    /// See also [general notes above][Cell::Shl].
-    SShr(Value, Value, u32),
-    /// `a >> (b * c)`. The top bits are filled with `X`.
-    ///
-    /// See also [general notes above][Cell::Shl].
-    XShr(Value, Value, u32),
+//     /// `a << (b * c)`. The bottom bits are filled with zeros.
+//     ///
+//     /// General notes for all shift cells:
+//     /// - output is the same width as `a`. If you need wider output,
+//     ///   zero-extend or sign-extend your input first, as appropriate.
+//     /// - the shift count does not wrap. If you shift by more than
+//     ///   `a.len() - 1`, you get the same result as if you made an equivalent
+//     ///   sequence of 1-bit shifts (i.e. all zeros, all sign bits, or all `X`,
+//     ///   as appropriate).
+//     /// - shift cells are one of the few cells which *do not* expect their
+//     ///   inputs to be of the same width. In fact, that is the expected case.
+//     Shl(Value, Value, u32),
+//     /// `a >> (b * c)`. The top bits are filled with zeros.
+//     ///
+//     /// See also [general notes above][Cell::Shl].
+//     UShr(Value, Value, u32),
+//     /// `a >> (b * c)`. The top bits are filled with copies of the top bit
+//     /// of the input.
+//     ///
+//     /// `a` must be at least one bit wide (as otherwise there would be no sign
+//     /// bit to propagate, and while there wouldn't be anywhere to propagate it
+//     /// *to*, it's an edge-case it doesn't make sense to bother handling).
+//     ///
+//     /// See also [general notes above][Cell::Shl].
+//     SShr(Value, Value, u32),
+//     /// `a >> (b * c)`. The top bits are filled with `X`.
+//     ///
+//     /// See also [general notes above][Cell::Shl].
+//     XShr(Value, Value, u32),
 
-    // future possibilities: popcnt, count leading/trailing zeros, powers
-    Mul(Value, Value),
-    UDiv(Value, Value),
-    UMod(Value, Value),
-    SDivTrunc(Value, Value),
-    SDivFloor(Value, Value),
-    SModTrunc(Value, Value),
-    SModFloor(Value, Value),
+//     // future possibilities: popcnt, count leading/trailing zeros, powers
+//     Mul(Value, Value),
+//     UDiv(Value, Value),
+//     UMod(Value, Value),
+//     SDivTrunc(Value, Value),
+//     SDivFloor(Value, Value),
+//     SModTrunc(Value, Value),
+//     SModFloor(Value, Value),
 
-    Match(MatchCell),
-    Assign(AssignCell),
+//     Match(MatchCell),
+//     Assign(AssignCell),
 
-    Dff(FlipFlop),
-    Memory(Memory),
-    IoBuf(IoBuffer),
-    Target(TargetCell),
-    Other(Instance),
+//     Dff(FlipFlop),
+//     Memory(Memory),
+//     IoBuf(IoBuffer),
+//     Target(TargetCell),
+//     Other(Instance),
 
-    /// Design input of a given width.
-    ///
-    /// If synthesizing for a specified target, and not in out-of-context mode,
-    /// an input will be replaced with an [`IoBuffer`] and attached to a pin on
-    /// the target device.
-    Input(String, usize),
-    /// Design output. Attaches a name to a given value.
-    ///
-    /// If synthesizing for a specified target, and not in out-of-context mode,
-    /// an output will be replaced with an [`IoBuffer`] and attached to a pin on
-    /// the target device.
-    Output(String, Value),
-    /// Attaches a name to a given value for debugging.
-    ///
-    /// `Name` keeps a given value alive during optimization and makes it easily
-    /// available to be poked at during simulation.
-    ///
-    /// Do note that the [`unname` pass][unname], which runs during
-    /// target-dependent synthesis, replaces all `Name` cells with [`Debug`]
-    /// cells.
-    ///
-    /// [unname]: ../prjunnamed_generic/fn.unname.html
-    /// [`Debug`]: Cell::Debug
-    Name(String, Value),
-    /// Tentatively attaches a name to a given value.
-    ///
-    /// `Debug` gives a name to a particular value, without insisting on keeping
-    /// it alive during optimization. This helps correlate the output of
-    /// synthesis with the corresponding input logic.
-    ///
-    /// If at any point a value is being kept alive only by a `Debug` cell,
-    /// it will be optimized out and the input to the `Debug` cell will
-    /// be replaced with `X`.
-    ///
-    /// See also: [`Name`][Cell::Name].
-    Debug(String, Value),
-}
+//     /// Design input of a given width.
+//     ///
+//     /// If synthesizing for a specified target, and not in out-of-context mode,
+//     /// an input will be replaced with an [`IoBuffer`] and attached to a pin on
+//     /// the target device.
+//     Input(String, usize),
+//     /// Design output. Attaches a name to a given value.
+//     ///
+//     /// If synthesizing for a specified target, and not in out-of-context mode,
+//     /// an output will be replaced with an [`IoBuffer`] and attached to a pin on
+//     /// the target device.
+//     Output(String, Value),
+//     /// Attaches a name to a given value for debugging.
+//     ///
+//     /// `Name` keeps a given value alive during optimization and makes it easily
+//     /// available to be poked at during simulation.
+//     ///
+//     /// Do note that the [`unname` pass][unname], which runs during
+//     /// target-dependent synthesis, replaces all `Name` cells with [`Debug`]
+//     /// cells.
+//     ///
+//     /// [unname]: ../prjunnamed_generic/fn.unname.html
+//     /// [`Debug`]: Cell::Debug
+//     Name(String, Value),
+//     /// Tentatively attaches a name to a given value.
+//     ///
+//     /// `Debug` gives a name to a particular value, without insisting on keeping
+//     /// it alive during optimization. This helps correlate the output of
+//     /// synthesis with the corresponding input logic.
+//     ///
+//     /// If at any point a value is being kept alive only by a `Debug` cell,
+//     /// it will be optimized out and the input to the `Debug` cell will
+//     /// be replaced with `X`.
+//     ///
+//     /// See also: [`Name`][Cell::Name].
+//     Debug(String, Value),
+// }
 
 fn cells_match(pattern_cell: &Cell, design_cell: &Cell) -> bool {
+    use Cell::*;
     match (pattern_cell, design_cell) {
-        (Cell::Buf(pv), Cell::Buf(dv)) => todo!(),
+        (Buf(pv), Buf(dv)) => todo!(),
+        (Not(pv), Not(dv)) => todo!(),
+        (And(pa, pb), And(da, db)) => todo!(),
+        (Or(pa, pb), Or(da, db)) => todo!(),
+        (Xor(pa, pb), Xor(da, db)) => todo!(),
+        (Mux(pa, pb, pc), Mux(da, db, dc)) => todo!(),
+        (Adc(pa, pb, pci), Adc(da, db, dci)) => todo!(),
+        (Aig(pa, pb), Aig(da, db)) => todo!(),
+        (Eq(pa, pb), Eq(da, db)) => todo!(),
+        (ULt(pa, pb), ULt(da, db)) => todo!(),
+        (SLt(pa, pb), SLt(da, db)) => todo!(),
+        (Shl(pa, pb, pc), Shl(da, db, dc)) => todo!(),
+        (UShr(pa, pb, pc), UShr(da, db, dc)) => todo!(),
+        (SShr(pa, pb, pc), SShr(da, db, dc)) => todo!(),
+        (XShr(pa, pb, pc), XShr(da, db, dc)) => todo!(),
+        (Mul(pa, pb), Mul(da, db)) => todo!(),
+        (UDiv(pa, pb), UDiv(da, db)) => todo!(),
+        (UMod(pa, pb), UMod(da, db)) => todo!(),
+        (SDivTrunc(pa, pb), SDivTrunc(da, db)) => todo!(),
+        (SDivFloor(pa, pb), SDivFloor(da, db)) => todo!(),
+        (SModTrunc(pa, pb), SModTrunc(da, db)) => todo!(),
+        (SModFloor(pa, pb), SModFloor(da, db)) => todo!(),
+        (Match(pm), Match(dm)) => todo!(),
+        (Assign(pa), Assign(da)) => todo!(),
+        (Dff(pd), Dff(dd)) => todo!(),
+        (Memory(pm), Memory(dm)) => todo!(),
+        // (IoBuf(pi), IoBuf(di)) => todo!(),
+        // (Target(pt), Target(dt)) => todo!(),
+        // (Other(po), Other(do_)) => todo!(),
+        (Input(pn, pw), Input(dn, dw)) => todo!(),
+        // (Output(pn, pv), Output(dn, dv)) => todo!(),
+        // (Name(pn, pv), Name(dn, dv)) => todo!(),
+        // (Debug(pn, pv), Debug(dn, dv)) => todo!(),
+        _ => false,
     }
 }
