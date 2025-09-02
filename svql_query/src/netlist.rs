@@ -86,13 +86,14 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
 
     #[contracts::debug_ensures(ret.as_ref().map(|c| c.len()).unwrap_or(1) == 1, "Context for a single pattern only")]
     fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {
-        tracing::event!(tracing::Level::TRACE, "Creating context for netlist");
-        let key = Self::driver_key();
-        let design = driver
-            .get_or_load_design(key.path(), key.module_name().to_string(), config)?
-            .1;
-
-        Ok(Context::from_single(key, design))
+        // tracing::event!(tracing::Level::TRACE, "Creating context for netlist");
+        // let key = Self::driver_key();
+        // let design = driver
+        //     .get_or_load_design(key.path(), key.module_name().to_string(), config)?
+        //     .1;
+        //
+        // Ok(Context::from_single(key, design))
+        todo!()
     }
 }
 

@@ -74,7 +74,7 @@ lazy_static::lazy_static! {
     };
     static ref AND_SEQ: Pattern = Pattern::Netlist {
         yosys_module: YosysModule::new(
-            "examples/patterns/basic/and/verilog/and_seq.v",
+            "examples/fixtures/basic/and/verilog/and_seq.v",
             "and_seq",
         ).expect("Failed to create YosysModule for and_seq"),
         pattern_query_type: None,
@@ -284,6 +284,22 @@ lazy_static::lazy_static! {
             haystack: &AND_TREE_HAYSTACK,
             expected_matches: 2,
         },
+
+        // DFF tests
+        TestCase {
+            name: "sdffe_self",
+            config: {
+                Config::builder()
+                    .exact_length()
+                    .build()
+            },
+            pattern: &SDFFE,
+            haystack: &SDFFE_HAYSTACK,
+            expected_matches: 1,
+        },
+
+        // #######################################
+
         // TestCase {
         //     name: "and_gate_self_auto_morph",
         //     config: Config::builder().exact_length().auto_morph().flatten().build(),
@@ -320,18 +336,18 @@ lazy_static::lazy_static! {
         //     expected_matches: 7,
         // },
 
-        // DFF tests
-        TestCase {
-            name: "sdffe_self",
-            config: {
-                Config::builder()
-                    .exact_length()
-                    .build()
-            },
-            pattern: &SDFFE,
-            haystack: &SDFFE_HAYSTACK,
-            expected_matches: 1,
-        },
+        // // DFF tests
+        // TestCase {
+        //     name: "sdffe_self",
+        //     config: {
+        //         Config::builder()
+        //             .exact_length()
+        //             .build()
+        //     },
+        //     pattern: &SDFFE,
+        //     haystack: &SDFFE_HAYSTACK,
+        //     expected_matches: 1,
+        // },
     //     TestCase {
     //         name: "sdffe_in_comb_d_double_none",
     //         config: Config::builder().exact_length().none().flatten().build(),

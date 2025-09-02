@@ -4,8 +4,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::Config;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct YosysModule {
     path: DesignPath,
@@ -14,13 +12,24 @@ pub struct YosysModule {
 
 impl YosysModule {
     pub fn new(path: &str, module: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let design_path = DesignPath::new(PathBuf::from(path))?;
+        // let design_path = DesignPath::new(PathBuf::from(path))?;
+
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let design_path = Path::new(path);
+        let design_path = if design_path.is_absolute() {
+            design_path.to_path_buf()
+        } else {
+            workspace.join(design_path)
+        };
+
+        let design_path = DesignPath::new(design_path)?;
+
         Ok(YosysModule {
             path: design_path,
             module: module.to_string(),
         })
     }
-    pub fn design_path(&self) -> &DesignPath {
+    fn design_path(&self) -> &DesignPath {
         &self.path
     }
     pub fn path(&self) -> &Path {
@@ -31,7 +40,7 @@ impl YosysModule {
     }
     fn get_command_args_slice(&self, json_out: &Path, config: &ModuleConfig) -> Vec<String> {
         let read_cmd = match self.path {
-            DesignPath::Verilog(_) => "read_verilog",
+            DesignPath::Verilog(_) => "read_verilog -sv ",
             DesignPath::Rtlil(_) => "read_rtlil",
             DesignPath::Json(_) => "read_json",
         };
@@ -112,7 +121,7 @@ impl YosysModule {
             .canonicalize()
             .map_err(|e| format!("Failed to canonicalize design path: {}", e))?;
 
-        let design_path = DesignPath::new(design_path)?;
+        // let design_path = DesignPath::new(design_path)?;
 
         let mut cmd = std::process::Command::new(yosys);
         cmd.args(self.get_command_args_slice(json_temp_file.path(), module_config))

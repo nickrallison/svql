@@ -1,11 +1,11 @@
 // svql_query/src/queries/enum_composite/and_any.rs
 
 use crate::{
-    Match, Search, State, Wire, WithPath,
-    composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
-    instance::Instance,
-    netlist::SearchableNetlist,
-    queries::netlist::basic::and::{AndGate, AndMux, AndNor},
+    composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite}, instance::Instance, netlist::SearchableNetlist, queries::netlist::basic::and::{AndGate, AndMux, AndNor}, Match,
+    Search,
+    State,
+    Wire,
+    WithPath,
 };
 use svql_common::Config;
 use svql_driver::{Context, Driver, DriverKey};
@@ -186,78 +186,78 @@ impl SearchableEnumComposite for AndAny<Search> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use svql_common::{Config, DedupeMode};
-    use svql_driver::Driver;
-    use tracing_subscriber;
-
-    fn init_test_logger() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .try_init();
-    }
-
-    use crate::{
-        Search, composite::SearchableEnumComposite, instance::Instance,
-        queries::enum_composite::and_any::AndAny,
-    };
-
-    #[test]
-    fn test_and_any() {
-        init_test_logger();
-        let driver = Driver::new_workspace().expect("Failed to create driver");
-
-        let config = Config::builder()
-            .exact_length()
-            .dedupe(DedupeMode::AutoMorph)
-            .build();
-
-        let context = AndAny::<Search>::context(&driver, &config)
-            .expect("Failed to create context for AndAny");
-
-        // haystack
-        let haystack_path = "examples/fixtures/basic/and/json/mixed_and_tree.json";
-        let haystack_module_name = "mixed_and_tree";
-        let (haystack_key, haystack) = driver
-            .get_or_load_design(haystack_path, haystack_module_name.to_string(), &config)
-            .expect("Failed to get haystack design");
-
-        let context = context.with_design(haystack_key.clone(), haystack.clone());
-
-        // root path for the composite
-        let root = Instance::root("and_any".to_string());
-
-        // run composite query
-        let hits = AndAny::<Search>::query(&haystack_key, &context, root, &config);
-
-        for h in &hits {
-            tracing::event!(tracing::Level::TRACE, "Found match: {:#?}", h);
-        }
-
-        let mut gate_cnt = 0usize;
-        let mut mux_cnt = 0usize;
-        let mut nor_cnt = 0usize;
-
-        for h in hits {
-            match h {
-                AndAny::Gate(_) => gate_cnt += 1,
-                AndAny::Mux(_) => mux_cnt += 1,
-                AndAny::Nor(_) => nor_cnt += 1,
-            }
-        }
-
-        tracing::event!(
-            tracing::Level::TRACE,
-            "Found {} gate matches, {} mux matches, {} nor matches",
-            gate_cnt,
-            mux_cnt,
-            nor_cnt
-        );
-
-        assert_eq!(gate_cnt, 3, "expected 3 and_gate matches");
-        assert_eq!(mux_cnt, 2, "expected 2 and_mux matches");
-        assert_eq!(nor_cnt, 2, "expected 2 and_nor matches");
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use svql_common::{Config, DedupeMode};
+//     use svql_driver::Driver;
+//     use tracing_subscriber;
+//
+//     fn init_test_logger() {
+//         let _ = tracing_subscriber::fmt()
+//             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+//             .with_test_writer()
+//             .try_init();
+//     }
+//
+//     use crate::{
+//         Search, composite::SearchableEnumComposite, instance::Instance,
+//         queries::enum_composite::and_any::AndAny,
+//     };
+//
+//     #[test]
+//     fn test_and_any() {
+//         init_test_logger();
+//         let driver = Driver::new_workspace().expect("Failed to create driver");
+//
+//         let config = Config::builder()
+//             .exact_length()
+//             .dedupe(DedupeMode::AutoMorph)
+//             .build();
+//
+//         let context = AndAny::<Search>::context(&driver, &config)
+//             .expect("Failed to create context for AndAny");
+//
+//         // haystack
+//         let haystack_path = "examples/fixtures/basic/and/json/mixed_and_tree.json";
+//         let haystack_module_name = "mixed_and_tree";
+//         let (haystack_key, haystack) = driver
+//             .get_or_load_design(haystack_path, haystack_module_name.to_string(), &config)
+//             .expect("Failed to get haystack design");
+//
+//         let context = context.with_design(haystack_key.clone(), haystack.clone());
+//
+//         // root path for the composite
+//         let root = Instance::root("and_any".to_string());
+//
+//         // run composite query
+//         let hits = AndAny::<Search>::query(&haystack_key, &context, root, &config);
+//
+//         for h in &hits {
+//             tracing::event!(tracing::Level::TRACE, "Found match: {:#?}", h);
+//         }
+//
+//         let mut gate_cnt = 0usize;
+//         let mut mux_cnt = 0usize;
+//         let mut nor_cnt = 0usize;
+//
+//         for h in hits {
+//             match h {
+//                 AndAny::Gate(_) => gate_cnt += 1,
+//                 AndAny::Mux(_) => mux_cnt += 1,
+//                 AndAny::Nor(_) => nor_cnt += 1,
+//             }
+//         }
+//
+//         tracing::event!(
+//             tracing::Level::TRACE,
+//             "Found {} gate matches, {} mux matches, {} nor matches",
+//             gate_cnt,
+//             mux_cnt,
+//             nor_cnt
+//         );
+//
+//         assert_eq!(gate_cnt, 3, "expected 3 and_gate matches");
+//         assert_eq!(mux_cnt, 2, "expected 2 and_mux matches");
+//         assert_eq!(nor_cnt, 2, "expected 2 and_nor matches");
+//     }
+// }

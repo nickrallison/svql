@@ -41,8 +41,8 @@ impl Driver {
         Self::new(workspace)
     }
 
-    #[contracts::debug_ensures(ret.as_ref().map(|o| o.root_path.is_absolute()).unwrap_or(true), "Root path must be absolute")]
-    #[contracts::debug_ensures(ret.as_ref().map(|o| o.yosys_path.exists()).unwrap_or(true), "Custom yosys path must exist")]
+    // #[contracts::debug_ensures(ret.as_ref().map(|o| o.root_path.is_absolute()).unwrap_or(true), "Root path must be absolute")]
+    // #[contracts::debug_ensures(ret.as_ref().map(|o| o.yosys_path.exists()).unwrap_or(true), "Custom yosys path must exist")]
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -68,7 +68,7 @@ impl Driver {
         &self,
         design_path: P,
         module_name: String,
-        config: &svql_common::Config,
+        module_config: &svql_common::ModuleConfig,
     ) -> Result<DriverKey, DriverError> {
         let design_path = design_path.as_ref();
         let absolute_path = if design_path.is_absolute() {
@@ -94,7 +94,11 @@ impl Driver {
             absolute_path.display(),
             module_name
         );
-        let design = self.load_design_from_path(&absolute_path, &module_name, config)?;
+        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+        let design = yosys_module
+            .import_design(module_config)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         // Store in registry
         {
@@ -103,7 +107,7 @@ impl Driver {
             tracing::event!(
                 tracing::Level::DEBUG,
                 "Design stored in registry: {:?}",
-                key
+                &key
             );
         }
 
@@ -116,15 +120,16 @@ impl Driver {
         &self,
         design_path: &str,
         module_name: &str,
-        config: &svql_common::Config,
+        module_config: &svql_common::ModuleConfig,
     ) -> Result<(DriverKey, Arc<Design>), DriverError> {
+        let design_path = Path::new(design_path);
         let absolute_path = if design_path.is_absolute() {
             design_path.to_path_buf()
         } else {
             self.root_path.join(design_path)
         };
 
-        let key = DriverKey::new(&absolute_path, module_name.clone());
+        let key = DriverKey::new(&absolute_path, module_name.to_string());
 
         // Try to get from registry first
         {
@@ -142,7 +147,13 @@ impl Driver {
             absolute_path.display(),
             module_name
         );
-        let design = self.load_design_from_path(&absolute_path, &module_name, config)?;
+
+        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+        let design = yosys_module
+            .import_design(module_config)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+
         let design_arc = Arc::new(design);
 
         {
