@@ -1,55 +1,43 @@
-
 module and_tree #(
-    parameter N = 2,
-
-    // Derived parameters
-    parameter N1 = N / 2,
-    parameter N2 = N - N1
+    parameter N = 2
 )
 (
     input [0:N-1] x,
     output y
 );
 
-genvar i;
+// Calculate the number of levels needed for the tree
+localparam LEVELS = $clog2(N) + 1;
+
+// Create arrays for each level of the tree
+wire [0:N-1] level [0:LEVELS-1];
+
+genvar i, j;
 
 generate
-    if (N == 1) begin // base case, return input
-        assign y = x[0];
-    end else begin // recursive case
-        wire y1;
-        wire y2;
-        wire [0:N1-1] x1;
-        wire [0:N2-1] x2;
-
-        // Splitting Inputs
-        genvar j;
-        for (j = 0; j < N1; j = j + 1) begin
-            assign x1[j] = x[j];
-        end
+    // Level 0: assign inputs
+    for (i = 0; i < N; i = i + 1) begin : input_level
+        assign level[0][i] = x[i];
+    end
+    
+    // Generate tree levels
+    for (i = 1; i < LEVELS; i = i + 1) begin : tree_levels
+        localparam PREV_WIDTH = N >> (i-1);
+        localparam CURR_WIDTH = (PREV_WIDTH + 1) >> 1;
         
-        for (j = 0; j < N2; j = j + 1) begin
-            assign x2[j] = x[N1 + j];
+        for (j = 0; j < CURR_WIDTH; j = j + 1) begin : level_nodes
+            if (j * 2 + 1 < PREV_WIDTH) begin
+                // Both inputs available
+                assign level[i][j] = level[i-1][j*2] & level[i-1][j*2+1];
+            end else if (j * 2 < PREV_WIDTH) begin
+                // Only left input available (odd number case)
+                assign level[i][j] = level[i-1][j*2];
+            end
         end
-
-        // Recursive Work
-        and_tree #(
-            .N(N1),
-        ) and_tree_1 (
-            .x(x1),
-            .y(y1)
-        );
-
-        and_tree #(
-            .N(N2),
-        ) and_tree_2 (
-            .x(x2),
-            .y(y2)
-        );
-
-        // Combining Results
-        assign y = y1 & y2;
-
     end
 endgenerate
+
+// Output is the final result
+assign y = level[LEVELS-1][0];
+
 endmodule
