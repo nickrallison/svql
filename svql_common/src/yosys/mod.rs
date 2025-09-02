@@ -149,13 +149,15 @@ impl YosysModule {
             return Err(format!("Yosys failed: status={:?}\n{}", output.status, stderr_str).into());
         }
 
-        let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
-        assert_eq!(
-            designs.len(),
-            1,
-            "can only convert single-module Yosys JSON to Unnamed IR"
-        );
-        let design = designs.into_values().next().unwrap();
+        let mut designs =
+            prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
+
+        let design = designs.remove(self.module_name()).ok_or_else(|| {
+            format!(
+                "Design not found in Yosys JSON output: {}",
+                design_path.display()
+            )
+        })?;
 
         Ok(design)
     }
