@@ -1,13 +1,13 @@
 // svql_query/src/queries/enum_composite/and_any.rs
 
 use crate::{
-    composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite}, instance::Instance, netlist::SearchableNetlist, queries::netlist::basic::and::{AndGate, AndMux, AndNor}, Match,
-    Search,
-    State,
-    Wire,
-    WithPath,
+    Match, Search, State, Wire, WithPath,
+    composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
+    instance::Instance,
+    netlist::SearchableNetlist,
+    queries::netlist::basic::and::{AndGate, AndMux, AndNor},
 };
-use svql_common::Config;
+use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
 #[cfg(feature = "rayon")]
@@ -53,7 +53,10 @@ impl<'ctx> MatchedEnumComposite<'ctx> for AndAny<Match<'ctx>> {}
 impl SearchableEnumComposite for AndAny<Search> {
     type Hit<'ctx> = AndAny<Match<'ctx>>;
 
-    fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
         let and_gate_context = AndGate::<Search>::context(driver, config)?;
         let and_mux_context = AndMux::<Search>::context(driver, config)?;
         let and_nor_context = AndNor::<Search>::context(driver, config)?;

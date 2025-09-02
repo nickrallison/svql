@@ -1,5 +1,5 @@
 // svql_query/src/queries/composite/dff_then_and.rs
-use svql_common::Config;
+use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
 #[cfg(feature = "rayon")]
@@ -72,7 +72,10 @@ impl<'ctx> MatchedComposite<'ctx> for SdffeThenAnd<Match<'ctx>> {}
 impl SearchableComposite for SdffeThenAnd<Search> {
     type Hit<'ctx> = SdffeThenAnd<Match<'ctx>>;
 
-    fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
         let sdffe_context = Sdffe::<Search>::context(driver, config)?;
         let and_context = AndGate::<Search>::context(driver, config)?;
         Ok(sdffe_context.merge(and_context))

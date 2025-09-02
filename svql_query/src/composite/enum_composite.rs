@@ -1,4 +1,4 @@
-use svql_common::Config;
+use svql_common::{Config, ModuleConfig};
 use svql_driver::{DriverKey, context::Context, driver::Driver};
 
 use crate::{Match, Search, State, instance::Instance};
@@ -12,7 +12,10 @@ where
 pub trait SearchableEnumComposite: EnumComposite<Search> {
     type Hit<'ctx>;
 
-    fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>>;
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>>;
 
     fn query<'ctx>(
         haystack_key: &DriverKey,
