@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use prjunnamed_netlist::Design;
+use svql_common::YosysModule;
 use thiserror::Error;
 
 use crate::{Context, DriverKey};
@@ -111,13 +112,12 @@ impl Driver {
 
     /// Get a design from the registry, loading it if necessary
     #[contracts::debug_requires(!module_name.is_empty())]
-    pub fn get_or_load_design<P: AsRef<Path>>(
+    pub fn get_or_load_design(
         &self,
-        design_path: P,
-        module_name: String,
+        design_path: &str,
+        module_name: &str,
         config: &svql_common::Config,
     ) -> Result<(DriverKey, Arc<Design>), DriverError> {
-        let design_path = design_path.as_ref();
         let absolute_path = if design_path.is_absolute() {
             design_path.to_path_buf()
         } else {
@@ -238,23 +238,32 @@ impl Driver {
     /// Private helper to load design from path
     fn load_design_from_path(
         &self,
-        design_path: &Path,
+        design_path: &str,
         module_name: &str,
-        config: &svql_common::Config,
+        module_config: &svql_common::ModuleConfig,
     ) -> Result<Design, DriverError> {
         tracing::event!(
             tracing::Level::DEBUG,
             "Loading design from path: {} ({})",
-            design_path.display(),
+            design_path,
             module_name
         );
-        svql_common::import_design_yosys(
-            &self.yosys_path,
-            design_path.to_path_buf(),
-            module_name,
-            config,
-        )
-        .map_err(|e| DriverError::DesignLoading(e.to_string()))
+        let yosys_module = YosysModule::new(design_path, module_name)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+
+        let result = yosys_module
+            .import_design(module_config)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+
+        Ok(result)
+
+        // svql_common::import_design_yosys(
+        //     &self.yosys_path,
+        //     design_path.to_path_buf(),
+        //     module_name,
+        //     config,
+        // )
+        // .map_err(|e| DriverError::DesignLoading(e.to_string()))
     }
 }
 

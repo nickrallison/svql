@@ -14,7 +14,7 @@ use prjunnamed_netlist::{CellRef, Design, Trit};
 use tracing::{debug, info, trace};
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use svql_common::{Config, DedupeMode};
+use svql_common::Config;
 
 pub use util::*;
 
@@ -102,11 +102,11 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         results.len()
     );
 
-    if matches!(config.dedupe, DedupeMode::AutoMorph) {
-        let mut seen: HashSet<Vec<usize>> = HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.signature()));
-        info!("After AutoMorph deduplication: {} results", results.len());
-    }
+    // if matches!(config.dedupe, DedupeMode::AutoMorph) {
+    //     let mut seen: HashSet<Vec<usize>> = HashSet::new();
+    //     results.retain(|m| seen.insert(m.mapping.signature()));
+    //     info!("After AutoMorph deduplication: {} results", results.len());
+    // }
 
     info!("Final result count: {}", results.len());
     results
