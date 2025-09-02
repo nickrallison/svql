@@ -40,7 +40,7 @@ impl YosysModule {
     }
     fn get_command_args_slice(&self, json_out: &Path, config: &ModuleConfig) -> Vec<String> {
         let read_cmd = match self.path {
-            DesignPath::Verilog(_) => "read_verilog -sv ",
+            DesignPath::Verilog(_) => "read_verilog",
             DesignPath::Rtlil(_) => "read_rtlil",
             DesignPath::Json(_) => "read_json",
         };
@@ -60,7 +60,12 @@ impl YosysModule {
         // chparam
         for (param, value) in &config.params {
             args.push("-p".to_string());
-            args.push(format!("chparam {} {}", param, value));
+            args.push(format!(
+                "chparam -set {} {} {}",
+                param,
+                value,
+                self.module_name()
+            ));
         }
 
         // proc

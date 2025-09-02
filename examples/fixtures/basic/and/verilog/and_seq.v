@@ -1,6 +1,5 @@
-
 module and_seq #(
-    parameter N = 2,
+    parameter N = 2
 )
 (
     input [0:N-1] x,
@@ -8,35 +7,19 @@ module and_seq #(
 );
 
 genvar i;
+wire [0:N-1] intermediate;
 
 generate
-    if (N == 1) begin // base case, return input
-        assign y = x[0];
-    end else begin // recursive case
-        wire y1;
-        wire [0:N-2] x1;
-        wire x2;
-
-        // Splitting Inputs
-        genvar j;
-        for (j = 0; j < N - 1; j = j + 1) begin
-            assign x1[j] = x[j];
-        end
-
-        assign x2 = x[N - 1];
+    // Base case: first intermediate result is just the first input
+    assign intermediate[0] = x[0];
     
-
-        // Recursive Work
-        and_seq #(
-            .N(N-1)
-        ) and_seq_1 (
-            .x(x1),
-            .y(y1)
-        );
-
-        // Combining Results
-        assign y = y1 & x2;
-
+    // Iteratively AND each subsequent input with the accumulated result
+    for (i = 1; i < N; i = i + 1) begin : and_chain
+        assign intermediate[i] = intermediate[i-1] & x[i];
     end
 endgenerate
+
+// Final output is the last intermediate result
+assign y = intermediate[N-1];
+
 endmodule
