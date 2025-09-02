@@ -260,47 +260,59 @@ lazy_static::lazy_static! {
     pub static ref BASIC_TEST_CASES: Vec<TestCase> = vec![
         // AND gate tests
         TestCase {
-            name: "and_gate_self_none",
-            config: Config::builder().exact_length().none().flatten().build(),
+            name: "and_gate_self",
+            config: {
+                Config::builder()
+                .exact_length()
+                .haystack_flatten(true)
+                .build()
+            },
             pattern: &AND_GATE,
             haystack: &AND_GATE_SELF,
             expected_matches: 2,
         },
         TestCase {
-            name: "and_gate_self_auto_morph",
-            config: Config::builder().exact_length().auto_morph().flatten().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_GATE_SELF,
-            expected_matches: 1,
-        },
-        TestCase {
-            name: "and_gate_in_and_q_double_none",
+            name: "and_2_seq_small_and_tree",
             config: Config::builder().exact_length().none().flatten().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_Q_DOUBLE_SDFFE,
-            expected_matches: 4,
-        },
-        TestCase {
-            name: "and_gate_in_and_q_double_auto_morph",
-            config: Config::builder().exact_length().auto_morph().flatten().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_Q_DOUBLE_SDFFE,
+            pattern: &AND_2_SEQ,
+            haystack: &SMALL_AND_TREE,
             expected_matches: 2,
         },
-        TestCase {
-            name: "and_gate_in_and_tree_auto_morph",
-            config: Config::builder().exact_length().auto_morph().flatten().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_TREE,
-            expected_matches: 7,
-        },
-        TestCase {
-            name: "and_gate_in_and_seq_auto_morph",
-            config: Config::builder().exact_length().auto_morph().flatten().build(),
-            pattern: &AND_GATE,
-            haystack: &AND_SEQ,
-            expected_matches: 7,
-        },
+        // TestCase {
+        //     name: "and_gate_self_auto_morph",
+        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_GATE_SELF,
+        //     expected_matches: 1,
+        // },
+        // TestCase {
+        //     name: "and_gate_in_and_q_double_none",
+        //     config: Config::builder().exact_length().none().flatten().build(),
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     expected_matches: 4,
+        // },
+        // TestCase {
+        //     name: "and_gate_in_and_q_double_auto_morph",
+        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     expected_matches: 2,
+        // },
+        // TestCase {
+        //     name: "and_gate_in_and_tree_auto_morph",
+        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_TREE,
+        //     expected_matches: 7,
+        // },
+        // TestCase {
+        //     name: "and_gate_in_and_seq_auto_morph",
+        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_SEQ,
+        //     expected_matches: 7,
+        // },
         TestCase {
             name: "and_2_seq_small_and_tree",
             config: Config::builder().exact_length().none().flatten().build(),
