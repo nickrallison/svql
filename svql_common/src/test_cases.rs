@@ -1,10 +1,11 @@
-use crate::config::Config;
+use std::path::Path;
+
+use crate::{YosysModule, config::Config};
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Netlist {
-        path: &'static str,
-        module: &'static str,
+        yosys_module: YosysModule,
         pattern_query_type: Option<&'static str>,
     },
     Composite {
@@ -17,9 +18,9 @@ impl Pattern {
         matches!(self, Pattern::Netlist { .. })
     }
 
-    pub fn path(&self) -> &'static str {
+    pub fn path(&self) -> &Path {
         match self {
-            Pattern::Netlist { path, .. } => path,
+            Pattern::Netlist { yosys_module, .. } => yosys_module.path(),
             Pattern::Composite { .. } => panic!("Composite patterns don't have paths"),
         }
     }
@@ -27,8 +28,7 @@ impl Pattern {
 
 #[derive(Debug, Clone)]
 pub struct Haystack {
-    pub path: &'static str,
-    pub module: &'static str,
+    pub yosys_module: YosysModule,
 }
 
 #[derive(Debug, Clone)]
@@ -45,28 +45,38 @@ pub struct TestCase {
 // #####################
 lazy_static::lazy_static! {
     static ref AND_GATE: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/and/verilog/and_gate.v",
-        module: "and_gate",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_gate.v",
+            "and_gate",
+        ).expect("Failed to create YosysModule for and_gate"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndGate"),
     };
     static ref AND_NOR: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/and/verilog/and_nor.v",
-        module: "and_nor",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_nor.v",
+            "and_nor",
+        ).expect("Failed to create YosysModule for and_nor"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndNor"),
     };
     static ref AND_MUX: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/and/verilog/and_mux.v",
-        module: "and_mux",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_mux.v",
+            "and_mux",
+        ).expect("Failed to create YosysModule for and_mux"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndMux"),
     };
     static ref SDFFE: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/ff/rtlil/sdffe.il",
-        module: "sdffe",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/ff/rtlil/sdffe.il",
+            "sdffe",
+        ).expect("Failed to create YosysModule for sdffe"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::dff::Sdffe"),
     };
     static ref AND_2_SEQ: Pattern = Pattern::Netlist {
-        path: "examples/patterns/basic/and/verilog/and_2_seq.v",
-        module: "and_2_seq",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_2_seq.v",
+            "and_2_seq",
+        ).expect("Failed to create YosysModule for and_2_seq"),
         pattern_query_type: None,
     };
 }
@@ -74,23 +84,31 @@ lazy_static::lazy_static! {
 // SECURITY: locked_reg (RTLIL patterns)
 lazy_static::lazy_static! {
     static ref ASYNC_EN_IL: Pattern = Pattern::Netlist {
-        path: "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
-        module: "async_en",
+        yosys_module: YosysModule::new(
+            "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
+            "async_en",
+        ).expect("Failed to create YosysModule for async_en"),
         pattern_query_type: None,
     };
     static ref ASYNC_MUX_IL: Pattern = Pattern::Netlist {
-        path: "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
-        module: "async_mux",
+        yosys_module: YosysModule::new(
+            "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
+            "async_mux",
+        ).expect("Failed to create YosysModule for async_mux"),
         pattern_query_type: None,
     };
     static ref SYNC_EN_IL: Pattern = Pattern::Netlist {
-        path: "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
-        module: "sync_en",
+        yosys_module: YosysModule::new(
+            "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
+            "sync_en",
+        ).expect("Failed to create YosysModule for sync_en"),
         pattern_query_type: None,
     };
     static ref SYNC_MUX_IL: Pattern = Pattern::Netlist {
-        path: "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
-        module: "sync_mux",
+        yosys_module: YosysModule::new(
+            "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
+            "sync_mux",
+        ).expect("Failed to create YosysModule for sync_mux"),
         pattern_query_type: None,
     };
 }
@@ -112,88 +130,126 @@ lazy_static::lazy_static! {
 // #####################
 lazy_static::lazy_static! {
     static ref AND_GATE_SELF: Haystack = Haystack {
-        path: "examples/patterns/basic/and/verilog/and_gate.v",
-        module: "and_gate",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_gate.v",
+            "and_gate",
+        ).expect("Failed to create YosysModule for and_gate"),
     };
     static ref AND_Q_DOUBLE_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
-        module: "and_q_double_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v",
+            "and_q_double_sdffe",
+        ).expect("Failed to create YosysModule for and_q_double_sdffe"),
     };
     static ref AND_TREE: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_tree.v",
-        module: "and_tree",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_tree.v",
+            "and_tree",
+        ).expect("Failed to create YosysModule for and_tree"),
     };
     static ref AND_SEQ: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_seq.v",
-        module: "and_seq",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_seq.v",
+            "and_seq",
+        ).expect("Failed to create YosysModule for and_seq"),
     };
     static ref SDFFE_SELF: Haystack = Haystack {
-        path: "examples/patterns/basic/ff/rtlil/sdffe.il",
-        module: "sdffe",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/ff/rtlil/sdffe.il",
+            "sdffe",
+        ).expect("Failed to create YosysModule for sdffe"),
     };
     static ref COMB_D_DOUBLE_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v",
-        module: "comb_d_double_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/comb_d_double_sdffe.v",
+            "comb_d_double_sdffe",
+        ).expect("Failed to create YosysModule for comb_d_double_sdffe"),
     };
     static ref PAR_DOUBLE_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/par_double_sdffe.v",
-        module: "par_double_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/par_double_sdffe.v",
+            "par_double_sdffe",
+        ).expect("Failed to create YosysModule for par_double_sdffe"),
     };
     static ref SEQ_DOUBLE_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
-        module: "seq_double_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
+            "seq_double_sdffe",
+        ).expect("Failed to create YosysModule for seq_double_sdffe"),
     };
     static ref SEQ_2_WIDTH_2_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/rtlil/seq_2_width_2_sdffe.il",
-        module: "seq_2_width_2_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/rtlil/seq_2_width_2_sdffe.il",
+            "seq_2_width_2_sdffe",
+        ).expect("Failed to create YosysModule for seq_2_width_2_sdffe"),
     };
     static ref SEQ_1_WIDTH_2_SDFFE: Haystack = Haystack {
-        path: "examples/fixtures/basic/ff/rtlil/seq_1_width_2_sdffe.il",
-        module: "seq_1_width_2_sdffe",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/rtlil/seq_1_width_2_sdffe.il",
+            "seq_1_width_2_sdffe",
+        ).expect("Failed to create YosysModule for seq_1_width_2_sdffe"),
     };
     // Mixed tree provided as a yosys JSON (as per your current layout)
     static ref MIXED_AND_TREE: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/json/mixed_and_tree.json",
-        module: "mixed_and_tree",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/json/mixed_and_tree.json",
+            "mixed_and_tree",
+        ).expect("Failed to create YosysModule for mixed_and_tree"),
     };
     // New haystacks for the pure-submodule trees
     static ref AND_NOR_TREE: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_nor_tree.v",
-        module: "and_nor_tree",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_nor_tree.v",
+            "and_nor_tree",
+        ).expect("Failed to create YosysModule for and_nor_tree"),
     };
     static ref AND_MUX_TREE: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_mux_tree.v",
-        module: "and_mux_tree",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_mux_tree.v",
+            "and_mux_tree",
+        ).expect("Failed to create YosysModule for and_mux_tree"),
     };
     // Self haystacks for direct self-matching
     static ref AND_NOR_SELF: Haystack = Haystack {
-        path: "examples/patterns/basic/and/verilog/and_nor.v",
-        module: "and_nor",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_nor.v",
+            "and_nor",
+        ).expect("Failed to create YosysModule for and_nor"),
     };
     static ref AND_MUX_SELF: Haystack = Haystack {
-        path: "examples/patterns/basic/and/verilog/and_mux.v",
-        module: "and_mux",
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_mux.v",
+            "and_mux",
+        ).expect("Failed to create YosysModule for and_mux"),
     };
     // New haystacks for constant checking on and_mux
     static ref AND_MUX_CONST_VARIANTS: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_mux_const_variants.v",
-        module: "and_mux_const_variants",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_mux_const_variants.v",
+            "and_mux_const_variants",
+        ).expect("Failed to create YosysModule for and_mux_const_variants"),
     };
     static ref AND_MUX_CONST_BAD: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/and_mux_const_bad.v",
-        module: "and_mux_const_bad",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/and_mux_const_bad.v",
+            "and_mux_const_bad",
+        ).expect("Failed to create YosysModule for and_mux_const_bad"),
     };
     static ref SMALL_AND_TREE: Haystack = Haystack {
-        path: "examples/fixtures/basic/and/verilog/small_and_tree.v",
-        module: "small_and_tree",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/small_and_tree.v",
+            "small_and_tree",
+        ).expect("Failed to create YosysModule for small_and_tree"),
     };
 }
 
 // SECURITY: locked_reg (RTLIL haystack)
 lazy_static::lazy_static! {
     static ref MANY_LOCKED_REGS_IL: Haystack = Haystack {
-        path: "examples/fixtures/security/access_control/locked_reg/rtlil/many_locked_regs.il",
-        module: "many_locked_regs",
+        yosys_module: YosysModule::new(
+            "examples/fixtures/security/access_control/locked_reg/rtlil/many_locked_regs.il",
+            "many_locked_regs",
+        ).expect("Failed to create YosysModule for many_locked_regs"),
     };
 }
 
