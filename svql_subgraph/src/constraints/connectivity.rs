@@ -44,58 +44,6 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         self.validate_fanin_connections(d_cell)
     }
 
-    // fn validate_fanout_connections(&self, d_cell: CellRef<'d>) -> bool {
-    //     let _t = Timer::new("ConnectivityConstraint::validate_fanout_connections");
-    //     let p_fanouts = self.pattern_index.get_fanouts(self.p_cell);
-
-    //     trace!(
-    //         "Validating fanout connections for design cell {:?}, pattern has {} fanouts",
-    //         d_cell,
-    //         p_fanouts.len()
-    //     );
-
-    //     // Only need to validate edges to already-mapped sinks.
-    //     let result = p_fanouts
-    //         .iter()
-    //         .filter_map(|(p_sink_cell, pin_idx)| {
-    //             self.mapping
-    //                 .get_design_cell(*p_sink_cell)
-    //                 .map(|d_sink_cell| (d_sink_cell, *pin_idx))
-    //         })
-    //         .all(|(d_sink_cell, pin_idx)| self.fanout_edge_ok(d_cell, d_sink_cell, pin_idx));
-
-    //     if !result {
-    //         debug!("Fanout validation failed for design cell {:?}", d_cell);
-    //     }
-    //     result
-    // }
-
-    // fn fanout_edge_ok(
-    //     &self,
-    //     d_driver: prjunnamed_netlist::CellRef<'d>,
-    //     d_sink_cell: prjunnamed_netlist::CellRef<'d>,
-    //     pin_idx: usize,
-    // ) -> bool {
-    //     let _t = Timer::new("ConnectivityConstraint::fanout_edge_ok");
-    //     let d_sink_cell_type = NodeType::from(d_sink_cell.get().as_ref());
-    //     let sink_commutative = d_sink_cell_type.has_commutative_inputs();
-
-    //     let result = if sink_commutative {
-    //         self.design_index.has_fanout_to(d_driver, d_sink_cell)
-    //     } else {
-    //         self.design_index
-    //             .has_fanout_to_pin(d_driver, d_sink_cell, pin_idx)
-    //     };
-
-    //     if !result {
-    //         trace!(
-    //             "Fanout edge check failed: driver {:?} -> sink {:?} pin {}, commutative: {}",
-    //             d_driver, d_sink_cell, pin_idx, sink_commutative
-    //         );
-    //     }
-    //     result
-    // }
-
     fn validate_fanin_connections(&self, d_cell: CellWrapper<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
 
@@ -108,28 +56,6 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         self.cells_match_fan_in(p_cell, d_cell)
     }
 
-    // fn sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
-    //     let _t = Timer::new("ConnectivityConstraint::sources_compatible");
-    //     match p_src {
-    //         NodeSource::Const(pt) => matches!(d_src, NodeSource::Const(dt) if dt == pt),
-
-    //         // Gate/Io sources must map to the mapped design cell (if mapping exists yet).
-    //         NodeSource::Gate(p_cell, p_bit) | NodeSource::Io(p_cell, p_bit) => {
-    //             if let Some(d_expected) = self.mapping.get_design_cell(*p_cell) {
-    //                 match d_src {
-    //                     NodeSource::Gate(d_cell, d_bit) | NodeSource::Io(d_cell, d_bit) => {
-    //                         *d_cell == d_expected && *d_bit == *p_bit
-    //                     }
-    //                     NodeSource::Const(_) => false,
-    //                 }
-    //             } else {
-    //                 // If the pattern source isn't mapped yet, we don't constrain it here.
-    //                 true
-    //             }
-    //         }
-    //     }
-    // }
-
     // ####################################
     fn cells_match_fan_in(&self, pattern_cell: &Cell, design_cell: &Cell) -> bool {
         trace!(
@@ -140,76 +66,47 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         match (pattern_cell, design_cell) {
             (Buf(p_value), Buf(d_value)) => {
                 let value_matches = self.values_match_fan_in(p_value, d_value);
-                match value_matches {
-                    true => trace!("Buf values match fan-in: {:?} and {:?}", p_value, d_value),
-                    false => trace!(
-                        "Buf values do NOT match fan-in: {:?} and {:?}",
-                        p_value, d_value
-                    ),
-                };
                 value_matches
             }
             (Not(p_value), Not(d_value)) => {
                 let value_matches = self.values_match_fan_in(p_value, d_value);
-                match value_matches {
-                    true => trace!("Not values match fan-in: {:?} and {:?}", p_value, d_value),
-                    false => trace!(
-                        "Not values do NOT match fan-in: {:?} and {:?}",
-                        p_value, d_value
-                    ),
-                };
                 value_matches
             }
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
                 let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
-                let result = a_matches && b_matches;
+                let result_normal = a_matches && b_matches;
 
-                match result {
-                    true => trace!(
-                        "And values match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                    false => trace!(
-                        "And values do NOT match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                };
-                result
+                // Commutative case
+                let a_swapped = self.values_match_fan_in(p_a_value, d_b_value);
+                let b_swapped = self.values_match_fan_in(p_b_value, d_a_value);
+                let result_swapped = a_swapped && b_swapped;
+
+                result_normal || result_swapped
             }
             (Or(p_a_value, p_b_value), Or(d_a_value, d_b_value)) => {
                 let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
-                let result = a_matches && b_matches;
+                let result_normal = a_matches && b_matches;
 
-                match result {
-                    true => trace!(
-                        "Or values match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                    false => trace!(
-                        "Or values do NOT match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                };
-                result
+                // Commutative case
+                let a_swapped = self.values_match_fan_in(p_a_value, d_b_value);
+                let b_swapped = self.values_match_fan_in(p_b_value, d_a_value);
+                let result_swapped = a_swapped && b_swapped;
+
+                result_normal || result_swapped
             }
             (Xor(p_a_value, p_b_value), Xor(d_a_value, d_b_value)) => {
                 let a_matches = self.values_match_fan_in(p_a_value, d_a_value);
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value);
-                let result = a_matches && b_matches;
+                let result_normal = a_matches && b_matches;
 
-                match result {
-                    true => trace!(
-                        "Xor values match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                    false => trace!(
-                        "Xor values do NOT match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                };
-                result
+                // Commutative case
+                let a_swapped = self.values_match_fan_in(p_a_value, d_b_value);
+                let b_swapped = self.values_match_fan_in(p_b_value, d_a_value);
+                let result_swapped = a_swapped && b_swapped;
+
+                result_normal || result_swapped
             }
             (Mux(p_a_value, p_b_value, p_c_value), Mux(d_a_value, d_b_value, d_c_value)) => {
                 let a_matches = self.nets_match_fan_in(p_a_value, d_a_value);
@@ -267,19 +164,14 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
             (Eq(pa_value, pb_value), Eq(da_value, db_value)) => {
                 let a_matches = self.values_match_fan_in(pa_value, da_value);
                 let b_matches = self.values_match_fan_in(pb_value, db_value);
-                let result = a_matches && b_matches;
+                let result_normal = a_matches && b_matches;
 
-                match result {
-                    true => trace!(
-                        "Eq values match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                    false => trace!(
-                        "Eq values do NOT match fan-in: a={:?}, b={:?}",
-                        a_matches, b_matches
-                    ),
-                };
-                result
+                // Commutative case
+                let a_swapped = self.values_match_fan_in(pa_value, db_value);
+                let b_swapped = self.values_match_fan_in(pb_value, da_value);
+                let result_swapped = a_swapped && b_swapped;
+
+                result_normal || result_swapped
             }
             (ULt(pa_value, pb_value), ULt(da_value, db_value)) => {
                 let a_matches = self.values_match_fan_in(pa_value, da_value);

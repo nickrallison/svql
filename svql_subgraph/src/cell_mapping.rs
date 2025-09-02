@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Timer, cell::CellWrapper};
+use crate::{cell::CellWrapper, Timer};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct CellMapping<'p, 'd> {

@@ -9,14 +9,9 @@ pub mod cell;
 
 use cell_mapping::CellMapping;
 use graph_index::GraphIndex;
-use tracing::{debug, info, trace};
 
-// use crate::cell::{CellType, NodeSource};
-// use crate::constraints::{
-//     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
-//     NotAlreadyMappedConstraint,
-// };
-use prjunnamed_netlist::Design;
+use prjunnamed_netlist::{CellRef, Design, Trit};
+use tracing::{debug, info, trace};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
@@ -89,15 +84,6 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     // in topological_order, only gates & inputs (push inputs to the back)
     let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
 
-    // Estimate total candidates up‑front: sum initial candidate counts per pattern cell.
-    // if progress.is_some() {
-    //     let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
-    //     progress
-    //         .unwrap()
-    //         .set_total_candidates(total_candidates as u64);
-    //     info!("Estimated total candidates: {}", total_candidates);
-    // }
-
     let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
     let mut results = find_isomorphisms_recursive_collect(
@@ -131,7 +117,7 @@ fn build_pattern_mapping_queue<'p>(pattern_index: &GraphIndex<'p>) -> VecDeque<C
         let q: Vec<CellWrapper<'p>> = pattern_index
             .get_cells_topo()
             .iter()
-            .filter(|c| !matches!(c.cell_type(), CellType::Input))
+            // .filter(|c| !matches!(c.cell_type(), CellType::Input))
             .filter(|c| !matches!(c.cell_type(), CellType::Output))
             .cloned()
             .rev()
@@ -251,14 +237,13 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     // Base Case
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
+        // attach
         return vec![SubgraphIsomorphism {
             mapping: cell_mapping,
             input_by_name: pattern_index.get_input_by_name().clone(),
             output_by_name: pattern_index.get_output_by_name().clone(),
         }];
     };
-
-    let pattern_current_type = pattern_current.cell_type();
 
     let candidates_vec = build_candidates(
         pattern_current.clone(),
@@ -283,7 +268,8 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
                 d_candidate, pattern_current
             );
             let mut nm = cell_mapping.clone();
-            nm.insert(pattern_current.clone(), d_candidate);
+            nm.insert(pattern_current.clone(), d_candidate.clone());
+
             find_isomorphisms_recursive_collect(
                 pattern_index,
                 design_index,
