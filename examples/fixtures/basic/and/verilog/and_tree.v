@@ -1,16 +1,16 @@
 
 module and_tree #(
     parameter N = 2,
-    parameter WIDTH = 1
+    parameter WIDTH = 1,
+
+    // Derived parameters
+    parameter N1 = N / 2,
+    parameter N2 = N - N1
 )
-
 (
-input [N-1:0] x [WIDTH-1:0],
-output y [WIDTH-1:0]
+    input [WIDTH-1:0] x [0:N-1],
+    output [WIDTH-1:0] y
 );
-
-parameter N1 = N / 2;
-parameter N2 = N - N1;
 
 genvar i;
 
@@ -18,14 +18,22 @@ generate
     if (N == 1) begin // base case, return input
         assign y = x[0];
     end else begin // recursive case
-        wire y1 [WIDTH-1:0];
-        wire y2 [WIDTH-1:0];
-        wire x1 [N1-1:0][WIDTH-1:0];
-        wire x2 [N2-1:0][WIDTH-1:0];
+        wire [WIDTH-1:0] y1;
+        wire [WIDTH-1:0] y2;
+        wire [WIDTH-1:0] x1 [0:N1-1];
+        wire [WIDTH-1:0] x2 [0:N2-1];
 
-        assign x1 = x[N1-1:0];
-        assign x2 = x[N-1:N1];
+        // Splitting Inputs
+        genvar j;
+        for (j = 0; j < N1; j = j + 1) begin
+            assign x1[j] = x[j];
+        end
+        
+        for (j = 0; j < N2; j = j + 1) begin
+            assign x2[j] = x[N1 + j];
+        end
 
+        // Recursive Work
         and_tree #(
             .N(N1),
             .WIDTH(WIDTH)
@@ -42,7 +50,11 @@ generate
             .y(y2)
         );
 
-        assign y = y1 & y2;
+        // Combining Results
+        genvar k;
+        for (k = 0; k < WIDTH; k = k + 1) begin
+            assign y[k] = y1[k] & y2[k];
+        end
     end
 endgenerate
 endmodule

@@ -1,16 +1,12 @@
 
 module and_seq #(
     parameter N = 2,
-    parameter WIDTH = 1
+    parameter WIDTH = 1,
 )
-
 (
-input [N-1:0] x [WIDTH-1:0],
-output y [WIDTH-1:0]
+    input [WIDTH-1:0] x [0:N-1],
+    output [WIDTH-1:0] y
 );
-
-parameter N1 = N / 2;
-parameter N2 = N - N1;
 
 genvar i;
 
@@ -18,28 +14,33 @@ generate
     if (N == 1) begin // base case, return input
         assign y = x[0];
     end else begin // recursive case
-        wire y1 [WIDTH-1:0];
-        wire x1 [N1-1:0][WIDTH-1:0];
+        wire [WIDTH-1:0] y1;
+        wire [WIDTH-1:0] x1 [0:N-2];
+        wire [WIDTH-1:0] x2;
 
-        assign x1 = x[N1-1:0];
+        // Splitting Inputs
+        genvar j;
+        for (j = 0; j < N - 1; j = j + 1) begin
+            assign x1[j] = x[j];
+        end
 
-        and_tree #(
+        assign x2 = x[N - 1];
+    
+
+        // Recursive Work
+        and_seq #(
             .N(N1),
             .WIDTH(WIDTH)
-        ) and_tree_1 (
+        ) and_seq_1 (
             .x(x1),
             .y(y1)
         );
 
-        and_tree #(
-            .N(N2),
-            .WIDTH(WIDTH)
-        ) and_tree_2 (
-            .x(x2),
-            .y(y2)
-        );
-
-        assign y = y1 & y2;
+        // Combining Results
+        genvar k;
+        for (k = 0; k < WIDTH; k = k + 1) begin
+            assign y[k] = y1[k] & x2[k];
+        end
     end
 endgenerate
 endmodule
