@@ -1,7 +1,6 @@
 use svql_common::Config;
-use svql_driver::{Driver, DriverKey, context::Context};
-use svql_subgraph::Progress;
-use svql_subgraph::{SubgraphIsomorphism, find_subgraph_isomorphisms};
+use svql_driver::{context::Context, Driver, DriverKey};
+use svql_subgraph::{find_subgraph_isomorphisms, SubgraphIsomorphism};
 
 use crate::instance::Instance;
 
@@ -55,36 +54,35 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
             .expect("Haystack design not found in context")
             .as_ref();
 
-        find_subgraph_isomorphisms(needle, haystack, config, None)
+        find_subgraph_isomorphisms(needle, haystack, config)
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
     }
 
     /// Same as `query`, but also updates the provided `progress` as the subgraph search proceeds.
-    #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
-    #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
-    fn query_with_progress<'ctx>(
-        haystack_key: &DriverKey,
-        context: &'ctx Context,
-        path: Instance,
-        config: &Config,
-        progress: &Progress,
-    ) -> Vec<Self::Hit<'ctx>> {
-        let needle = context
-            .get(&Self::driver_key())
-            .expect("Pattern design not found in context")
-            .as_ref();
-        let haystack = context
-            .get(haystack_key)
-            .expect("Haystack design not found in context")
-            .as_ref();
-
-        svql_subgraph::find_subgraph_isomorphisms(needle, haystack, config, Some(progress))
-            .into_iter()
-            .map(|m| Self::from_subgraph(&m, path.clone()))
-            .collect()
-    }
+    // #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
+    // #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
+    // fn query_with_progress<'ctx>(
+    //     haystack_key: &DriverKey,
+    //     context: &'ctx Context,
+    //     path: Instance,
+    //     config: &Config,
+    // ) -> Vec<Self::Hit<'ctx>> {
+    //     let needle = context
+    //         .get(&Self::driver_key())
+    //         .expect("Pattern design not found in context")
+    //         .as_ref();
+    //     let haystack = context
+    //         .get(haystack_key)
+    //         .expect("Haystack design not found in context")
+    //         .as_ref();
+    //
+    //     svql_subgraph::find_subgraph_isomorphisms(needle, haystack, config, Some(progress))
+    //         .into_iter()
+    //         .map(|m| Self::from_subgraph(&m, path.clone()))
+    //         .collect()
+    // }
 
     #[contracts::debug_ensures(ret.as_ref().map(|c| c.len()).unwrap_or(1) == 1, "Context for a single pattern only")]
     fn context(driver: &Driver, config: &Config) -> Result<Context, Box<dyn std::error::Error>> {

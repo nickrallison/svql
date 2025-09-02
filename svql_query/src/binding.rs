@@ -11,13 +11,14 @@ pub fn bind_input<'ctx>(
     name: &str,
     bit: usize,
 ) -> Match<'ctx> {
-    tracing::event!(tracing::Level::TRACE, "Binding input: {} bit {}", name, bit);
-    let pat = m.input_by_name.get(name).cloned();
-    let des = m.design_source_of_input_bit(name, bit).map(|(c, _b)| c);
-    Match {
-        pat_node_ref: pat,
-        design_node_ref: des,
-    }
+    // tracing::event!(tracing::Level::TRACE, "Binding input: {} bit {}", name, bit);
+    // let pat = m.input_by_name.get(name).cloned();
+    // let des = m.design_source_of_input_bit(name, bit).map(|(c, _b)| c);
+    // Match {
+    //     pat_node_ref: pat,
+    //     design_node_ref: des,
+    // }
+    todo!()
 }
 
 pub fn bind_output<'ctx>(
@@ -25,16 +26,17 @@ pub fn bind_output<'ctx>(
     name: &str,
     bit: usize,
 ) -> Match<'ctx> {
-    tracing::event!(
-        tracing::Level::TRACE,
-        "Binding output: {} bit {}",
-        name,
-        bit
-    );
-    let pat = m.output_by_name.get(name).cloned();
-    let des = m.design_driver_of_output_bit(name, bit).map(|(c, _b)| c);
-    Match {
-        pat_node_ref: pat,
-        design_node_ref: des,
-    }
+    // tracing::event!(
+    //     tracing::Level::TRACE,
+    //     "Binding output: {} bit {}",
+    //     name,
+    //     bit
+    // );
+    // let pat = m.output_by_name.get(name).cloned();
+    // let des = m.design_driver_of_output_bit(name, bit).map(|(c, _b)| c);
+    // Match {
+    //     pat_node_ref: pat,
+    //     design_node_ref: des,
+    // }
+    todo!()
 }

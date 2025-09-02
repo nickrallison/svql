@@ -8,7 +8,7 @@ use std::{
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use regex::Regex;
-use syn::{LitStr, Path as SynPath, parse_str};
+use syn::{parse_str, LitStr, Path as SynPath};
 use walkdir::WalkDir;
 
 use svql_common::build_support::{sanitize_ident, test_case_names};
@@ -290,7 +290,7 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
                 Kind::Netlist => {
                     (
                         quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::context(driver, config)),
-                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query_with_progress(&hk, &ctx, root, config, progress)),
+                        quote!(<#ty_search as svql_query::netlist::SearchableNetlist>::query(&hk, &ctx, root, config)),
                     )
                 }
                 Kind::Composite => {
@@ -373,7 +373,6 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
 
         use svql_common::Config;
         use svql_driver::Driver;
-        use svql_subgraph::Progress;
 
         pub fn run_count_for_type_name(
             name: &str,
@@ -388,19 +387,19 @@ fn emit_generated_query_dispatch(found: &[Discovered]) {
             }
         }
 
-        pub fn run_count_for_type_name_with_progress(
-            name: &str,
-            driver: &Driver,
-            haystack_path: &str,
-            haystack_module: &str,
-            config: &Config,
-            progress: &Progress,
-        ) -> Result<usize, String> {
-            match name {
-                #(#arms_with_progress,)*
-                _ => Err(format!("Unknown query type: {}", name)),
-            }
-        }
+        // pub fn run_count_for_type_name_with_progress(
+        //     name: &str,
+        //     driver: &Driver,
+        //     haystack_path: &str,
+        //     haystack_module: &str,
+        //     config: &Config,
+        //     progress: &Progress,
+        // ) -> Result<usize, String> {
+        //     match name {
+        //         #(#arms_with_progress,)*
+        //         _ => Err(format!("Unknown query type: {}", name)),
+        //     }
+        // }
 
         pub fn known_query_type_names() -> &'static [&'static str] {
             &[

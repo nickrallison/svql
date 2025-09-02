@@ -33,7 +33,7 @@ use crate::{
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
-    // Mapping of pattern nodes to design nodes (and reverse)
+    // Mapping of pattern cells to design cells (and reverse)
     mapping: CellMapping<'p, 'd>,
 
     // Boundary IO lookup tables
@@ -59,7 +59,7 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     //     bit: usize,
     // ) -> Option<(CellRef<'d>, usize)> {
     //     let p_input = self.input_by_name.get(name)?;
-    //     let d_src = self.mapping.get_design_node(*p_input)?;
+    //     let d_src = self.mapping.get_design_cell(*p_input)?;
     //     Some((d_src, bit))
     // }
 
@@ -89,7 +89,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     // in topological_order, only gates & inputs (push inputs to the back)
     let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
 
-    // Estimate total candidates up‑front: sum initial candidate counts per pattern node.
+    // Estimate total candidates up‑front: sum initial candidate counts per pattern cell.
     // if progress.is_some() {
     //     let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
     //     progress
@@ -98,7 +98,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     //     info!("Estimated total candidates: {}", total_candidates);
     // }
 
-    let initial_node_mapping: CellMapping<'p, 'd> = CellMapping::new();
+    let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
     let mut results = find_isomorphisms_recursive_collect(
         &pattern_index,
@@ -106,7 +106,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         pattern,
         design,
         config,
-        initial_node_mapping,
+        initial_cell_mapping,
         pattern_mapping_queue,
         0, // depth
     );
@@ -155,7 +155,7 @@ fn build_candidates<'a, 'p, 'd, 'g>(
     pattern: &'p Design,
     design: &'d Design,
     config: &'a Config,
-    node_mapping: &CellMapping<'p, 'd>,
+    cell_mapping: &CellMapping<'p, 'd>,
 ) -> Vec<CellWrapper<'d>> {
     let current_type = pattern_current.cell_type();
 
@@ -181,7 +181,7 @@ fn build_candidates<'a, 'p, 'd, 'g>(
 
     // Filter 2: Filter only not already mapped cells
     let not_already_mapped_filter: NotAlreadyMappedConstraint<'p, 'd> =
-        NotAlreadyMappedConstraint::new(node_mapping.clone());
+        NotAlreadyMappedConstraint::new(cell_mapping.clone());
 
     // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
     // since cells are chosen in the order inputs -> outputs
@@ -193,7 +193,7 @@ fn build_candidates<'a, 'p, 'd, 'g>(
         pattern,
         design,
         config,
-        node_mapping.clone(),
+        cell_mapping.clone(),
     );
 
     candidates
@@ -213,15 +213,15 @@ fn build_candidates<'a, 'p, 'd, 'g>(
 
 //     for (&name, &p_out) in output_by_name.iter() {
 //         // For each bit of the pattern output, find its source in the pattern,
-//         // map that source node to the design node, and record (design_node, bit).
-//         let sources = pattern_index.get_node_sources(p_out);
+//         // map that source cell to the design cell, and record (design_cell, bit).
+//         let sources = pattern_index.get_cell_sources(p_out);
 //         let mut vec_bits: Vec<(CellRef<'d>, usize)> = Vec::with_capacity(sources.len());
 
 //         for (_bit_idx, src) in sources.iter().enumerate() {
 //             match src {
-//                 NodeSource::Gate(p_src_node, p_bit) | NodeSource::Io(p_src_node, p_bit) => {
-//                     if let Some(d_src_node) = mapping.get_design_node(*p_src_node) {
-//                         vec_bits.push((d_src_node, *p_bit));
+//                 NodeSource::Gate(p_src_cell, p_bit) | NodeSource::Io(p_src_cell, p_bit) => {
+//                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
+//                         vec_bits.push((d_src_cell, *p_bit));
 //                     } else {
 //                         // Unmapped source — should not happen for complete mapping; skip.
 //                     }
@@ -245,14 +245,14 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &'a Config,
-    node_mapping: CellMapping<'p, 'd>,
+    cell_mapping: CellMapping<'p, 'd>,
     mut pattern_mapping_queue: VecDeque<CellWrapper<'p>>,
     depth: usize,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     // Base Case
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
         return vec![SubgraphIsomorphism {
-            mapping: node_mapping,
+            mapping: cell_mapping,
             input_by_name: pattern_index.get_input_by_name().clone(),
             output_by_name: pattern_index.get_output_by_name().clone(),
         }];
@@ -267,7 +267,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         pattern,
         design,
         config,
-        &node_mapping,
+        &cell_mapping,
     );
 
     #[cfg(feature = "rayon")]
@@ -279,10 +279,10 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     let results: Vec<SubgraphIsomorphism<'p, 'd>> = cand_iter
         .flat_map(|d_candidate| {
             trace!(
-                "Trying candidate {:?} for pattern node {:?}",
+                "Trying candidate {:?} for pattern cell {:?}",
                 d_candidate, pattern_current
             );
-            let mut nm = node_mapping.clone();
+            let mut nm = cell_mapping.clone();
             nm.insert(pattern_current.clone(), d_candidate);
             find_isomorphisms_recursive_collect(
                 pattern_index,

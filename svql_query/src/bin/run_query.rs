@@ -14,17 +14,10 @@
 // - --progress shows a simple textual progress spinner while loading, then a bar when matching.
 
 use std::env;
-use std::io::{self, Write};
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-use std::thread;
-use std::time::Duration;
+use std::io::Write;
 
 use svql_common::{Config, DedupeMode};
 use svql_driver::Driver;
-use svql_subgraph::Progress;
 
 // Generated at build-time. Provides dispatch helpers.
 mod gen_dispatch {
@@ -120,27 +113,27 @@ fn parse_args() -> Args {
     }
 }
 
-fn render_progress_bar(s: svql_subgraph::ProgressSnapshot) -> String {
-    let total = s.total_candidates.max(1); // avoid div-by-zero if used standalone
-    let scanned = s.scanned_candidates.min(total);
-    let pct = (scanned as f64 / total as f64) * 100.0;
-
-    let width = 40usize;
-    let filled = ((scanned as f64 / total as f64) * width as f64).round() as usize;
-    let filled = filled.min(width);
-
-    let mut bar = String::with_capacity(width + 2);
-    bar.push('[');
-    for _ in 0..filled {
-        bar.push('#');
-    }
-    for _ in filled..width {
-        bar.push('.');
-    }
-    bar.push(']');
-
-    format!("{} {:>10}/{:<10} ({:>5.1}%)", bar, scanned, total, pct)
-}
+// fn render_progress_bar(s: svql_subgraph::ProgressSnapshot) -> String {
+//     let total = s.total_candidates.max(1); // avoid div-by-zero if used standalone
+//     let scanned = s.scanned_candidates.min(total);
+//     let pct = (scanned as f64 / total as f64) * 100.0;
+//
+//     let width = 40usize;
+//     let filled = ((scanned as f64 / total as f64) * width as f64).round() as usize;
+//     let filled = filled.min(width);
+//
+//     let mut bar = String::with_capacity(width + 2);
+//     bar.push('[');
+//     for _ in 0..filled {
+//         bar.push('#');
+//     }
+//     for _ in filled..width {
+//         bar.push('.');
+//     }
+//     bar.push(']');
+//
+//     format!("{} {:>10}/{:<10} ({:>5.1}%)", bar, scanned, total, pct)
+// }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logger
@@ -153,96 +146,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = Config::new(args.match_length, args.dedupe, args.flatten);
     let driver = Driver::new_workspace()?;
 
-    if args.show_progress {
-        // Progress shared with the matching engine (once it starts).
-        let progress = Arc::new(Progress::new());
-        // Spinner/renderer stop flag.
-        let stop = Arc::new(AtomicBool::new(false));
-
-        let p_for_thread = progress.clone();
-        let stop_for_thread = stop.clone();
-
-        // Background renderer: spinner while total==0 (design loading), progress bar once search begins.
-        let handle = thread::spawn(move || {
-            let mut first = true;
-            let frames: [char; 4] = ['|', '/', '-', '\\'];
-            let mut fi = 0usize;
-
-            while !stop_for_thread.load(Ordering::Relaxed) {
-                let snap = p_for_thread.snapshot();
-
-                if snap.total_candidates == 0 {
-                    // Designs are still being read/imported; subgraph hasn't started.
-                    let ch = frames[fi % frames.len()];
-                    fi += 1;
-                    print!("\r{} loading designs and building indices...", ch);
-                } else {
-                    // Show the real progress bar once total is known.
-                    let line = render_progress_bar(snap);
-                    if first {
-                        first = false;
-                    }
-                    print!("\r{}", line);
-                }
-
-                let _ = io::stdout().flush();
-                thread::sleep(Duration::from_millis(100));
-            }
-
-            // Final snapshot/line
-            let snap = p_for_thread.snapshot();
-            if snap.total_candidates == 0 {
-                println!("\r✓ finished (no candidates)");
-            } else {
-                let line = render_progress_bar(snap);
-                println!("\r{}", line);
-            }
-            let _ = io::stdout().flush();
-        });
-
-        // Progress-aware dispatch (netlist queries will update progress during subgraph search).
-        let count = gen_dispatch::run_count_for_type_name_with_progress(
-            &args.query,
-            &driver,
-            &args.haystack,
-            &args.module,
-            &cfg,
-            &progress,
+    let count = gen_dispatch::run_count_for_type_name(
+        &args.query,
+        &driver,
+        &args.haystack,
+        &args.module,
+        &cfg,
+    )
+    .map_err(|e| {
+        format!(
+            "Failed to run query '{}': {}\nKnown types:\n  {}",
+            args.query,
+            e,
+            gen_dispatch::known_query_type_names().join("\n  ")
         )
-        .map_err(|e| {
-            format!(
-                "Failed to run query '{}': {}\nKnown types:\n  {}",
-                args.query,
-                e,
-                gen_dispatch::known_query_type_names().join("\n  ")
-            )
-        })?;
+    })?;
 
-        // Stop the renderer and wait for it to finish
-        stop.store(true, Ordering::Relaxed);
-        let _ = handle.join();
-
-        println!("{}", count);
-    } else {
-        // No progress display: use the original path
-        let count = gen_dispatch::run_count_for_type_name(
-            &args.query,
-            &driver,
-            &args.haystack,
-            &args.module,
-            &cfg,
-        )
-        .map_err(|e| {
-            format!(
-                "Failed to run query '{}': {}\nKnown types:\n  {}",
-                args.query,
-                e,
-                gen_dispatch::known_query_type_names().join("\n  ")
-            )
-        })?;
-
-        println!("{}", count);
-    }
+    println!("{}", count);
 
     // If svql_subgraph "profiling" feature is enabled, print timings
     svql_subgraph::report();
