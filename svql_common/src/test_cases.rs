@@ -64,6 +64,11 @@ lazy_static::lazy_static! {
         module: "sdffe",
         pattern_query_type: Some("svql_query::queries::netlist::basic::dff::Sdffe"),
     };
+    static ref AND_2_SEQ: Pattern = Pattern::Netlist {
+        path: "examples/patterns/basic/and/verilog/and_2_seq.v",
+        module: "and_2_seq",
+        pattern_query_type: None,
+    };
 }
 
 // SECURITY: locked_reg (RTLIL patterns)
@@ -178,6 +183,10 @@ lazy_static::lazy_static! {
         path: "examples/fixtures/basic/and/verilog/and_mux_const_bad.v",
         module: "and_mux_const_bad",
     };
+    static ref SMALL_AND_TREE: Haystack = Haystack {
+        path: "examples/fixtures/basic/and/verilog/small_and_tree.v",
+        module: "small_and_tree",
+    };
 }
 
 // SECURITY: locked_reg (RTLIL haystack)
@@ -235,6 +244,13 @@ lazy_static::lazy_static! {
             pattern: &AND_GATE,
             haystack: &AND_SEQ,
             expected_matches: 7,
+        },
+        TestCase {
+            name: "and_2_seq_small_and_tree",
+            config: Config::builder().exact_length().none().flatten().build(),
+            pattern: &AND_2_SEQ,
+            haystack: &SMALL_AND_TREE,
+            expected_matches: 2,
         },
 
         // DFF tests
