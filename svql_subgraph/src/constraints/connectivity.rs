@@ -1,14 +1,13 @@
-use crate::Timer;
+use crate::cell_mapping::CellMapping;
 use crate::constraints::Constraint;
 use crate::graph_index::GraphIndex;
-use crate::node::{NodeFanin, NodeSource, NodeType};
-use crate::node_mapping::NodeMapping;
+use crate::{Timer, cell::CellWrapper};
 use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
 use tracing::{debug, trace};
 
 pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
-    p_node: CellRef<'p>,
+    p_cell: CellWrapper<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
 
@@ -16,21 +15,21 @@ pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
     design: &'d Design,
 
     config: &'a Config,
-    mapping: NodeMapping<'p, 'd>,
+    mapping: CellMapping<'p, 'd>,
 }
 
 impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     pub(crate) fn new(
-        p_node: CellRef<'p>,
+        p_cell: CellWrapper<'p>,
         pattern_index: &'a GraphIndex<'p>,
         design_index: &'a GraphIndex<'d>,
         pattern: &'p Design,
         design: &'d Design,
         config: &'a Config,
-        mapping: NodeMapping<'p, 'd>,
+        mapping: CellMapping<'p, 'd>,
     ) -> Self {
         ConnectivityConstraint {
-            p_node,
+            p_cell,
             pattern_index,
             design_index,
             pattern,
@@ -40,111 +39,96 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
         }
     }
 
-    fn is_node_connectivity_valid(&self, d_node: CellRef<'d>) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::is_node_connectivity_valid");
-        trace!(
-            "Validating connectivity for design node {:?} against pattern node {:?}",
-            d_node, self.p_node
-        );
-
-        let valid_fanin = self.validate_fanin_connections(d_node);
-        let valid_fanout = self.validate_fanout_connections(d_node);
-
-        let result = valid_fanin && valid_fanout;
-        if !result {
-            debug!(
-                "Connectivity validation failed for design node {:?}: fanin={}, fanout={}",
-                d_node, valid_fanin, valid_fanout
-            );
-        }
-        result
+    fn is_cell_connectivity_valid(&self, d_cell: CellWrapper<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::is_cell_connectivity_valid");
+        self.validate_fanin_connections(d_cell)
     }
 
-    fn validate_fanout_connections(&self, d_node: CellRef<'d>) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::validate_fanout_connections");
-        let p_fanouts = self.pattern_index.get_fanouts(self.p_node);
+    // fn validate_fanout_connections(&self, d_cell: CellRef<'d>) -> bool {
+    //     let _t = Timer::new("ConnectivityConstraint::validate_fanout_connections");
+    //     let p_fanouts = self.pattern_index.get_fanouts(self.p_cell);
 
-        trace!(
-            "Validating fanout connections for design node {:?}, pattern has {} fanouts",
-            d_node,
-            p_fanouts.len()
-        );
+    //     trace!(
+    //         "Validating fanout connections for design cell {:?}, pattern has {} fanouts",
+    //         d_cell,
+    //         p_fanouts.len()
+    //     );
 
-        // Only need to validate edges to already-mapped sinks.
-        let result = p_fanouts
-            .iter()
-            .filter_map(|(p_sink_node, pin_idx)| {
-                self.mapping
-                    .get_design_node(*p_sink_node)
-                    .map(|d_sink_node| (d_sink_node, *pin_idx))
-            })
-            .all(|(d_sink_node, pin_idx)| self.fanout_edge_ok(d_node, d_sink_node, pin_idx));
+    //     // Only need to validate edges to already-mapped sinks.
+    //     let result = p_fanouts
+    //         .iter()
+    //         .filter_map(|(p_sink_cell, pin_idx)| {
+    //             self.mapping
+    //                 .get_design_cell(*p_sink_cell)
+    //                 .map(|d_sink_cell| (d_sink_cell, *pin_idx))
+    //         })
+    //         .all(|(d_sink_cell, pin_idx)| self.fanout_edge_ok(d_cell, d_sink_cell, pin_idx));
 
-        if !result {
-            debug!("Fanout validation failed for design node {:?}", d_node);
-        }
-        result
-    }
+    //     if !result {
+    //         debug!("Fanout validation failed for design cell {:?}", d_cell);
+    //     }
+    //     result
+    // }
 
-    fn fanout_edge_ok(
-        &self,
-        d_driver: prjunnamed_netlist::CellRef<'d>,
-        d_sink_node: prjunnamed_netlist::CellRef<'d>,
-        pin_idx: usize,
-    ) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::fanout_edge_ok");
-        let d_sink_node_type = NodeType::from(d_sink_node.get().as_ref());
-        let sink_commutative = d_sink_node_type.has_commutative_inputs();
+    // fn fanout_edge_ok(
+    //     &self,
+    //     d_driver: prjunnamed_netlist::CellRef<'d>,
+    //     d_sink_cell: prjunnamed_netlist::CellRef<'d>,
+    //     pin_idx: usize,
+    // ) -> bool {
+    //     let _t = Timer::new("ConnectivityConstraint::fanout_edge_ok");
+    //     let d_sink_cell_type = NodeType::from(d_sink_cell.get().as_ref());
+    //     let sink_commutative = d_sink_cell_type.has_commutative_inputs();
 
-        let result = if sink_commutative {
-            self.design_index.has_fanout_to(d_driver, d_sink_node)
-        } else {
-            self.design_index
-                .has_fanout_to_pin(d_driver, d_sink_node, pin_idx)
-        };
+    //     let result = if sink_commutative {
+    //         self.design_index.has_fanout_to(d_driver, d_sink_cell)
+    //     } else {
+    //         self.design_index
+    //             .has_fanout_to_pin(d_driver, d_sink_cell, pin_idx)
+    //     };
 
-        if !result {
-            trace!(
-                "Fanout edge check failed: driver {:?} -> sink {:?} pin {}, commutative: {}",
-                d_driver, d_sink_node, pin_idx, sink_commutative
-            );
-        }
-        result
-    }
+    //     if !result {
+    //         trace!(
+    //             "Fanout edge check failed: driver {:?} -> sink {:?} pin {}, commutative: {}",
+    //             d_driver, d_sink_cell, pin_idx, sink_commutative
+    //         );
+    //     }
+    //     result
+    // }
 
-    fn validate_fanin_connections(&self, d_node: CellRef<'d>) -> bool {
+    fn validate_fanin_connections(&self, d_cell: CellWrapper<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
 
-        let p_cell_cow = self.p_node.get();
-        let d_cell_cow = d_node.get();
+        // let p_cell_cow = self.p_cell.get();
+        // let d_cell_cow = d_cell.get();
 
-        let p_cell: &Cell = p_cell_cow.as_ref();
-        let d_cell: &Cell = d_cell_cow.as_ref();
+        let p_cell: &Cell = self.p_cell.get();
+        let d_cell: &Cell = d_cell.get();
 
         self.cells_match_fan_in(p_cell, d_cell)
     }
 
-    fn sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::sources_compatible");
-        match p_src {
-            NodeSource::Const(pt) => matches!(d_src, NodeSource::Const(dt) if dt == pt),
+    // fn sources_compatible(&self, p_src: &NodeSource<'p>, d_src: &NodeSource<'d>) -> bool {
+    //     let _t = Timer::new("ConnectivityConstraint::sources_compatible");
+    //     match p_src {
+    //         NodeSource::Const(pt) => matches!(d_src, NodeSource::Const(dt) if dt == pt),
 
-            // Gate/Io sources must map to the mapped design node (if mapping exists yet).
-            NodeSource::Gate(p_node, p_bit) | NodeSource::Io(p_node, p_bit) => {
-                if let Some(d_expected) = self.mapping.get_design_node(*p_node) {
-                    match d_src {
-                        NodeSource::Gate(d_node, d_bit) | NodeSource::Io(d_node, d_bit) => {
-                            *d_node == d_expected && *d_bit == *p_bit
-                        }
-                        NodeSource::Const(_) => false,
-                    }
-                } else {
-                    // If the pattern source isn't mapped yet, we don't constrain it here.
-                    true
-                }
-            }
-        }
-    }
+    //         // Gate/Io sources must map to the mapped design cell (if mapping exists yet).
+    //         NodeSource::Gate(p_cell, p_bit) | NodeSource::Io(p_cell, p_bit) => {
+    //             if let Some(d_expected) = self.mapping.get_design_cell(*p_cell) {
+    //                 match d_src {
+    //                     NodeSource::Gate(d_cell, d_bit) | NodeSource::Io(d_cell, d_bit) => {
+    //                         *d_cell == d_expected && *d_bit == *p_bit
+    //                     }
+    //                     NodeSource::Const(_) => false,
+    //                 }
+    //             } else {
+    //                 // If the pattern source isn't mapped yet, we don't constrain it here.
+    //                 true
+    //             }
+    //         }
+    //     }
+    // }
 
     // ####################################
     fn cells_match_fan_in(&self, pattern_cell: &Cell, design_cell: &Cell) -> bool {
@@ -514,16 +498,17 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
                 _ => return false,
             };
 
-        let expected_fan_in_design_cell_opt = self.mapping.get_design_node(fan_in_pattern_cell_ref);
+        let expected_fan_in_design_cell_opt =
+            self.mapping.get_design_cell(fan_in_pattern_cell_ref.into());
 
         if expected_fan_in_design_cell_opt.is_none() {
             // Pattern fan-in cell not mapped yet, so we can't constrain it here.
             return true;
         }
 
-        let expected_fan_in_design_cell_ref = expected_fan_in_design_cell_opt.unwrap();
+        let expected_fan_in_design_cell_wrapper = expected_fan_in_design_cell_opt.unwrap();
 
-        return expected_fan_in_design_cell_ref == actual_fan_in_design_cell_ref;
+        return expected_fan_in_design_cell_wrapper == actual_fan_in_design_cell_ref.into();
 
         todo!("How to handle expected idx");
     }
@@ -633,7 +618,7 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
 }
 
 impl<'a, 'p, 'd> Constraint<'d> for ConnectivityConstraint<'a, 'p, 'd> {
-    fn d_candidate_is_valid(&self, d_node: &CellRef<'d>) -> bool {
-        self.is_node_connectivity_valid(*d_node)
+    fn d_candidate_is_valid(&self, d_cell: &CellWrapper<'d>) -> bool {
+        self.is_cell_connectivity_valid(d_cell.clone())
     }
 }

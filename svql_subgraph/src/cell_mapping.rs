@@ -1,17 +1,16 @@
-use prjunnamed_netlist::CellRef;
 use std::collections::HashMap;
 
-use crate::Timer;
+use crate::{Timer, cell::CellWrapper};
 
 #[derive(Clone, Debug, Default)]
-pub(super) struct NodeMapping<'p, 'd> {
-    /// Pattern to Design node mapping
-    pattern_to_design: HashMap<CellRef<'p>, CellRef<'d>>,
-    /// Design to Pattern node mapping
-    design_to_pattern: HashMap<CellRef<'d>, CellRef<'p>>,
+pub(super) struct CellMapping<'p, 'd> {
+    /// Pattern to Design cell mapping
+    pattern_to_design: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
+    /// Design to Pattern cell mapping
+    design_to_pattern: HashMap<CellWrapper<'d>, CellWrapper<'p>>,
 }
 
-impl<'p, 'd> NodeMapping<'p, 'd> {
+impl<'p, 'd> CellMapping<'p, 'd> {
     #[contracts::debug_ensures(ret.pattern_to_design.is_empty())]
     #[contracts::debug_ensures(ret.design_to_pattern.is_empty())]
     pub(super) fn new() -> Self {
@@ -23,24 +22,25 @@ impl<'p, 'd> NodeMapping<'p, 'd> {
 
     #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
     #[contracts::debug_ensures(self.pattern_to_design.len() == self.design_to_pattern.len())]
-    pub(super) fn insert(&mut self, pattern: CellRef<'p>, design: CellRef<'d>) {
+    pub(super) fn insert(&mut self, pattern: CellWrapper<'p>, design: CellWrapper<'d>) {
         let _t = Timer::new("NodeMapping::insert");
 
-        self.pattern_to_design.insert(pattern, design);
+        self.pattern_to_design
+            .insert(pattern.clone(), design.clone());
         self.design_to_pattern.insert(design, pattern);
     }
 
     // debug ensure that pattern & design mappings are consistent
-    pub(super) fn get_design_node(&self, pattern: CellRef<'p>) -> Option<CellRef<'d>> {
-        let _t = Timer::new("NodeMapping::get_design_node");
-        let out = self.pattern_to_design.get(&pattern).copied();
+    pub(super) fn get_design_cell(&self, pattern: CellWrapper<'p>) -> Option<CellWrapper<'d>> {
+        let _t = Timer::new("NodeMapping::get_design_cell");
+        let out = self.pattern_to_design.get(&pattern).cloned();
         out
     }
 
     // debug ensure that pattern & design mappings are consistent
-    pub(super) fn get_pattern_node(&self, design: CellRef<'d>) -> Option<CellRef<'p>> {
-        let _t = Timer::new("NodeMapping::get_pattern_node");
-        let out = self.design_to_pattern.get(&design).copied();
+    pub(super) fn get_pattern_cell(&self, design: CellWrapper<'d>) -> Option<CellWrapper<'p>> {
+        let _t = Timer::new("NodeMapping::get_pattern_cell");
+        let out = self.design_to_pattern.get(&design).cloned();
         out
     }
 
@@ -57,12 +57,12 @@ impl<'p, 'd> NodeMapping<'p, 'd> {
     }
 
     #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
-    pub(super) fn design_mapping(&self) -> &HashMap<CellRef<'d>, CellRef<'p>> {
+    pub(super) fn design_mapping(&self) -> &HashMap<CellWrapper<'d>, CellWrapper<'p>> {
         &self.design_to_pattern
     }
 
     #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
-    pub(super) fn pattern_mapping(&self) -> &HashMap<CellRef<'p>, CellRef<'d>> {
+    pub(super) fn pattern_mapping(&self) -> &HashMap<CellWrapper<'p>, CellWrapper<'d>> {
         &self.pattern_to_design
     }
 

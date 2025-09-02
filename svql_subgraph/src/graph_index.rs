@@ -1,248 +1,270 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use prjunnamed_netlist::{Cell, CellRef, Design};
+use prjunnamed_netlist::{CellRef, Design};
 
 use crate::{
     Timer,
-    node::{NodeFanin, NodeSource, NodeType, fanin_named, net_to_source},
+    cell::{CellType, CellWrapper},
 };
-
-// #[derive(Clone, Debug)]
-// struct NodeWrapper<'a> {
-//     cell_ref: CellRef<'a>,
-
-//     todo: !,
-
-//     // Get the nodes Fan-In, as a named mapping for each input port on the cell get the corresponding source nodes driving it
-//     fanin: HashMap<&'a str, Vec<NodeSource<'a>>>,
-
-//     // Get the nodes Fan-Out, with a mapping for each input port the output of this cell is connected to
-//     fanout: HashSet<(CellRef<'a>, HashSet<(&'a str, CellRef<'a>, usize)>)>,
-// }
 
 #[derive(Clone, Debug)]
 pub(super) struct GraphIndex<'a> {
     /// Nodes of design in topological order (Name nodes filtered out)
-    nodes_topo: Vec<CellRef<'a>>,
-    by_type: HashMap<NodeType, Vec<CellRef<'a>>>,
-    /// For each driver (key), the list of (sink, sink_pin_idx)
-    reverse_node_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>>,
+    cells_topo: Vec<CellWrapper<'a>>,
+    cell_type_map: HashMap<CellType, Vec<CellWrapper<'a>>>,
 
-    /// Pre-computed source information for each node: sources[sink][pin_idx] = NodeSource
-    node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>>,
+    fanout_map: HashMap<CellWrapper<'a>, Vec<CellWrapper<'a>>>,
 
-    /// fanout membership: driver -> (sink -> set_of_pins)
-    fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>>,
-
-    /// Named fan-in (by port name) for each node.
-    fanin_named: HashMap<CellRef<'a>, NodeFanin<'a>>,
-
-    gate_count: usize,
+    // ##########################################
+    input_by_name: HashMap<&'a str, CellWrapper<'a>>,
+    output_by_name: HashMap<&'a str, CellWrapper<'a>>,
 }
 
 impl<'a> GraphIndex<'a> {
-    #[contracts::debug_ensures(ret.gate_count() <= design.iter_cells().count())]
     pub(super) fn build(design: &'a Design) -> Self {
         let _t = Timer::new("GraphIndex::build");
 
-        let mut by_type: HashMap<NodeType, Vec<CellRef<'a>>> = HashMap::new();
-        let nodes_topo: Vec<CellRef<'a>> = design
+        // 0: Preparing a vector of cell references in topological order
+        let cell_refs_topo = Self::build_cell_refs_topo(design);
+
+        // 1: Building cells_topo
+        let cells_topo = Self::build_cells_topo(&cell_refs_topo);
+
+        // 2: Building cell_type_map
+        let cell_type_map = Self::build_cell_type_map(&cell_refs_topo);
+
+        // 3: Building fanout_map
+        let fanout_map = Self::build_fanout_map(design, &cell_refs_topo);
+
+        // #############
+        // Building I/O Maps
+        let input_by_name = Self::build_input_by_name(&cells_topo);
+        let output_by_name = Self::build_output_by_name(&cells_topo);
+
+        GraphIndex {
+            cells_topo,
+            cell_type_map,
+            fanout_map,
+            //
+            input_by_name,
+            output_by_name,
+        }
+    }
+
+    fn build_cell_refs_topo(design: &'a Design) -> Vec<CellRef<'a>> {
+        let cell_refs_topo: Vec<CellRef<'a>> = design
             .iter_cells_topo()
             .rev()
             .filter(|cell_ref| {
-                let node_type = NodeType::from(cell_ref.get().as_ref());
-                !matches!(node_type, NodeType::Name)
+                let node_type = CellType::from(cell_ref.get().as_ref());
+                !matches!(node_type, CellType::Name)
+            })
+            // .map(|cell_ref| cell_ref.get())
+            .collect();
+        cell_refs_topo
+    }
+
+    fn build_cells_topo(cell_refs_topo: &[CellRef<'a>]) -> Vec<CellWrapper<'a>> {
+        let cell_refs_topo: Vec<CellWrapper<'a>> = cell_refs_topo
+            .iter()
+            .cloned()
+            .map(|cell_ref| cell_ref.into())
+            .collect();
+        cell_refs_topo
+    }
+
+    fn build_cell_type_map(
+        cell_refs_topo: &[CellRef<'a>],
+    ) -> HashMap<CellType, Vec<CellWrapper<'a>>> {
+        let mut cell_type_map: HashMap<CellType, Vec<CellWrapper<'a>>> = HashMap::new();
+        for cell in cell_refs_topo {
+            let node_type = CellType::from(cell.get().as_ref());
+            cell_type_map
+                .entry(node_type)
+                .or_default()
+                .push(cell.clone().into());
+        }
+        cell_type_map
+    }
+
+    fn build_fanout_map(
+        design: &'a Design,
+        cell_refs_topo: &[CellRef<'a>],
+    ) -> HashMap<CellWrapper<'a>, Vec<CellWrapper<'a>>> {
+        let mut fanout_map: HashMap<CellWrapper<'a>, Vec<CellWrapper<'a>>> = HashMap::new();
+        for sink_ref in cell_refs_topo.iter().cloned() {
+            let sink_wrapper: CellWrapper<'a> = sink_ref.into();
+            sink_ref.visit(|net| {
+                if let Ok((source_ref, _source_pin_idx)) = design.find_cell(net) {
+                    let driver_wrapper: CellWrapper<'a> = source_ref.into();
+                    fanout_map
+                        .entry(driver_wrapper)
+                        .or_default()
+                        .push(sink_wrapper.clone());
+                }
+            });
+        }
+        fanout_map
+    }
+
+    fn build_input_by_name(cells_topo: &[CellWrapper<'a>]) -> HashMap<&'a str, CellWrapper<'a>> {
+        let input_by_name: HashMap<&'a str, CellWrapper<'a>> = cells_topo
+            .iter()
+            .filter_map(|c| {
+                if matches!(c.cell_type(), CellType::Input) {
+                    let input_name: &'a str =
+                        c.input_name().expect("Input cell should have a name");
+                    Some((input_name, c.clone()))
+                } else {
+                    None
+                }
             })
             .collect();
+        input_by_name
+    }
 
-        for node_ref in nodes_topo.iter().cloned() {
-            let node_type = NodeType::from(node_ref.get().as_ref());
-            by_type.entry(node_type).or_default().push(node_ref);
-        }
-
-        let mut reverse_node_lookup: HashMap<CellRef<'a>, Vec<(CellRef<'a>, usize)>> =
-            HashMap::new();
-        let mut node_sources: HashMap<CellRef<'a>, Vec<NodeSource<'a>>> = HashMap::new();
-        let mut fanout_map: HashMap<CellRef<'a>, HashMap<CellRef<'a>, HashSet<usize>>> =
-            HashMap::new();
-        let mut fanin_named_map: HashMap<CellRef<'a>, NodeFanin<'a>> = HashMap::new();
-
-        let gate_count = nodes_topo
+    fn build_output_by_name(cells_topo: &[CellWrapper<'a>]) -> HashMap<&'a str, CellWrapper<'a>> {
+        let output_by_name: HashMap<&'a str, CellWrapper<'a>> = cells_topo
             .iter()
-            .filter(|c| NodeType::from(c.get().as_ref()).is_logic_gate())
-            .count();
-
-        // Pre-compute source information for all nodes (as sinks) and named fan-in.
-        for node_ref in nodes_topo.iter() {
-            // positional sources (kept for existing constraints and fanout_map)
-            let mut sources: Vec<NodeSource<'a>> = Vec::new();
-            node_ref.visit(|net| {
-                sources.push(net_to_source(design, net));
-            });
-            node_sources.insert(*node_ref, sources);
-
-            // named fan-in
-            let cell = node_ref.get();
-            fanin_named_map.insert(*node_ref, fanin_named(design, cell.as_ref()));
-        }
-
-        // Build reverse lookups and O(1) fanout membership map
-        for sink_ref in nodes_topo.iter() {
-            let sources = node_sources.get(sink_ref).unwrap();
-            for (sink_pin_idx, source) in sources.iter().enumerate() {
-                let driver_node = match source {
-                    NodeSource::Gate(node_ref, _src_bit) => Some(*node_ref),
-                    NodeSource::Io(node_ref, _src_bit) => Some(*node_ref),
-                    NodeSource::Const(_trit) => None,
-                };
-
-                if let Some(driver) = driver_node {
-                    // reverse list (driver -> vec of (sink, pin))
-                    reverse_node_lookup
-                        .entry(driver)
-                        .or_default()
-                        .push((*sink_ref, sink_pin_idx));
-
-                    // fanout_map (driver -> map sink -> set_of_pins)
-                    let entry = fanout_map.entry(driver).or_default();
-                    entry.entry(*sink_ref).or_default().insert(sink_pin_idx);
+            .filter_map(|c| {
+                if matches!(c.cell_type(), CellType::Output) {
+                    let output_name: &'a str =
+                        c.output_name().expect("Output cell should have a name");
+                    Some((output_name, c.clone()))
+                } else {
+                    None
                 }
-            }
-        }
-
-        GraphIndex {
-            nodes_topo,
-            by_type,
-            reverse_node_lookup,
-            node_sources,
-            fanout_map,
-            fanin_named: fanin_named_map,
-            gate_count,
-        }
+            })
+            .collect();
+        output_by_name
     }
 
-    pub(super) fn gate_count(&self) -> usize {
-        self.gate_count
-    }
-
-    pub(super) fn get_by_type(&self, node_type: NodeType) -> &[CellRef<'a>] {
+    pub fn get_by_type(&self, node_type: CellType) -> &[CellWrapper<'a>] {
         let _t = Timer::new("GraphIndex::get_by_type");
-        self.by_type
+        self.cell_type_map
             .get(&node_type)
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
 
-    pub(super) fn get_nodes_topo(&self) -> &[CellRef<'a>] {
-        self.nodes_topo.as_slice()
+    pub fn get_cells_topo(&self) -> &[CellWrapper<'a>] {
+        self.cells_topo.as_slice()
     }
 
-    pub(super) fn get_fanouts(&self, node: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
-        let _t = Timer::new("GraphIndex::get_fanouts");
-        let slice = self
-            .reverse_node_lookup
-            .get(&node)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[]);
-        slice
+    pub fn get_input_by_name(&self) -> &HashMap<&'a str, CellWrapper<'a>> {
+        &self.input_by_name
     }
 
-    pub(super) fn get_node_sources(&self, node: CellRef<'a>) -> &[NodeSource<'a>] {
-        let _t = Timer::new("GraphIndex::get_node_sources");
-        self.node_sources
-            .get(&node)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[])
+    pub fn get_output_by_name(&self) -> &HashMap<&'a str, CellWrapper<'a>> {
+        &self.output_by_name
     }
 
-    pub(super) fn get_input_name(&self, node: CellRef<'a>) -> Option<&'a str> {
-        let _t = Timer::new("GraphIndex::get_input_name");
-        match node.get() {
-            std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
+    // pub(super) fn get_fanouts(&self, node: CellRef<'a>) -> &[(CellRef<'a>, usize)] {
+    //     let _t = Timer::new("GraphIndex::get_fanouts");
+    //     let slice = self
+    //         .reverse_node_lookup
+    //         .get(&node)
+    //         .map(|v| v.as_slice())
+    //         .unwrap_or(&[]);
+    //     slice
+    // }
 
-    pub(super) fn get_output_name(&self, node: CellRef<'a>) -> Option<&'a str> {
-        let _t = Timer::new("GraphIndex::get_output_name");
-        match node.get() {
-            std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
+    // pub(super) fn get_node_sources(&self, node: CellRef<'a>) -> &[NodeSource<'a>] {
+    //     let _t = Timer::new("GraphIndex::get_node_sources");
+    //     self.node_sources
+    //         .get(&node)
+    //         .map(|v| v.as_slice())
+    //         .unwrap_or(&[])
+    // }
 
-    pub(super) fn node_summary(&self, node: CellRef<'a>) -> String {
-        let _t = Timer::new("GraphIndex::node_summary");
-        let node_type = NodeType::from(node.get().as_ref());
-        let iname = self.get_input_name(node).unwrap_or("");
-        let oname = self.get_output_name(node).unwrap_or("");
-        let n = if !iname.is_empty() { iname } else { oname };
-        if n.is_empty() {
-            format!("#{} {:?}", node.debug_index(), node_type)
-        } else {
-            format!("#{} {:?}({})", node.debug_index(), node_type, n)
-        }
-    }
+    // pub(super) fn get_input_name(&self, node: CellRef<'a>) -> Option<&'a str> {
+    //     let _t = Timer::new("GraphIndex::get_input_name");
+    //     match node.get() {
+    //         std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+    //         _ => None,
+    //     }
+    // }
 
-    /// Named fan‑in accessor: returns a named port -> sources map (by bit).
-    pub(super) fn get_node_fanin_named(&self, node: CellRef<'a>) -> &NodeFanin<'a> {
-        // Constructed for all nodes in build(); unwrap is safe.
-        self.fanin_named
-            .get(&node)
-            .expect("missing NodeFanin for node")
-    }
+    // pub(super) fn get_output_name(&self, node: CellRef<'a>) -> Option<&'a str> {
+    //     let _t = Timer::new("GraphIndex::get_output_name");
+    //     match node.get() {
+    //         std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
+    //         _ => None,
+    //     }
+    // }
 
-    /// True if `driver` has any fanout edge to `sink` (any input pin).
-    pub(super) fn has_fanout_to(&self, driver: CellRef<'a>, sink: CellRef<'a>) -> bool {
-        let _t = Timer::new("GraphIndex::has_fanout_to");
-        self.fanout_map
-            .get(&driver)
-            .and_then(|m| m.get(&sink))
-            .is_some()
-    }
+    // pub(super) fn node_summary(&self, node: CellRef<'a>) -> String {
+    //     let _t = Timer::new("GraphIndex::node_summary");
+    //     let node_type = CellType::from(node.get().as_ref());
+    //     let iname = self.get_input_name(node).unwrap_or("");
+    //     let oname = self.get_output_name(node).unwrap_or("");
+    //     let n = if !iname.is_empty() { iname } else { oname };
+    //     if n.is_empty() {
+    //         format!("#{} {:?}", node.debug_index(), node_type)
+    //     } else {
+    //         format!("#{} {:?}({})", node.debug_index(), node_type, n)
+    //     }
+    // }
 
-    /// True if `driver` feeds `sink` specifically at `pin_idx`.
-    pub(super) fn has_fanout_to_pin(
-        &self,
-        driver: CellRef<'a>,
-        sink: CellRef<'a>,
-        pin_idx: usize,
-    ) -> bool {
-        let _t = Timer::new("GraphIndex::has_fanout_to_pin");
-        self.fanout_map
-            .get(&driver)
-            .and_then(|m| m.get(&sink))
-            .is_some_and(|pins| pins.contains(&pin_idx))
-    }
+    // /// Named fan‑in accessor: returns a named port -> sources map (by bit).
+    // pub(super) fn get_node_fanin_named(&self, node: CellRef<'a>) -> &NodeFanin<'a> {
+    //     // Constructed for all nodes in build(); unwrap is safe.
+    //     self.fanin_named
+    //         .get(&node)
+    //         .expect("missing NodeFanin for node")
+    // }
 
-    /// The unique driver of a given sink input pin, if any (Gate/Io sources only).
-    pub(super) fn driver_of_sink_pin(
-        &self,
-        sink: CellRef<'a>,
-        pin_idx: usize,
-    ) -> Option<CellRef<'a>> {
-        let _t = Timer::new("GraphIndex::driver_of_sink_pin");
-        let src = self.get_node_sources(sink).get(pin_idx)?;
-        match src {
-            NodeSource::Gate(c, _) | NodeSource::Io(c, _) => Some(*c),
-            NodeSource::Const(_) => None,
-        }
-    }
+    // /// True if `driver` has any fanout edge to `sink` (any input pin).
+    // pub(super) fn has_fanout_to(&self, driver: CellRef<'a>, sink: CellRef<'a>) -> bool {
+    //     let _t = Timer::new("GraphIndex::has_fanout_to");
+    //     self.fanout_map
+    //         .get(&driver)
+    //         .and_then(|m| m.get(&sink))
+    //         .is_some()
+    // }
 
-    /// All drivers of a sink across all pins (Gate/Io only), duplicates removed.
-    pub(super) fn drivers_of_sink_all_pins(&self, sink: CellRef<'a>) -> Vec<CellRef<'a>> {
-        let _t = Timer::new("GraphIndex::drivers_of_sink_all_pins");
-        let mut out: Vec<CellRef<'a>> = self
-            .get_node_sources(sink)
-            .iter()
-            .filter_map(|src| match src {
-                NodeSource::Gate(c, _) | NodeSource::Io(c, _) => Some(*c),
-                NodeSource::Const(_) => None,
-            })
-            .collect();
+    // /// True if `driver` feeds `sink` specifically at `pin_idx`.
+    // pub(super) fn has_fanout_to_pin(
+    //     &self,
+    //     driver: CellRef<'a>,
+    //     sink: CellRef<'a>,
+    //     pin_idx: usize,
+    // ) -> bool {
+    //     let _t = Timer::new("GraphIndex::has_fanout_to_pin");
+    //     self.fanout_map
+    //         .get(&driver)
+    //         .and_then(|m| m.get(&sink))
+    //         .is_some_and(|pins| pins.contains(&pin_idx))
+    // }
 
-        out.sort_by_key(|c| c.debug_index());
-        out.dedup();
-        out
-    }
+    // /// The unique driver of a given sink input pin, if any (Gate/Io sources only).
+    // pub(super) fn driver_of_sink_pin(
+    //     &self,
+    //     sink: CellRef<'a>,
+    //     pin_idx: usize,
+    // ) -> Option<CellRef<'a>> {
+    //     let _t = Timer::new("GraphIndex::driver_of_sink_pin");
+    //     let src = self.get_node_sources(sink).get(pin_idx)?;
+    //     match src {
+    //         NodeSource::Gate(c, _) | NodeSource::Io(c, _) => Some(*c),
+    //         NodeSource::Const(_) => None,
+    //     }
+    // }
+
+    // /// All drivers of a sink across all pins (Gate/Io only), duplicates removed.
+    // pub(super) fn drivers_of_sink_all_pins(&self, sink: CellRef<'a>) -> Vec<CellRef<'a>> {
+    //     let _t = Timer::new("GraphIndex::drivers_of_sink_all_pins");
+    //     let mut out: Vec<CellRef<'a>> = self
+    //         .get_node_sources(sink)
+    //         .iter()
+    //         .filter_map(|src| match src {
+    //             NodeSource::Gate(c, _) | NodeSource::Io(c, _) => Some(*c),
+    //             NodeSource::Const(_) => None,
+    //         })
+    //         .collect();
+
+    //     out.sort_by_key(|c| c.debug_index());
+    //     out.dedup();
+    //     out
+    // }
 }

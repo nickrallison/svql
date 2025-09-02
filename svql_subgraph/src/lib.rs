@@ -1,22 +1,22 @@
 #![allow(dead_code)]
-mod candidates;
+// mod candidates;
+mod cell_mapping;
 mod constraints;
 mod graph_index;
-mod node_mapping;
 mod util;
 
-pub(crate) mod node;
+pub mod cell;
 
+use cell_mapping::CellMapping;
 use graph_index::GraphIndex;
-use node_mapping::NodeMapping;
 use tracing::{debug, info, trace};
 
-use crate::constraints::{
-    ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
-    NotAlreadyMappedConstraint,
-};
-use crate::node::{NodeSource, NodeType};
-use prjunnamed_netlist::{CellRef, Design};
+// use crate::cell::{CellType, NodeSource};
+// use crate::constraints::{
+//     ConnectivityConstraint, Constraint, DesignSinkConstraint, DesignSourceConstraint,
+//     NotAlreadyMappedConstraint,
+// };
+use prjunnamed_netlist::Design;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use svql_common::{Config, DedupeMode};
@@ -26,18 +26,22 @@ pub use util::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
+use crate::{
+    cell::{CellType, CellWrapper},
+    constraints::{ConnectivityConstraint, Constraint, NotAlreadyMappedConstraint},
+};
+
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
     // Mapping of pattern nodes to design nodes (and reverse)
-    mapping: NodeMapping<'p, 'd>,
+    mapping: CellMapping<'p, 'd>,
 
     // Boundary IO lookup tables
-    pub input_by_name: HashMap<&'p str, CellRef<'p>>,
-    pub output_by_name: HashMap<&'p str, CellRef<'p>>,
-
+    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
     // For each named output in the pattern, the driver cell/bit in the design for each bit
     // index of that output (usually single-bit in our patterns). Indexed by output name, then bit.
-    output_driver_by_name: HashMap<&'p str, Vec<(CellRef<'d>, usize)>>,
+    // output_driver_by_name: HashMap<&'p str, Vec<(CellRef<'d>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
@@ -49,25 +53,25 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
         self.mapping.is_empty()
     }
 
-    pub fn design_source_of_input_bit(
-        &self,
-        name: &str,
-        bit: usize,
-    ) -> Option<(CellRef<'d>, usize)> {
-        let p_input = self.input_by_name.get(name)?;
-        let d_src = self.mapping.get_design_node(*p_input)?;
-        Some((d_src, bit))
-    }
+    // pub fn design_source_of_input_bit(
+    //     &self,
+    //     name: &str,
+    //     bit: usize,
+    // ) -> Option<(CellRef<'d>, usize)> {
+    //     let p_input = self.input_by_name.get(name)?;
+    //     let d_src = self.mapping.get_design_node(*p_input)?;
+    //     Some((d_src, bit))
+    // }
 
-    pub fn design_driver_of_output_bit(
-        &self,
-        name: &str,
-        bit: usize,
-    ) -> Option<(CellRef<'d>, usize)> {
-        self.output_driver_by_name
-            .get(name)
-            .and_then(|v| v.get(bit).copied())
-    }
+    // pub fn design_driver_of_output_bit(
+    //     &self,
+    //     name: &str,
+    //     bit: usize,
+    // ) -> Option<(CellRef<'d>, usize)> {
+    //     self.output_driver_by_name
+    //         .get(name)
+    //         .and_then(|v| v.get(bit).copied())
+    // }
 }
 
 /// New API that updates the provided `progress` atomically as the search proceeds.
@@ -75,7 +79,6 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
     config: &Config,
-    progress: Option<&Progress>,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     info!("Starting subgraph isomorphism search");
     trace!("Config: {:?}", config);
@@ -83,74 +86,19 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     let pattern_index = GraphIndex::build(pattern);
     let design_index = GraphIndex::build(design);
 
-    info!(
-        "Built indices: pattern has {} nodes, design has {} nodes",
-        pattern_index.gate_count(),
-        design_index.gate_count()
-    );
-
-    if pattern_index.gate_count() == 0 || design_index.gate_count() == 0 {
-        info!("Empty pattern or design, returning empty results");
-        return Vec::new();
-    }
-
-    // Build boundary IO maps for the pattern (by name).
-    let input_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
-        .get_nodes_topo()
-        .iter()
-        .filter(|c| matches!(NodeType::from(c.get().as_ref()), NodeType::Input))
-        .filter_map(|c| pattern_index.get_input_name(*c).map(|n| (n, *c)))
-        .collect();
-
-    let output_by_name: HashMap<&'p str, CellRef<'p>> = pattern_index
-        .get_nodes_topo()
-        .iter()
-        .filter(|c| matches!(NodeType::from(c.get().as_ref()), NodeType::Output))
-        .filter_map(|c| pattern_index.get_output_name(*c).map(|n| (n, *c)))
-        .collect();
-
-    debug!(
-        "Pattern inputs: {:?}",
-        input_by_name.keys().collect::<Vec<_>>()
-    );
-    debug!(
-        "Pattern outputs: {:?}",
-        output_by_name.keys().collect::<Vec<_>>()
-    );
-
     // in topological_order, only gates & inputs (push inputs to the back)
-    let pattern_mapping_queue: VecDeque<CellRef<'p>> = {
-        let mut q: Vec<CellRef<'p>> = pattern_index
-            .get_nodes_topo()
-            .iter()
-            .filter(|c| !matches!(NodeType::from(c.get().as_ref()), NodeType::Output))
-            .copied()
-            .collect();
-
-        q.sort_by(|a, b| {
-            let a_is_input = matches!(NodeType::from(a.get().as_ref()), NodeType::Input);
-            let b_is_input = matches!(NodeType::from(b.get().as_ref()), NodeType::Input);
-            a_is_input.cmp(&b_is_input)
-        });
-
-        q.into()
-    };
-
-    debug!(
-        "Pattern mapping queue size: {}",
-        pattern_mapping_queue.len()
-    );
+    let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
 
     // Estimate total candidates up‑front: sum initial candidate counts per pattern node.
-    if progress.is_some() {
-        let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
-        progress
-            .unwrap()
-            .set_total_candidates(total_candidates as u64);
-        info!("Estimated total candidates: {}", total_candidates);
-    }
+    // if progress.is_some() {
+    //     let total_candidates = estimate_total_candidates(&pattern_mapping_queue, &design_index);
+    //     progress
+    //         .unwrap()
+    //         .set_total_candidates(total_candidates as u64);
+    //     info!("Estimated total candidates: {}", total_candidates);
+    // }
 
-    let initial_node_mapping: NodeMapping<'p, 'd> = NodeMapping::new();
+    let initial_node_mapping: CellMapping<'p, 'd> = CellMapping::new();
 
     let mut results = find_isomorphisms_recursive_collect(
         &pattern_index,
@@ -160,10 +108,7 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         config,
         initial_node_mapping,
         pattern_mapping_queue,
-        &input_by_name,
-        &output_by_name,
         0, // depth
-        progress,
     );
 
     info!(
@@ -181,179 +126,68 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     results
 }
 
-fn estimate_total_candidates<'p, 'd>(
-    pattern_queue: &VecDeque<CellRef<'p>>,
-    design_index: &GraphIndex<'d>,
-) -> usize {
-    pattern_queue
-        .iter()
-        .map(|p_node| {
-            let ty = NodeType::from(p_node.get().as_ref());
-            match ty {
-                NodeType::Input => design_index.get_nodes_topo().len(),
-                _ => design_index.get_by_type(ty).len(),
-            }
-        })
-        .sum()
+fn build_pattern_mapping_queue<'p>(pattern_index: &GraphIndex<'p>) -> VecDeque<CellWrapper<'p>> {
+    let pattern_mapping_queue: VecDeque<CellWrapper<'p>> = {
+        let q: Vec<CellWrapper<'p>> = pattern_index
+            .get_cells_topo()
+            .iter()
+            .filter(|c| !matches!(c.cell_type(), CellType::Input))
+            .filter(|c| !matches!(c.cell_type(), CellType::Output))
+            .cloned()
+            .rev()
+            .collect();
+
+        // q.sort_by(|a, b| {
+        //     let a_is_input = matches!(a.cell_type(), CellType::Output);
+        //     let b_is_input = matches!(b.cell_type(), CellType::Output);
+        //     a_is_input.cmp(&b_is_input)
+        // });
+
+        q.into()
+    };
+    pattern_mapping_queue
 }
 
 fn build_candidates<'a, 'p, 'd, 'g>(
-    pattern_current: CellRef<'p>,
+    pattern_current: CellWrapper<'p>,
     pattern_index: &'a GraphIndex<'p>,
     design_index: &'a GraphIndex<'d>,
     pattern: &'p Design,
     design: &'d Design,
     config: &'a Config,
-    node_mapping: &NodeMapping<'p, 'd>,
-    progress: Option<&'g Progress>,
-) -> Vec<CellRef<'d>> {
-    let current_type = NodeType::from(pattern_current.get().as_ref());
-    trace!(
-        "Building filtered candidates for pattern node {:?} of type {:?}",
-        pattern_current, current_type
-    );
+    node_mapping: &CellMapping<'p, 'd>,
+) -> Vec<CellWrapper<'d>> {
+    let current_type = pattern_current.cell_type();
 
-    // let node_constraints = {
-    //     trace!("Computing design sink constraints");
-    //     let design_sinks_constraints =
-    //         DesignSinkConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
-    //             .get_candidates_owned();
-    //     trace!("Computing design source constraints");
-    //     let sources_constraints =
-    //         DesignSourceConstraint::new(pattern_current, pattern_index, design_index, node_mapping)
-    //             .get_candidates_owned();
-    //     let intersection = design_sinks_constraints.intersect(sources_constraints);
-    //     let candidate_count = intersection
-    //         .get_candidates()
-    //         .map_or("unlimited".to_string(), |s| s.len().to_string());
-    //     trace!(
-    //         "Node constraints intersection has {} candidates",
-    //         candidate_count
-    //     );
-    //     intersection
-    // };
+    // The candidates all must be the correct type based on the input cell
+    let candidates = {
+        let slice: &'a [CellWrapper<'d>] = match current_type {
+            CellType::Input => design_index.get_cells_topo(),
+            _ => design_index.get_by_type(current_type),
+        };
 
-    let base = match node_constraints.get_candidates_owned() {
-        Some(set) => {
-            trace!(
-                "Using constrained base iterator with {} candidates",
-                set.len()
-            );
-            set.into_iter().collect::<Vec<_>>()
-        }
-        None => {
-            let candidates = {
-                let slice: &'a [CellRef<'d>] = match current_type {
-                    NodeType::Input => design_index.get_nodes_topo(),
-                    _ => design_index.get_by_type(current_type),
-                };
-                slice.to_vec()
-            };
-            trace!(
-                "Using unconstrained base iterator for type {:?}",
-                current_type
-            );
-            candidates
-        }
+        #[cfg(feature = "rayon")]
+        let slice_iter = slice.into_par_iter();
+
+        #[cfg(not(feature = "rayon"))]
+        let slice_iter = slice.into_iter();
+
+        slice_iter
     };
 
-    base
-}
+    // Filter 1: Filter only cells that have fan out from mapped design cells
+    // This is to cut down the number of possible candidates to search
+    // let fan_out_from_mapped_design: Option<HashSet<CellWrapper<'d>>> = None;
 
-fn compute_output_drivers<'p, 'd>(
-    pattern_index: &GraphIndex<'p>,
-    _design_index: &GraphIndex<'d>,
-    output_by_name: &HashMap<&'p str, CellRef<'p>>,
-    mapping: &NodeMapping<'p, 'd>,
-) -> HashMap<&'p str, Vec<(CellRef<'d>, usize)>> {
-    let mut result: HashMap<&'p str, Vec<(CellRef<'d>, usize)>> = HashMap::new();
+    // Filter 2: Filter only not already mapped cells
+    let not_already_mapped_filter: NotAlreadyMappedConstraint<'p, 'd> =
+        NotAlreadyMappedConstraint::new(node_mapping.clone());
 
-    for (&name, &p_out) in output_by_name.iter() {
-        // For each bit of the pattern output, find its source in the pattern,
-        // map that source node to the design node, and record (design_node, bit).
-        let sources = pattern_index.get_node_sources(p_out);
-        let mut vec_bits: Vec<(CellRef<'d>, usize)> = Vec::with_capacity(sources.len());
-
-        for (_bit_idx, src) in sources.iter().enumerate() {
-            match src {
-                NodeSource::Gate(p_src_node, p_bit) | NodeSource::Io(p_src_node, p_bit) => {
-                    if let Some(d_src_node) = mapping.get_design_node(*p_src_node) {
-                        vec_bits.push((d_src_node, *p_bit));
-                    } else {
-                        // Unmapped source — should not happen for complete mapping; skip.
-                    }
-                }
-                NodeSource::Const(_t) => {
-                    // Outputs driven by consts are not used by current patterns; skip.
-                }
-            }
-        }
-
-        // If there are no sources (shouldn't happen for normal outputs), leave empty.
-        result.insert(name, vec_bits);
-    }
-
-    result
-}
-
-fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
-    pattern: &'p Design,
-    design: &'d Design,
-    config: &'a Config,
-    node_mapping: NodeMapping<'p, 'd>,
-    mut pattern_mapping_queue: VecDeque<CellRef<'p>>,
-    input_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    output_by_name: &'a HashMap<&'p str, CellRef<'p>>,
-    depth: usize,
-    progress: Option<&'a Progress>,
-) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-    trace!(
-        "Recursive call at depth {}, queue size: {}, current mapping size: {}",
-        depth,
-        pattern_mapping_queue.len(),
-        node_mapping.len()
-    );
-
-    let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
-        // Complete assignment: compute output drivers for boundary lookup
-        debug!("Complete assignment reached at depth {}", depth);
-        let output_driver_by_name =
-            compute_output_drivers(pattern_index, design_index, output_by_name, &node_mapping);
-
-        trace!(
-            "Created complete isomorphism with {} mappings",
-            node_mapping.len()
-        );
-        return vec![SubgraphIsomorphism {
-            mapping: node_mapping,
-            input_by_name: input_by_name.clone(),
-            output_by_name: output_by_name.clone(),
-            output_driver_by_name,
-        }];
-    };
-
-    let pattern_current_type = NodeType::from(pattern_current.get().as_ref());
-    debug!(
-        "Processing pattern node {:?} of type {:?} at depth {}",
-        pattern_current, pattern_current_type, depth
-    );
-
-    let candidates_vec = build_candidates(
-        pattern_current,
-        pattern_index,
-        design_index,
-        pattern,
-        design,
-        config,
-        &node_mapping,
-        progress,
-    );
-
-    let already_mapped_constraint = NotAlreadyMappedConstraint::new(node_mapping.clone());
-    let connectivity_constraint = ConnectivityConstraint::new(
-        pattern_current,
+    // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
+    // since cells are chosen in the order inputs -> outputs
+    // we check that for each design cell <-> pattern cell, their fan in are connected (since in topological order)
+    let connectivity_filter: ConnectivityConstraint<'a, 'p, 'd> = ConnectivityConstraint::new(
+        pattern_current.clone(),
         pattern_index,
         design_index,
         pattern,
@@ -362,31 +196,85 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         node_mapping.clone(),
     );
 
-    let filtered_candidates: Vec<_> = candidates_vec
-        .into_iter()
-        .filter(|d_candidate| already_mapped_constraint.d_candidate_is_valid(d_candidate))
-        .filter(|d_candidate| connectivity_constraint.d_candidate_is_valid(d_candidate))
-        .collect();
+    candidates
+        .filter(|d_candidate| not_already_mapped_filter.d_candidate_is_valid(d_candidate))
+        .filter(|d_candidate| connectivity_filter.d_candidate_is_valid(d_candidate))
+        .cloned()
+        .collect()
+}
 
-    debug!(
-        "Found {} candidates for pattern node {:?}",
-        filtered_candidates.len(),
-        pattern_current
+// fn compute_output_drivers<'p, 'd>(
+//     pattern_index: &GraphIndex<'p>,
+//     _design_index: &GraphIndex<'d>,
+//     output_by_name: &HashMap<&'p str, CellWrapper<'p>>,
+//     mapping: &NodeMapping<'p, 'd>,
+// ) -> HashMap<&'p str, Vec<(CellRef<'d>, usize)>> {
+//     let mut result: HashMap<&'p str, Vec<(CellRef<'d>, usize)>> = HashMap::new();
+
+//     for (&name, &p_out) in output_by_name.iter() {
+//         // For each bit of the pattern output, find its source in the pattern,
+//         // map that source node to the design node, and record (design_node, bit).
+//         let sources = pattern_index.get_node_sources(p_out);
+//         let mut vec_bits: Vec<(CellRef<'d>, usize)> = Vec::with_capacity(sources.len());
+
+//         for (_bit_idx, src) in sources.iter().enumerate() {
+//             match src {
+//                 NodeSource::Gate(p_src_node, p_bit) | NodeSource::Io(p_src_node, p_bit) => {
+//                     if let Some(d_src_node) = mapping.get_design_node(*p_src_node) {
+//                         vec_bits.push((d_src_node, *p_bit));
+//                     } else {
+//                         // Unmapped source — should not happen for complete mapping; skip.
+//                     }
+//                 }
+//                 NodeSource::Const(_t) => {
+//                     // Outputs driven by consts are not used by current patterns; skip.
+//                 }
+//             }
+//         }
+
+//         // If there are no sources (shouldn't happen for normal outputs), leave empty.
+//         result.insert(name, vec_bits);
+//     }
+
+//     result
+// }
+
+fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
+    pattern_index: &'a GraphIndex<'p>,
+    design_index: &'a GraphIndex<'d>,
+    pattern: &'p Design,
+    design: &'d Design,
+    config: &'a Config,
+    node_mapping: CellMapping<'p, 'd>,
+    mut pattern_mapping_queue: VecDeque<CellWrapper<'p>>,
+    depth: usize,
+) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    // Base Case
+    let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
+        return vec![SubgraphIsomorphism {
+            mapping: node_mapping,
+            input_by_name: pattern_index.get_input_by_name().clone(),
+            output_by_name: pattern_index.get_output_by_name().clone(),
+        }];
+    };
+
+    let pattern_current_type = pattern_current.cell_type();
+
+    let candidates_vec = build_candidates(
+        pattern_current.clone(),
+        pattern_index,
+        design_index,
+        pattern,
+        design,
+        config,
+        &node_mapping,
     );
 
-    if filtered_candidates.is_empty() {
-        debug!(
-            "No valid candidates found for pattern node {:?}, backtracking",
-            pattern_current
-        );
-        return Vec::new();
-    }
-
     #[cfg(feature = "rayon")]
-    let cand_iter = filtered_candidates.into_par_iter();
+    let cand_iter = candidates_vec.into_par_iter();
 
     #[cfg(not(feature = "rayon"))]
-    let cand_iter = filtered_candidates.into_iter();
+    let cand_iter = candidates_vec.into_iter();
 
     let results: Vec<SubgraphIsomorphism<'p, 'd>> = cand_iter
         .flat_map(|d_candidate| {
@@ -395,7 +283,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
                 d_candidate, pattern_current
             );
             let mut nm = node_mapping.clone();
-            nm.insert(pattern_current, d_candidate);
+            nm.insert(pattern_current.clone(), d_candidate);
             find_isomorphisms_recursive_collect(
                 pattern_index,
                 design_index,
@@ -404,10 +292,7 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
                 config,
                 nm,
                 pattern_mapping_queue.clone(),
-                input_by_name,
-                output_by_name,
                 depth + 1,
-                progress,
             )
         })
         .collect();

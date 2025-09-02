@@ -42,7 +42,7 @@ fn main() {
                         let haystack = import_design(tc.haystack.path.into(), tc.haystack.module, &tc.config)
                             .unwrap_or_else(|e| panic!("Failed to load haystack {}: {}", tc.haystack.path, e));
 
-                        let matches = svql_subgraph::find_subgraph_isomorphisms(&needle, &haystack, &tc.config, None);
+                        let matches = svql_subgraph::find_subgraph_isomorphisms(&needle, &haystack, &tc.config);
                         assert_eq!(
                             matches.len(),
                             tc.expected_matches,
