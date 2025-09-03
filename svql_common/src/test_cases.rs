@@ -79,6 +79,13 @@ lazy_static::lazy_static! {
         ).expect("Failed to create YosysModule for and_seq"),
         pattern_query_type: None,
     };
+    static ref SMALL_AND_SEQ: Pattern = Pattern::Netlist {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/small_and_seq.v",
+            "small_and_seq",
+        ).expect("Failed to create YosysModule for small_and_seq"),
+        pattern_query_type: None,
+    };
 }
 
 // SECURITY: locked_reg (RTLIL patterns)
@@ -146,6 +153,12 @@ lazy_static::lazy_static! {
             "examples/fixtures/basic/and/verilog/and_tree.v",
             "and_tree",
         ).expect("Failed to create YosysModule for and_tree"),
+    };
+    static ref SMALL_AND_TREE_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/and/verilog/small_and_tree.v",
+            "small_and_tree",
+        ).expect("Failed to create YosysModule for small_and_tree"),
     };
     static ref AND_SEQ_HAYSTACK: Haystack = Haystack {
         yosys_module: YosysModule::new(
@@ -282,9 +295,22 @@ lazy_static::lazy_static! {
                     .haystack_flatten(true)
                     .build()
             },
+            pattern: &SMALL_AND_SEQ,
+            haystack: &SMALL_AND_TREE_HAYSTACK,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "and_gate_and_tree_4",
+            config: {
+                Config::builder()
+                    .exact_length()
+                    .haystack_param("N", "4")
+                    .haystack_flatten(true)
+                    .build()
+            },
             pattern: &AND_SEQ,
             haystack: &AND_TREE_HAYSTACK,
-            expected_matches: 2,
+            expected_matches: 3,
         },
 
         // DFF tests

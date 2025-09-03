@@ -167,15 +167,6 @@ impl<'a> CellWrapper<'a> {
             _ => None,
         }
     }
-
-    // for initial_candidate_list
-    pub fn get_fan_in(&self) -> Option<HashSet<CellWrapper<'a>>> {
-        todo!("get fan-in")
-    }
-    // for initial_candidate_list
-    pub fn get_fan_out(&self) -> Option<HashSet<CellWrapper<'a>>> {
-        todo!("get fan-out")
-    }
 }
 
 impl<'a> Into<CellWrapper<'a>> for CellRef<'a> {

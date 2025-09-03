@@ -261,28 +261,30 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     #[cfg(not(feature = "rayon"))]
     let cand_iter = candidates_vec.into_iter();
 
-    let results: Vec<SubgraphIsomorphism<'p, 'd>> = cand_iter
-        .flat_map(|d_candidate| {
-            trace!(
-                "Trying candidate {:?} for pattern cell {:?}",
-                d_candidate, pattern_current
-            );
-            let mut nm = cell_mapping.clone();
-            nm.insert(pattern_current.clone(), d_candidate.clone());
+    let results = cand_iter.map(|d_candidate| {
+        trace!(
+            "Trying candidate {:?} for pattern cell {:?}",
+            d_candidate, pattern_current
+        );
+        let mut nm = cell_mapping.clone();
+        nm.insert(pattern_current.clone(), d_candidate.clone());
 
-            find_isomorphisms_recursive_collect(
-                pattern_index,
-                design_index,
-                pattern,
-                design,
-                config,
-                nm,
-                pattern_mapping_queue.clone(),
-                depth + 1,
-            )
-        })
-        .collect();
+        find_isomorphisms_recursive_collect(
+            pattern_index,
+            design_index,
+            pattern,
+            design,
+            config,
+            nm,
+            pattern_mapping_queue.clone(),
+            depth + 1,
+        )
+    });
 
-    debug!("Depth {} returning {} results", depth, results.len());
-    results
+    let results_debug = results.clone().collect::<Vec<_>>();
+    println!("{:?}", results_debug.len());
+
+    let flat_results: Vec<SubgraphIsomorphism<'p, 'd>> = results.flatten().collect();
+    debug!("Depth {} returning {} results", depth, flat_results.len());
+    flat_results
 }
