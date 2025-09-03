@@ -127,9 +127,9 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 
     info!("Final result count: {}", results.len());
 
-    for result in &results {
-        result.print_mapping();
-    }
+    // for result in &results {
+    //     result.print_mapping();
+    // }
 
     results
 }
