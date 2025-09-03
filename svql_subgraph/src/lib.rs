@@ -116,11 +116,11 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
         results.len()
     );
 
-    // if matches!(config.dedupe, DedupeMode::AutoMorph) {
-    //     let mut seen: HashSet<Vec<usize>> = HashSet::new();
-    //     results.retain(|m| seen.insert(m.mapping.signature()));
-    //     info!("After AutoMorph deduplication: {} results", results.len());
-    // }
+    if config.dedupe {
+        let mut seen: HashSet<Vec<usize>> = HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.signature()));
+        info!("After AutoMorph deduplication: {} results", results.len());
+    }
 
     // let mut seen: HashSet<Vec<usize>> = HashSet::new();
     // results.retain(|m| seen.insert(m.mapping.signature()));
@@ -144,12 +144,6 @@ fn build_pattern_mapping_queue<'p>(pattern_index: &GraphIndex<'p>) -> VecDeque<C
             .cloned()
             .rev()
             .collect();
-
-        // q.sort_by(|a, b| {
-        //     let a_is_input = matches!(a.cell_type(), CellType::Output);
-        //     let b_is_input = matches!(b.cell_type(), CellType::Output);
-        //     a_is_input.cmp(&b_is_input)
-        // });
 
         q.into()
     };
@@ -210,42 +204,6 @@ fn build_candidates<'a, 'p, 'd, 'g>(
         .cloned()
         .collect()
 }
-
-// fn compute_output_drivers<'p, 'd>(
-//     pattern_index: &GraphIndex<'p>,
-//     _design_index: &GraphIndex<'d>,
-//     output_by_name: &HashMap<&'p str, CellWrapper<'p>>,
-//     mapping: &NodeMapping<'p, 'd>,
-// ) -> HashMap<&'p str, Vec<(CellRef<'d>, usize)>> {
-//     let mut result: HashMap<&'p str, Vec<(CellRef<'d>, usize)>> = HashMap::new();
-
-//     for (&name, &p_out) in output_by_name.iter() {
-//         // For each bit of the pattern output, find its source in the pattern,
-//         // map that source cell to the design cell, and record (design_cell, bit).
-//         let sources = pattern_index.get_cell_sources(p_out);
-//         let mut vec_bits: Vec<(CellRef<'d>, usize)> = Vec::with_capacity(sources.len());
-
-//         for (_bit_idx, src) in sources.iter().enumerate() {
-//             match src {
-//                 NodeSource::Gate(p_src_cell, p_bit) | NodeSource::Io(p_src_cell, p_bit) => {
-//                     if let Some(d_src_cell) = mapping.get_design_cell(*p_src_cell) {
-//                         vec_bits.push((d_src_cell, *p_bit));
-//                     } else {
-//                         // Unmapped source — should not happen for complete mapping; skip.
-//                     }
-//                 }
-//                 NodeSource::Const(_t) => {
-//                     // Outputs driven by consts are not used by current patterns; skip.
-//                 }
-//             }
-//         }
-
-//         // If there are no sources (shouldn't happen for normal outputs), leave empty.
-//         result.insert(name, vec_bits);
-//     }
-
-//     result
-// }
 
 fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     pattern_index: &'a GraphIndex<'p>,

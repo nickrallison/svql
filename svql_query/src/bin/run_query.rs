@@ -143,11 +143,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = parse_args();
 
-    let cfg = Config::new(
-        args.match_length,
-        ModuleConfig::default(),
-        ModuleConfig::default(),
-    );
+    let cfg = Config::builder()
+        .match_length(args.match_length)
+        .haystack_flatten(args.flatten)
+        .build();
+
     let driver = Driver::new_workspace()?;
 
     let count = gen_dispatch::run_count_for_type_name(

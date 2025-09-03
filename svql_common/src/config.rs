@@ -4,12 +4,8 @@ use crate::{ModuleConfig, YosysModule};
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
-    /// Whether to require exact pin-count (true) or allow superset arity in the design (false).
     pub match_length: bool,
-    // /// How to deduplicate matches after search.
-    // pub dedupe: DedupeMode,
-    // /// Whether to flatten the search space (true) or keep it hierarchical (false).
-    // pub flatten: bool,
+    pub dedupe: bool,
     pub needle_options: ModuleConfig,
     pub haystack_options: ModuleConfig,
 }
@@ -18,11 +14,13 @@ impl Config {
     /// Create a new configuration.
     pub fn new(
         match_length: bool,
+        dedupe: bool,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
     ) -> Self {
         Self {
             match_length,
+            dedupe,
             needle_options,
             haystack_options,
         }
@@ -36,6 +34,7 @@ impl Config {
 #[derive(Clone, Debug, Default)]
 pub struct ConfigBuilder {
     match_length: bool,
+    dedupe: bool,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
 }
@@ -53,6 +52,10 @@ impl ConfigBuilder {
 
     pub fn superset_length(mut self) -> Self {
         self.match_length = false;
+        self
+    }
+    pub fn dedupe(mut self, value: bool) -> Self {
+        self.dedupe = value;
         self
     }
 
@@ -103,6 +106,7 @@ impl ConfigBuilder {
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
+            dedupe: self.dedupe,
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
         }
