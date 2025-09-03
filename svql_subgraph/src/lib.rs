@@ -281,8 +281,8 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
         )
     });
 
-    let results_debug = results.clone().collect::<Vec<_>>();
-    println!("{:?}", results_debug.len());
+    // let results_debug = results.clone().collect::<Vec<_>>();
+    // println!("{:?}", results_debug.len());
 
     let flat_results: Vec<SubgraphIsomorphism<'p, 'd>> = results.flatten().collect();
     debug!("Depth {} returning {} results", depth, flat_results.len());

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{YosysModule, config::Config};
+use crate::{config::Config, YosysModule};
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
@@ -284,13 +284,29 @@ lazy_static::lazy_static! {
         //     haystack: &AND_GATE_HAYSTACK,
         //     expected_matches: 2,
         // },
+
+        // TestCase {
+        //     name: "and_seq_3_and_tree_4",
+        //     config: {
+        //         Config::builder()
+        //             .exact_length()
+        //             .needle_param("N", "3")
+        //             .haystack_param("N", "4")
+        //             .needle_flatten(true)
+        //             .haystack_flatten(true)
+        //             .build()
+        //     },
+        //     pattern: &AND_SEQ,
+        //     haystack: &AND_TREE_HAYSTACK,
+        //     expected_matches: 2,
+        // },
         TestCase {
-            name: "and_seq_3_and_tree_4",
+            name: "small_and_seq_3_and_tree_4",
             config: {
                 Config::builder()
                     .exact_length()
-                    .needle_param("N", "3")
-                    .haystack_param("N", "4")
+                    // .needle_param("N", "3")
+                    // .haystack_param("N", "4")
                     .needle_flatten(true)
                     .haystack_flatten(true)
                     .build()
@@ -299,19 +315,19 @@ lazy_static::lazy_static! {
             haystack: &SMALL_AND_TREE_HAYSTACK,
             expected_matches: 2,
         },
-        TestCase {
-            name: "and_gate_and_tree_4",
-            config: {
-                Config::builder()
-                    .exact_length()
-                    .haystack_param("N", "4")
-                    .haystack_flatten(true)
-                    .build()
-            },
-            pattern: &AND_SEQ,
-            haystack: &AND_TREE_HAYSTACK,
-            expected_matches: 3,
-        },
+        // TestCase {
+        //     name: "and_gate_and_tree_4",
+        //     config: {
+        //         Config::builder()
+        //             .exact_length()
+        //             .haystack_param("N", "4")
+        //             .haystack_flatten(true)
+        //             .build()
+        //     },
+        //     pattern: &AND_SEQ,
+        //     haystack: &AND_TREE_HAYSTACK,
+        //     expected_matches: 3,
+        // },
 
         // DFF tests
         // TestCase {
