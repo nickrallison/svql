@@ -67,6 +67,20 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     //         .get(name)
     //         .and_then(|v| v.get(bit).copied())
     // }
+
+    pub fn print_mapping(&self) {
+        let mapping = self.mapping.pattern_mapping();
+        for (pat_cell, des_cell) in mapping {
+            println!(
+                "{}: {:?} -> {}: {:?}",
+                pat_cell.debug_index(),
+                pat_cell.get(),
+                des_cell.debug_index(),
+                des_cell.get()
+            );
+        }
+        println!("--------------------------------------------------------")
+    }
 }
 
 /// New API that updates the provided `progress` atomically as the search proceeds.
@@ -108,7 +122,15 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     //     info!("After AutoMorph deduplication: {} results", results.len());
     // }
 
+    // let mut seen: HashSet<Vec<usize>> = HashSet::new();
+    // results.retain(|m| seen.insert(m.mapping.signature()));
+
     info!("Final result count: {}", results.len());
+
+    for result in &results {
+        result.print_mapping();
+    }
+
     results
 }
 

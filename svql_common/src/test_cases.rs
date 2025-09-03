@@ -305,8 +305,6 @@ lazy_static::lazy_static! {
             config: {
                 Config::builder()
                     .exact_length()
-                    // .needle_param("N", "3")
-                    // .haystack_param("N", "4")
                     .needle_flatten(true)
                     .haystack_flatten(true)
                     .build()
