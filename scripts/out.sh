@@ -63,25 +63,38 @@ find target -name "svql_subgraph_generated_tests.rs" -printf "%T+ %p\n" | sort -
 # find target -name "svql_query_generated_tests.rs" -printf "%T+ %p\n" | sort -r | head -n 1 | awk '{print $2}' | xargs -I{} cp {} generated/svql_query_generated_tests.rs
 
 
+# python3 scripts/md_tree.py --root . \
+#     --include 'prjunnamed/netlist/src/design.rs' \
+#     --include 'prjunnamed/netlist/src/cell.rs' \
+#     --include 'prjunnamed/netlist/src/cell/flip_flop.rs' \
+#     --include 'prjunnamed/netlist/src/value.rs' \
+#     --include 'svql_subgraph/**.rs' \
+#     --include 'examples/**.v' \
+#     --include 'examples/patterns/security/access_control/locked_reg/rtlil/*.il' \
+#     --include 'examples/fixtures/security/access_control/locked_reg/rtlil/*.il' \
+#     --exclude 'examples/fixtures/larger_designs/verilog/openpiton_system.v' \
+#     --include 'generated/**.rs' \
+#     --include 'Cargo.toml' \
+#     --include 'README.md' \
+#     --include 'svql_subgraph/Cargo.toml' \
+#     --include 'svql_subgraph/README.md' \
+#     --header-base-level 2 \
+#     --section "examples=Examples" \
+#     --section "generated=Generated" \
+#     --section "svql_subgraph=svql_subgraph" \
+#     --section "svql_driver=svql_driver" \
+#     --section "svql_query=svql_query" \
+#     > out.md
+
 python3 scripts/md_tree.py --root . \
-    --include 'prjunnamed/netlist/src/design.rs' \
-    --include 'prjunnamed/netlist/src/cell.rs' \
-    --include 'prjunnamed/netlist/src/cell/flip_flop.rs' \
-    --include 'prjunnamed/netlist/src/value.rs' \
-    --include 'svql_subgraph/**.rs' \
-    --include 'examples/**.v' \
-    --include 'examples/patterns/security/access_control/locked_reg/rtlil/*.il' \
-    --include 'examples/fixtures/security/access_control/locked_reg/rtlil/*.il' \
-    --exclude 'examples/fixtures/larger_designs/verilog/openpiton_system.v' \
-    --include 'generated/**.rs' \
+    --include 'svql_subgraph/src/lib.rs' \
+    --include 'svql_common/**.rs' \
     --include 'Cargo.toml' \
-    --include 'README.md' \
-    --include 'svql_subgraph/Cargo.toml' \
-    --include 'svql_subgraph/README.md' \
     --header-base-level 2 \
     --section "examples=Examples" \
     --section "generated=Generated" \
     --section "svql_subgraph=svql_subgraph" \
     --section "svql_driver=svql_driver" \
     --section "svql_query=svql_query" \
+    --section "svql_common=svql_common" \
     > out.md

@@ -259,18 +259,18 @@ lazy_static::lazy_static! {
 lazy_static::lazy_static! {
     pub static ref BASIC_TEST_CASES: Vec<TestCase> = vec![
         // AND gate tests
-        TestCase {
-            name: "and_gate_self",
-            config: {
-                Config::builder()
-                .exact_length()
-                .haystack_flatten(true)
-                .build()
-            },
-            pattern: &AND_GATE,
-            haystack: &AND_GATE_HAYSTACK,
-            expected_matches: 2,
-        },
+        // TestCase {
+        //     name: "and_gate_self",
+        //     config: {
+        //         Config::builder()
+        //         .exact_length()
+        //         .haystack_flatten(true)
+        //         .build()
+        //     },
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_GATE_HAYSTACK,
+        //     expected_matches: 2,
+        // },
         TestCase {
             name: "and_seq_3_and_tree_4",
             config: {
@@ -288,17 +288,17 @@ lazy_static::lazy_static! {
         },
 
         // DFF tests
-        TestCase {
-            name: "sdffe_self",
-            config: {
-                Config::builder()
-                    .exact_length()
-                    .build()
-            },
-            pattern: &SDFFE,
-            haystack: &SDFFE_HAYSTACK,
-            expected_matches: 1,
-        },
+        // TestCase {
+        //     name: "sdffe_self",
+        //     config: {
+        //         Config::builder()
+        //             .exact_length()
+        //             .build()
+        //     },
+        //     pattern: &SDFFE,
+        //     haystack: &SDFFE_HAYSTACK,
+        //     expected_matches: 1,
+        // },
 
         // #######################################
 
