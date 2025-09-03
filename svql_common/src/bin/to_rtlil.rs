@@ -12,6 +12,10 @@ fn write_yosys_to_rtlil(
     }
 }
 
+// EXAMPLES:
+// cargo run --bin to_rtlil examples/fixtures/basic/and/verilog/and_tree.v and_tree -f -p N=4
+// cargo run --bin to_rtlil examples/fixtures/basic/and/verilog/and_seq.v  and_seq  -f -p N=3
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use argparse::{ArgumentParser, Store, StoreOption, StoreTrue};
 
