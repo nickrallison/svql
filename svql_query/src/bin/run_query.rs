@@ -14,9 +14,7 @@
 // - --progress shows a simple textual progress spinner while loading, then a bar when matching.
 
 use std::env;
-use std::io::Write;
-
-use svql_common::{Config, ModuleConfig};
+use svql_common::Config;
 use svql_driver::Driver;
 
 // Generated at build-time. Provides dispatch helpers.
@@ -51,7 +49,7 @@ struct Args {
     query: String,
     haystack: String,
     module: String,
-    // dedupe: DedupeMode,
+    dedupe: bool,
     match_length: bool, // true=exact, false=superset
     flatten: bool,
     show_progress: bool,
@@ -61,7 +59,7 @@ fn parse_args() -> Args {
     let mut query: Option<String> = None;
     let mut haystack: Option<String> = None;
     let mut module: Option<String> = None;
-    // let mut dedupe = DedupeMode::None;
+    let mut dedupe = false;
     let mut match_length = true; // exact by default
     let mut show_progress = false;
     let mut flatten = false;
@@ -72,16 +70,7 @@ fn parse_args() -> Args {
             "--query" | "-q" => query = it.next(),
             "--haystack" | "-H" => haystack = it.next(),
             "--module" | "-m" => module = it.next(),
-            // "--dedupe" => match it.next().as_deref() {
-            //     Some("auto") | Some("AutoMorph") | Some("automorph") => {
-            //         dedupe = DedupeMode::AutoMorph
-            //     }
-            //     Some("none") | Some("None") => dedupe = DedupeMode::None,
-            //     other => {
-            //         eprintln!("Unknown dedupe mode: {:?}", other);
-            //         print_usage_and_exit();
-            //     }
-            // },
+            "--dedupe" => dedupe = true,
             "--superset" => match_length = false,
             "--flatten" => flatten = true,
             "--exact" => match_length = true,
@@ -106,34 +95,12 @@ fn parse_args() -> Args {
         query,
         haystack,
         module,
-        // dedupe,
+        dedupe,
         match_length,
         flatten,
         show_progress,
     }
 }
-
-// fn render_progress_bar(s: svql_subgraph::ProgressSnapshot) -> String {
-//     let total = s.total_candidates.max(1); // avoid div-by-zero if used standalone
-//     let scanned = s.scanned_candidates.min(total);
-//     let pct = (scanned as f64 / total as f64) * 100.0;
-//
-//     let width = 40usize;
-//     let filled = ((scanned as f64 / total as f64) * width as f64).round() as usize;
-//     let filled = filled.min(width);
-//
-//     let mut bar = String::with_capacity(width + 2);
-//     bar.push('[');
-//     for _ in 0..filled {
-//         bar.push('#');
-//     }
-//     for _ in filled..width {
-//         bar.push('.');
-//     }
-//     bar.push(']');
-//
-//     format!("{} {:>10}/{:<10} ({:>5.1}%)", bar, scanned, total, pct)
-// }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logger
@@ -146,6 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = Config::builder()
         .match_length(args.match_length)
         .haystack_flatten(args.flatten)
+        .dedupe(args.dedupe)
         .build();
 
     let driver = Driver::new_workspace()?;

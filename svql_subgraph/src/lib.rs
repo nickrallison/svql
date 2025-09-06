@@ -112,8 +112,8 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
 pub fn find_subgraph_isomorphisms_index<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
-    pattern_index: DesignIndex<'p>,
-    design_index: DesignIndex<'d>,
+    pattern_index: &DesignIndex<'p>,
+    design_index: &DesignIndex<'d>,
     config: &Config,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
     info!("Starting subgraph isomorphism search");
@@ -155,7 +155,7 @@ fn build_pattern_mapping_queue<'p>(pattern_index: &DesignIndex<'p>) -> VecDeque<
         let q: Vec<CellWrapper<'p>> = pattern_index
             .get_cells_topo()
             .iter()
-            // .filter(|c| !matches!(c.cell_type(), CellType::Input))
+            .filter(|c| !matches!(c.cell_type(), CellType::Input))
             .filter(|c| !matches!(c.cell_type(), CellType::Output))
             .cloned()
             .rev()
