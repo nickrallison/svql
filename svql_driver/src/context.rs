@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use prjunnamed_netlist::Design;
-
 use crate::DriverKey;
+use crate::design_container::DesignContainer;
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    designs: HashMap<DriverKey, Arc<Design>>,
+    designs: HashMap<DriverKey, Arc<DesignContainer>>,
 }
 
 impl Default for Context {
@@ -25,13 +24,13 @@ impl Context {
     }
 
     #[contracts::debug_ensures(ret.get(&key).is_some())]
-    pub fn with_design(mut self, key: DriverKey, design: Arc<Design>) -> Self {
+    pub fn with_design(mut self, key: DriverKey, design: Arc<DesignContainer>) -> Self {
         self.designs.insert(key.clone(), design);
         tracing::event!(tracing::Level::DEBUG, "Design added to context: {:?}", key);
         self
     }
 
-    pub fn get(&self, key: &DriverKey) -> Option<&Arc<Design>> {
+    pub fn get(&self, key: &DriverKey) -> Option<&Arc<DesignContainer>> {
         self.designs.get(key)
     }
 
@@ -39,7 +38,7 @@ impl Context {
         &self,
         path: P,
         module_name: &str,
-    ) -> Option<&Arc<Design>> {
+    ) -> Option<&Arc<DesignContainer>> {
         let key = DriverKey::new(path, module_name.to_string());
         self.designs.get(&key)
     }
@@ -56,14 +55,18 @@ impl Context {
         self.designs.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&DriverKey, &Arc<Design>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&DriverKey, &Arc<DesignContainer>)> {
         self.designs.iter()
     }
 
     #[contracts::debug_ensures(self.get(&key).is_some())]
-    pub(crate) fn insert(&mut self, key: DriverKey, design: Arc<Design>) {
+    pub(crate) fn insert(&mut self, key: DriverKey, design: Arc<DesignContainer>) {
         self.designs.insert(key.clone(), design);
-        tracing::event!(tracing::Level::DEBUG, "Design inserted into context: {:?}", key);
+        tracing::event!(
+            tracing::Level::DEBUG,
+            "Design inserted into context: {:?}",
+            key
+        );
     }
 
     #[contracts::debug_ensures(ret.len() >= self.len())]
@@ -71,13 +74,17 @@ impl Context {
         for (key, design) in other.designs {
             self.designs.insert(key, design);
         }
-        tracing::event!(tracing::Level::DEBUG, "Context merged, new size: {}", self.designs.len());
+        tracing::event!(
+            tracing::Level::DEBUG,
+            "Context merged, new size: {}",
+            self.designs.len()
+        );
         self.clone()
     }
 
     /// Create a context from a single design
     #[contracts::debug_ensures(ret.len() == 1)]
-    pub fn from_single(key: DriverKey, design: Arc<Design>) -> Self {
+    pub fn from_single(key: DriverKey, design: Arc<DesignContainer>) -> Self {
         let mut ctx = Self::new();
         ctx.designs.insert(key, design);
         tracing::event!(tracing::Level::DEBUG, "Single design context created");

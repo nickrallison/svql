@@ -2,15 +2,15 @@
 // mod candidates;
 mod cell_mapping;
 mod constraints;
-mod graph_index;
 mod util;
 
 pub mod cell;
+pub mod design_index;
 
 use cell_mapping::CellMapping;
-use graph_index::GraphIndex;
+use design_index::DesignIndex;
 
-use prjunnamed_netlist::{CellRef, Design, Trit};
+use prjunnamed_netlist::Design;
 use tracing::{debug, info, trace};
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -34,9 +34,6 @@ pub struct SubgraphIsomorphism<'p, 'd> {
     // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
     pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    // For each named output in the pattern, the driver cell/bit in the design for each bit
-    // index of that output (usually single-bit in our patterns). Indexed by output name, then bit.
-    // output_driver_by_name: HashMap<&'p str, Vec<(CellRef<'d>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
@@ -47,26 +44,6 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     pub fn is_empty(&self) -> bool {
         self.mapping.is_empty()
     }
-
-    // pub fn design_source_of_input_bit(
-    //     &self,
-    //     name: &str,
-    //     bit: usize,
-    // ) -> Option<(CellRef<'d>, usize)> {
-    //     let p_input = self.input_by_name.get(name)?;
-    //     let d_src = self.mapping.get_design_cell(*p_input)?;
-    //     Some((d_src, bit))
-    // }
-
-    // pub fn design_driver_of_output_bit(
-    //     &self,
-    //     name: &str,
-    //     bit: usize,
-    // ) -> Option<(CellRef<'d>, usize)> {
-    //     self.output_driver_by_name
-    //         .get(name)
-    //         .and_then(|v| v.get(bit).copied())
-    // }
 
     pub fn print_mapping(&self) {
         let mapping = self.mapping.pattern_mapping();
@@ -83,7 +60,6 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-/// New API that updates the provided `progress` atomically as the search proceeds.
 pub fn find_subgraph_isomorphisms<'p, 'd>(
     pattern: &'p Design,
     design: &'d Design,
@@ -92,10 +68,9 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     info!("Starting subgraph isomorphism search");
     trace!("Config: {:?}", config);
 
-    let pattern_index = GraphIndex::build(pattern);
-    let design_index = GraphIndex::build(design);
+    let pattern_index = DesignIndex::build(pattern);
+    let design_index = DesignIndex::build(design);
 
-    // in topological_order, only gates & inputs (push inputs to the back)
     let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
 
     let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
@@ -134,7 +109,48 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     results
 }
 
-fn build_pattern_mapping_queue<'p>(pattern_index: &GraphIndex<'p>) -> VecDeque<CellWrapper<'p>> {
+pub fn find_subgraph_isomorphisms_index<'p, 'd>(
+    pattern: &'p Design,
+    design: &'d Design,
+    pattern_index: DesignIndex<'p>,
+    design_index: DesignIndex<'d>,
+    config: &Config,
+) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    info!("Starting subgraph isomorphism search");
+    trace!("Config: {:?}", config);
+
+    let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
+
+    let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
+
+    let mut results = find_isomorphisms_recursive_collect(
+        &pattern_index,
+        &design_index,
+        pattern,
+        design,
+        config,
+        initial_cell_mapping,
+        pattern_mapping_queue,
+        0, // depth
+    );
+
+    info!(
+        "Found {} initial results before deduplication",
+        results.len()
+    );
+
+    if config.dedupe {
+        let mut seen: HashSet<Vec<usize>> = HashSet::new();
+        results.retain(|m| seen.insert(m.mapping.signature()));
+        info!("After AutoMorph deduplication: {} results", results.len());
+    }
+
+    info!("Final result count: {}", results.len());
+
+    results
+}
+
+fn build_pattern_mapping_queue<'p>(pattern_index: &DesignIndex<'p>) -> VecDeque<CellWrapper<'p>> {
     let pattern_mapping_queue: VecDeque<CellWrapper<'p>> = {
         let q: Vec<CellWrapper<'p>> = pattern_index
             .get_cells_topo()
@@ -152,8 +168,8 @@ fn build_pattern_mapping_queue<'p>(pattern_index: &GraphIndex<'p>) -> VecDeque<C
 
 fn build_candidates<'a, 'p, 'd, 'g>(
     pattern_current: CellWrapper<'p>,
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
+    pattern_index: &'a DesignIndex<'p>,
+    design_index: &'a DesignIndex<'d>,
     pattern: &'p Design,
     design: &'d Design,
     config: &'a Config,
@@ -206,8 +222,8 @@ fn build_candidates<'a, 'p, 'd, 'g>(
 }
 
 fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
+    pattern_index: &'a DesignIndex<'p>,
+    design_index: &'a DesignIndex<'d>,
     pattern: &'p Design,
     design: &'d Design,
     config: &'a Config,

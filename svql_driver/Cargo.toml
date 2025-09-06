@@ -41,3 +41,4 @@ tracing.workspace = true
 tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
+ouroboros = "0.18.5"

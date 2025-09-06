@@ -4,6 +4,7 @@ use crate::{ModuleConfig, YosysModule};
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
+    pub parallel: bool,
     pub match_length: bool,
     pub dedupe: bool,
     pub needle_options: ModuleConfig,
@@ -13,12 +14,14 @@ pub struct Config {
 impl Config {
     /// Create a new configuration.
     pub fn new(
+        parallel: bool,
         match_length: bool,
         dedupe: bool,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
     ) -> Self {
         Self {
+            parallel,
             match_length,
             dedupe,
             needle_options,
@@ -33,6 +36,7 @@ impl Config {
 
 #[derive(Clone, Debug, Default)]
 pub struct ConfigBuilder {
+    parallel: bool,
     match_length: bool,
     dedupe: bool,
     needle_options: ModuleConfig,
@@ -40,6 +44,10 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    pub fn parallel(mut self, value: bool) -> Self {
+        self.parallel = value;
+        self
+    }
     pub fn match_length(mut self, value: bool) -> Self {
         self.match_length = value;
         self
@@ -105,6 +113,7 @@ impl ConfigBuilder {
 
     pub fn build(self) -> Config {
         Config {
+            parallel: self.parallel,
             match_length: self.match_length,
             dedupe: self.dedupe,
             needle_options: self.needle_options,

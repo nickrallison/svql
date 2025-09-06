@@ -1,6 +1,6 @@
 use crate::cell_mapping::CellMapping;
 use crate::constraints::Constraint;
-use crate::graph_index::GraphIndex;
+use crate::design_index::DesignIndex;
 use crate::{Timer, cell::CellWrapper};
 use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
@@ -8,8 +8,8 @@ use tracing::{debug, trace};
 
 pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
     p_cell: CellWrapper<'p>,
-    pattern_index: &'a GraphIndex<'p>,
-    design_index: &'a GraphIndex<'d>,
+    pattern_index: &'a DesignIndex<'p>,
+    design_index: &'a DesignIndex<'d>,
 
     pattern: &'p Design,
     design: &'d Design,
@@ -21,8 +21,8 @@ pub(crate) struct ConnectivityConstraint<'a, 'p, 'd> {
 impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
     pub(crate) fn new(
         p_cell: CellWrapper<'p>,
-        pattern_index: &'a GraphIndex<'p>,
-        design_index: &'a GraphIndex<'d>,
+        pattern_index: &'a DesignIndex<'p>,
+        design_index: &'a DesignIndex<'d>,
         pattern: &'p Design,
         design: &'d Design,
         config: &'a Config,

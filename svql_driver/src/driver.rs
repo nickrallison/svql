@@ -6,6 +6,7 @@ use prjunnamed_netlist::Design;
 use svql_common::YosysModule;
 use thiserror::Error;
 
+use crate::design_container::DesignContainer;
 use crate::{Context, DriverKey};
 
 #[derive(Debug, Error)]
@@ -20,7 +21,7 @@ pub enum DriverError {
 
 #[derive(Debug, Clone)]
 pub struct Driver {
-    registry: Arc<RwLock<HashMap<DriverKey, Arc<Design>>>>,
+    registry: Arc<RwLock<HashMap<DriverKey, Arc<DesignContainer>>>>,
     yosys_path: PathBuf,
     root_path: PathBuf,
 }
@@ -103,7 +104,7 @@ impl Driver {
         // Store in registry
         {
             let mut registry = self.registry.write().unwrap();
-            registry.insert(key.clone(), Arc::new(design));
+            registry.insert(key.clone(), Arc::new(DesignContainer::build(design)));
             tracing::event!(
                 tracing::Level::DEBUG,
                 "Design stored in registry: {:?}",
@@ -121,7 +122,7 @@ impl Driver {
         design_path: &str,
         module_name: &str,
         module_config: &svql_common::ModuleConfig,
-    ) -> Result<(DriverKey, Arc<Design>), DriverError> {
+    ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
         let design_path = Path::new(design_path);
         let absolute_path = if design_path.is_absolute() {
             design_path.to_path_buf()
@@ -154,7 +155,8 @@ impl Driver {
             .import_design(module_config)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        let design_arc = Arc::new(design);
+        let design_container = DesignContainer::build(design);
+        let design_arc = Arc::new(design_container);
 
         {
             let mut registry = self.registry.write().unwrap();
@@ -170,7 +172,7 @@ impl Driver {
     }
 
     /// Get a design from the registry (returns None if not loaded)
-    pub fn get_design(&self, key: &DriverKey) -> Option<Arc<Design>> {
+    pub fn get_design(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
         let registry = self.registry.read().unwrap();
         let result = registry.get(key).cloned();
         if result.is_some() {
@@ -194,7 +196,7 @@ impl Driver {
         &self,
         path: P,
         module_name: &str,
-    ) -> Option<Arc<Design>> {
+    ) -> Option<Arc<DesignContainer>> {
         let key = DriverKey::new(path, module_name.to_string());
         self.get_design(&key)
     }
@@ -206,8 +208,8 @@ impl Driver {
         let registry = self.registry.read().unwrap();
 
         for key in keys {
-            if let Some(design) = registry.get(key) {
-                context.insert(key.clone(), design.clone());
+            if let Some(design_container) = registry.get(key) {
+                context.insert(key.clone(), design_container.clone());
                 tracing::event!(tracing::Level::DEBUG, "Design added to context: {:?}", key);
             } else {
                 tracing::event!(
@@ -236,7 +238,7 @@ impl Driver {
     }
 
     /// Get all currently loaded designs
-    pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<Design>> {
+    pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
         let registry = self.registry.read().unwrap();
         tracing::event!(
             tracing::Level::DEBUG,
