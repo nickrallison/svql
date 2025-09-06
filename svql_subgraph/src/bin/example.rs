@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = svql_common::Config::builder()
         .match_length(true)
-        .dedupe(true)
+        .dedupe(false)
         .haystack_flatten(true)
         .build();
 
