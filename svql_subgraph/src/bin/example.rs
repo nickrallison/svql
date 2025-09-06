@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,8 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .haystack_flatten(true)
         .build();
 
-    let pattern = pattern_module.import_design(&config.needle_options)?;
-    let design = design_module.import_design(&config.haystack_options)?;
+    let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");
+
+    let pattern = pattern_module.import_design_yosys(&config.needle_options, &yosys)?;
+    let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
     let matches = svql_subgraph::find_subgraph_isomorphisms(&pattern, &design, &config);
 

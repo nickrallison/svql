@@ -12,8 +12,8 @@ pub fn bind_input<'ctx>(
     bit: usize,
 ) -> Match<'ctx> {
     tracing::event!(tracing::Level::TRACE, "Binding input: {} bit {}", name, bit);
+    let des = m.bound_inputs.get(name).cloned().unwrap();
     let pat = m.input_by_name.get(name).cloned().unwrap();
-    let des = m.mapping.get_design_cell(pat.clone()).unwrap();
     Match {
         pat_node_ref: Some(pat),
         design_node_ref: Some(des),
@@ -32,8 +32,17 @@ pub fn bind_output<'ctx>(
         name,
         bit
     );
-    let pat = m.output_by_name.get(name).cloned().unwrap();
-    let des = m.mapping.get_design_cell(pat.clone()).unwrap();
+
+    let des_res = m.bound_outputs.get(name).cloned();
+    let des = match des_res {
+        Some(v) => v,
+        None => panic!("No bound output found for name {}", name),
+    };
+    if des.len() != 1 {
+        panic!("For now, only single-bit outputs are supported");
+    }
+    let (des, _) = des.into_iter().next().unwrap();
+    let pat = m.mapping.get_pattern_cell(des.clone()).unwrap();
     Match {
         pat_node_ref: Some(pat),
         design_node_ref: Some(des),

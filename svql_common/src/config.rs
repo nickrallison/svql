@@ -2,28 +2,40 @@
 
 use crate::{ModuleConfig, YosysModule};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Config {
-    pub parallel: bool,
     pub match_length: bool,
     pub dedupe: bool,
+    pub bind_inputs: bool,
     pub needle_options: ModuleConfig,
     pub haystack_options: ModuleConfig,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            match_length: false,
+            dedupe: false,
+            bind_inputs: true,
+            needle_options: Default::default(),
+            haystack_options: Default::default(),
+        }
+    }
 }
 
 impl Config {
     /// Create a new configuration.
     pub fn new(
-        parallel: bool,
         match_length: bool,
         dedupe: bool,
+        bind_inputs: bool,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
     ) -> Self {
         Self {
-            parallel,
             match_length,
             dedupe,
+            bind_inputs,
             needle_options,
             haystack_options,
         }
@@ -36,18 +48,14 @@ impl Config {
 
 #[derive(Clone, Debug, Default)]
 pub struct ConfigBuilder {
-    parallel: bool,
     match_length: bool,
     dedupe: bool,
+    bind_inputs: bool,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
 }
 
 impl ConfigBuilder {
-    pub fn parallel(mut self, value: bool) -> Self {
-        self.parallel = value;
-        self
-    }
     pub fn match_length(mut self, value: bool) -> Self {
         self.match_length = value;
         self
@@ -64,6 +72,11 @@ impl ConfigBuilder {
     }
     pub fn dedupe(mut self, value: bool) -> Self {
         self.dedupe = value;
+        self
+    }
+
+    pub fn bind_inputs(mut self, value: bool) -> Self {
+        self.bind_inputs = value;
         self
     }
 
@@ -113,9 +126,9 @@ impl ConfigBuilder {
 
     pub fn build(self) -> Config {
         Config {
-            parallel: self.parallel,
             match_length: self.match_length,
             dedupe: self.dedupe,
+            bind_inputs: self.bind_inputs,
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
         }

@@ -41,11 +41,11 @@ impl<'a, 'p, 'd> ConnectivityConstraint<'a, 'p, 'd> {
 
     fn is_cell_connectivity_valid(&self, d_cell: CellWrapper<'d>) -> bool {
         let _t = Timer::new("ConnectivityConstraint::is_cell_connectivity_valid");
-        self.validate_fanin_connections(d_cell)
+        self.validate_fan_in_connections(d_cell)
     }
 
-    fn validate_fanin_connections(&self, d_cell: CellWrapper<'d>) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::validate_fanin_connections");
+    fn validate_fan_in_connections(&self, d_cell: CellWrapper<'d>) -> bool {
+        let _t = Timer::new("ConnectivityConstraint::validate_fan_in_connections");
 
         // let p_cell_cow = self.p_cell.get();
         // let d_cell_cow = d_cell.get();

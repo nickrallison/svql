@@ -11,8 +11,6 @@ pub struct CellMapping<'p, 'd> {
 }
 
 impl<'p, 'd> CellMapping<'p, 'd> {
-    #[contracts::debug_ensures(ret.pattern_to_design.is_empty())]
-    #[contracts::debug_ensures(ret.design_to_pattern.is_empty())]
     pub(super) fn new() -> Self {
         Self {
             pattern_to_design: HashMap::new(),
@@ -20,14 +18,24 @@ impl<'p, 'd> CellMapping<'p, 'd> {
         }
     }
 
-    #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
-    #[contracts::debug_ensures(self.pattern_to_design.len() == self.design_to_pattern.len())]
     pub(super) fn insert(&mut self, pattern: CellWrapper<'p>, design: CellWrapper<'d>) {
         let _t = Timer::new("NodeMapping::insert");
 
         self.pattern_to_design
             .insert(pattern.clone(), design.clone());
         self.design_to_pattern.insert(design, pattern);
+    }
+
+    pub(super) fn remove_by_pattern(
+        &mut self,
+        pattern: CellWrapper<'p>,
+    ) -> Option<CellWrapper<'d>> {
+        let _t = Timer::new("NodeMapping::remove_by_pattern");
+        if let Some(design_cell) = self.pattern_to_design.remove(&pattern) {
+            self.design_to_pattern.remove(&design_cell);
+            return Some(design_cell);
+        }
+        None
     }
 
     // debug ensure that pattern & design mappings are consistent
@@ -44,24 +52,20 @@ impl<'p, 'd> CellMapping<'p, 'd> {
         out
     }
 
-    #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
     pub fn len(&self) -> usize {
         debug_assert_eq!(self.pattern_to_design.len(), self.design_to_pattern.len());
         self.pattern_to_design.len()
     }
 
-    #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
     pub fn is_empty(&self) -> bool {
         debug_assert_eq!(self.pattern_to_design.len(), self.design_to_pattern.len());
         self.pattern_to_design.is_empty()
     }
 
-    #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
     pub fn design_mapping(&self) -> &HashMap<CellWrapper<'d>, CellWrapper<'p>> {
         &self.design_to_pattern
     }
 
-    #[contracts::debug_requires(self.pattern_to_design.len() == self.design_to_pattern.len())]
     pub fn pattern_mapping(&self) -> &HashMap<CellWrapper<'p>, CellWrapper<'d>> {
         &self.pattern_to_design
     }

@@ -110,8 +110,12 @@ impl YosysModule {
         args
     }
 
-    fn run_yosys_command(&self, args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-        let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
+    fn run_yosys_command(
+        &self,
+        args: Vec<String>,
+        yosys: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
 
         let mut cmd = Command::new(yosys);
         cmd.args(args)
@@ -139,6 +143,15 @@ impl YosysModule {
         &self,
         module_config: &ModuleConfig,
     ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+        let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
+        self.import_design_yosys(module_config, &yosys)
+    }
+
+    pub fn import_design_yosys(
+        &self,
+        module_config: &ModuleConfig,
+        yosys: &Path,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
         let json_temp_file = tempfile::Builder::new()
             .prefix("svql_prjunnamed_")
             .suffix(".json")
@@ -146,7 +159,7 @@ impl YosysModule {
             .tempfile()?;
 
         let args = self.build_yosys_args(json_temp_file.path(), module_config, OutputFormat::Json);
-        self.run_yosys_command(args)?;
+        self.run_yosys_command(args, yosys)?;
 
         let mut designs =
             prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
@@ -164,15 +177,18 @@ impl YosysModule {
     pub fn write_rtlil_to_path(
         &self,
         config: &ModuleConfig,
+        yosys: &Path,
         rtlil_out: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let args = self.build_yosys_args(rtlil_out, config, OutputFormat::Rtlil);
-        self.run_yosys_command(args)
+
+        self.run_yosys_command(args, yosys)
     }
 
     pub fn write_rtlil_to_stdout(
         &self,
         config: &ModuleConfig,
+        yosys: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let rtlil_temp_file = tempfile::Builder::new()
             .prefix("svql_rtlil_")
@@ -180,7 +196,7 @@ impl YosysModule {
             .rand_bytes(4)
             .tempfile()?;
 
-        self.write_rtlil_to_path(config, rtlil_temp_file.path())?;
+        self.write_rtlil_to_path(config, rtlil_temp_file.path(), yosys)?;
 
         let content = std::fs::read_to_string(rtlil_temp_file.path())?;
         print!("{}", content);

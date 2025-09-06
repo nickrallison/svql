@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use svql_common::{ModuleConfig, YosysModule};
 
 fn write_yosys_to_rtlil(
@@ -6,9 +6,10 @@ fn write_yosys_to_rtlil(
     config: &ModuleConfig,
     rtlil_out: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let yosys = which::which("yosys")?;
     match rtlil_out {
-        Some(path) => yosys_module.write_rtlil_to_path(config, path),
-        None => yosys_module.write_rtlil_to_stdout(config),
+        Some(path) => yosys_module.write_rtlil_to_path(config, path, &yosys),
+        None => yosys_module.write_rtlil_to_stdout(config, &yosys),
     }
 }
 

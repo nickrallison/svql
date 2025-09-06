@@ -34,6 +34,9 @@ pub struct SubgraphIsomorphism<'p, 'd> {
     // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
     pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    //
+    pub bound_inputs: HashMap<&'p str, CellWrapper<'d>>,
+    pub bound_outputs: HashMap<String, Vec<(CellWrapper<'d>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
@@ -58,6 +61,56 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
         }
         println!("--------------------------------------------------------")
     }
+    fn input_bindings(&mut self) {
+        // self.input_by_name = HashMap::new();
+        for (pat_cell, des_cell) in self.mapping.pattern_mapping().clone() {
+            if matches!(pat_cell.cell_type(), CellType::Input) {
+                let name = pat_cell.input_name().expect("Input must have name");
+                let returned = self
+                    .mapping
+                    .remove_by_pattern(pat_cell)
+                    .expect("Input must be mapped");
+                if returned != des_cell {
+                    panic!("Input mapping inconsistent");
+                }
+                self.bound_inputs.insert(name, returned);
+            }
+        }
+    }
+    fn output_bindings(&mut self, design: &'d Design) {
+        let mut bound_outputs: HashMap<String, Vec<(CellWrapper<'d>, usize)>> = HashMap::new();
+        for des_cell in design.iter_cells() {
+            let cell_wrapper: CellWrapper<'d> = des_cell.into();
+
+            match cell_wrapper.get() {
+                prjunnamed_netlist::Cell::Output(name, value) => {
+                    let value_repr = &value.0;
+                    let mut visited: Vec<(CellWrapper<'d>, usize)> = Vec::new();
+
+                    match value_repr {
+                        prjunnamed_netlist::ValueRepr::None => {}
+                        prjunnamed_netlist::ValueRepr::Some(net) => {
+                            let cell_res = design.find_cell(*net);
+                            if let Ok((cell_ref, id)) = cell_res {
+                                visited.push((cell_ref.into(), id));
+                            }
+                        }
+                        prjunnamed_netlist::ValueRepr::Many(nets) => {
+                            for net in nets {
+                                let cell_res = design.find_cell(*net);
+                                if let Ok((cell_ref, id)) = cell_res {
+                                    visited.push((cell_ref.into(), id));
+                                }
+                            }
+                        }
+                    }
+                    bound_outputs.insert(name.to_string(), visited);
+                }
+                _ => {}
+            }
+        }
+        self.bound_outputs = bound_outputs
+    }
 }
 
 pub fn find_subgraph_isomorphisms<'p, 'd>(
@@ -65,48 +118,10 @@ pub fn find_subgraph_isomorphisms<'p, 'd>(
     design: &'d Design,
     config: &Config,
 ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-    info!("Starting subgraph isomorphism search");
-    trace!("Config: {:?}", config);
-
     let pattern_index = DesignIndex::build(pattern);
     let design_index = DesignIndex::build(design);
 
-    let pattern_mapping_queue = build_pattern_mapping_queue(&pattern_index);
-
-    let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
-
-    let mut results = find_isomorphisms_recursive_collect(
-        &pattern_index,
-        &design_index,
-        pattern,
-        design,
-        config,
-        initial_cell_mapping,
-        pattern_mapping_queue,
-        0, // depth
-    );
-
-    info!(
-        "Found {} initial results before deduplication",
-        results.len()
-    );
-
-    if config.dedupe {
-        let mut seen: HashSet<Vec<usize>> = HashSet::new();
-        results.retain(|m| seen.insert(m.mapping.signature()));
-        info!("After AutoMorph deduplication: {} results", results.len());
-    }
-
-    // let mut seen: HashSet<Vec<usize>> = HashSet::new();
-    // results.retain(|m| seen.insert(m.mapping.signature()));
-
-    info!("Final result count: {}", results.len());
-
-    // for result in &results {
-    //     result.print_mapping();
-    // }
-
-    results
+    find_subgraph_isomorphisms_index(pattern, design, &pattern_index, &design_index, config)
 }
 
 pub fn find_subgraph_isomorphisms_index<'p, 'd>(
@@ -139,6 +154,11 @@ pub fn find_subgraph_isomorphisms_index<'p, 'd>(
         results.len()
     );
 
+    // Filter results out if they have inconsistent input bindings
+    // if config.bind_inputs {
+    //     results.retain(|m| {});
+    // }
+
     if config.dedupe {
         let mut seen: HashSet<Vec<usize>> = HashSet::new();
         results.retain(|m| seen.insert(m.mapping.signature()));
@@ -155,7 +175,7 @@ fn build_pattern_mapping_queue<'p>(pattern_index: &DesignIndex<'p>) -> VecDeque<
         let q: Vec<CellWrapper<'p>> = pattern_index
             .get_cells_topo()
             .iter()
-            .filter(|c| !matches!(c.cell_type(), CellType::Input))
+            // .filter(|c| !matches!(c.cell_type(), CellType::Input))
             .filter(|c| !matches!(c.cell_type(), CellType::Output))
             .cloned()
             .rev()
@@ -234,11 +254,18 @@ fn find_isomorphisms_recursive_collect<'a, 'p, 'd>(
     // Base Case
     let Some(pattern_current) = pattern_mapping_queue.pop_front() else {
         // attach
-        return vec![SubgraphIsomorphism {
+        let mut mapping = SubgraphIsomorphism {
             mapping: cell_mapping,
             input_by_name: pattern_index.get_input_by_name().clone(),
             output_by_name: pattern_index.get_output_by_name().clone(),
-        }];
+            bound_inputs: HashMap::new(),
+            bound_outputs: HashMap::new(),
+        };
+
+        mapping.input_bindings();
+        mapping.output_bindings(design);
+
+        return vec![mapping];
     };
 
     let candidates_vec = build_candidates(
