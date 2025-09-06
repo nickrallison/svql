@@ -1,3 +1,4 @@
+use svql_subgraph::cell::CellWrapper;
 
 use crate::instance::Instance;
 
@@ -19,8 +20,8 @@ pub trait QueryableState: State {}
 pub struct Search;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Match<'ctx> {
-    pub pat_node_ref: Option<prjunnamed_netlist::CellRef<'ctx>>,
-    pub design_node_ref: Option<prjunnamed_netlist::CellRef<'ctx>>,
+    pub pat_node_ref: Option<CellWrapper<'ctx>>,
+    pub design_node_ref: Option<CellWrapper<'ctx>>,
 }
 
 impl State for Search {}

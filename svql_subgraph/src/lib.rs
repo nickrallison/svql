@@ -29,7 +29,7 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
     // Mapping of pattern cells to design cells (and reverse)
-    mapping: CellMapping<'p, 'd>,
+    pub mapping: CellMapping<'p, 'd>,
 
     // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
