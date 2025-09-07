@@ -2,13 +2,11 @@ use std::path::PathBuf;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pattern_module: YosysModule = YosysModule::new(
-        "examples/fixtures/basic/and/verilog/small_and_seq.v",
-        "small_and_seq",
-    )?;
+    let pattern_module: YosysModule =
+        YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
     let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/basic/and/verilog/small_and_tree.v",
-        "small_and_tree",
+        "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v",
+        "AddrDecode",
     )?;
 
     let config = svql_common::Config::builder()
