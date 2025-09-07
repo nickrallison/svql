@@ -37,6 +37,10 @@ impl Driver {
         })
     }
 
+    pub fn set_yosys_path<P: AsRef<Path>>(&mut self, yosys: P) {
+        self.yosys_path = yosys.as_ref().to_path_buf();
+    }
+
     pub fn new_workspace() -> Result<Self, DriverError> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         Self::new(workspace)
@@ -98,7 +102,7 @@ impl Driver {
         let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
         let design = yosys_module
-            .import_design(module_config)
+            .import_design_yosys(module_config, &self.yosys_path)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         // Store in registry
@@ -152,7 +156,7 @@ impl Driver {
         let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
         let design = yosys_module
-            .import_design(module_config)
+            .import_design_yosys(module_config)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         let design_container = DesignContainer::build(design);
@@ -265,7 +269,7 @@ impl Driver {
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         let result = yosys_module
-            .import_design(module_config)
+            .import_design_yosys(module_config)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         Ok(result)

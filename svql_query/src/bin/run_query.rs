@@ -14,6 +14,7 @@
 // - --progress shows a simple textual progress spinner while loading, then a bar when matching.
 
 use std::env;
+use std::path::PathBuf;
 use svql_common::Config;
 use svql_driver::Driver;
 
@@ -49,19 +50,19 @@ struct Args {
     query: String,
     haystack: String,
     module: String,
+    yosys: Option<PathBuf>,
     dedupe: bool,
     match_length: bool, // true=exact, false=superset
     flatten: bool,
-    show_progress: bool,
 }
 
 fn parse_args() -> Args {
     let mut query: Option<String> = None;
     let mut haystack: Option<String> = None;
     let mut module: Option<String> = None;
+    let mut yosys: Option<PathBuf> = None;
     let mut dedupe = false;
     let mut match_length = true; // exact by default
-    let mut show_progress = false;
     let mut flatten = false;
 
     let mut it = env::args().skip(1);
@@ -74,7 +75,7 @@ fn parse_args() -> Args {
             "--superset" => match_length = false,
             "--flatten" => flatten = true,
             "--exact" => match_length = true,
-            "--progress" | "-p" => show_progress = true,
+            "--yosys" => yosys = it.next().map(PathBuf::from),
             "--help" | "-h" => print_usage_and_exit(),
             unknown => {
                 eprintln!("Unknown argument: {unknown}");
@@ -95,10 +96,10 @@ fn parse_args() -> Args {
         query,
         haystack,
         module,
+        yosys,
         dedupe,
         match_length,
         flatten,
-        show_progress,
     }
 }
 
