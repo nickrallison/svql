@@ -61,16 +61,20 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-pub struct FindSubgraphs<'p, 'd> {
+pub struct FindSubgraphs<'p, 'd, 'a> {
     pattern: &'p Design,
     design: &'d Design,
     pattern_index: DesignIndex<'p>,
     design_index: DesignIndex<'d>,
-    config: Config,
+    config: &'a Config,
 }
 
-impl<'p, 'd> FindSubgraphs<'p, 'd> {
-    pub fn new(pattern: &'p Design, design: &'d Design, config: Config) -> FindSubgraphs<'p, 'd> {
+impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
+    pub fn new(
+        pattern: &'p Design,
+        design: &'d Design,
+        config: &'a Config,
+    ) -> FindSubgraphs<'p, 'd, 'a> {
         let pattern_index = DesignIndex::build(pattern);
         let design_index = DesignIndex::build(design);
 
@@ -88,8 +92,8 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
         design: &'d Design,
         pattern_index: DesignIndex<'p>,
         design_index: DesignIndex<'d>,
-        config: Config,
-    ) -> FindSubgraphs<'p, 'd> {
+        config: &'a Config,
+    ) -> FindSubgraphs<'p, 'd, 'a> {
         FindSubgraphs {
             pattern,
             design,
@@ -101,7 +105,7 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
 
     pub fn find_subgraph_isomorphisms(&self) -> Vec<SubgraphIsomorphism<'p, 'd>> {
         let (pattern_gate_mapping_queue, pattern_input_mapping_queue) =
-            self.build_pattern_mapping_queues(&self.pattern_index);
+            self.build_pattern_mapping_queues();
         let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
         let mut results = self.find_isomorphisms_recurse(
             initial_cell_mapping,
@@ -177,7 +181,7 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
             return vec![mapping];
         };
 
-        let candidates_vec = self.build_input_candidates(pattern_current.clone(), &cell_mapping);
+        let candidates_vec = self.build_gate_candidates(pattern_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
         let cand_iter = candidates_vec.into_par_iter();
@@ -228,7 +232,7 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
         (pattern_input_mapping_queue, pattern_gate_mapping_queue)
     }
 
-    fn build_candidates(
+    fn build_gate_candidates(
         &self,
         pattern_current: CellWrapper<'p>,
         cell_mapping: &CellMapping<'p, 'd>,
@@ -256,6 +260,7 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
             .get_fanin_raw(&pattern_current)
             .map(|vec| vec.as_slice())
             .unwrap_or_default();
+
         let mapped_design_fan_in: Vec<CellWrapper<'d>> = pattern_fan_in
             .iter()
             .filter_map(|(p_fan_in_cell, _)| cell_mapping.get_design_cell(p_fan_in_cell.clone()))
@@ -274,6 +279,8 @@ impl<'p, 'd> FindSubgraphs<'p, 'd> {
             .filter(|c| c.cell_type() == current_type)
             .filter(|c| cell_mapping.design_mapping().get(c).is_none())
             .collect();
+
+        candidates
 
         // // Filter 1: Filter only cells that have fan out from mapped design cells
         // // This is to cut down the number of possible candidates to search
