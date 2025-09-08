@@ -181,7 +181,7 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             return vec![mapping];
         };
 
-        let candidates_vec = self.build_gate_candidates(pattern_current.clone(), &cell_mapping);
+        let candidates_vec = self.build_inputs_candidates(pattern_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
         let cand_iter = candidates_vec.into_par_iter();
@@ -274,8 +274,19 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
             intersection(design_fan_out_sets);
 
+        let connectivity_filter: ConnectivityConstraint<'a, 'p, 'd> = ConnectivityConstraint::new(
+            pattern_current.clone(),
+            &self.pattern_index,
+            &self.design_index,
+            &self.pattern,
+            &self.design,
+            &self.config,
+            cell_mapping.clone(),
+        );
+
         let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_out
             .into_iter()
+            .filter(|c| connectivity_filter.d_candidate_is_valid(c))
             .filter(|c| c.cell_type() == current_type)
             .filter(|c| cell_mapping.design_mapping().get(c).is_none())
             .collect();
@@ -293,15 +304,6 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         // // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
         // // since cells are chosen in the order inputs -> outputs
         // // we check that for each design cell <-> pattern cell, their fan in are connected (since in topological order)
-        // let connectivity_filter: ConnectivityConstraint<'a, 'p, 'd> = ConnectivityConstraint::new(
-        //     pattern_current.clone(),
-        //     pattern_index,
-        //     design_index,
-        //     pattern,
-        //     design,
-        //     config,
-        //     cell_mapping.clone(),
-        // );
 
         // candidates
         //     .filter(|d_candidate| not_already_mapped_filter.d_candidate_is_valid(d_candidate))
