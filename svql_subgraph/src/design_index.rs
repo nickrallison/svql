@@ -1,4 +1,8 @@
-use std::{collections::HashMap, vec};
+use std::{
+    collections::{HashMap, HashSet},
+    os::linux::raw,
+    vec,
+};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
@@ -167,5 +171,42 @@ impl<'a> DesignIndex<'a> {
 
     pub fn get_output_by_name(&self) -> &HashMap<&'a str, CellWrapper<'a>> {
         &self.output_by_name
+    }
+
+    pub fn get_fanout(&self, cell: &CellWrapper<'a>) -> HashSet<CellWrapper<'a>> {
+        let raw = self.fanout_map.get(&cell.debug_index());
+        raw.map(|v| v.iter().map(|(c, _)| c.clone()).collect())
+            .unwrap_or_default()
+    }
+    pub fn get_fanin(&self, cell: &CellWrapper<'a>) -> HashSet<CellWrapper<'a>> {
+        let raw = self.fanin_map.get(&cell.debug_index());
+        raw.map(|v| v.iter().map(|(c, _)| c.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_fanout_raw(&self, cell: &CellWrapper<'a>) -> Option<&Vec<(CellWrapper<'a>, usize)>> {
+        self.fanout_map.get(&cell.debug_index())
+    }
+    pub fn get_fanin_raw(&self, cell: &CellWrapper<'a>) -> Option<&Vec<(CellWrapper<'a>, usize)>> {
+        self.fanin_map.get(&cell.debug_index())
+    }
+
+    pub fn get_intersect_fanout_of_fanin(
+        &self,
+        cell: &CellWrapper<'a>,
+    ) -> HashSet<CellWrapper<'a>> {
+        let mut fanin: Vec<CellWrapper<'a>> = self.get_fanin(cell).into_iter().collect();
+
+        let first_fanin = fanin.remove(0);
+        let initial_fanout = self.get_fanout(&first_fanin);
+
+        let fanout_of_fanin: HashSet<CellWrapper<'a>> = fanin
+            .iter()
+            .map(|c| self.get_fanout(c))
+            .fold(initial_fanout, |acc: HashSet<CellWrapper<'a>>, hs| {
+                acc.intersection(&hs).cloned().collect()
+            });
+
+        fanout_of_fanin
     }
 }
