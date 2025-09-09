@@ -13,17 +13,15 @@ pub struct DesignIndex<'a> {
     cells_topo: Vec<CellWrapper<'a>>,
     cell_type_map: HashMap<CellType, Vec<CellWrapper<'a>>>,
 
-    // ##########################################
-    input_by_name: HashMap<&'a str, CellWrapper<'a>>,
-    output_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>>,
-
     // Input Fanout map
-    fanin_map: HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
-    fanout_map: HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
-
-    //
+    fanin_map: HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
+    fanout_map: HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
     clean_fanout_map: HashMap<usize, HashSet<CellWrapper<'a>>>,
     clean_fanin_map: HashMap<usize, HashSet<CellWrapper<'a>>>,
+
+    // io fanin/out
+    input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>>,
+    output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>>,
 }
 
 impl<'a> DesignIndex<'a> {
@@ -39,16 +37,16 @@ impl<'a> DesignIndex<'a> {
         // 2: Building cell_type_map
         let cell_type_map = Self::build_cell_type_map(&cell_refs_topo);
 
-        // #############
-        // Building I/O Maps
-        let input_by_name = Self::build_input_by_name(&cells_topo);
-        let output_by_name = Self::build_output_by_name(&cells_topo, design);
-
         // Building fanin/fanout_map
         let (fanin_map, fanout_map) = Self::build_fanin_fanout_maps(design, &cell_refs_topo);
 
         let clean_fanout_map = Self::build_clean_fanout_fanin_map(&fanout_map);
         let clean_fanin_map = Self::build_clean_fanout_fanin_map(&fanin_map);
+
+        // #############
+        // Building I/O Maps
+        let input_fanout_by_name = Self::build_input_fanout_by_name(&fanout_map);
+        let output_fanin_by_name = Self::build_output_fanin_by_name(&fanin_map);
 
         DesignIndex {
             cells_topo,
@@ -56,8 +54,8 @@ impl<'a> DesignIndex<'a> {
             fanout_map,
             fanin_map,
             //
-            input_by_name,
-            output_by_name,
+            input_fanout_by_name,
+            output_fanin_by_name,
             //
             clean_fanout_map,
             clean_fanin_map,
@@ -116,53 +114,58 @@ impl<'a> DesignIndex<'a> {
         input_by_name
     }
 
-    fn build_output_by_name(
-        cells_topo: &[CellWrapper<'a>],
-        design: &'a Design,
+    fn build_output_fanin_by_name(
+        fanin_map: &HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
     ) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        let output_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>> = cells_topo
+        let output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>> = fanin_map
             .iter()
-            .filter_map(|c| {
-                if let Cell::Output(name, value) = c.get() {
-                    let mut visited: Vec<(CellWrapper<'a>, usize)> = Vec::new();
-                    value.visit(|net| {
-                        let cell = design.find_cell(net);
-
-                        if let Ok((source_ref, id)) = cell {
-                            let source_wrapper: CellWrapper<'a> = source_ref.into();
-                            if !visited.contains(&(source_wrapper.clone(), id)) {
-                                visited.push((source_wrapper, id));
-                            }
-                        }
-                    });
-                    Some((name.to_string(), visited))
+            .filter_map(|(cell_wrapper, value)| {
+                if let Cell::Output(name, _) = cell_wrapper.get() {
+                    Some((name.clone(), value.clone()))
                 } else {
                     None
                 }
             })
-            .collect();
-        output_by_name
+            .collect::<HashMap<_, _>>();
+        output_fanin_by_name
+    }
+
+    fn build_input_fanout_by_name(
+        fanin_map: &HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
+    ) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+        let input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>> = fanin_map
+            .iter()
+            .filter_map(|(cell_wrapper, value)| {
+                if let Cell::Input(name, _) = cell_wrapper.get() {
+                    Some((name.clone(), value.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+        input_fanout_by_name
     }
 
     fn build_fanin_fanout_maps(
         design: &'a Design,
         cell_refs_topo: &[CellRef<'a>],
     ) -> (
-        HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
-        HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
+        HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
+        HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
     ) {
-        let mut fanout_map: HashMap<usize, Vec<(CellWrapper<'a>, usize)>> = HashMap::new();
-        let mut fanin_map: HashMap<usize, Vec<(CellWrapper<'a>, usize)>> = HashMap::new();
+        let mut fanout_map: HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>> =
+            HashMap::new();
+        let mut fanin_map: HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>> = HashMap::new();
         for sink_ref in cell_refs_topo.iter().cloned() {
             let sink_wrapper: CellWrapper<'a> = sink_ref.into();
             sink_ref.visit(|net| {
                 if let Ok((source_ref, source_pin_idx)) = design.find_cell(net) {
                     fanout_map
-                        .entry(source_ref.debug_index())
+                        .entry(source_ref.into())
                         .or_default()
                         .push((sink_wrapper.clone(), source_pin_idx));
                     fanin_map
-                        .entry(sink_wrapper.debug_index())
+                        .entry(sink_wrapper.clone())
                         .or_default()
                         .push((source_ref.into(), source_pin_idx));
                 }
@@ -172,12 +175,12 @@ impl<'a> DesignIndex<'a> {
     }
 
     fn build_clean_fanout_fanin_map(
-        fanout_fanin_map: &HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
+        fanout_fanin_map: &HashMap<CellWrapper<'a>, Vec<(CellWrapper<'a>, usize)>>,
     ) -> HashMap<usize, HashSet<CellWrapper<'a>>> {
         let mut clean_fanout_fanin_map: HashMap<usize, HashSet<CellWrapper<'a>>> = HashMap::new();
         for (key, vec) in fanout_fanin_map.iter() {
             let set: HashSet<CellWrapper<'a>> = vec.iter().map(|(c, _)| c.clone()).collect();
-            clean_fanout_fanin_map.insert(*key, set);
+            clean_fanout_fanin_map.insert(key.debug_index(), set);
         }
         clean_fanout_fanin_map
     }
@@ -194,12 +197,12 @@ impl<'a> DesignIndex<'a> {
         self.cells_topo.as_slice()
     }
 
-    pub fn get_input_by_name(&self) -> &HashMap<&'a str, CellWrapper<'a>> {
-        &self.input_by_name
+    pub fn get_input_fanout_by_name(&self) -> &HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+        &self.input_fanout_by_name
     }
 
-    pub fn get_output_by_name(&self) -> &HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        &self.output_by_name
+    pub fn get_output_fanin_by_name(&self) -> &HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+        &self.output_fanin_by_name
     }
 
     pub fn get_fanout(&self, cell: &CellWrapper<'a>) -> Option<&HashSet<CellWrapper<'a>>> {
@@ -210,10 +213,10 @@ impl<'a> DesignIndex<'a> {
     }
 
     pub fn get_fanout_raw(&self, cell: &CellWrapper<'a>) -> Option<&Vec<(CellWrapper<'a>, usize)>> {
-        self.fanout_map.get(&cell.debug_index())
+        self.fanout_map.get(&cell)
     }
     pub fn get_fanin_raw(&self, cell: &CellWrapper<'a>) -> Option<&Vec<(CellWrapper<'a>, usize)>> {
-        self.fanin_map.get(&cell.debug_index())
+        self.fanin_map.get(&cell)
     }
 
     pub fn get_intersect_fanout_of_fanin(

@@ -15,7 +15,7 @@
 
 use std::env;
 use std::path::PathBuf;
-use svql_common::Config;
+use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 
 // Generated at build-time. Provides dispatch helpers.
@@ -51,8 +51,8 @@ struct Args {
     haystack: String,
     module: String,
     yosys: Option<PathBuf>,
-    dedupe: bool,
-    match_length: bool, // true=exact, false=superset
+    dedupe: Dedupe,
+    match_length: MatchLength,
     flatten: bool,
 }
 
@@ -61,9 +61,10 @@ fn parse_args() -> Args {
     let mut haystack: Option<String> = None;
     let mut module: Option<String> = None;
     let mut yosys: Option<PathBuf> = None;
-    let mut dedupe = false;
-    let mut match_length = true; // exact by default
-    let mut flatten = false;
+
+    let mut dedupe: Option<String> = None;
+    let mut match_length: Option<String> = None;
+    let mut flatten: bool = false;
 
     let mut it = env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -71,10 +72,9 @@ fn parse_args() -> Args {
             "--query" | "-q" => query = it.next(),
             "--haystack" | "-H" => haystack = it.next(),
             "--module" | "-m" => module = it.next(),
-            "--dedupe" => dedupe = true,
-            "--superset" => match_length = false,
+            "--dedupe" => dedupe = it.next(),
+            "--match_length" => match_length = it.next(),
             "--flatten" => flatten = true,
-            "--exact" => match_length = true,
             "--yosys" => yosys = it.next().map(PathBuf::from),
             "--help" | "-h" => print_usage_and_exit(),
             unknown => {
@@ -91,6 +91,24 @@ fn parse_args() -> Args {
             print_usage_and_exit();
         }
     };
+
+    let dedupe: Dedupe = dedupe
+        .clone()
+        .unwrap_or_default()
+        .parse()
+        .unwrap_or_else(|_| {
+            eprintln!("Invalid --dedupe value: {dedupe:?}");
+            print_usage_and_exit();
+        });
+
+    let match_length: MatchLength = match_length
+        .clone()
+        .unwrap_or_default()
+        .parse()
+        .unwrap_or_else(|_| {
+            eprintln!("Invalid --match_length value: {match_length:?}");
+            print_usage_and_exit();
+        });
 
     Args {
         query,

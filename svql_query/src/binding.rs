@@ -11,12 +11,14 @@ pub fn bind_input<'ctx>(
     name: &str,
     bit: usize,
 ) -> Match<'ctx> {
-    let pat = m.input_by_name.get(name).cloned().unwrap();
-    let des = m.mapping.get_design_cell(pat.clone()).unwrap();
-    Match {
-        pat_node_ref: Some(pat),
+    let pat = m.input_fanout_by_name.get(name).cloned().unwrap();
+    let pat_first = &pat[0].0;
+    let des = m.mapping.get_design_cell(pat_first.clone()).unwrap();
+    return Match {
+        pat_node_ref: Some(pat_first.clone()),
         design_node_ref: Some(des),
-    }
+    };
+    todo!("how to handle length matching with bind")
     // todo!()
 }
 
@@ -25,11 +27,12 @@ pub fn bind_output<'ctx>(
     name: &str,
     bit: usize,
 ) -> Match<'ctx> {
-    let pat = m.output_by_name.get(name).cloned().unwrap();
+    let pat = m.output_fanin_by_name.get(name).cloned().unwrap();
     let pat_first = &pat[0].0;
     let des = m.mapping.get_design_cell(pat_first.clone()).unwrap();
-    Match {
+    return Match {
         pat_node_ref: Some(pat_first.clone()),
         design_node_ref: Some(des),
-    }
+    };
+    todo!("how to handle length matching with bind")
 }

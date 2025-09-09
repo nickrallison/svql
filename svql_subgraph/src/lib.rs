@@ -26,12 +26,9 @@ use crate::cell::{CellType, CellWrapper};
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
-    // Mapping of pattern cells to design cells (and reverse)
     pub mapping: CellMapping<'p, 'd>,
-    // // Boundary IO lookup tables
-    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    pub output_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
-    //
+    pub input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
+    pub output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
 }
 
 impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
@@ -55,6 +52,18 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
             );
         }
         println!("--------------------------------------------------------")
+    }
+
+    pub fn io_signature(&self) -> Vec<usize> {
+        let mut sig: Vec<usize> = self
+            .mapping
+            .pattern_mapping()
+            .iter()
+            .filter(|(p, _)| !matches!(p.cell_type(), CellType::Input | CellType::Output))
+            .map(|(_, d)| d.debug_index())
+            .collect();
+        sig.sort_unstable();
+        sig
     }
 }
 
@@ -124,9 +133,14 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             0,
         );
 
-        if self.config.dedupe {
+        if self.config.dedupe.all() {
             let mut seen: HashSet<Vec<usize>> = HashSet::new();
             results.retain(|m| seen.insert(m.mapping.signature()));
+        }
+
+        if self.config.dedupe.inner() {
+            let mut seen: HashSet<Vec<usize>> = HashSet::new();
+            results.retain(|m| seen.insert(m.io_signature()));
         }
 
         results
@@ -184,8 +198,8 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             // attach
             let mapping = SubgraphIsomorphism {
                 mapping: cell_mapping,
-                input_by_name: self.pattern_index.get_input_by_name().clone(),
-                output_by_name: self.pattern_index.get_output_by_name().clone(),
+                input_fanout_by_name: self.pattern_index.get_input_fanout_by_name().clone(),
+                output_fanin_by_name: self.pattern_index.get_output_fanin_by_name().clone(),
             };
 
             return vec![mapping];

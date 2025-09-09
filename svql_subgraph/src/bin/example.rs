@@ -19,8 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let config = svql_common::Config::builder()
-        .match_length(true)
-        .dedupe(false)
+        .match_length(svql_common::MatchLength::First)
+        .dedupe(svql_common::Dedupe::Inner)
         .haystack_flatten(true)
         .build();
 

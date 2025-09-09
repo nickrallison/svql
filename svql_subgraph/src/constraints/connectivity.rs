@@ -1,5 +1,5 @@
-use crate::cell_mapping::CellMapping;
 use crate::FindSubgraphsInner;
+use crate::cell_mapping::CellMapping;
 use crate::{Timer, cell::CellWrapper};
 use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
 use tracing::trace;
@@ -35,14 +35,8 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         );
         use Cell::*;
         match (pattern_cell, design_cell) {
-            (Buf(p_value), Buf(d_value)) => {
-                
-                self.values_match_fan_in(p_value, d_value, mapping)
-            }
-            (Not(p_value), Not(d_value)) => {
-                
-                self.values_match_fan_in(p_value, d_value, mapping)
-            }
+            (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
+            (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
                 let a_matches = self.values_match_fan_in(p_a_value, d_a_value, mapping);
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value, mapping);
@@ -165,22 +159,22 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
                 self.values_match_fan_in(pa_value, da_value, mapping)
                     && self.values_match_fan_in(pb_value, db_value, mapping)
             }
-            (Match(p_match_cell), Match(d_match_cell)) => {
+            (Match(_p_match_cell), Match(_d_match_cell)) => {
                 todo!("Make Function to match match cells")
             }
-            (Assign(p_assign_cell), Assign(d_assign_cell)) => {
+            (Assign(_p_assign_cell), Assign(_d_assign_cell)) => {
                 todo!("Make Function to match assign cells")
             }
             (Dff(p_dff_cell), Dff(d_dff_cell)) => {
                 self.dffs_match_fan_in(p_dff_cell, d_dff_cell, mapping)
             }
-            (Memory(p_memory_cell), Memory(d_memory_cell)) => {
+            (Memory(_p_memory_cell), Memory(_d_memory_cell)) => {
                 todo!("Make Function to match memory cells")
             }
             // (IoBuf(pi), IoBuf(di)) => todo!(),
             // (Target(pt), Target(dt)) => todo!(),
             // (Other(po), Other(do_)) => todo!(),
-            (Input(p_name, p_width), Input(d_name, d_width)) => {
+            (Input(_p_name, _p_width), Input(_d_name, _d_width)) => {
                 // panic!(
                 //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
                 // );
@@ -298,7 +292,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_const: &prjunnamed_netlist::Const,
         design_const: &prjunnamed_netlist::Const,
-        mapping: &CellMapping<'p, 'd>,
+        _mapping: &CellMapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if consts match fan-in: {:?} and {:?}",
