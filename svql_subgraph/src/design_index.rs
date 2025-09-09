@@ -95,7 +95,7 @@ impl<'a> DesignIndex<'a> {
             cell_type_map
                 .entry(node_type)
                 .or_default()
-                .push(cell.clone().into());
+                .push((*cell).into());
         }
         cell_type_map
     }
@@ -164,7 +164,7 @@ impl<'a> DesignIndex<'a> {
                     fanin_map
                         .entry(sink_wrapper.debug_index())
                         .or_default()
-                        .push((source_ref.clone().into(), source_pin_idx));
+                        .push((source_ref.into(), source_pin_idx));
                 }
             });
         }

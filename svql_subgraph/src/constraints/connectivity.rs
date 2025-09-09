@@ -1,11 +1,8 @@
 use crate::cell_mapping::CellMapping;
-use crate::constraints::Constraint;
-use crate::design_index::DesignIndex;
-use crate::{FindSubgraphs, FindSubgraphsInner};
+use crate::FindSubgraphsInner;
 use crate::{Timer, cell::CellWrapper};
-use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
-use svql_common::Config;
-use tracing::{debug, trace};
+use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
+use tracing::trace;
 
 impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
     pub(crate) fn validate_fan_in_connections(
@@ -39,12 +36,12 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         use Cell::*;
         match (pattern_cell, design_cell) {
             (Buf(p_value), Buf(d_value)) => {
-                let value_matches = self.values_match_fan_in(p_value, d_value, mapping);
-                value_matches
+                
+                self.values_match_fan_in(p_value, d_value, mapping)
             }
             (Not(p_value), Not(d_value)) => {
-                let value_matches = self.values_match_fan_in(p_value, d_value, mapping);
-                value_matches
+                
+                self.values_match_fan_in(p_value, d_value, mapping)
             }
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
                 let a_matches = self.values_match_fan_in(p_a_value, d_a_value, mapping);
@@ -219,7 +216,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         match (pattern_value_repr, design_value_repr) {
             (ValueRepr::None, ValueRepr::None) => true,
             (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
-                self.nets_match_fan_in(&p_net, &d_net, mapping)
+                self.nets_match_fan_in(p_net, d_net, mapping)
             }
             (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => {
                 todo!(
@@ -228,7 +225,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             }
             (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => {
                 let first_d_net = d_nets.first().unwrap();
-                return self.nets_match_fan_in(&p_net, first_d_net, mapping);
+                return self.nets_match_fan_in(p_net, first_d_net, mapping);
                 todo!("Should single pattern match against many design?")
             }
             _ => false,

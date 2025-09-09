@@ -136,7 +136,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         cell_mapping: CellMapping<'p, 'd>,
         mut pattern_gate_mapping_queue: VecDeque<CellWrapper<'p>>,
-        mut pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
+        pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
         depth: usize,
     ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
         // Base Case
@@ -182,7 +182,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         // Base Case
         let Some(pattern_current) = pattern_input_mapping_queue.pop_front() else {
             // attach
-            let mut mapping = SubgraphIsomorphism {
+            let mapping = SubgraphIsomorphism {
                 mapping: cell_mapping,
                 input_by_name: self.pattern_index.get_input_by_name().clone(),
                 output_by_name: self.pattern_index.get_output_by_name().clone(),
@@ -353,7 +353,7 @@ pub fn intersection<T: Eq + Hash + Clone>(mut items: Vec<HashSet<T>>) -> HashSet
     };
 
     let intersection: HashSet<T> = items.iter().fold(first_fanin, |acc: HashSet<T>, hs| {
-        acc.intersection(&hs).cloned().collect()
+        acc.intersection(hs).cloned().collect()
     });
 
     intersection
@@ -367,7 +367,7 @@ pub fn intersection_ref<T: Eq + Hash + Clone>(mut items: Vec<&HashSet<T>>) -> Ha
     let first_fanin = first_fanin.clone();
 
     let intersection: HashSet<T> = items.iter().fold(first_fanin, |acc: HashSet<T>, hs| {
-        acc.intersection(&hs).cloned().collect()
+        acc.intersection(hs).cloned().collect()
     });
 
     intersection

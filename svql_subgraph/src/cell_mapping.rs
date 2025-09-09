@@ -41,15 +41,15 @@ impl<'p, 'd> CellMapping<'p, 'd> {
     // debug ensure that pattern & design mappings are consistent
     pub fn get_design_cell(&self, pattern: CellWrapper<'p>) -> Option<CellWrapper<'d>> {
         let _t = Timer::new("NodeMapping::get_design_cell");
-        let out = self.pattern_to_design.get(&pattern).cloned();
-        out
+        
+        self.pattern_to_design.get(&pattern).cloned()
     }
 
     // debug ensure that pattern & design mappings are consistent
     pub fn get_pattern_cell(&self, design: CellWrapper<'d>) -> Option<CellWrapper<'p>> {
         let _t = Timer::new("NodeMapping::get_pattern_cell");
-        let out = self.design_to_pattern.get(&design).cloned();
-        out
+        
+        self.design_to_pattern.get(&design).cloned()
     }
 
     pub fn len(&self) -> usize {

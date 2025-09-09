@@ -167,17 +167,17 @@ impl SearchableEnumComposite for AndAny<Search> {
             // Convert matches to enum variants
             let and_gate_results: Vec<Self::Hit<'ctx>> = and_gate_matches
                 .into_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Gate(match_))
+                .map(AndAny::<Match<'ctx>>::Gate)
                 .collect();
 
             let and_mux_results: Vec<Self::Hit<'ctx>> = and_mux_matches
                 .into_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Mux(match_))
+                .map(AndAny::<Match<'ctx>>::Mux)
                 .collect();
 
             let and_nor_results: Vec<Self::Hit<'ctx>> = and_nor_matches
                 .into_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Nor(match_))
+                .map(AndAny::<Match<'ctx>>::Nor)
                 .collect();
 
             and_gate_results

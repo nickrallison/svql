@@ -153,7 +153,7 @@ impl Driver {
             module_name
         );
 
-        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
+        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
         let design = yosys_module
             .import_design_yosys(module_config, &self.yosys_path)

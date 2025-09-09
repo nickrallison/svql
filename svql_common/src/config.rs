@@ -1,6 +1,6 @@
 //! Configuration for the subgraph isomorphism search.
 
-use crate::{ModuleConfig, YosysModule};
+use crate::ModuleConfig;
 
 #[derive(Clone, Debug)]
 pub struct Config {

@@ -169,11 +169,11 @@ impl<'a> CellWrapper<'a> {
     }
 }
 
-impl<'a> Into<CellWrapper<'a>> for CellRef<'a> {
-    fn into(self) -> CellWrapper<'a> {
+impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
+    fn from(val: CellRef<'a>) -> Self {
         CellWrapper {
-            cell: self.get(),
-            debug_index: self.debug_index(),
+            cell: val.get(),
+            debug_index: val.debug_index(),
         }
     }
 }

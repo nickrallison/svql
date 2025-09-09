@@ -1,21 +1,13 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct ModuleConfig {
     pub flatten: bool,
     pub params: HashMap<String, String>,
     pub other_steps: Vec<String>,
 }
 
-impl Default for ModuleConfig {
-    fn default() -> Self {
-        Self {
-            flatten: false,
-            params: HashMap::new(),
-            other_steps: vec![],
-        }
-    }
-}
 
 impl ModuleConfig {
     pub fn new() -> Self {

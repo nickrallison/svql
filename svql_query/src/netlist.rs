@@ -60,7 +60,8 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let needle_index = needle_container.index();
         let haystack_index = haystack_container.index();
 
-        let matches = svql_subgraph::FindSubgraphs::find_subgraphs_from_index(
+        
+        svql_subgraph::FindSubgraphs::find_subgraphs_from_index(
             needle,
             haystack,
             needle_index,
@@ -69,8 +70,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         )
         .into_iter()
         .map(|m| Self::from_subgraph(&m, path.clone()))
-        .collect();
-        matches
+        .collect()
     }
 
     /// Same as `query`, but also updates the provided `progress` as the subgraph search proceeds.
@@ -107,7 +107,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let design = driver
             .get_or_load_design(
                 &key.path().display().to_string(),
-                &key.module_name().to_string(),
+                key.module_name(),
                 config,
             )?
             .1;

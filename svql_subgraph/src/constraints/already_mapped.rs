@@ -1,5 +1,4 @@
 use crate::{CellMapping, Timer, cell::CellWrapper, constraints::Constraint};
-use prjunnamed_netlist::CellRef;
 use tracing::trace;
 
 pub(crate) struct NotAlreadyMappedConstraint<'p, 'd> {
@@ -18,7 +17,7 @@ impl<'p, 'd> Constraint<'d> for NotAlreadyMappedConstraint<'p, 'd> {
         let is_valid = !self
             .cell_mapping
             .design_mapping()
-            .contains_key(&(cell.clone().into()));
+            .contains_key(&cell.clone());
         if !is_valid {
             trace!("Design cell {:?} already mapped, rejecting", cell);
         }

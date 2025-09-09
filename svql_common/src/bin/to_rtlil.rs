@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Convert output file to Path if provided
-    let output_path = output_file.as_ref().map(|s| Path::new(s));
+    let output_path = output_file.as_ref().map(Path::new);
 
     // Write the RTLIL
     write_yosys_to_rtlil(&yosys_module, &config, output_path)?;
