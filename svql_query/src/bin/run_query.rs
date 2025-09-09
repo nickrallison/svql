@@ -92,23 +92,21 @@ fn parse_args() -> Args {
         }
     };
 
-    let dedupe: Dedupe = dedupe
-        .clone()
-        .unwrap_or_default()
-        .parse()
-        .unwrap_or_else(|_| {
+    let dedupe: Dedupe = match dedupe.clone() {
+        Some(dedupe) => dedupe.parse().unwrap_or_else(|_| {
             eprintln!("Invalid --dedupe value: {dedupe:?}");
             print_usage_and_exit();
-        });
+        }),
+        None => Default::default(),
+    };
 
-    let match_length: MatchLength = match_length
-        .clone()
-        .unwrap_or_default()
-        .parse()
-        .unwrap_or_else(|_| {
+    let match_length: MatchLength = match match_length {
+        Some(match_length) => match_length.parse().unwrap_or_else(|_| {
             eprintln!("Invalid --match_length value: {match_length:?}");
             print_usage_and_exit();
-        });
+        }),
+        None => Default::default(),
+    };
 
     Args {
         query,
