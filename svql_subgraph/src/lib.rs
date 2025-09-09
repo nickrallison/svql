@@ -271,13 +271,13 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             // This happens for the first cells mapped and is not avoidable
             self.design_index.get_by_type(current_type).to_vec()
         } else {
-            let design_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_in
+            let design_fan_out_sets: Vec<&HashSet<CellWrapper<'d>>> = mapped_design_fan_in
                 .iter()
-                .map(|d_cell| self.design_index.get_fanout(d_cell))
+                .filter_map(|d_cell| self.design_index.get_fanout(d_cell))
                 .collect();
 
             let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
-                intersection(design_fan_out_sets);
+                intersection_ref(design_fan_out_sets);
             intersection_design_fan_out.into_iter().collect()
         };
 
@@ -313,12 +313,13 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             .filter_map(|(p_fan_out_cell, _)| cell_mapping.get_design_cell(p_fan_out_cell.clone()))
             .collect();
 
-        let design_fan_in_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_out
+        let design_fan_in_sets: Vec<&HashSet<CellWrapper<'d>>> = mapped_design_fan_out
             .iter()
-            .map(|d_cell| self.design_index.get_fanin(d_cell))
+            .filter_map(|d_cell| self.design_index.get_fanin(d_cell))
             .collect();
 
-        let intersection_design_fan_in: HashSet<CellWrapper<'d>> = intersection(design_fan_in_sets);
+        let intersection_design_fan_in: HashSet<CellWrapper<'d>> =
+            intersection_ref(design_fan_in_sets);
 
         let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_in
             .into_iter()
@@ -327,6 +328,10 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
                 nm.insert(pattern_current.clone(), d_cell.clone());
 
                 let fanout = self.design_index.get_fanout(d_cell);
+                if fanout.is_none() {
+                    return false;
+                }
+                let fanout = fanout.unwrap();
                 fanout.iter().all(|d_fanout_cell| {
                     if let Some(p_fanout_cell) = nm.get_pattern_cell(d_fanout_cell.clone()) {
                         self.validate_fan_in_connections(p_fanout_cell, d_fanout_cell.clone(), &nm)
@@ -346,6 +351,20 @@ pub fn intersection<T: Eq + Hash + Clone>(mut items: Vec<HashSet<T>>) -> HashSet
     let Some(first_fanin) = items.pop() else {
         return HashSet::new();
     };
+
+    let intersection: HashSet<T> = items.iter().fold(first_fanin, |acc: HashSet<T>, hs| {
+        acc.intersection(&hs).cloned().collect()
+    });
+
+    intersection
+}
+
+pub fn intersection_ref<T: Eq + Hash + Clone>(mut items: Vec<&HashSet<T>>) -> HashSet<T> {
+    let Some(first_fanin) = items.pop() else {
+        return HashSet::new();
+    };
+
+    let first_fanin = first_fanin.clone();
 
     let intersection: HashSet<T> = items.iter().fold(first_fanin, |acc: HashSet<T>, hs| {
         acc.intersection(&hs).cloned().collect()
