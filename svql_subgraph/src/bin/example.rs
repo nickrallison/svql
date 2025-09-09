@@ -4,10 +4,13 @@ use svql_common::YosysModule;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern_module: YosysModule =
         YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
-    let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v",
-        "AddrDecode",
-    )?;
+    // let design_module: YosysModule = YosysModule::new(
+    //     "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v",
+    //     "AddrDecode",
+    // )?;
+
+    let design_module: YosysModule =
+        YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let config = svql_common::Config::builder()
         .match_length(true)

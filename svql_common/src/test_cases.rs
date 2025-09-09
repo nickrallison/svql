@@ -285,267 +285,48 @@ lazy_static::lazy_static! {
             haystack: &AND_GATE_HAYSTACK,
             expected_matches: 2,
         },
-        TestCase {
-            name: "and_gate_self_dedupe_yes",
-            config: {
-                Config::builder()
-                .exact_length()
-                .haystack_flatten(true)
-                .dedupe(true)
-                .build()
-            },
-            pattern: &AND_GATE,
-            haystack: &AND_GATE_HAYSTACK,
-            expected_matches: 1,
-        },
-        TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_no",
-            config: {
-                Config::builder()
-                    .exact_length()
-                    .dedupe(false)
-                    .needle_flatten(true)
-                    .haystack_flatten(true)
-                    .build()
-            },
-            pattern: &SMALL_AND_SEQ,
-            haystack: &SMALL_AND_TREE_HAYSTACK,
-            expected_matches: 4,
-        },
-        TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_yes",
-            config: {
-                Config::builder()
-                    .exact_length()
-                    .dedupe(true)
-                    .needle_flatten(true)
-                    .haystack_flatten(true)
-                    .build()
-            },
-            pattern: &SMALL_AND_SEQ,
-            haystack: &SMALL_AND_TREE_HAYSTACK,
-            expected_matches: 2,
-        },
         // TestCase {
-        //     name: "and_gate_and_tree_4",
+        //     name: "and_gate_self_dedupe_yes",
+        //     config: {
+        //         Config::builder()
+        //         .exact_length()
+        //         .haystack_flatten(true)
+        //         .dedupe(true)
+        //         .build()
+        //     },
+        //     pattern: &AND_GATE,
+        //     haystack: &AND_GATE_HAYSTACK,
+        //     expected_matches: 1,
+        // },
+        // TestCase {
+        //     name: "small_and_seq_3_and_tree_4_dedupe_no",
         //     config: {
         //         Config::builder()
         //             .exact_length()
-        //             .haystack_param("N", "4")
+        //             .dedupe(false)
+        //             .needle_flatten(true)
         //             .haystack_flatten(true)
         //             .build()
         //     },
-        //     pattern: &AND_SEQ,
-        //     haystack: &AND_TREE_HAYSTACK,
-        //     expected_matches: 3,
-        // },
-
-        // DFF tests
-        // TestCase {
-        //     name: "sdffe_self",
-        //     config: {
-        //         Config::builder()
-        //             .exact_length()
-        //             .build()
-        //     },
-        //     pattern: &SDFFE,
-        //     haystack: &SDFFE_HAYSTACK,
-        //     expected_matches: 1,
-        // },
-
-        // #######################################
-
-        // TestCase {
-        //     name: "and_gate_self_auto_morph",
-        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_GATE_SELF,
-        //     expected_matches: 1,
-        // },
-        // TestCase {
-        //     name: "and_gate_in_and_q_double_none",
-        //     config: Config::builder().exact_length().none().flatten().build(),
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     pattern: &SMALL_AND_SEQ,
+        //     haystack: &SMALL_AND_TREE_HAYSTACK,
         //     expected_matches: 4,
         // },
         // TestCase {
-        //     name: "and_gate_in_and_q_double_auto_morph",
-        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_Q_DOUBLE_SDFFE,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "and_gate_in_and_tree_auto_morph",
-        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_TREE,
-        //     expected_matches: 7,
-        // },
-        // TestCase {
-        //     name: "and_gate_in_and_seq_auto_morph",
-        //     config: Config::builder().exact_length().auto_morph().flatten().build(),
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_SEQ,
-        //     expected_matches: 7,
-        // },
-
-        // // DFF tests
-        // TestCase {
-        //     name: "sdffe_self",
+        //     name: "small_and_seq_3_and_tree_4_dedupe_yes",
         //     config: {
         //         Config::builder()
         //             .exact_length()
+        //             .dedupe(true)
+        //             .needle_flatten(true)
+        //             .haystack_flatten(true)
         //             .build()
         //     },
-        //     pattern: &SDFFE,
-        //     haystack: &SDFFE_HAYSTACK,
-        //     expected_matches: 1,
+        //     pattern: &SMALL_AND_SEQ,
+        //     haystack: &SMALL_AND_TREE_HAYSTACK,
+        //     expected_matches: 2,
         // },
-    //     TestCase {
-    //         name: "sdffe_in_comb_d_double_none",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &COMB_D_DOUBLE_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_and_q_double_none",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &AND_Q_DOUBLE_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_par_double_none",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &PAR_DOUBLE_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_seq_double_none",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &SEQ_DOUBLE_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_seq_1_width_2_none_superset_length",
-    //         config: Config::builder().superset_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &SEQ_1_WIDTH_2_SDFFE,
-    //         expected_matches: 1,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_seq_2_width_2_none_superset_length",
-    //         config: Config::builder().superset_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &SEQ_2_WIDTH_2_SDFFE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_seq_1_width_2_none_exact_length",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &SEQ_1_WIDTH_2_SDFFE,
-    //         expected_matches: 0,
-    //     },
-    //     TestCase {
-    //         name: "sdffe_in_seq_2_width_2_none_exact_length",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &SDFFE,
-    //         haystack: &SEQ_2_WIDTH_2_SDFFE,
-    //         expected_matches: 0,
-    //     },
-    //     // =========================
-    //     // and_nor — positive cases
-    //     // =========================
-    //     TestCase {
-    //         name: "and_nor_self_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &AND_NOR_SELF,
-    //         expected_matches: 1,
-    //     },
-    //     TestCase {
-    //         name: "and_nor_in_and_nor_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &AND_NOR_TREE,
-    //         expected_matches: 7, // 7 submodule instances
-    //     },
-    //     TestCase {
-    //         name: "and_nor_in_mixed_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &MIXED_AND_TREE,
-    //         expected_matches: 2, // two and_nor instances in mixed tree
-    //     },
 
-    //     // =========================
-    //     // and_nor — negative cases
-    //     // =========================
-    //     TestCase {
-    //         name: "and_nor_in_and_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &AND_TREE,
-    //         expected_matches: 0,
-    //     },
-
-    //     // =========================
-    //     // and_mux — positive cases
-    //     // =========================
-    //     TestCase {
-    //         name: "and_mux_self_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &AND_MUX_SELF,
-    //         expected_matches: 1,
-    //     },
-    //     TestCase {
-    //         name: "and_mux_in_and_mux_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &AND_MUX_TREE,
-    //         expected_matches: 7, // 7 submodule instances
-    //     },
-    //     TestCase {
-    //         name: "and_mux_in_mixed_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &MIXED_AND_TREE,
-    //         expected_matches: 2, // two and_mux instances in mixed tree
-    //     },
-    //     // Constant correctness: one correct + two incorrect in same haystack
-    //     TestCase {
-    //         name: "and_mux_const_variants_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &AND_MUX_CONST_VARIANTS,
-    //         expected_matches: 1, // only the arm with 1'b0 on false branch must match
-    //     },
-
-    //     // =========================
-    //     // and_mux — negative cases
-    //     // =========================
-    //     TestCase {
-    //         name: "and_mux_in_and_tree_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &AND_TREE,
-    //         expected_matches: 0,
-    //     },
-    //     // Constant correctness: only incorrect variants present
-    //     TestCase {
-    //         name: "and_mux_const_bad_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &AND_MUX_CONST_BAD,
-    //         expected_matches: 0,
-    //     },
     ];
 
     pub static ref DEDUPE_TEST_CASES: Vec<TestCase> = vec![

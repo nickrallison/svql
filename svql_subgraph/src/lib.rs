@@ -101,7 +101,7 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
     }
 
     pub fn find_subgraph_isomorphisms(&self) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-        let (pattern_gate_mapping_queue, pattern_input_mapping_queue) =
+        let (pattern_input_mapping_queue, pattern_gate_mapping_queue) =
             self.build_pattern_mapping_queues();
         let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
         let mut results = self.find_isomorphisms_recurse(
@@ -226,6 +226,12 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             }
         }
 
+        println!(
+            "Pattern mapping queues: {} gates, {} inputs",
+            pattern_gate_mapping_queue.len(),
+            pattern_input_mapping_queue.len()
+        );
+
         (pattern_input_mapping_queue, pattern_gate_mapping_queue)
     }
 
@@ -235,22 +241,6 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         cell_mapping: &CellMapping<'p, 'd>,
     ) -> Vec<CellWrapper<'d>> {
         let current_type = pattern_current.cell_type();
-
-        // The candidates all must be the correct type based on the input cell
-        // let candidates = {
-        //     let slice: &'a [CellWrapper<'d>] = match current_type {
-        //         CellType::Input => design_index.get_cells_topo(),
-        //         _ => design_index.get_by_type(current_type),
-        //     };
-
-        //     #[cfg(feature = "rayon")]
-        //     let slice_iter = slice.into_par_iter();
-
-        //     #[cfg(not(feature = "rayon"))]
-        //     let slice_iter = slice.into_iter();
-
-        //     slice_iter
-        // };
 
         let pattern_fan_in = self
             .pattern_index
@@ -263,15 +253,22 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             .filter_map(|(p_fan_in_cell, _)| cell_mapping.get_design_cell(p_fan_in_cell.clone()))
             .collect();
 
-        let design_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_in
-            .iter()
-            .map(|d_cell| self.design_index.get_fanout(d_cell))
-            .collect();
+        let pre_filtered_candidates: Vec<CellWrapper<'d>> = if mapped_design_fan_in.is_empty() {
+            // if no fanin mapped, return all cells of the correct type
+            // This happens for the first cells mapped and is not avoidable
+            self.design_index.get_by_type(current_type).to_vec()
+        } else {
+            let design_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_in
+                .iter()
+                .map(|d_cell| self.design_index.get_fanout(d_cell))
+                .collect();
 
-        let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
-            intersection(design_fan_out_sets);
+            let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
+                intersection(design_fan_out_sets);
+            intersection_design_fan_out.into_iter().collect()
+        };
 
-        let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_out
+        let candidates: Vec<CellWrapper<'d>> = pre_filtered_candidates
             .into_iter()
             .filter(|d_cell| {
                 self.validate_fan_in_connections(
@@ -285,24 +282,6 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             .collect();
 
         candidates
-
-        // // Filter 1: Filter only cells that have fan out from mapped design cells
-        // // This is to cut down the number of possible candidates to search
-        // // let fan_out_from_mapped_design: Option<HashSet<CellWrapper<'d>>> = None;
-
-        // // Filter 2: Filter only not already mapped cells
-        // let not_already_mapped_filter: NotAlreadyMappedConstraint<'p, 'd> =
-        //     NotAlreadyMappedConstraint::new(cell_mapping.clone());
-
-        // // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
-        // // since cells are chosen in the order inputs -> outputs
-        // // we check that for each design cell <-> pattern cell, their fan in are connected (since in topological order)
-
-        // candidates
-        //     .filter(|d_candidate| not_already_mapped_filter.d_candidate_is_valid(d_candidate))
-        //     .filter(|d_candidate| connectivity_filter.d_candidate_is_valid(d_candidate))
-        //     .cloned()
-        //     .collect()
     }
 
     fn build_input_candidates(
@@ -331,13 +310,6 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_in
             .into_iter()
             .filter(|d_cell| {
-                // self.validate_fan_in_connections(
-                //     pattern_current.clone(),
-                //     d_cell.clone(),
-                //     cell_mapping,
-                // )
-                // #########
-                // validate fanout connections
                 let mut nm = cell_mapping.clone();
                 nm.insert(pattern_current.clone(), d_cell.clone());
 
@@ -350,29 +322,10 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
                     }
                 })
             })
-            // .filter(|d_cell| d_cell.cell_type() == current_type)
             .filter(|d_cell| cell_mapping.design_mapping().get(d_cell).is_none())
             .collect();
 
         candidates
-
-        // // Filter 1: Filter only cells that have fan out from mapped design cells
-        // // This is to cut down the number of possible candidates to search
-        // // let fan_out_from_mapped_design: Option<HashSet<CellWrapper<'d>>> = None;
-
-        // // Filter 2: Filter only not already mapped cells
-        // let not_already_mapped_filter: NotAlreadyMappedConstraint<'p, 'd> =
-        //     NotAlreadyMappedConstraint::new(cell_mapping.clone());
-
-        // // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
-        // // since cells are chosen in the order inputs -> outputs
-        // // we check that for each design cell <-> pattern cell, their fan in are connected (since in topological order)
-
-        // candidates
-        //     .filter(|d_candidate| not_already_mapped_filter.d_candidate_is_valid(d_candidate))
-        //     .filter(|d_candidate| connectivity_filter.d_candidate_is_valid(d_candidate))
-        //     .cloned()
-        //     .collect()
     }
 }
 
