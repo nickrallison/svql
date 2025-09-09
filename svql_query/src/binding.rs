@@ -26,9 +26,10 @@ pub fn bind_output<'ctx>(
     bit: usize,
 ) -> Match<'ctx> {
     let pat = m.output_by_name.get(name).cloned().unwrap();
-    let des = m.mapping.get_design_cell(pat.clone()).unwrap();
+    let pat_first = &pat[0].0;
+    let des = m.mapping.get_design_cell(pat_first.clone()).unwrap();
     Match {
-        pat_node_ref: Some(pat),
+        pat_node_ref: Some(pat_first.clone()),
         design_node_ref: Some(des),
     }
 }

@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    os::linux::raw,
-    vec,
-};
+use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
@@ -19,7 +15,7 @@ pub struct DesignIndex<'a> {
 
     // ##########################################
     input_by_name: HashMap<&'a str, CellWrapper<'a>>,
-    output_by_name: HashMap<&'a str, CellWrapper<'a>>,
+    output_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>>,
 
     // Input Fanout map
     fanin_map: HashMap<usize, Vec<(CellWrapper<'a>, usize)>>,
@@ -42,7 +38,7 @@ impl<'a> DesignIndex<'a> {
         // #############
         // Building I/O Maps
         let input_by_name = Self::build_input_by_name(&cells_topo);
-        let output_by_name = Self::build_output_by_name(&cells_topo);
+        let output_by_name = Self::build_output_by_name(&cells_topo, design);
 
         // Building fanin/fanout_map
         let (fanin_map, fanout_map) = Self::build_fanin_fanout_maps(design, &cell_refs_topo);
@@ -110,14 +106,26 @@ impl<'a> DesignIndex<'a> {
         input_by_name
     }
 
-    fn build_output_by_name(cells_topo: &[CellWrapper<'a>]) -> HashMap<&'a str, CellWrapper<'a>> {
-        let output_by_name: HashMap<&'a str, CellWrapper<'a>> = cells_topo
+    fn build_output_by_name(
+        cells_topo: &[CellWrapper<'a>],
+        design: &'a Design,
+    ) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+        let output_by_name: HashMap<String, Vec<(CellWrapper<'a>, usize)>> = cells_topo
             .iter()
             .filter_map(|c| {
-                if matches!(c.cell_type(), CellType::Output) {
-                    let output_name: &'a str =
-                        c.output_name().expect("Output cell should have a name");
-                    Some((output_name, c.clone()))
+                if let Cell::Output(name, value) = c.get() {
+                    let mut visited: Vec<(CellWrapper<'a>, usize)> = Vec::new();
+                    value.visit(|net| {
+                        let cell = design.find_cell(net);
+
+                        if let Ok((source_ref, id)) = cell {
+                            let source_wrapper: CellWrapper<'a> = source_ref.into();
+                            if !visited.contains(&(source_wrapper.clone(), id)) {
+                                visited.push((source_wrapper, id));
+                            }
+                        }
+                    });
+                    Some((name.to_string(), visited))
                 } else {
                     None
                 }
@@ -169,7 +177,7 @@ impl<'a> DesignIndex<'a> {
         &self.input_by_name
     }
 
-    pub fn get_output_by_name(&self) -> &HashMap<&'a str, CellWrapper<'a>> {
+    pub fn get_output_by_name(&self) -> &HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         &self.output_by_name
     }
 

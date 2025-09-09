@@ -83,9 +83,13 @@ fn emit_generated_tests(found: &[Discovered]) {
             if aliases.is_empty() {
                 quote! {
                     #primary => {
+
+                        let haystack_path = &tc.haystack.yosys_module.path().display().to_string();
+                        let haystack_module = tc.haystack.yosys_module.module_name().to_string();
+
                         let ctx = #ty_path::<Search>::context(driver, &tc.config.needle_options).map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(tc.haystack.path, &tc.haystack.module.to_string(), &tc.config.haystack_options)
+                            .get_or_load_design(&haystack_path, &haystack_module, &tc.config.haystack_options)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root(tc.name.to_string());
@@ -96,9 +100,13 @@ fn emit_generated_tests(found: &[Discovered]) {
             } else {
                 quote! {
                     #primary #( | #aliases )* => {
+
+                        let haystack_path = &tc.haystack.yosys_module.path().display().to_string();
+                        let haystack_module = tc.haystack.yosys_module.module_name().to_string();
+
                         let ctx = #ty_path::<Search>::context(driver, &tc.config.needle_options).map_err(|e| e.to_string())?;
                         let (hk, hd) = driver
-                            .get_or_load_design(tc.haystack.path, &tc.haystack.module.to_string(), &tc.config.haystack_options)
+                            .get_or_load_design(&haystack_path, &haystack_module, &tc.config.haystack_options)
                             .map_err(|e| e.to_string())?;
                         let ctx = ctx.with_design(hk.clone(), hd);
                         let root = svql_query::instance::Instance::root(tc.name.to_string());

@@ -30,7 +30,7 @@ pub struct SubgraphIsomorphism<'p, 'd> {
     pub mapping: CellMapping<'p, 'd>,
     // // Boundary IO lookup tables
     pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub output_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
     //
 }
 
