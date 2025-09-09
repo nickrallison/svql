@@ -285,47 +285,47 @@ lazy_static::lazy_static! {
             haystack: &AND_GATE_HAYSTACK,
             expected_matches: 2,
         },
-        // TestCase {
-        //     name: "and_gate_self_dedupe_yes",
-        //     config: {
-        //         Config::builder()
-        //         .exact_length()
-        //         .haystack_flatten(true)
-        //         .dedupe(true)
-        //         .build()
-        //     },
-        //     pattern: &AND_GATE,
-        //     haystack: &AND_GATE_HAYSTACK,
-        //     expected_matches: 1,
-        // },
-        // TestCase {
-        //     name: "small_and_seq_3_and_tree_4_dedupe_no",
-        //     config: {
-        //         Config::builder()
-        //             .exact_length()
-        //             .dedupe(false)
-        //             .needle_flatten(true)
-        //             .haystack_flatten(true)
-        //             .build()
-        //     },
-        //     pattern: &SMALL_AND_SEQ,
-        //     haystack: &SMALL_AND_TREE_HAYSTACK,
-        //     expected_matches: 4,
-        // },
-        // TestCase {
-        //     name: "small_and_seq_3_and_tree_4_dedupe_yes",
-        //     config: {
-        //         Config::builder()
-        //             .exact_length()
-        //             .dedupe(true)
-        //             .needle_flatten(true)
-        //             .haystack_flatten(true)
-        //             .build()
-        //     },
-        //     pattern: &SMALL_AND_SEQ,
-        //     haystack: &SMALL_AND_TREE_HAYSTACK,
-        //     expected_matches: 2,
-        // },
+        TestCase {
+            name: "and_gate_self_dedupe_yes",
+            config: {
+                Config::builder()
+                .exact_length()
+                .haystack_flatten(true)
+                .dedupe(true)
+                .build()
+            },
+            pattern: &AND_GATE,
+            haystack: &AND_GATE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "small_and_seq_3_and_tree_4_dedupe_no",
+            config: {
+                Config::builder()
+                    .exact_length()
+                    .dedupe(false)
+                    .needle_flatten(true)
+                    .haystack_flatten(true)
+                    .build()
+            },
+            pattern: &SMALL_AND_SEQ,
+            haystack: &SMALL_AND_TREE_HAYSTACK,
+            expected_matches: 4,
+        },
+        TestCase {
+            name: "small_and_seq_3_and_tree_4_dedupe_yes",
+            config: {
+                Config::builder()
+                    .exact_length()
+                    .dedupe(true)
+                    .needle_flatten(true)
+                    .haystack_flatten(true)
+                    .build()
+            },
+            pattern: &SMALL_AND_SEQ,
+            haystack: &SMALL_AND_TREE_HAYSTACK,
+            expected_matches: 2,
+        },
 
     ];
 

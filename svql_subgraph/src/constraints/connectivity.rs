@@ -1,13 +1,13 @@
-use crate::FindSubgraphs;
 use crate::cell_mapping::CellMapping;
 use crate::constraints::Constraint;
 use crate::design_index::DesignIndex;
+use crate::{FindSubgraphs, FindSubgraphsInner};
 use crate::{Timer, cell::CellWrapper};
 use prjunnamed_netlist::{Cell, CellRef, Design, FlipFlop, Trit, Value, ValueRepr};
 use svql_common::Config;
 use tracing::{debug, trace};
 
-impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
+impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
     pub(crate) fn validate_fan_in_connections(
         &self,
         p_cell: CellWrapper<'p>,

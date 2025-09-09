@@ -13,7 +13,7 @@ use design_index::DesignIndex;
 use prjunnamed_netlist::Design;
 use tracing::debug;
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use svql_common::Config;
 
@@ -29,8 +29,8 @@ pub struct SubgraphIsomorphism<'p, 'd> {
     // Mapping of pattern cells to design cells (and reverse)
     pub mapping: CellMapping<'p, 'd>,
     // // Boundary IO lookup tables
-    // pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
-    // pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub input_by_name: HashMap<&'p str, CellWrapper<'p>>,
+    pub output_by_name: HashMap<&'p str, CellWrapper<'p>>,
     //
 }
 
@@ -66,40 +66,53 @@ pub struct FindSubgraphs<'p, 'd, 'a> {
     config: &'a Config,
 }
 
+pub(crate) struct FindSubgraphsInner<'p, 'd, 'a> {
+    pattern: &'p Design,
+    design: &'d Design,
+    pattern_index: &'a DesignIndex<'p>,
+    design_index: &'a DesignIndex<'d>,
+    config: &'a Config,
+}
+
 impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
-    pub fn new(
+    pub fn find_subgraphs(
         pattern: &'p Design,
         design: &'d Design,
         config: &'a Config,
-    ) -> FindSubgraphs<'p, 'd, 'a> {
+    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
         let pattern_index = DesignIndex::build(pattern);
         let design_index = DesignIndex::build(design);
 
-        FindSubgraphs {
+        let matcher = FindSubgraphsInner {
             pattern,
             design,
-            pattern_index,
-            design_index,
+            pattern_index: &pattern_index,
+            design_index: &design_index,
             config,
-        }
+        };
+
+        matcher.find_subgraph_isomorphisms()
     }
 
-    pub fn from_index(
+    pub fn find_subgraphs_from_index(
         pattern: &'p Design,
         design: &'d Design,
-        pattern_index: DesignIndex<'p>,
-        design_index: DesignIndex<'d>,
+        pattern_index: &'a DesignIndex<'p>,
+        design_index: &'a DesignIndex<'d>,
         config: &'a Config,
-    ) -> FindSubgraphs<'p, 'd, 'a> {
-        FindSubgraphs {
+    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+        let matcher = FindSubgraphsInner {
             pattern,
             design,
             pattern_index,
             design_index,
             config,
-        }
+        };
+        matcher.find_subgraph_isomorphisms()
     }
+}
 
+impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
     pub fn find_subgraph_isomorphisms(&self) -> Vec<SubgraphIsomorphism<'p, 'd>> {
         let (pattern_input_mapping_queue, pattern_gate_mapping_queue) =
             self.build_pattern_mapping_queues();
@@ -171,8 +184,8 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             // attach
             let mut mapping = SubgraphIsomorphism {
                 mapping: cell_mapping,
-                // input_by_name: self.pattern_index.get_input_by_name().clone(),
-                // output_by_name: self.pattern_index.get_output_by_name().clone(),
+                input_by_name: self.pattern_index.get_input_by_name().clone(),
+                output_by_name: self.pattern_index.get_output_by_name().clone(),
             };
 
             return vec![mapping];

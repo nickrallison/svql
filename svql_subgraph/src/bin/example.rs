@@ -23,9 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern = pattern_module.import_design_yosys(&config.needle_options, &yosys)?;
     let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
-    let matcher = svql_subgraph::FindSubgraphs::new(&pattern, &design, &config);
-
-    let matches = matcher.find_subgraph_isomorphisms();
+    let matches = svql_subgraph::FindSubgraphs::find_subgraphs(&pattern, &design, &config);
 
     for match_ in matches {
         match_.print_mapping();

@@ -1,8 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Driver, DriverKey, context::Context, design_container::DesignContainer};
-use svql_subgraph::{
-    SubgraphIsomorphism, find_subgraph_isomorphisms, find_subgraph_isomorphisms_index,
-};
+use svql_subgraph::SubgraphIsomorphism;
 
 use crate::instance::Instance;
 
@@ -62,7 +60,16 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let needle_index = needle_container.index();
         let haystack_index = haystack_container.index();
 
-        find_subgraph_isomorphisms_index(needle, haystack, needle_index, haystack_index, config)
+        let matcher = svql_subgraph::FindSubgraphs::from_index(
+            needle,
+            haystack,
+            needle_index,
+            haystack_index,
+            config,
+        );
+
+        matcher
+            .find_subgraph_isomorphisms()
             .into_iter()
             .map(|m| Self::from_subgraph(&m, path.clone()))
             .collect()
