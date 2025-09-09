@@ -22,10 +22,7 @@ pub use util::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::{
-    cell::{CellType, CellWrapper},
-    constraints::{ConnectivityConstraint, Constraint, NotAlreadyMappedConstraint},
-};
+use crate::cell::{CellType, CellWrapper};
 
 #[derive(Clone, Debug, Default)]
 pub struct SubgraphIsomorphism<'p, 'd> {
@@ -181,7 +178,7 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
             return vec![mapping];
         };
 
-        let candidates_vec = self.build_inputs_candidates(pattern_current.clone(), &cell_mapping);
+        let candidates_vec = self.build_input_candidates(pattern_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
         let cand_iter = candidates_vec.into_par_iter();
@@ -274,21 +271,87 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
             intersection(design_fan_out_sets);
 
-        let connectivity_filter: ConnectivityConstraint<'a, 'p, 'd> = ConnectivityConstraint::new(
-            pattern_current.clone(),
-            &self.pattern_index,
-            &self.design_index,
-            &self.pattern,
-            &self.design,
-            &self.config,
-            cell_mapping.clone(),
-        );
-
         let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_out
             .into_iter()
-            .filter(|c| connectivity_filter.d_candidate_is_valid(c))
-            .filter(|c| c.cell_type() == current_type)
-            .filter(|c| cell_mapping.design_mapping().get(c).is_none())
+            .filter(|d_cell| {
+                self.validate_fan_in_connections(
+                    pattern_current.clone(),
+                    d_cell.clone(),
+                    cell_mapping,
+                )
+            })
+            .filter(|d_cell| d_cell.cell_type() == current_type)
+            .filter(|d_cell| cell_mapping.design_mapping().get(d_cell).is_none())
+            .collect();
+
+        candidates
+
+        // // Filter 1: Filter only cells that have fan out from mapped design cells
+        // // This is to cut down the number of possible candidates to search
+        // // let fan_out_from_mapped_design: Option<HashSet<CellWrapper<'d>>> = None;
+
+        // // Filter 2: Filter only not already mapped cells
+        // let not_already_mapped_filter: NotAlreadyMappedConstraint<'p, 'd> =
+        //     NotAlreadyMappedConstraint::new(cell_mapping.clone());
+
+        // // Filter 3: If that cell is chosen as a mapping for pattern, it must not invalidate the connectivity specified by by the pattern
+        // // since cells are chosen in the order inputs -> outputs
+        // // we check that for each design cell <-> pattern cell, their fan in are connected (since in topological order)
+
+        // candidates
+        //     .filter(|d_candidate| not_already_mapped_filter.d_candidate_is_valid(d_candidate))
+        //     .filter(|d_candidate| connectivity_filter.d_candidate_is_valid(d_candidate))
+        //     .cloned()
+        //     .collect()
+    }
+
+    fn build_input_candidates(
+        &self,
+        pattern_current: CellWrapper<'p>,
+        cell_mapping: &CellMapping<'p, 'd>,
+    ) -> Vec<CellWrapper<'d>> {
+        let pattern_fan_out = self
+            .pattern_index
+            .get_fanout_raw(&pattern_current)
+            .map(|vec| vec.as_slice())
+            .unwrap_or_default();
+
+        let mapped_design_fan_out: Vec<CellWrapper<'d>> = pattern_fan_out
+            .iter()
+            .filter_map(|(p_fan_out_cell, _)| cell_mapping.get_design_cell(p_fan_out_cell.clone()))
+            .collect();
+
+        let design_fan_in_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_out
+            .iter()
+            .map(|d_cell| self.design_index.get_fanin(d_cell))
+            .collect();
+
+        let intersection_design_fan_in: HashSet<CellWrapper<'d>> = intersection(design_fan_in_sets);
+
+        let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_in
+            .into_iter()
+            .filter(|d_cell| {
+                // self.validate_fan_in_connections(
+                //     pattern_current.clone(),
+                //     d_cell.clone(),
+                //     cell_mapping,
+                // )
+                // #########
+                // validate fanout connections
+                let mut nm = cell_mapping.clone();
+                nm.insert(pattern_current.clone(), d_cell.clone());
+
+                let fanout = self.design_index.get_fanout(d_cell);
+                fanout.iter().all(|d_fanout_cell| {
+                    if let Some(p_fanout_cell) = nm.get_pattern_cell(d_fanout_cell.clone()) {
+                        self.validate_fan_in_connections(p_fanout_cell, d_fanout_cell.clone(), &nm)
+                    } else {
+                        true
+                    }
+                })
+            })
+            // .filter(|d_cell| d_cell.cell_type() == current_type)
+            .filter(|d_cell| cell_mapping.design_mapping().get(d_cell).is_none())
             .collect();
 
         candidates

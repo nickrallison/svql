@@ -8,7 +8,7 @@ mod connectivity;
 use prjunnamed_netlist::CellRef;
 
 pub(crate) use already_mapped::NotAlreadyMappedConstraint;
-pub(crate) use connectivity::ConnectivityConstraint;
+// pub(crate) use connectivity::ConnectivityConstraint;
 
 use crate::cell::CellWrapper;
 // pub(crate) use design_sink::DesignSinkConstraint;

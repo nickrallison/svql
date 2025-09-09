@@ -2,7 +2,7 @@ use std::{env, fs::File, io::Write, path::PathBuf};
 
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use svql_common::{build_support::sanitize_ident, TestCase};
+use svql_common::{TestCase, build_support::sanitize_ident};
 
 fn main() {
     // Re-run whenever the list of test cases changes
@@ -42,7 +42,8 @@ fn main() {
                         let haystack = tc.haystack.yosys_module.import_design(&tc.config.haystack_options)
                             .unwrap_or_else(|e| panic!("Failed to import needle design for test case '{:#?}': {}", tc, e));
 
-                        let matches = svql_subgraph::find_subgraph_isomorphisms(&needle, &haystack, &tc.config);
+                        let matcher = svql_subgraph::FindSubgraphs::new(&needle, &haystack, &tc.config);
+                        let matches = matcher.find_subgraph_isomorphisms();
                         assert_eq!(
                             matches.len(),
                             tc.expected_matches,
