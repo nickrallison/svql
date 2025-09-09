@@ -4,13 +4,19 @@ use svql_common::YosysModule;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern_module: YosysModule =
         YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
+
+    let design_module: YosysModule = YosysModule::new(
+        "examples/fixtures/larger_designs/json/otbn_core.json",
+        "otbn_core",
+    )?;
+
     // let design_module: YosysModule = YosysModule::new(
     //     "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v",
     //     "AddrDecode",
     // )?;
 
-    let design_module: YosysModule =
-        YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
+    // let design_module: YosysModule =
+    //     YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let config = svql_common::Config::builder()
         .match_length(true)
@@ -25,9 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let matches = svql_subgraph::FindSubgraphs::find_subgraphs(&pattern, &design, &config);
 
-    for match_ in matches {
-        match_.print_mapping();
-    }
+    // for match_ in matches {
+    //     match_.print_mapping();
+    // }
+
+    println!("Found {} matches", matches.len());
 
     // let pattern = pattern_module.
     // let design = design_module.get_design();

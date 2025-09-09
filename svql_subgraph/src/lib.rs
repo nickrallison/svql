@@ -239,11 +239,11 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             }
         }
 
-        println!(
-            "Pattern mapping queues: {} gates, {} inputs",
-            pattern_gate_mapping_queue.len(),
-            pattern_input_mapping_queue.len()
-        );
+        // println!(
+        //     "Pattern mapping queues: {} gates, {} inputs",
+        //     pattern_gate_mapping_queue.len(),
+        //     pattern_input_mapping_queue.len()
+        // );
 
         (pattern_input_mapping_queue, pattern_gate_mapping_queue)
     }
