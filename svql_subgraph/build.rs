@@ -42,8 +42,7 @@ fn main() {
                         let haystack = tc.haystack.yosys_module.import_design(&tc.config.haystack_options)
                             .unwrap_or_else(|e| panic!("Failed to import needle design for test case '{:#?}': {}", tc, e));
 
-                        let matcher = svql_subgraph::FindSubgraphs::new(&needle, &haystack, &tc.config);
-                        let matches = matcher.find_subgraph_isomorphisms();
+                        let matches = svql_subgraph::FindSubgraphs::find_subgraphs(&needle, &haystack, &tc.config);
                         assert_eq!(
                             matches.len(),
                             tc.expected_matches,
