@@ -2,8 +2,10 @@ use std::path::PathBuf;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pattern_module: YosysModule =
-        YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
+    let pattern_module: YosysModule = YosysModule::new(
+        "examples/patterns/basic/and/verilog/and_2_seq.v",
+        "and_2_seq",
+    )?;
 
     let design_module: YosysModule = YosysModule::new(
         "examples/fixtures/larger_designs/json/otbn_core.json",

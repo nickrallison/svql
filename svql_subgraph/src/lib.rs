@@ -272,7 +272,6 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         let pattern_fan_in = self
             .pattern_index
             .get_fanin_raw(&pattern_current)
-            .map(|vec| vec.as_slice())
             .unwrap_or_default();
 
         let mapped_design_fan_in: Vec<CellWrapper<'d>> = pattern_fan_in
@@ -285,13 +284,13 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             // This happens for the first cells mapped and is not avoidable
             self.design_index.get_by_type(current_type).to_vec()
         } else {
-            let design_fan_out_sets: Vec<&HashSet<CellWrapper<'d>>> = mapped_design_fan_in
+            let design_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_in
                 .iter()
                 .filter_map(|d_cell| self.design_index.get_fanout(d_cell))
                 .collect();
 
             let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
-                intersection_ref(design_fan_out_sets);
+                intersection(design_fan_out_sets);
             intersection_design_fan_out.into_iter().collect()
         };
 
@@ -319,7 +318,6 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         let pattern_fan_out = self
             .pattern_index
             .get_fanout_raw(&pattern_current)
-            .map(|vec| vec.as_slice())
             .unwrap_or_default();
 
         let mapped_design_fan_out: Vec<CellWrapper<'d>> = pattern_fan_out
@@ -327,13 +325,12 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             .filter_map(|(p_fan_out_cell, _)| cell_mapping.get_design_cell(p_fan_out_cell.clone()))
             .collect();
 
-        let design_fan_in_sets: Vec<&HashSet<CellWrapper<'d>>> = mapped_design_fan_out
+        let design_fan_in_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_out
             .iter()
             .filter_map(|d_cell| self.design_index.get_fanin(d_cell))
             .collect();
 
-        let intersection_design_fan_in: HashSet<CellWrapper<'d>> =
-            intersection_ref(design_fan_in_sets);
+        let intersection_design_fan_in: HashSet<CellWrapper<'d>> = intersection(design_fan_in_sets);
 
         let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_in
             .into_iter()
