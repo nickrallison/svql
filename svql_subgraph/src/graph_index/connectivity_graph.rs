@@ -9,10 +9,6 @@ pub struct ConnectivityGraph {
     fanin_map: HashMap<CellIndex, Vec<(CellIndex, usize)>>,
     /// Maps each cell to its fan-out cells with port information
     fanout_map: HashMap<CellIndex, Vec<(CellIndex, usize)>>,
-    /// Maps each cell to its fan-out cells (no port information)
-    clean_fanout_map: HashMap<CellIndex, HashSet<CellIndex>>,
-    /// Maps each cell to its fan-in cells (no port information)
-    clean_fanin_map: HashMap<CellIndex, HashSet<CellIndex>>,
 }
 
 impl ConnectivityGraph {
@@ -23,14 +19,10 @@ impl ConnectivityGraph {
     ) -> Self {
         let (fanin_map, fanout_map) =
             Self::build_fanin_fanout_maps(design, cell_refs_topo, cell_id_map);
-        let clean_fanout_map = Self::build_clean_map(&fanout_map);
-        let clean_fanin_map = Self::build_clean_map(&fanin_map);
 
         ConnectivityGraph {
             fanin_map,
             fanout_map,
-            clean_fanout_map,
-            clean_fanin_map,
         }
     }
 
@@ -73,93 +65,54 @@ impl ConnectivityGraph {
         (fanin_map, fanout_map)
     }
 
-    fn build_clean_map(
-        fanout_fanin_map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
-    ) -> HashMap<CellIndex, HashSet<CellIndex>> {
-        fanout_fanin_map
-            .iter()
-            .map(|(key, vec)| {
-                let set: HashSet<CellIndex> = vec.iter().map(|(c, _)| *c).collect();
-                (*key, set)
-            })
-            .collect()
+    // Work with indices for better performance
+    pub fn fanout_indices(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+        self.fanout_map.get(&cell_idx).map(|v| v.as_slice())
     }
 
-    pub fn fanout_set<'a>(
-        &self,
-        cell: &CellWrapper<'a>,
-        registry: &CellRegistry<'a>,
-    ) -> Option<HashSet<CellWrapper<'a>>> {
-        let idx = registry.get_cell_index(cell)?;
-        self.clean_fanout_map.get(&idx).map(|v| {
-            v.iter()
-                .map(|idx| registry.get_cell_by_index(*idx).clone())
-                .collect()
-        })
+    pub fn fanin_indices(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+        self.fanin_map.get(&cell_idx).map(|v| v.as_slice())
     }
 
-    pub fn fanin_set<'a>(
-        &self,
-        cell: &CellWrapper<'a>,
-        registry: &CellRegistry<'a>,
-    ) -> Option<HashSet<CellWrapper<'a>>> {
-        let idx = registry.get_cell_index(cell)?;
-        self.clean_fanin_map.get(&idx).map(|v| {
-            v.iter()
-                .map(|idx| registry.get_cell_by_index(*idx).clone())
-                .collect()
-        })
+    // Helper to get clean indices set
+    pub fn fanout_indices_set(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
+        self.fanout_map
+            .get(&cell_idx)
+            .map(|v| v.iter().map(|(idx, _)| *idx).collect())
+            .unwrap_or_default()
     }
 
-    pub fn fanout_with_ports<'a>(
-        &self,
-        cell: &CellWrapper<'a>,
-        registry: &CellRegistry<'a>,
-    ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        let idx = registry.get_cell_index(cell)?;
-        self.fanout_map.get(&idx).map(|v| {
-            v.iter()
-                .map(|(idx, pin)| (registry.get_cell_by_index(*idx).clone(), *pin))
-                .collect()
-        })
+    pub fn fanin_indices_set(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
+        self.fanin_map
+            .get(&cell_idx)
+            .map(|v| v.iter().map(|(idx, _)| *idx).collect())
+            .unwrap_or_default()
     }
 
-    pub fn fanin_with_ports<'a>(
-        &self,
-        cell: &CellWrapper<'a>,
-        registry: &CellRegistry<'a>,
-    ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        let idx = registry.get_cell_index(cell)?;
-        self.fanin_map.get(&idx).map(|v| {
-            v.iter()
-                .map(|(idx, pin)| (registry.get_cell_by_index(*idx).clone(), *pin))
-                .collect()
-        })
-    }
+    // Optimized intersection using indices
+    pub fn get_intersect_fanout_of_fanin_indices(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
+        let Some(fanin_indices) = self.fanin_map.get(&cell_idx) else {
+            return HashSet::new();
+        };
 
-    pub fn get_intersect_fanout_of_fanin<'a>(
-        &self,
-        cell: &CellWrapper<'a>,
-        registry: &CellRegistry<'a>,
-    ) -> HashSet<CellWrapper<'a>> {
-        let mut fanin: Vec<CellWrapper<'a>> = self
-            .fanin_set(cell, registry)
-            .map(|s| s.into_iter().collect())
-            .unwrap_or_default();
-
-        if fanin.is_empty() {
+        if fanin_indices.is_empty() {
             return HashSet::new();
         }
 
-        let first_fanin = fanin.remove(0);
-        let initial_fanout = self.fanout_set(&first_fanin, registry).unwrap_or_default();
-
-        fanin
+        let fanout_sets: Vec<HashSet<CellIndex>> = fanin_indices
             .iter()
-            .map(|c| self.fanout_set(c, registry).unwrap_or_default())
-            .fold(initial_fanout, |acc: HashSet<CellWrapper<'a>>, hs| {
-                acc.intersection(&hs).cloned().collect()
-            })
+            .map(|(idx, _)| self.fanout_indices_set(*idx))
+            .collect();
+
+        if fanout_sets.is_empty() {
+            return HashSet::new();
+        }
+
+        let mut result = fanout_sets[0].clone();
+        for set in &fanout_sets[1..] {
+            result = &result & set;
+        }
+        result
     }
 
     pub fn fanin_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {

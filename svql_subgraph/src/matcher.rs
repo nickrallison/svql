@@ -231,7 +231,10 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         {
             // if no fanin mapped, return all cells of the correct type
             // This happens for the first cells mapped and is not avoidable
-            self.haystack_index.cells_of_type(current_kind).to_vec()
+            self.haystack_index
+                .cells_of_type_iter(current_kind)
+                .map(|iter| iter.cloned().collect())
+                .unwrap_or_default()
         } else {
             let haystack_fan_out_sets: Vec<HashSet<CellWrapper<'haystack>>> = mapped_haystack_fanin
                 .iter()

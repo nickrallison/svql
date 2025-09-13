@@ -19,15 +19,10 @@ pub struct GraphIndex<'a> {
 
 impl<'a> GraphIndex<'a> {
     pub fn build(design: &'a Design) -> Self {
-        // 1. Build cell registry first
         let cell_refs_topo = Self::build_cell_refs_topo(design);
         let cell_registry = CellRegistry::build(&cell_refs_topo);
-
-        // 2. Build connectivity graph using the registry
         let connectivity =
             ConnectivityGraph::build(design, &cell_refs_topo, cell_registry.cell_id_map());
-
-        // 3. Build I/O mapping using both registry and connectivity
         let io_mapping = IoMapping::build(
             cell_registry.cells_topo(),
             connectivity.fanin_map(),
@@ -53,45 +48,81 @@ impl<'a> GraphIndex<'a> {
     }
 
     // Delegate to cell registry
-    pub fn cells_of_type(&self, node_type: CellKind) -> Vec<CellWrapper<'a>> {
-        self.cell_registry.cells_of_type(node_type)
+    pub fn cells_of_type_iter(
+        &self,
+        node_type: CellKind,
+    ) -> Option<impl Iterator<Item = &CellWrapper<'a>>> {
+        self.cell_registry.cells_of_type_iter(node_type)
     }
 
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
         self.cell_registry.cells_topo()
     }
 
-    // Delegate to connectivity graph
+    // Helper to get cell index
+    fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
+        self.cell_registry.get_cell_index(cell)
+    }
+
+    // Optimized methods that work with indices internally
     pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
-        self.connectivity.fanout_set(cell, &self.cell_registry)
+        let idx = self.get_cell_index(cell)?;
+        let indices_set = self.connectivity.fanout_indices_set(idx);
+        let cells: HashSet<CellWrapper<'a>> = indices_set
+            .into_iter()
+            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
+            .collect();
+        Some(cells)
     }
 
     pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
-        self.connectivity.fanin_set(cell, &self.cell_registry)
+        let idx = self.get_cell_index(cell)?;
+        let indices_set = self.connectivity.fanin_indices_set(idx);
+        let cells: HashSet<CellWrapper<'a>> = indices_set
+            .into_iter()
+            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
+            .collect();
+        Some(cells)
     }
 
     pub fn fanout_with_ports(
         &self,
         cell: &CellWrapper<'a>,
     ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        self.connectivity
-            .fanout_with_ports(cell, &self.cell_registry)
+        let idx = self.get_cell_index(cell)?;
+        let indices_with_ports = self.connectivity.fanout_indices(idx)?;
+        Some(
+            self.cell_registry
+                .indices_with_ports_to_cells(indices_with_ports),
+        )
     }
 
     pub fn fanin_with_ports(
         &self,
         cell: &CellWrapper<'a>,
     ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        self.connectivity
-            .fanin_with_ports(cell, &self.cell_registry)
+        let idx = self.get_cell_index(cell)?;
+        let indices_with_ports = self.connectivity.fanin_indices(idx)?;
+        Some(
+            self.cell_registry
+                .indices_with_ports_to_cells(indices_with_ports),
+        )
     }
 
     pub fn get_intersect_fanout_of_fanin(
         &self,
         cell: &CellWrapper<'a>,
     ) -> HashSet<CellWrapper<'a>> {
-        self.connectivity
-            .get_intersect_fanout_of_fanin(cell, &self.cell_registry)
+        let Some(idx) = self.get_cell_index(cell) else {
+            return HashSet::new();
+        };
+
+        let intersection_indices = self.connectivity.get_intersect_fanout_of_fanin_indices(idx);
+
+        intersection_indices
+            .into_iter()
+            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
+            .collect()
     }
 
     // Delegate to I/O mapping

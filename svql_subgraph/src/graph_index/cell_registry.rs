@@ -8,20 +8,20 @@ pub struct CellRegistry<'a> {
     cells_topo: Vec<CellWrapper<'a>>,
     /// Maps cell debug index to internal CellIndex
     cell_id_map: HashMap<usize, CellIndex>,
-    /// Maps cell types to lists of cells of that type
-    cell_type_map: HashMap<CellKind, Vec<CellIndex>>,
+    /// Maps cell types to lists of cell indices
+    cell_type_indices: HashMap<CellKind, Vec<CellIndex>>,
 }
 
 impl<'a> CellRegistry<'a> {
     pub fn build(cell_refs_topo: &[CellRef<'a>]) -> Self {
         let cells_topo = Self::build_cells_topo(cell_refs_topo);
         let cell_id_map = Self::build_cell_id_map(&cells_topo);
-        let cell_type_map = Self::build_cell_type_map(cell_refs_topo);
+        let cell_type_indices = Self::build_cell_type_indices(cell_refs_topo);
 
         CellRegistry {
             cells_topo,
             cell_id_map,
-            cell_type_map,
+            cell_type_indices,
         }
     }
 
@@ -41,27 +41,34 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
-    fn build_cell_type_map(cell_refs_topo: &[CellRef<'a>]) -> HashMap<CellKind, Vec<CellIndex>> {
-        let mut cell_type_map: HashMap<CellKind, Vec<CellIndex>> = HashMap::new();
+    fn build_cell_type_indices(
+        cell_refs_topo: &[CellRef<'a>],
+    ) -> HashMap<CellKind, Vec<CellIndex>> {
+        let mut cell_type_indices: HashMap<CellKind, Vec<CellIndex>> = HashMap::new();
         for (idx, cell) in cell_refs_topo.iter().enumerate() {
             let node_type = CellKind::from(cell.get().as_ref());
-            cell_type_map
+            cell_type_indices
                 .entry(node_type)
                 .or_default()
                 .push(CellIndex::new(idx));
         }
-        cell_type_map
+        cell_type_indices
     }
 
-    pub fn cells_of_type(&self, node_type: CellKind) -> Vec<CellWrapper<'a>> {
-        self.cell_type_map
+    pub fn cells_of_type_iter(
+        &self,
+        node_type: CellKind,
+    ) -> Option<impl Iterator<Item = &CellWrapper<'a>>> {
+        self.cell_type_indices
             .get(&node_type)
-            .map(|v| {
-                v.iter()
-                    .map(|idx| self.cells_topo[idx.index()].clone())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default()
+            .map(|indices| indices.iter().map(|idx| &self.cells_topo[idx.index()]))
+    }
+
+    pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
+        self.cell_type_indices
+            .get(&node_type)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
@@ -78,5 +85,24 @@ impl<'a> CellRegistry<'a> {
 
     pub fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
         self.cell_id_map.get(&cell.debug_index()).copied()
+    }
+
+    // Helper method to convert indices to cells
+    pub fn indices_to_cells(&self, indices: &[CellIndex]) -> Vec<CellWrapper<'a>> {
+        indices
+            .iter()
+            .map(|idx| self.cells_topo[idx.index()].clone())
+            .collect()
+    }
+
+    // Helper method to convert indices with ports to cells with ports
+    pub fn indices_with_ports_to_cells(
+        &self,
+        indices_with_ports: &[(CellIndex, usize)],
+    ) -> Vec<(CellWrapper<'a>, usize)> {
+        indices_with_ports
+            .iter()
+            .map(|(idx, port)| (self.cells_topo[idx.index()].clone(), *port))
+            .collect()
     }
 }
