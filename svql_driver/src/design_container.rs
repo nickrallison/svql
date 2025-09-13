@@ -28,9 +28,11 @@ impl DesignContainer {
         }
         .build()
     }
+
     pub fn design(&self) -> &Design {
         self.borrow_design()
     }
+
     pub fn index(&self) -> &GraphIndex<'_> {
         self.borrow_index()
     }

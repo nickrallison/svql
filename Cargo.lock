@@ -847,6 +847,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
+ "rstest",
  "svql_common",
  "svql_subgraph",
  "tempfile",

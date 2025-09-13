@@ -19,6 +19,7 @@ proc-macro2.workspace = true
 [dev-dependencies]
 lazy_static.workspace = true
 tracing-subscriber.workspace = true
+rstest.workspace = true
 
 [dependencies]
 ###############
@@ -41,4 +42,4 @@ tracing.workspace = true
 tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
-ouroboros = "0.18.5"
+ouroboros.workspace = true

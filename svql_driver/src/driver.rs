@@ -46,8 +46,6 @@ impl Driver {
         Self::new(workspace)
     }
 
-    // #[contracts::debug_ensures(ret.as_ref().map(|o| o.root_path.is_absolute()).unwrap_or(true), "Root path must be absolute")]
-    // #[contracts::debug_ensures(ret.as_ref().map(|o| o.yosys_path.exists()).unwrap_or(true), "Custom yosys path must exist")]
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -273,47 +271,5 @@ impl Driver {
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
         Ok(result)
-
-        // svql_common::import_design_yosys(
-        //     &self.yosys_path,
-        //     design_path.to_path_buf(),
-        //     module_name,
-        //     config,
-        // )
-        // .map_err(|e| DriverError::DesignLoading(e.to_string()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{Driver, DriverError, DriverKey};
-    use tracing_subscriber;
-
-    fn init_test_logger() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .try_init();
-    }
-
-    #[test]
-    fn driver_create_workspace() {
-        init_test_logger();
-        let d = Driver::new_workspace().expect("workspace driver");
-        // registry should be empty initially
-        assert_eq!(d.get_all_designs().len(), 0);
-    }
-
-    #[test]
-    fn driver_create_context_missing_key() {
-        init_test_logger();
-        let d = Driver::new_workspace().expect("workspace driver");
-        // Make a key that won't be in the registry
-        let k = DriverKey::new("nonexistent.v", "missing_top".to_string());
-        let err = d.create_context(&[k]).unwrap_err();
-        match err {
-            DriverError::DesignLoading(msg) => assert!(msg.contains("Design not found")),
-            _ => panic!("unexpected error variant"),
-        }
     }
 }
