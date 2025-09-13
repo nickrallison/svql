@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use crate::cell::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
-pub struct Mapping<'needle, 'haystack> {
+pub struct Assignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
     needle_to_haystack: HashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
     /// Design to Pattern cell mapping
     haystack_to_needle: HashMap<CellWrapper<'haystack>, CellWrapper<'needle>>,
 }
 
-impl<'needle, 'haystack> Mapping<'needle, 'haystack> {
+impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: HashMap::new(),
@@ -18,7 +18,7 @@ impl<'needle, 'haystack> Mapping<'needle, 'haystack> {
         }
     }
 
-    pub(super) fn insert(
+    pub(super) fn assign(
         &mut self,
         needle: CellWrapper<'needle>,
         haystack: CellWrapper<'haystack>,

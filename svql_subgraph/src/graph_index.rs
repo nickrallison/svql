@@ -21,7 +21,7 @@ impl CellIndex {
 }
 
 #[derive(Clone, Debug)]
-pub struct DesignIndex<'a> {
+pub struct GraphIndex<'a> {
     /// Nodes of haystack in topological order (Name nodes filtered out)
     cells_topo: Vec<CellWrapper<'a>>,
     cell_id_map: HashMap<usize, CellIndex>,
@@ -40,7 +40,7 @@ pub struct DesignIndex<'a> {
     output_fanin_by_name: HashMap<String, Vec<(CellIndex, usize)>>,
 }
 
-impl<'a> DesignIndex<'a> {
+impl<'a> GraphIndex<'a> {
     pub fn build(haystack: &'a Design) -> Self {
         // 0: Preparing a vector of cell references in topological order
         let cell_refs_topo = Self::build_cell_refs_topo(haystack);
@@ -69,7 +69,7 @@ impl<'a> DesignIndex<'a> {
         let input_fanout_by_name = Self::build_input_fanout_by_name(&cells_topo, &fanout_map);
         let output_fanin_by_name = Self::build_output_fanin_by_name(&cells_topo, &fanin_map);
 
-        DesignIndex {
+        GraphIndex {
             cells_topo,
 
             cell_id_map,

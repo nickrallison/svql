@@ -9,7 +9,7 @@ use svql_subgraph::Embedding;
 pub fn bind_input<'ctx>(m: &Embedding<'ctx, 'ctx>, name: &str, bit: usize) -> Match<'ctx> {
     let pat = m.input_fanout_by_name.get(name).cloned().unwrap();
     let pat_first = &pat[0].0;
-    let des = m.mapping.get_design_cell(pat_first.clone()).unwrap();
+    let des = m.assignment.get_design_cell(pat_first.clone()).unwrap();
     return Match {
         pat_node_ref: Some(pat_first.clone()),
         design_node_ref: Some(des),
@@ -21,7 +21,7 @@ pub fn bind_input<'ctx>(m: &Embedding<'ctx, 'ctx>, name: &str, bit: usize) -> Ma
 pub fn bind_output<'ctx>(m: &Embedding<'ctx, 'ctx>, name: &str, bit: usize) -> Match<'ctx> {
     let pat = m.output_fanin_by_name.get(name).cloned().unwrap();
     let pat_first = &pat[0].0;
-    let des = m.mapping.get_design_cell(pat_first.clone()).unwrap();
+    let des = m.assignment.get_design_cell(pat_first.clone()).unwrap();
     return Match {
         pat_node_ref: Some(pat_first.clone()),
         design_node_ref: Some(des),

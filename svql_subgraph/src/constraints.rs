@@ -1,6 +1,6 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
-use crate::mapping::Mapping;
+use crate::mapping::Assignment;
 use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
 use tracing::trace;
 
@@ -9,7 +9,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         p_cell: CellWrapper<'needle>,
         d_cell: CellWrapper<'haystack>,
-        mapping: &Mapping<'needle, 'haystack>,
+        mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         self.cells_match_fan_in(p_cell.get(), d_cell.get(), mapping)
     }
@@ -19,7 +19,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_cell: &Cell,
         haystack_cell: &Cell,
-        mapping: &Mapping<'needle, 'haystack>,
+        mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         use Cell::*;
         match (needle_cell, haystack_cell) {
@@ -187,7 +187,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_value: &Value,
         haystack_value: &Value,
-        mapping: &Mapping<'needle, 'haystack>,
+        mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if values match fan-in: {:?} and {:?}",
@@ -262,7 +262,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_net: &prjunnamed_netlist::Net,
         haystack_net: &prjunnamed_netlist::Net,
-        mapping: &Mapping<'needle, 'haystack>,
+        mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if nets match fan-in: {:?} and {:?}",
@@ -301,7 +301,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNet,
         haystack_c_net: &prjunnamed_netlist::ControlNet,
-        mapping: &Mapping<'needle, 'haystack>,
+        mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if control nets match fan-in: {:?} and {:?}",
@@ -324,7 +324,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_const: &prjunnamed_netlist::Const,
         haystack_const: &prjunnamed_netlist::Const,
-        _mapping: &Mapping<'needle, 'haystack>,
+        _mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if consts match fan-in: {:?} and {:?}",
@@ -368,7 +368,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         needle_dff: &FlipFlop,
         haystack_dff: &FlipFlop,
-        mapping: &Mapping,
+        mapping: &Assignment,
     ) -> bool {
         trace!(
             "Checking if DFFs match fan-in: {:?} and {:?}",

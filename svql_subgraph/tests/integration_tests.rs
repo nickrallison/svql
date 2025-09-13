@@ -33,14 +33,14 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         .yosys_module
         .import_design(&tc.config.haystack_options)?;
 
-    let embeddings = SubgraphMatcher::search_all(&needle, &haystack, &tc.config);
+    let embeddings = SubgraphMatcher::enumerate_all(&needle, &haystack, &tc.config);
 
-    if embeddings.embeddings.len() != tc.expected_matches {
+    if embeddings.items.len() != tc.expected_matches {
         return Err(format!(
             "Subgraph test case '{}' failed: expected {} matches, got {}",
             tc.name,
             tc.expected_matches,
-            embeddings.embeddings.len()
+            embeddings.items.len()
         )
         .into());
     }

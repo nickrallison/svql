@@ -1,6 +1,6 @@
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
-use svql_subgraph::graph_index::DesignIndex;
+use svql_subgraph::graph_index::GraphIndex;
 
 // #[derive(Debug)]
 #[self_referencing]
@@ -8,7 +8,7 @@ pub struct DesignContainer {
     design: Design,
     #[borrows(design)]
     #[covariant]
-    index: DesignIndex<'this>,
+    index: GraphIndex<'this>,
 }
 
 impl std::fmt::Debug for DesignContainer {
@@ -24,14 +24,14 @@ impl DesignContainer {
     pub fn build(design: Design) -> Self {
         DesignContainerBuilder {
             design,
-            index_builder: |design: &Design| DesignIndex::build(design),
+            index_builder: |design: &Design| GraphIndex::build(design),
         }
         .build()
     }
     pub fn design(&self) -> &Design {
         self.borrow_design()
     }
-    pub fn index(&self) -> &DesignIndex<'_> {
+    pub fn index(&self) -> &GraphIndex<'_> {
         self.borrow_index()
     }
 }
