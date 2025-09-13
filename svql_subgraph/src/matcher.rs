@@ -115,7 +115,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let candidates = self.candidates_for_cell(needle_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
-        let candidates_iter = candidates_vec.into_par_iter();
+        let candidates_iter = candidates.into_par_iter();
 
         #[cfg(not(feature = "rayon"))]
         let candidates_iter = candidates.into_iter();
