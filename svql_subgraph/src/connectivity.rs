@@ -4,12 +4,12 @@ use crate::mapping::Mapping;
 use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
 use tracing::trace;
 
-impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
-    pub(crate) fn validate_fan_in_connections(
+impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+    pub(crate) fn check_fanin_constraints(
         &self,
-        p_cell: CellWrapper<'p>,
-        d_cell: CellWrapper<'d>,
-        mapping: &Mapping<'p, 'd>,
+        p_cell: CellWrapper<'needle>,
+        d_cell: CellWrapper<'haystack>,
+        mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         self.cells_match_fan_in(p_cell.get(), d_cell.get(), mapping)
     }
@@ -19,7 +19,7 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
         &self,
         needle_cell: &Cell,
         haystack_cell: &Cell,
-        mapping: &Mapping<'p, 'd>,
+        mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         use Cell::*;
         match (needle_cell, haystack_cell) {
@@ -187,7 +187,7 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
         &self,
         needle_value: &Value,
         haystack_value: &Value,
-        mapping: &Mapping<'p, 'd>,
+        mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if values match fan-in: {:?} and {:?}",
@@ -262,15 +262,15 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
         &self,
         needle_net: &prjunnamed_netlist::Net,
         haystack_net: &prjunnamed_netlist::Net,
-        mapping: &Mapping<'p, 'd>,
+        mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if nets match fan-in: {:?} and {:?}",
             needle_net, haystack_net
         );
-        let actual_fan_in_haystack_cell: Result<(CellRef<'d>, usize), Trit> =
+        let actual_fan_in_haystack_cell: Result<(CellRef<'haystack>, usize), Trit> =
             self.haystack.find_cell(*haystack_net);
-        let fan_in_needle_cell: Result<(CellRef<'p>, usize), Trit> =
+        let fan_in_needle_cell: Result<(CellRef<'needle>, usize), Trit> =
             self.needle.find_cell(*needle_net);
 
         let (actual_fan_in_haystack_cell_ref, d_fan_in_idx, fan_in_needle_cell_ref, p_fan_in_idx) =
@@ -301,7 +301,7 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNet,
         haystack_c_net: &prjunnamed_netlist::ControlNet,
-        mapping: &Mapping<'p, 'd>,
+        mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if control nets match fan-in: {:?} and {:?}",
@@ -324,7 +324,7 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
         &self,
         needle_const: &prjunnamed_netlist::Const,
         haystack_const: &prjunnamed_netlist::Const,
-        _mapping: &Mapping<'p, 'd>,
+        _mapping: &Mapping<'needle, 'haystack>,
     ) -> bool {
         trace!(
             "Checking if consts match fan-in: {:?} and {:?}",

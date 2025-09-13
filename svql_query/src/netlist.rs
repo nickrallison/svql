@@ -60,7 +60,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let needle_index = needle_container.index();
         let haystack_index = haystack_container.index();
 
-        svql_subgraph::SubgraphMatcher::find_subgraphs_from_index(
+        svql_subgraph::SubgraphMatcher::search_with_indices(
             needle,
             haystack,
             needle_index,

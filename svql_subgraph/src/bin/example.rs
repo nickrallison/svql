@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
     let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
-    let embeddings = svql_subgraph::SubgraphMatcher::find_subgraphs(&needle, &design, &config);
+    let embeddings = svql_subgraph::SubgraphMatcher::search_all(&needle, &design, &config);
 
     println!("Found {} embeddings", embeddings.embeddings.len());
 

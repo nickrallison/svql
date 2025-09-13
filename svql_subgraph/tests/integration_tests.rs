@@ -33,7 +33,7 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         .yosys_module
         .import_design(&tc.config.haystack_options)?;
 
-    let embeddings = SubgraphMatcher::find_subgraphs(&needle, &haystack, &tc.config);
+    let embeddings = SubgraphMatcher::search_all(&needle, &haystack, &tc.config);
 
     if embeddings.embeddings.len() != tc.expected_matches {
         return Err(format!(
