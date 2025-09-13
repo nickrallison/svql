@@ -15,7 +15,7 @@ fn main() {
 
     let tests = test_cases
         .iter()
-        .filter(|tc| matches!(tc.pattern, svql_common::Pattern::Netlist { .. }))
+        .filter(|tc| matches!(tc.needle, svql_common::Needle::Netlist { .. }))
         .map(|tc| {
             let fn_ident = Ident::new(
                 &sanitize_ident(&format!("test_subgraph_{}", tc.name)),

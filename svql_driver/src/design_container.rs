@@ -1,6 +1,6 @@
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
-use svql_subgraph::design_index::DesignIndex;
+use svql_subgraph::graph_index::DesignIndex;
 
 // #[derive(Debug)]
 #[self_referencing]

@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::{YosysModule, config::Config};
 
 #[derive(Debug, Clone)]
-pub enum Pattern {
+pub enum Needle {
     Netlist {
         yosys_module: YosysModule,
         pattern_query_type: Option<&'static str>,
@@ -13,15 +13,15 @@ pub enum Pattern {
     },
 }
 
-impl Pattern {
+impl Needle {
     pub fn is_netlist(&self) -> bool {
-        matches!(self, Pattern::Netlist { .. })
+        matches!(self, Needle::Netlist { .. })
     }
 
     pub fn path(&self) -> &Path {
         match self {
-            Pattern::Netlist { yosys_module, .. } => yosys_module.path(),
-            Pattern::Composite { .. } => panic!("Composite patterns don't have paths"),
+            Needle::Netlist { yosys_module, .. } => yosys_module.path(),
+            Needle::Composite { .. } => panic!("Composite patterns don't have paths"),
         }
     }
 }
@@ -35,7 +35,7 @@ pub struct Haystack {
 pub struct TestCase {
     pub name: &'static str,
     pub config: Config,
-    pub pattern: &'static Pattern,
+    pub needle: &'static Needle,
     pub haystack: &'static Haystack,
     pub expected_matches: usize,
 }
@@ -44,42 +44,42 @@ pub struct TestCase {
 // NEEDLES (Patterns)
 // #####################
 lazy_static::lazy_static! {
-    static ref AND_GATE: Pattern = Pattern::Netlist {
+    static ref AND_GATE: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/and/verilog/and_gate.v",
             "and_gate",
         ).expect("Failed to create YosysModule for and_gate"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndGate"),
     };
-    static ref AND_NOR: Pattern = Pattern::Netlist {
+    static ref AND_NOR: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/and/verilog/and_nor.v",
             "and_nor",
         ).expect("Failed to create YosysModule for and_nor"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndNor"),
     };
-    static ref AND_MUX: Pattern = Pattern::Netlist {
+    static ref AND_MUX: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/and/verilog/and_mux.v",
             "and_mux",
         ).expect("Failed to create YosysModule for and_mux"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::and::AndMux"),
     };
-    static ref SDFFE: Pattern = Pattern::Netlist {
+    static ref SDFFE: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/ff/rtlil/sdffe.il",
             "sdffe",
         ).expect("Failed to create YosysModule for sdffe"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::dff::Sdffe"),
     };
-    static ref AND_SEQ: Pattern = Pattern::Netlist {
+    static ref AND_SEQ: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/fixtures/basic/and/verilog/and_seq.v",
             "and_seq",
         ).expect("Failed to create YosysModule for and_seq"),
         pattern_query_type: None,
     };
-    static ref SMALL_AND_SEQ: Pattern = Pattern::Netlist {
+    static ref SMALL_AND_SEQ: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/fixtures/basic/and/verilog/small_and_seq.v",
             "small_and_seq",
@@ -90,28 +90,28 @@ lazy_static::lazy_static! {
 
 // SECURITY: locked_reg (RTLIL patterns)
 lazy_static::lazy_static! {
-    static ref ASYNC_EN_IL: Pattern = Pattern::Netlist {
+    static ref ASYNC_EN_IL: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
             "async_en",
         ).expect("Failed to create YosysModule for async_en"),
         pattern_query_type: None,
     };
-    static ref ASYNC_MUX_IL: Pattern = Pattern::Netlist {
+    static ref ASYNC_MUX_IL: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
             "async_mux",
         ).expect("Failed to create YosysModule for async_mux"),
         pattern_query_type: None,
     };
-    static ref SYNC_EN_IL: Pattern = Pattern::Netlist {
+    static ref SYNC_EN_IL: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
             "sync_en",
         ).expect("Failed to create YosysModule for sync_en"),
         pattern_query_type: None,
     };
-    static ref SYNC_MUX_IL: Pattern = Pattern::Netlist {
+    static ref SYNC_MUX_IL: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
             "sync_mux",
@@ -124,10 +124,10 @@ lazy_static::lazy_static! {
 // COMPOSITE NEEDLES
 // #####################
 lazy_static::lazy_static! {
-    static ref SDFFE_THEN_AND: Pattern = Pattern::Composite {
+    static ref SDFFE_THEN_AND: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::netlist::composite::SdffeThenAnd",
     };
-    static ref AND_ANY: Pattern = Pattern::Composite {
+    static ref AND_ANY: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::netlist::composite::AndAny",
     };
 }
@@ -279,7 +279,7 @@ lazy_static::lazy_static! {
                 .haystack_flatten(true)
                 .dedupe(crate::Dedupe::None)
                 .build(),
-            pattern: &AND_GATE,
+            needle: &AND_GATE,
             haystack: &AND_GATE_HAYSTACK,
             expected_matches: 2,
         },
@@ -290,7 +290,7 @@ lazy_static::lazy_static! {
                 .haystack_flatten(true)
                 .dedupe(crate::Dedupe::All)
                 .build(),
-            pattern: &AND_GATE,
+            needle: &AND_GATE,
             haystack: &AND_GATE_HAYSTACK,
             expected_matches: 1,
         },
@@ -301,7 +301,7 @@ lazy_static::lazy_static! {
                 .haystack_flatten(true)
                 .dedupe(crate::Dedupe::None)
                 .build(),
-            pattern: &SMALL_AND_SEQ,
+            needle: &SMALL_AND_SEQ,
             haystack: &SMALL_AND_TREE_HAYSTACK,
             expected_matches: 4,
         },
@@ -312,7 +312,7 @@ lazy_static::lazy_static! {
                 .haystack_flatten(true)
                 .dedupe(crate::Dedupe::All)
                 .build(),
-            pattern: &SMALL_AND_SEQ,
+            needle: &SMALL_AND_SEQ,
             haystack: &SMALL_AND_TREE_HAYSTACK,
             expected_matches: 2,
         },
@@ -350,14 +350,14 @@ lazy_static::lazy_static! {
         TestCase {
             name: "async_en_in_many_locked_regs",
             config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &ASYNC_EN_IL,
+            needle: &ASYNC_EN_IL,
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
         TestCase {
             name: "async_mux_in_many_locked_regs",
             config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &ASYNC_MUX_IL,
+            needle: &ASYNC_MUX_IL,
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
@@ -382,7 +382,7 @@ lazy_static::lazy_static! {
         TestCase {
             name: "sdffe_then_and_simple_none",
             config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &SDFFE_THEN_AND,
+            needle: &SDFFE_THEN_AND,
             haystack: &AND_Q_DOUBLE_SDFFE,
             expected_matches: 4,
         },
@@ -392,7 +392,7 @@ lazy_static::lazy_static! {
         TestCase {
             name: "and_any_in_mixed_tree_auto_morph",
             config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &AND_ANY,
+            needle: &AND_ANY,
             haystack: &MIXED_AND_TREE,
             expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
         },

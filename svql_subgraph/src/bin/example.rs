@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pattern_module: YosysModule = YosysModule::new(
+    let needle_module: YosysModule = YosysModule::new(
         "examples/patterns/basic/and/verilog/and_2_seq.v",
         "and_2_seq",
     )?;
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // )?;
 
     // let design_module: YosysModule =
-    //     YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
+    //     YosysModule::new("examples/needles/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let config = svql_common::Config::builder()
         .match_length(svql_common::MatchLength::First)
@@ -28,10 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");
 
-    let pattern = pattern_module.import_design_yosys(&config.needle_options, &yosys)?;
+    let needle = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
     let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
-    let embeddings = svql_subgraph::SubgraphMatcher::find_subgraphs(&pattern, &design, &config);
+    let embeddings = svql_subgraph::SubgraphMatcher::find_subgraphs(&needle, &design, &config);
 
     println!("Found {} embeddings", embeddings.embeddings.len());
 

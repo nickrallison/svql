@@ -1,7 +1,7 @@
 use rstest::rstest;
 use std::sync::OnceLock;
 
-use svql_common::{ALL_TEST_CASES, Pattern, TestCase};
+use svql_common::{ALL_TEST_CASES, Needle, TestCase};
 use svql_subgraph::SubgraphMatcher;
 
 fn init_test_logger() {
@@ -17,13 +17,13 @@ fn init_test_logger() {
 fn netlist_cases() -> Vec<&'static TestCase> {
     ALL_TEST_CASES
         .iter()
-        .filter(|tc| matches!(tc.pattern, Pattern::Netlist { .. }))
+        .filter(|tc| matches!(tc.needle, Needle::Netlist { .. }))
         .collect()
 }
 
 fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
-    let Pattern::Netlist { yosys_module, .. } = tc.pattern else {
-        return Err("Invalid pattern".into());
+    let Needle::Netlist { yosys_module, .. } = tc.needle else {
+        return Err("Invalid needle".into());
     };
 
     let needle = yosys_module.import_design(&tc.config.needle_options)?;

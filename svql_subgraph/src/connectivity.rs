@@ -17,12 +17,12 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
     // ####################################
     fn cells_match_fan_in(
         &self,
-        pattern_cell: &Cell,
-        design_cell: &Cell,
+        needle_cell: &Cell,
+        haystack_cell: &Cell,
         mapping: &Mapping<'p, 'd>,
     ) -> bool {
         use Cell::*;
-        match (pattern_cell, design_cell) {
+        match (needle_cell, haystack_cell) {
             (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
             (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
             (And(p_a_value, p_b_value), And(d_a_value, d_b_value)) => {
@@ -185,17 +185,17 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     fn values_match_fan_in(
         &self,
-        pattern_value: &Value,
-        design_value: &Value,
+        needle_value: &Value,
+        haystack_value: &Value,
         mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if values match fan-in: {:?} and {:?}",
-            pattern_value, design_value
+            needle_value, haystack_value
         );
-        let pattern_value_repr: &ValueRepr = &pattern_value.0;
-        let design_value_repr: &ValueRepr = &design_value.0;
-        match (pattern_value_repr, design_value_repr) {
+        let needle_value_repr: &ValueRepr = &needle_value.0;
+        let haystack_value_repr: &ValueRepr = &haystack_value.0;
+        match (needle_value_repr, haystack_value_repr) {
             (ValueRepr::None, ValueRepr::None) => true,
             (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
                 self.nets_match_fan_in(p_net, d_net, mapping)
@@ -260,54 +260,54 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     fn nets_match_fan_in(
         &self,
-        pattern_net: &prjunnamed_netlist::Net,
-        design_net: &prjunnamed_netlist::Net,
+        needle_net: &prjunnamed_netlist::Net,
+        haystack_net: &prjunnamed_netlist::Net,
         mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if nets match fan-in: {:?} and {:?}",
-            pattern_net, design_net
+            needle_net, haystack_net
         );
-        let actual_fan_in_design_cell: Result<(CellRef<'d>, usize), Trit> =
-            self.design.find_cell(*design_net);
-        let fan_in_pattern_cell: Result<(CellRef<'p>, usize), Trit> =
-            self.pattern.find_cell(*pattern_net);
+        let actual_fan_in_haystack_cell: Result<(CellRef<'d>, usize), Trit> =
+            self.haystack.find_cell(*haystack_net);
+        let fan_in_needle_cell: Result<(CellRef<'p>, usize), Trit> =
+            self.needle.find_cell(*needle_net);
 
-        let (actual_fan_in_design_cell_ref, d_fan_in_idx, fan_in_pattern_cell_ref, p_fan_in_idx) =
-            match (actual_fan_in_design_cell, fan_in_pattern_cell) {
+        let (actual_fan_in_haystack_cell_ref, d_fan_in_idx, fan_in_needle_cell_ref, p_fan_in_idx) =
+            match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
                 (Ok((d_fan_in_cell_ref, d_bit_idx)), Ok((p_fan_in_cell_ref, p_bit_idx))) => {
                     (d_fan_in_cell_ref, d_bit_idx, p_fan_in_cell_ref, p_bit_idx)
                 }
-                (Err(design_trit), Err(pattern_trit)) => return design_trit == pattern_trit,
+                (Err(haystack_trit), Err(needle_trit)) => return haystack_trit == needle_trit,
                 _ => return false,
             };
 
-        let expected_fan_in_design_cell_opt =
-            mapping.get_design_cell(fan_in_pattern_cell_ref.into());
+        let expected_fan_in_haystack_cell_opt =
+            mapping.get_haystack_cell(fan_in_needle_cell_ref.into());
 
-        if expected_fan_in_design_cell_opt.is_none() {
+        if expected_fan_in_haystack_cell_opt.is_none() {
             // Pattern fan-in cell not mapped yet, so we can't constrain it here.
             return true;
         }
 
-        let expected_fan_in_design_cell_wrapper = expected_fan_in_design_cell_opt.unwrap();
+        let expected_fan_in_haystack_cell_wrapper = expected_fan_in_haystack_cell_opt.unwrap();
 
-        return expected_fan_in_design_cell_wrapper == actual_fan_in_design_cell_ref.into();
+        return expected_fan_in_haystack_cell_wrapper == actual_fan_in_haystack_cell_ref.into();
 
         todo!("How to handle expected idx");
     }
 
     fn control_nets_match_fan_in(
         &self,
-        pattern_c_net: &prjunnamed_netlist::ControlNet,
-        design_c_net: &prjunnamed_netlist::ControlNet,
+        needle_c_net: &prjunnamed_netlist::ControlNet,
+        haystack_c_net: &prjunnamed_netlist::ControlNet,
         mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if control nets match fan-in: {:?} and {:?}",
-            pattern_c_net, design_c_net
+            needle_c_net, haystack_c_net
         );
-        match (pattern_c_net, design_c_net) {
+        match (needle_c_net, haystack_c_net) {
             (
                 prjunnamed_netlist::ControlNet::Pos(p_pos_net),
                 prjunnamed_netlist::ControlNet::Pos(d_pos_net),
@@ -322,18 +322,18 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     fn const_match_fan_in(
         &self,
-        pattern_const: &prjunnamed_netlist::Const,
-        design_const: &prjunnamed_netlist::Const,
+        needle_const: &prjunnamed_netlist::Const,
+        haystack_const: &prjunnamed_netlist::Const,
         _mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if consts match fan-in: {:?} and {:?}",
-            pattern_const, design_const
+            needle_const, haystack_const
         );
-        let mut pattern_const_iter = pattern_const.clone().into_iter();
-        let mut design_const_iter = design_const.clone().into_iter();
+        let mut needle_const_iter = needle_const.clone().into_iter();
+        let mut haystack_const_iter = haystack_const.clone().into_iter();
 
-        while let (Some(p_t), Some(d_t)) = (pattern_const_iter.next(), design_const_iter.next()) {
+        while let (Some(p_t), Some(d_t)) = (needle_const_iter.next(), haystack_const_iter.next()) {
             if p_t != d_t {
                 return false;
             }
@@ -366,29 +366,29 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     fn dffs_match_fan_in(
         &self,
-        pattern_dff: &FlipFlop,
-        design_dff: &FlipFlop,
+        needle_dff: &FlipFlop,
+        haystack_dff: &FlipFlop,
         mapping: &Mapping,
     ) -> bool {
         trace!(
             "Checking if DFFs match fan-in: {:?} and {:?}",
-            pattern_dff, design_dff
+            needle_dff, haystack_dff
         );
-        let data_matches = self.values_match_fan_in(&pattern_dff.data, &design_dff.data, mapping);
+        let data_matches = self.values_match_fan_in(&needle_dff.data, &haystack_dff.data, mapping);
         let clock_matches =
-            self.control_nets_match_fan_in(&pattern_dff.clock, &design_dff.clock, mapping);
+            self.control_nets_match_fan_in(&needle_dff.clock, &haystack_dff.clock, mapping);
         let clear_matches =
-            self.control_nets_match_fan_in(&pattern_dff.clear, &design_dff.clear, mapping);
+            self.control_nets_match_fan_in(&needle_dff.clear, &haystack_dff.clear, mapping);
         let reset_matches =
-            self.control_nets_match_fan_in(&pattern_dff.reset, &design_dff.reset, mapping);
+            self.control_nets_match_fan_in(&needle_dff.reset, &haystack_dff.reset, mapping);
         let enable_matches =
-            self.control_nets_match_fan_in(&pattern_dff.enable, &design_dff.enable, mapping);
+            self.control_nets_match_fan_in(&needle_dff.enable, &haystack_dff.enable, mapping);
         let clear_value_matches =
-            self.const_match_fan_in(&pattern_dff.clear_value, &design_dff.clear_value, mapping);
+            self.const_match_fan_in(&needle_dff.clear_value, &haystack_dff.clear_value, mapping);
         let reset_value_matches =
-            self.const_match_fan_in(&pattern_dff.reset_value, &design_dff.reset_value, mapping);
+            self.const_match_fan_in(&needle_dff.reset_value, &haystack_dff.reset_value, mapping);
         let init_value_matches =
-            self.const_match_fan_in(&pattern_dff.init_value, &design_dff.init_value, mapping);
+            self.const_match_fan_in(&needle_dff.init_value, &haystack_dff.init_value, mapping);
 
         let value_data_matches = data_matches
             && clock_matches

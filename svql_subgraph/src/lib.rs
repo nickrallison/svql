@@ -4,9 +4,9 @@ mod connectivity;
 mod mapping;
 
 pub mod cell;
-pub mod design_index;
+pub mod graph_index;
 
-use design_index::DesignIndex;
+use graph_index::DesignIndex;
 use mapping::Mapping;
 
 use prjunnamed_netlist::Design;
@@ -43,7 +43,7 @@ impl<'p, 'd> Embedding<'p, 'd> {
     }
 
     pub fn print_mapping(&self) {
-        let mapping = self.mapping.pattern_mapping();
+        let mapping = self.mapping.needle_mapping();
         for (pat_cell, des_cell) in mapping {
             println!(
                 "{}: {:?} -> {}: {:?}",
@@ -59,7 +59,7 @@ impl<'p, 'd> Embedding<'p, 'd> {
     pub fn io_signature(&self) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .mapping
-            .pattern_mapping()
+            .needle_mapping()
             .iter()
             .filter(|(p, _)| !matches!(p.cell_type(), CellType::Input | CellType::Output))
             .map(|(_, d)| d.debug_index())
@@ -70,35 +70,35 @@ impl<'p, 'd> Embedding<'p, 'd> {
 }
 
 pub struct SubgraphMatcher<'p, 'd, 'a> {
-    pattern: &'p Design,
-    design: &'d Design,
-    pattern_index: DesignIndex<'p>,
-    design_index: DesignIndex<'d>,
+    needle: &'p Design,
+    haystack: &'d Design,
+    needle_index: DesignIndex<'p>,
+    haystack_index: DesignIndex<'d>,
     config: &'a Config,
 }
 
 pub(crate) struct SubgraphMatcherCore<'p, 'd, 'a> {
-    pattern: &'p Design,
-    design: &'d Design,
-    pattern_index: &'a DesignIndex<'p>,
-    design_index: &'a DesignIndex<'d>,
+    needle: &'p Design,
+    haystack: &'d Design,
+    needle_index: &'a DesignIndex<'p>,
+    haystack_index: &'a DesignIndex<'d>,
     config: &'a Config,
 }
 
 impl<'p, 'd, 'a> SubgraphMatcher<'p, 'd, 'a> {
     pub fn find_subgraphs(
-        pattern: &'p Design,
-        design: &'d Design,
+        needle: &'p Design,
+        haystack: &'d Design,
         config: &'a Config,
     ) -> AllEmbeddings<'p, 'd> {
-        let pattern_index = DesignIndex::build(pattern);
-        let design_index = DesignIndex::build(design);
+        let needle_index = DesignIndex::build(needle);
+        let haystack_index = DesignIndex::build(haystack);
 
         let matcher = SubgraphMatcherCore {
-            pattern,
-            design,
-            pattern_index: &pattern_index,
-            design_index: &design_index,
+            needle,
+            haystack,
+            needle_index: &needle_index,
+            haystack_index: &haystack_index,
             config,
         };
 
@@ -106,17 +106,17 @@ impl<'p, 'd, 'a> SubgraphMatcher<'p, 'd, 'a> {
     }
 
     pub fn find_subgraphs_from_index(
-        pattern: &'p Design,
-        design: &'d Design,
-        pattern_index: &'a DesignIndex<'p>,
-        design_index: &'a DesignIndex<'d>,
+        needle: &'p Design,
+        haystack: &'d Design,
+        needle_index: &'a DesignIndex<'p>,
+        haystack_index: &'a DesignIndex<'d>,
         config: &'a Config,
     ) -> AllEmbeddings<'p, 'd> {
         let matcher = SubgraphMatcherCore {
-            pattern,
-            design,
-            pattern_index,
-            design_index,
+            needle,
+            haystack,
+            needle_index,
+            haystack_index,
             config,
         };
         matcher.find_subgraph_isomorphisms()
@@ -125,13 +125,13 @@ impl<'p, 'd, 'a> SubgraphMatcher<'p, 'd, 'a> {
 
 impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
     pub fn find_subgraph_isomorphisms(&self) -> AllEmbeddings<'p, 'd> {
-        let (pattern_input_mapping_queue, pattern_gate_mapping_queue) =
-            self.build_pattern_mapping_queues();
+        let (needle_input_mapping_queue, needle_gate_mapping_queue) =
+            self.build_needle_mapping_queues();
         let initial_cell_mapping: Mapping<'p, 'd> = Mapping::new();
         let mut results = self.find_isomorphisms_recurse(
             initial_cell_mapping,
-            pattern_gate_mapping_queue,
-            pattern_input_mapping_queue,
+            needle_gate_mapping_queue,
+            needle_input_mapping_queue,
             0,
         );
 
@@ -147,28 +147,28 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
         AllEmbeddings {
             embeddings: results,
-            input_fanout_by_name: self.pattern_index.get_input_fanout_by_name().clone(),
-            output_fanin_by_name: self.pattern_index.get_output_fanin_by_name().clone(),
+            input_fanout_by_name: self.needle_index.get_input_fanout_by_name().clone(),
+            output_fanin_by_name: self.needle_index.get_output_fanin_by_name().clone(),
         }
     }
 
     fn find_isomorphisms_recurse(
         &self,
         cell_mapping: Mapping<'p, 'd>,
-        mut pattern_gate_mapping_queue: VecDeque<CellWrapper<'p>>,
-        pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
+        mut needle_gate_mapping_queue: VecDeque<CellWrapper<'p>>,
+        needle_input_mapping_queue: VecDeque<CellWrapper<'p>>,
         depth: usize,
     ) -> Vec<Embedding<'p, 'd>> {
         // Base Case
-        let Some(pattern_current) = pattern_gate_mapping_queue.pop_front() else {
+        let Some(needle_current) = needle_gate_mapping_queue.pop_front() else {
             return self.find_isomorphisms_recurse_inputs(
                 cell_mapping,
-                pattern_input_mapping_queue,
+                needle_input_mapping_queue,
                 depth + 1,
             );
         };
 
-        let candidates_vec = self.build_gate_candidates(pattern_current.clone(), &cell_mapping);
+        let candidates_vec = self.build_gate_candidates(needle_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
         let cand_iter = candidates_vec.into_par_iter();
@@ -178,12 +178,12 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
         let results = cand_iter.map(|d_candidate| {
             let mut nm = cell_mapping.clone();
-            nm.insert(pattern_current.clone(), d_candidate.clone());
+            nm.insert(needle_current.clone(), d_candidate.clone());
 
             self.find_isomorphisms_recurse(
                 nm,
-                pattern_gate_mapping_queue.clone(),
-                pattern_input_mapping_queue.clone(),
+                needle_gate_mapping_queue.clone(),
+                needle_input_mapping_queue.clone(),
                 depth + 1,
             )
         });
@@ -196,11 +196,11 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
     fn find_isomorphisms_recurse_inputs(
         &self,
         cell_mapping: Mapping<'p, 'd>,
-        mut pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
+        mut needle_input_mapping_queue: VecDeque<CellWrapper<'p>>,
         depth: usize,
     ) -> Vec<Embedding<'p, 'd>> {
         // Base Case
-        let Some(pattern_current) = pattern_input_mapping_queue.pop_front() else {
+        let Some(needle_current) = needle_input_mapping_queue.pop_front() else {
             let mapping = Embedding {
                 mapping: cell_mapping,
             };
@@ -208,7 +208,7 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
             return vec![mapping];
         };
 
-        let candidates_vec = self.build_input_candidates(pattern_current.clone(), &cell_mapping);
+        let candidates_vec = self.build_input_candidates(needle_current.clone(), &cell_mapping);
 
         #[cfg(feature = "rayon")]
         let cand_iter = candidates_vec.into_par_iter();
@@ -218,13 +218,9 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
         let results = cand_iter.map(|d_candidate| {
             let mut nm = cell_mapping.clone();
-            nm.insert(pattern_current.clone(), d_candidate.clone());
+            nm.insert(needle_current.clone(), d_candidate.clone());
 
-            self.find_isomorphisms_recurse_inputs(
-                nm,
-                pattern_input_mapping_queue.clone(),
-                depth + 1,
-            )
+            self.find_isomorphisms_recurse_inputs(nm, needle_input_mapping_queue.clone(), depth + 1)
         });
 
         let flat_results: Vec<Embedding<'p, 'd>> = results.flatten().collect();
@@ -234,11 +230,11 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     // ##########################
 
-    fn build_pattern_mapping_queues(
+    fn build_needle_mapping_queues(
         &self,
     ) -> (VecDeque<CellWrapper<'p>>, VecDeque<CellWrapper<'p>>) {
-        let mut pattern_mapping_queue: Vec<CellWrapper<'p>> = self
-            .pattern_index
+        let mut needle_mapping_queue: Vec<CellWrapper<'p>> = self
+            .needle_index
             .get_cells_topo()
             .iter()
             .filter(|c| !matches!(c.cell_type(), CellType::Output))
@@ -246,68 +242,68 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
             .rev()
             .collect();
 
-        let mut pattern_input_mapping_queue: VecDeque<CellWrapper<'p>> = VecDeque::new();
-        let mut pattern_gate_mapping_queue: VecDeque<CellWrapper<'p>> = VecDeque::new();
+        let mut needle_input_mapping_queue: VecDeque<CellWrapper<'p>> = VecDeque::new();
+        let mut needle_gate_mapping_queue: VecDeque<CellWrapper<'p>> = VecDeque::new();
 
-        for cell in pattern_mapping_queue.drain(..) {
+        for cell in needle_mapping_queue.drain(..) {
             match cell.cell_type() {
-                CellType::Input => pattern_input_mapping_queue.push_back(cell),
-                _ => pattern_gate_mapping_queue.push_back(cell),
+                CellType::Input => needle_input_mapping_queue.push_back(cell),
+                _ => needle_gate_mapping_queue.push_back(cell),
             }
         }
 
         // println!(
         //     "Pattern mapping queues: {} gates, {} inputs",
-        //     pattern_gate_mapping_queue.len(),
-        //     pattern_input_mapping_queue.len()
+        //     needle_gate_mapping_queue.len(),
+        //     needle_input_mapping_queue.len()
         // );
 
-        (pattern_input_mapping_queue, pattern_gate_mapping_queue)
+        (needle_input_mapping_queue, needle_gate_mapping_queue)
     }
 
     fn build_gate_candidates(
         &self,
-        pattern_current: CellWrapper<'p>,
+        needle_current: CellWrapper<'p>,
         cell_mapping: &Mapping<'p, 'd>,
     ) -> Vec<CellWrapper<'d>> {
-        let current_type = pattern_current.cell_type();
+        let current_type = needle_current.cell_type();
 
-        let pattern_fan_in = self
-            .pattern_index
-            .get_fanin_raw(&pattern_current)
+        let needle_fan_in = self
+            .needle_index
+            .get_fanin_raw(&needle_current)
             .unwrap_or_default();
 
-        let mapped_design_fan_in: Vec<CellWrapper<'d>> = pattern_fan_in
+        let mapped_haystack_fan_in: Vec<CellWrapper<'d>> = needle_fan_in
             .iter()
-            .filter_map(|(p_fan_in_cell, _)| cell_mapping.get_design_cell(p_fan_in_cell.clone()))
+            .filter_map(|(p_fan_in_cell, _)| cell_mapping.get_haystack_cell(p_fan_in_cell.clone()))
             .collect();
 
-        let pre_filtered_candidates: Vec<CellWrapper<'d>> = if mapped_design_fan_in.is_empty() {
+        let pre_filtered_candidates: Vec<CellWrapper<'d>> = if mapped_haystack_fan_in.is_empty() {
             // if no fanin mapped, return all cells of the correct type
             // This happens for the first cells mapped and is not avoidable
-            self.design_index.get_by_type(current_type).to_vec()
+            self.haystack_index.get_by_type(current_type).to_vec()
         } else {
-            let design_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_in
+            let haystack_fan_out_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_haystack_fan_in
                 .iter()
-                .filter_map(|d_cell| self.design_index.get_fanout(d_cell))
+                .filter_map(|d_cell| self.haystack_index.get_fanout(d_cell))
                 .collect();
 
-            let intersection_design_fan_out: HashSet<CellWrapper<'d>> =
-                intersection(design_fan_out_sets);
-            intersection_design_fan_out.into_iter().collect()
+            let intersection_haystack_fan_out: HashSet<CellWrapper<'d>> =
+                intersection(haystack_fan_out_sets);
+            intersection_haystack_fan_out.into_iter().collect()
         };
 
         let candidates: Vec<CellWrapper<'d>> = pre_filtered_candidates
             .into_iter()
             .filter(|d_cell| {
                 self.validate_fan_in_connections(
-                    pattern_current.clone(),
+                    needle_current.clone(),
                     d_cell.clone(),
                     cell_mapping,
                 )
             })
             .filter(|d_cell| d_cell.cell_type() == current_type)
-            .filter(|d_cell| cell_mapping.design_mapping().get(d_cell).is_none())
+            .filter(|d_cell| cell_mapping.haystack_mapping().get(d_cell).is_none())
             .collect();
 
         candidates
@@ -315,46 +311,49 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
 
     fn build_input_candidates(
         &self,
-        pattern_current: CellWrapper<'p>,
+        needle_current: CellWrapper<'p>,
         cell_mapping: &Mapping<'p, 'd>,
     ) -> Vec<CellWrapper<'d>> {
-        let pattern_fan_out = self
-            .pattern_index
-            .get_fanout_raw(&pattern_current)
+        let needle_fan_out = self
+            .needle_index
+            .get_fanout_raw(&needle_current)
             .unwrap_or_default();
 
-        let mapped_design_fan_out: Vec<CellWrapper<'d>> = pattern_fan_out
+        let mapped_haystack_fan_out: Vec<CellWrapper<'d>> = needle_fan_out
             .iter()
-            .filter_map(|(p_fan_out_cell, _)| cell_mapping.get_design_cell(p_fan_out_cell.clone()))
+            .filter_map(|(p_fan_out_cell, _)| {
+                cell_mapping.get_haystack_cell(p_fan_out_cell.clone())
+            })
             .collect();
 
-        let design_fan_in_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_design_fan_out
+        let haystack_fan_in_sets: Vec<HashSet<CellWrapper<'d>>> = mapped_haystack_fan_out
             .iter()
-            .filter_map(|d_cell| self.design_index.get_fanin(d_cell))
+            .filter_map(|d_cell| self.haystack_index.get_fanin(d_cell))
             .collect();
 
-        let intersection_design_fan_in: HashSet<CellWrapper<'d>> = intersection(design_fan_in_sets);
+        let intersection_haystack_fan_in: HashSet<CellWrapper<'d>> =
+            intersection(haystack_fan_in_sets);
 
-        let candidates: Vec<CellWrapper<'d>> = intersection_design_fan_in
+        let candidates: Vec<CellWrapper<'d>> = intersection_haystack_fan_in
             .into_iter()
             .filter(|d_cell| {
                 let mut nm = cell_mapping.clone();
-                nm.insert(pattern_current.clone(), d_cell.clone());
+                nm.insert(needle_current.clone(), d_cell.clone());
 
-                let fanout = self.design_index.get_fanout(d_cell);
+                let fanout = self.haystack_index.get_fanout(d_cell);
                 if fanout.is_none() {
                     return false;
                 }
                 let fanout = fanout.unwrap();
                 fanout.iter().all(|d_fanout_cell| {
-                    if let Some(p_fanout_cell) = nm.get_pattern_cell(d_fanout_cell.clone()) {
+                    if let Some(p_fanout_cell) = nm.get_needle_cell(d_fanout_cell.clone()) {
                         self.validate_fan_in_connections(p_fanout_cell, d_fanout_cell.clone(), &nm)
                     } else {
                         true
                     }
                 })
             })
-            .filter(|d_cell| cell_mapping.design_mapping().get(d_cell).is_none())
+            .filter(|d_cell| cell_mapping.haystack_mapping().get(d_cell).is_none())
             .collect();
 
         candidates
