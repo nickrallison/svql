@@ -14,7 +14,7 @@ use crate::{Const, Design, Trit};
 /// [`Cell`]: crate::Cell
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Net {
-    pub(crate) index: u32,
+    pub index: u32,
 }
 
 impl Net {

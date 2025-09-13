@@ -89,9 +89,29 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
                         );
 
                         if let (Some(from_n), Some(to_n)) = (from_node, to_node) {
-                            let result = from_n == to_n;
-                            tracing::event!(tracing::Level::TRACE, "Nodes equal: {}", result);
-                            result
+                            tracing::event!(tracing::Level::TRACE, "From node: {:?}", from_n);
+                            tracing::event!(tracing::Level::TRACE, "To node: {:?}", to_n);
+
+                            // temp just search by fan in of the "to" node
+                            let mut fan_in = Vec::new();
+                            to_n.get().visit(|net| fan_in.push(net));
+                            tracing::event!(tracing::Level::TRACE, "Fan in nodes: {:?}", fan_in);
+
+                            let fan_in_contains_from = fan_in.iter().any(|n| {
+                                if n.index >= 2 {
+                                    (n.index - 2) as usize == from_n.debug_index()
+                                } else {
+                                    false
+                                }
+                            });
+
+                            // let result = from_n.debug_index() == to_n.debug_index();
+                            tracing::event!(
+                                tracing::Level::TRACE,
+                                "Nodes equal: {}",
+                                fan_in_contains_from
+                            );
+                            fan_in_contains_from
                         } else {
                             tracing::event!(
                                 tracing::Level::TRACE,

@@ -380,8 +380,8 @@ lazy_static::lazy_static! {
 
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
-            name: "sdffe_then_and_simple_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+            name: "sdffe_then_and_simple_dedupe_none",
+            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).haystack_flatten(true).build(),
             needle: &SDFFE_THEN_AND,
             haystack: &AND_Q_DOUBLE_SDFFE,
             expected_matches: 4,
@@ -390,8 +390,8 @@ lazy_static::lazy_static! {
 
     pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
-            name: "and_any_in_mixed_tree_auto_morph",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+            name: "and_any_in_mixed_tree_dedupe_all",
+            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).haystack_flatten(true).build(),
             needle: &AND_ANY,
             haystack: &MIXED_AND_TREE,
             expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
