@@ -200,16 +200,60 @@ impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
             (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
                 self.nets_match_fan_in(p_net, d_net, mapping)
             }
-            (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => {
-                todo!(
-                    "Use config to control how nets of different sizes match, then use nets_match_fan_in method"
-                )
-            }
-            (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => {
-                let first_d_net = d_nets.first().unwrap();
-                return self.nets_match_fan_in(p_net, first_d_net, mapping);
-                todo!("Should single pattern match against many design?")
-            }
+            (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => match self.config.match_length {
+                svql_common::MatchLength::First => {
+                    let first_p_net = p_nets.first().unwrap();
+                    let first_d_net = d_nets.first().unwrap();
+                    return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
+                }
+                svql_common::MatchLength::NeedleSubsetHaystack => {
+                    for p_net in p_nets {
+                        let mut found_match = false;
+                        for d_net in d_nets {
+                            if self.nets_match_fan_in(p_net, d_net, mapping) {
+                                found_match = true;
+                                break;
+                            }
+                        }
+                        if !found_match {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                svql_common::MatchLength::Exact => {
+                    if p_nets.len() != d_nets.len() {
+                        return false;
+                    }
+                    for (p_net, d_net) in p_nets.iter().zip(d_nets.iter()) {
+                        if !self.nets_match_fan_in(p_net, d_net, mapping) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            },
+            (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => match self.config.match_length {
+                svql_common::MatchLength::First => {
+                    let first_d_net = d_nets.first().unwrap();
+                    return self.nets_match_fan_in(p_net, first_d_net, mapping);
+                }
+                svql_common::MatchLength::NeedleSubsetHaystack => {
+                    for d_net in d_nets {
+                        if self.nets_match_fan_in(p_net, d_net, mapping) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                svql_common::MatchLength::Exact => {
+                    if d_nets.len() != 1 {
+                        return false;
+                    }
+                    let first_d_net = d_nets.first().unwrap();
+                    return self.nets_match_fan_in(p_net, first_d_net, mapping);
+                }
+            },
             _ => false,
         }
     }

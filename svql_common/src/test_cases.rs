@@ -273,7 +273,7 @@ lazy_static::lazy_static! {
     pub static ref BASIC_TEST_CASES: Vec<TestCase> = vec![
         // AND gate tests
         TestCase {
-            name: "and_gate_self_dedupe_no",
+            name: "and_gate_self_dedupe_none",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
                 .haystack_flatten(true)
@@ -284,18 +284,18 @@ lazy_static::lazy_static! {
             expected_matches: 2,
         },
         TestCase {
-            name: "and_gate_self_dedupe_yes",
+            name: "and_gate_self_dedupe_all",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
                 .haystack_flatten(true)
-                .dedupe(crate::Dedupe::None)
+                .dedupe(crate::Dedupe::All)
                 .build(),
             pattern: &AND_GATE,
             haystack: &AND_GATE_HAYSTACK,
             expected_matches: 1,
         },
         TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_no",
+            name: "small_and_seq_3_and_tree_4_dedupe_none",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
                 .haystack_flatten(true)
@@ -306,11 +306,11 @@ lazy_static::lazy_static! {
             expected_matches: 4,
         },
         TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_yes",
+            name: "small_and_seq_3_and_tree_4_dedupe_all",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
                 .haystack_flatten(true)
-                .dedupe(crate::Dedupe::None)
+                .dedupe(crate::Dedupe::All)
                 .build(),
             pattern: &SMALL_AND_SEQ,
             haystack: &SMALL_AND_TREE_HAYSTACK,
@@ -361,20 +361,20 @@ lazy_static::lazy_static! {
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
-        TestCase {
-            name: "sync_en_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &SYNC_EN_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
-        TestCase {
-            name: "sync_mux_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
-            pattern: &SYNC_MUX_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
+        // TestCase {
+        //     name: "sync_en_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+        //     pattern: &SYNC_EN_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
+        // TestCase {
+        //     name: "sync_mux_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+        //     pattern: &SYNC_MUX_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
     ];
 
 

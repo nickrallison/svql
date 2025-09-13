@@ -21,59 +21,47 @@ fn netlist_cases() -> Vec<&'static TestCase> {
         .collect()
 }
 
-fn run_case(tc: &TestCase) {
+fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
     let Pattern::Netlist { yosys_module, .. } = tc.pattern else {
-        return;
+        return Err("Invalid pattern".into());
     };
 
-    let needle = yosys_module
-        .import_design(&tc.config.needle_options)
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to import needle design for test case '{:#?}': {}",
-                tc, e
-            )
-        });
+    let needle = yosys_module.import_design(&tc.config.needle_options)?;
 
     let haystack = tc
         .haystack
         .yosys_module
-        .import_design(&tc.config.haystack_options)
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to import haystack design for test case '{:#?}': {}",
-                tc, e
-            )
-        });
+        .import_design(&tc.config.haystack_options)?;
 
     let embeddings = SubgraphMatcher::find_subgraphs(&needle, &haystack, &tc.config);
 
-    assert!(
-        embeddings.embeddings.len() == tc.expected_matches,
-        "Subgraph test case '{}' failed: expected {} matches, got {}",
-        tc.name,
-        tc.expected_matches,
-        embeddings.embeddings.len()
-    );
+    if embeddings.embeddings.len() != tc.expected_matches {
+        return Err(format!(
+            "Subgraph test case '{}' failed: expected {} matches, got {}",
+            tc.name,
+            tc.expected_matches,
+            embeddings.embeddings.len()
+        )
+        .into());
+    }
+    Ok(())
 }
 
-#[rstest(
-    tc,
-    case("and_gate_self_dedupe_none"),
-    case("and_gate_self_dedupe_all"),
-    case("small_and_seq_3_and_tree_4_dedupe_none"),
-    case("small_and_seq_3_and_tree_4_dedupe_all"),
-    case("async_en_in_many_locked_regs"),
-    case("async_mux_in_many_locked_regs"),
-    case("sync_en_in_many_locked_regs"),
-    case("sync_mux_in_many_locked_regs")
-)]
-
-fn subgraph_named_cases(tc: &str) {
+#[rstest]
+fn subgraph_all_netlist_cases() {
     init_test_logger();
-    let case = ALL_TEST_CASES
-        .iter()
-        .find(|t| t.name == tc)
-        .expect("named case not found");
-    run_case(case);
+
+    let results = netlist_cases()
+        .into_iter()
+        .map(run_case)
+        .collect::<Vec<_>>();
+
+    let failures: Vec<_> = results.into_iter().filter(|r| r.is_err()).collect();
+    if !failures.is_empty() {
+        let mut error_msg = format!("{} subgraph test cases failed", failures.len());
+        for failure in failures {
+            error_msg.push_str(&format!("\n - {}", failure.as_ref().unwrap_err()));
+        }
+        panic!("{}", error_msg);
+    }
 }
