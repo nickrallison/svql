@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
-use crate::{Timer, cell::CellWrapper};
+use crate::cell::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
-pub struct CellMapping<'p, 'd> {
+pub struct Mapping<'p, 'd> {
     /// Pattern to Design cell mapping
     pattern_to_design: HashMap<CellWrapper<'p>, CellWrapper<'d>>,
     /// Design to Pattern cell mapping
     design_to_pattern: HashMap<CellWrapper<'d>, CellWrapper<'p>>,
 }
 
-impl<'p, 'd> CellMapping<'p, 'd> {
+impl<'p, 'd> Mapping<'p, 'd> {
     pub(super) fn new() -> Self {
         Self {
             pattern_to_design: HashMap::new(),
@@ -19,8 +19,6 @@ impl<'p, 'd> CellMapping<'p, 'd> {
     }
 
     pub(super) fn insert(&mut self, pattern: CellWrapper<'p>, design: CellWrapper<'d>) {
-        let _t = Timer::new("NodeMapping::insert");
-
         self.pattern_to_design
             .insert(pattern.clone(), design.clone());
         self.design_to_pattern.insert(design, pattern);
@@ -30,7 +28,6 @@ impl<'p, 'd> CellMapping<'p, 'd> {
         &mut self,
         pattern: CellWrapper<'p>,
     ) -> Option<CellWrapper<'d>> {
-        let _t = Timer::new("NodeMapping::remove_by_pattern");
         if let Some(design_cell) = self.pattern_to_design.remove(&pattern) {
             self.design_to_pattern.remove(&design_cell);
             return Some(design_cell);
@@ -40,15 +37,11 @@ impl<'p, 'd> CellMapping<'p, 'd> {
 
     // debug ensure that pattern & design mappings are consistent
     pub fn get_design_cell(&self, pattern: CellWrapper<'p>) -> Option<CellWrapper<'d>> {
-        let _t = Timer::new("NodeMapping::get_design_cell");
-
         self.pattern_to_design.get(&pattern).cloned()
     }
 
     // debug ensure that pattern & design mappings are consistent
     pub fn get_pattern_cell(&self, design: CellWrapper<'d>) -> Option<CellWrapper<'p>> {
-        let _t = Timer::new("NodeMapping::get_pattern_cell");
-
         self.design_to_pattern.get(&design).cloned()
     }
 
@@ -71,7 +64,6 @@ impl<'p, 'd> CellMapping<'p, 'd> {
     }
 
     pub(super) fn signature(&self) -> Vec<usize> {
-        let _t = Timer::new("NodeMapping::signature");
         let mut sig: Vec<usize> = self
             .pattern_to_design
             .values()
@@ -79,7 +71,6 @@ impl<'p, 'd> CellMapping<'p, 'd> {
             .collect();
         sig.sort_unstable();
         sig.dedup();
-        tracing::event!(tracing::Level::TRACE, "NodeMapping::signature -> {:?}", sig);
         sig
     }
 }

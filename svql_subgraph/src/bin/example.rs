@@ -31,16 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern = pattern_module.import_design_yosys(&config.needle_options, &yosys)?;
     let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
-    let matches = svql_subgraph::FindSubgraphs::find_subgraphs(&pattern, &design, &config);
+    let embeddings = svql_subgraph::SubgraphMatcher::find_subgraphs(&pattern, &design, &config);
 
-    // for match_ in matches {
-    //     match_.print_mapping();
-    // }
-
-    println!("Found {} matches", matches.len());
-
-    // let pattern = pattern_module.
-    // let design = design_module.get_design();
+    println!("Found {} embeddings", embeddings.embeddings.len());
 
     Ok(())
 }

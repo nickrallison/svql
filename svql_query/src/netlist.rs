@@ -1,6 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Driver, DriverKey, context::Context, design_container::DesignContainer};
-use svql_subgraph::SubgraphIsomorphism;
+use svql_subgraph::Embedding;
 
 use crate::instance::Instance;
 
@@ -30,7 +30,7 @@ pub trait NetlistMeta {
 pub trait SearchableNetlist: NetlistMeta + Sized {
     type Hit<'ctx>;
 
-    fn from_subgraph<'ctx>(m: &SubgraphIsomorphism<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
+    fn from_subgraph<'ctx>(m: &Embedding<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
 
     #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
     #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
@@ -60,8 +60,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let needle_index = needle_container.index();
         let haystack_index = haystack_container.index();
 
-        
-        svql_subgraph::FindSubgraphs::find_subgraphs_from_index(
+        svql_subgraph::SubgraphMatcher::find_subgraphs_from_index(
             needle,
             haystack,
             needle_index,
@@ -105,11 +104,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         tracing::event!(tracing::Level::TRACE, "Creating context for netlist");
         let key = Self::driver_key();
         let design = driver
-            .get_or_load_design(
-                &key.path().display().to_string(),
-                key.module_name(),
-                config,
-            )?
+            .get_or_load_design(&key.path().display().to_string(), key.module_name(), config)?
             .1;
 
         Ok(Context::from_single(key, design))

@@ -1,14 +1,8 @@
-use std::{
-    cell,
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
-use crate::{
-    Timer,
-    cell::{CellType, CellWrapper},
-};
+use crate::cell::{CellType, CellWrapper};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CellIndex {
@@ -48,8 +42,6 @@ pub struct DesignIndex<'a> {
 
 impl<'a> DesignIndex<'a> {
     pub fn build(design: &'a Design) -> Self {
-        let _t = Timer::new("GraphIndex::build");
-
         // 0: Preparing a vector of cell references in topological order
         let cell_refs_topo = Self::build_cell_refs_topo(design);
 
@@ -228,7 +220,6 @@ impl<'a> DesignIndex<'a> {
     }
 
     pub fn get_by_type(&self, node_type: CellType) -> Vec<CellWrapper<'a>> {
-        let _t = Timer::new("GraphIndex::get_by_type");
         self.cell_type_map
             .get(&node_type)
             .map(|v| {

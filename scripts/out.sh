@@ -86,7 +86,7 @@ find target -name "svql_subgraph_generated_tests.rs" -printf "%T+ %p\n" | sort -
 #     --section "svql_query=svql_query" \
 #     > out.md
 
-python3 scripts/md_tree.py --root . \
+/home/nick/Projects/svql/.venv/bin/python3 scripts/md_tree.py --root . \
     --include 'svql_subgraph/src/lib.rs' \
     --include 'svql_common/**.rs' \
     --include 'Cargo.toml' \

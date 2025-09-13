@@ -1,25 +1,17 @@
-use crate::FindSubgraphsInner;
-use crate::cell_mapping::CellMapping;
-use crate::{Timer, cell::CellWrapper};
+use crate::SubgraphMatcherCore;
+use crate::cell::CellWrapper;
+use crate::mapping::Mapping;
 use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
 use tracing::trace;
 
-impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
+impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
     pub(crate) fn validate_fan_in_connections(
         &self,
         p_cell: CellWrapper<'p>,
         d_cell: CellWrapper<'d>,
-        mapping: &CellMapping<'p, 'd>,
+        mapping: &Mapping<'p, 'd>,
     ) -> bool {
-        let _t = Timer::new("ConnectivityConstraint::validate_fan_in_connections");
-
-        // let p_cell_cow = self.p_cell.get();
-        // let d_cell_cow = d_cell.get();
-
-        let p_cell: &Cell = p_cell.get();
-        let d_cell: &Cell = d_cell.get();
-
-        self.cells_match_fan_in(p_cell, d_cell, mapping)
+        self.cells_match_fan_in(p_cell.get(), d_cell.get(), mapping)
     }
 
     // ####################################
@@ -27,12 +19,8 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_cell: &Cell,
         design_cell: &Cell,
-        mapping: &CellMapping<'p, 'd>,
+        mapping: &Mapping<'p, 'd>,
     ) -> bool {
-        trace!(
-            "Checking if cells match fan-in: {:?} and {:?}",
-            pattern_cell, design_cell
-        );
         use Cell::*;
         match (pattern_cell, design_cell) {
             (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
@@ -199,7 +187,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_value: &Value,
         design_value: &Value,
-        mapping: &CellMapping<'p, 'd>,
+        mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if values match fan-in: {:?} and {:?}",
@@ -230,7 +218,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_net: &prjunnamed_netlist::Net,
         design_net: &prjunnamed_netlist::Net,
-        mapping: &CellMapping<'p, 'd>,
+        mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if nets match fan-in: {:?} and {:?}",
@@ -269,7 +257,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_c_net: &prjunnamed_netlist::ControlNet,
         design_c_net: &prjunnamed_netlist::ControlNet,
-        mapping: &CellMapping<'p, 'd>,
+        mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if control nets match fan-in: {:?} and {:?}",
@@ -292,7 +280,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_const: &prjunnamed_netlist::Const,
         design_const: &prjunnamed_netlist::Const,
-        _mapping: &CellMapping<'p, 'd>,
+        _mapping: &Mapping<'p, 'd>,
     ) -> bool {
         trace!(
             "Checking if consts match fan-in: {:?} and {:?}",
@@ -336,7 +324,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
         &self,
         pattern_dff: &FlipFlop,
         design_dff: &FlipFlop,
-        mapping: &CellMapping,
+        mapping: &Mapping,
     ) -> bool {
         trace!(
             "Checking if DFFs match fan-in: {:?} and {:?}",

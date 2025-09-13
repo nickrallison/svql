@@ -1,14 +1,13 @@
 #![allow(dead_code)]
 // mod candidates;
-mod cell_mapping;
-mod constraints;
-mod util;
+mod connectivity;
+mod mapping;
 
 pub mod cell;
 pub mod design_index;
 
-use cell_mapping::CellMapping;
 use design_index::DesignIndex;
+use mapping::Mapping;
 
 use prjunnamed_netlist::Design;
 use tracing::debug;
@@ -17,21 +16,24 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use svql_common::Config;
 
-pub use util::*;
-
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
 use crate::cell::{CellType, CellWrapper};
 
 #[derive(Clone, Debug, Default)]
-pub struct SubgraphIsomorphism<'p, 'd> {
-    pub mapping: CellMapping<'p, 'd>,
+pub struct AllEmbeddings<'p, 'd> {
+    pub embeddings: Vec<Embedding<'p, 'd>>,
     pub input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
     pub output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'p>, usize)>>,
 }
 
-impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
+#[derive(Clone, Debug, Default)]
+pub struct Embedding<'p, 'd> {
+    pub mapping: Mapping<'p, 'd>,
+}
+
+impl<'p, 'd> Embedding<'p, 'd> {
     pub fn len(&self) -> usize {
         self.mapping.len()
     }
@@ -67,7 +69,7 @@ impl<'p, 'd> SubgraphIsomorphism<'p, 'd> {
     }
 }
 
-pub struct FindSubgraphs<'p, 'd, 'a> {
+pub struct SubgraphMatcher<'p, 'd, 'a> {
     pattern: &'p Design,
     design: &'d Design,
     pattern_index: DesignIndex<'p>,
@@ -75,7 +77,7 @@ pub struct FindSubgraphs<'p, 'd, 'a> {
     config: &'a Config,
 }
 
-pub(crate) struct FindSubgraphsInner<'p, 'd, 'a> {
+pub(crate) struct SubgraphMatcherCore<'p, 'd, 'a> {
     pattern: &'p Design,
     design: &'d Design,
     pattern_index: &'a DesignIndex<'p>,
@@ -83,16 +85,16 @@ pub(crate) struct FindSubgraphsInner<'p, 'd, 'a> {
     config: &'a Config,
 }
 
-impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
+impl<'p, 'd, 'a> SubgraphMatcher<'p, 'd, 'a> {
     pub fn find_subgraphs(
         pattern: &'p Design,
         design: &'d Design,
         config: &'a Config,
-    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    ) -> AllEmbeddings<'p, 'd> {
         let pattern_index = DesignIndex::build(pattern);
         let design_index = DesignIndex::build(design);
 
-        let matcher = FindSubgraphsInner {
+        let matcher = SubgraphMatcherCore {
             pattern,
             design,
             pattern_index: &pattern_index,
@@ -109,8 +111,8 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
         pattern_index: &'a DesignIndex<'p>,
         design_index: &'a DesignIndex<'d>,
         config: &'a Config,
-    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
-        let matcher = FindSubgraphsInner {
+    ) -> AllEmbeddings<'p, 'd> {
+        let matcher = SubgraphMatcherCore {
             pattern,
             design,
             pattern_index,
@@ -121,11 +123,11 @@ impl<'p, 'd, 'a> FindSubgraphs<'p, 'd, 'a> {
     }
 }
 
-impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
-    pub fn find_subgraph_isomorphisms(&self) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+impl<'p, 'd, 'a> SubgraphMatcherCore<'p, 'd, 'a> {
+    pub fn find_subgraph_isomorphisms(&self) -> AllEmbeddings<'p, 'd> {
         let (pattern_input_mapping_queue, pattern_gate_mapping_queue) =
             self.build_pattern_mapping_queues();
-        let initial_cell_mapping: CellMapping<'p, 'd> = CellMapping::new();
+        let initial_cell_mapping: Mapping<'p, 'd> = Mapping::new();
         let mut results = self.find_isomorphisms_recurse(
             initial_cell_mapping,
             pattern_gate_mapping_queue,
@@ -143,16 +145,20 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             results.retain(|m| seen.insert(m.io_signature()));
         }
 
-        results
+        AllEmbeddings {
+            embeddings: results,
+            input_fanout_by_name: self.pattern_index.get_input_fanout_by_name().clone(),
+            output_fanin_by_name: self.pattern_index.get_output_fanin_by_name().clone(),
+        }
     }
 
     fn find_isomorphisms_recurse(
         &self,
-        cell_mapping: CellMapping<'p, 'd>,
+        cell_mapping: Mapping<'p, 'd>,
         mut pattern_gate_mapping_queue: VecDeque<CellWrapper<'p>>,
         pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
         depth: usize,
-    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    ) -> Vec<Embedding<'p, 'd>> {
         // Base Case
         let Some(pattern_current) = pattern_gate_mapping_queue.pop_front() else {
             return self.find_isomorphisms_recurse_inputs(
@@ -182,24 +188,21 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             )
         });
 
-        let flat_results: Vec<SubgraphIsomorphism<'p, 'd>> = results.flatten().collect();
+        let flat_results: Vec<Embedding<'p, 'd>> = results.flatten().collect();
         debug!("Depth {} returning {} results", depth, flat_results.len());
         flat_results
     }
 
     fn find_isomorphisms_recurse_inputs(
         &self,
-        cell_mapping: CellMapping<'p, 'd>,
+        cell_mapping: Mapping<'p, 'd>,
         mut pattern_input_mapping_queue: VecDeque<CellWrapper<'p>>,
         depth: usize,
-    ) -> Vec<SubgraphIsomorphism<'p, 'd>> {
+    ) -> Vec<Embedding<'p, 'd>> {
         // Base Case
         let Some(pattern_current) = pattern_input_mapping_queue.pop_front() else {
-            // attach
-            let mapping = SubgraphIsomorphism {
+            let mapping = Embedding {
                 mapping: cell_mapping,
-                input_fanout_by_name: self.pattern_index.get_input_fanout_by_name().clone(),
-                output_fanin_by_name: self.pattern_index.get_output_fanin_by_name().clone(),
             };
 
             return vec![mapping];
@@ -224,7 +227,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
             )
         });
 
-        let flat_results: Vec<SubgraphIsomorphism<'p, 'd>> = results.flatten().collect();
+        let flat_results: Vec<Embedding<'p, 'd>> = results.flatten().collect();
         debug!("Depth {} returning {} results", depth, flat_results.len());
         flat_results
     }
@@ -265,7 +268,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
     fn build_gate_candidates(
         &self,
         pattern_current: CellWrapper<'p>,
-        cell_mapping: &CellMapping<'p, 'd>,
+        cell_mapping: &Mapping<'p, 'd>,
     ) -> Vec<CellWrapper<'d>> {
         let current_type = pattern_current.cell_type();
 
@@ -313,7 +316,7 @@ impl<'p, 'd, 'a> FindSubgraphsInner<'p, 'd, 'a> {
     fn build_input_candidates(
         &self,
         pattern_current: CellWrapper<'p>,
-        cell_mapping: &CellMapping<'p, 'd>,
+        cell_mapping: &Mapping<'p, 'd>,
     ) -> Vec<CellWrapper<'d>> {
         let pattern_fan_out = self
             .pattern_index
