@@ -1,6 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Driver, DriverKey, context::Context, design_container::DesignContainer};
-use svql_subgraph::Embedding;
+use svql_subgraph::{Embedding, EmbeddingSet};
 
 use crate::instance::Instance;
 
@@ -30,7 +30,11 @@ pub trait NetlistMeta {
 pub trait SearchableNetlist: NetlistMeta + Sized {
     type Hit<'ctx>;
 
-    fn from_subgraph<'ctx>(m: &Embedding<'ctx, 'ctx>, path: Instance) -> Self::Hit<'ctx>;
+    fn from_subgraph<'ctx>(
+        m: &Embedding<'ctx, 'ctx>,
+        path: Instance,
+        embedding_set: &EmbeddingSet<'ctx, 'ctx>,
+    ) -> Self::Hit<'ctx>;
 
     #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
     #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
@@ -60,41 +64,20 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
         let needle_index = needle_container.index();
         let haystack_index = haystack_container.index();
 
-        svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+        let embeddings = svql_subgraph::SubgraphMatcher::enumerate_with_indices(
             needle,
             haystack,
             needle_index,
             haystack_index,
             config,
-        )
-        .into_iter()
-        .map(|m| Self::from_subgraph(&m, path.clone()))
-        .collect()
-    }
+        );
 
-    /// Same as `query`, but also updates the provided `progress` as the subgraph search proceeds.
-    // #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]
-    // #[contracts::debug_requires(context.get(haystack_key).is_some(), "Haystack design must be present in context")]
-    // fn query_with_progress<'ctx>(
-    //     haystack_key: &DriverKey,
-    //     context: &'ctx Context,
-    //     path: Instance,
-    //     config: &Config,
-    // ) -> Vec<Self::Hit<'ctx>> {
-    //     let needle = context
-    //         .get(&Self::driver_key())
-    //         .expect("Pattern design not found in context")
-    //         .as_ref();
-    //     let haystack = context
-    //         .get(haystack_key)
-    //         .expect("Haystack design not found in context")
-    //         .as_ref();
-    //
-    //     svql_subgraph::find_subgraph_isomorphisms(needle, haystack, config, Some(progress))
-    //         .into_iter()
-    //         .map(|m| Self::from_subgraph(&m, path.clone()))
-    //         .collect()
-    // }
+        embeddings
+            .items
+            .iter()
+            .map(|m| Self::from_subgraph(m, path.clone(), &embeddings))
+            .collect()
+    }
 
     #[contracts::debug_ensures(ret.as_ref().map(|c| c.len()).unwrap_or(1) == 1, "Context for a single pattern only")]
     fn context(
@@ -181,18 +164,29 @@ macro_rules! netlist {
             type Hit<'ctx> = $name<$crate::Match<'ctx>>;
 
             fn from_subgraph<'ctx>(
-                m: &svql_subgraph::SubgraphIsomorphism<'ctx, 'ctx>,
-                path: $crate::instance::Instance
+                m: &svql_subgraph::Embedding<'ctx, 'ctx>,
+                path: $crate::instance::Instance,
+                embedding_set: &svql_subgraph::EmbeddingSet<'ctx, 'ctx>,
             ) -> Self::Hit<'ctx> {
                 $(
-                    let $input = $crate::binding::bind_input(m, stringify!($input), 0);
+                    let $input = $crate::binding::bind_input(
+                        m,
+                        stringify!($input),
+                        0,
+                        &embedding_set.needle_input_fanout_by_name
+                    );
                     let $input = $crate::Wire::with_val(
                         path.child(stringify!($input).to_string()),
                         $input
                     );
                 )*
                 $(
-                    let $output = $crate::binding::bind_output(m, stringify!($output), 0);
+                    let $output = $crate::binding::bind_output(
+                        m,
+                        stringify!($output),
+                        0,
+                        &embedding_set.needle_output_fanin_by_name
+                    );
                     let $output = $crate::Wire::with_val(
                         path.child(stringify!($output).to_string()),
                         $output

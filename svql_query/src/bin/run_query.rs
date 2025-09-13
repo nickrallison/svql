@@ -154,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", count);
 
     // If svql_subgraph "profiling" feature is enabled, print timings
-    svql_subgraph::report();
+    // svql_subgraph::report();
 
     Ok(())
 }

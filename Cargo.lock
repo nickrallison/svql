@@ -869,6 +869,7 @@ dependencies = [
  "quote",
  "rayon",
  "regex",
+ "rstest",
  "serde",
  "serde_json",
  "svql_common",

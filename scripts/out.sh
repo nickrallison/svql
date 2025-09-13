@@ -87,6 +87,7 @@ find target -name "svql_subgraph_generated_tests.rs" -printf "%T+ %p\n" | sort -
 #     > out.md
 
 /home/nick/Projects/svql/.venv/bin/python3 scripts/md_tree.py --root . \
+    --include 'svql_query/**.rs' \
     --include 'svql_driver/**.rs' \
     --include 'svql_subgraph/**.rs' \
     --include 'svql_common/**.rs' \

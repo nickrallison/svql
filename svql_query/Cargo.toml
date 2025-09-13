@@ -5,6 +5,8 @@ version = "0.1.0"
 
 [lib]
 
+
+
 [dependencies]
 ###############
 # SVQL
@@ -51,6 +53,7 @@ walkdir.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
+rstest.workspace = true
 
 [features]
 default = []
