@@ -2,23 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use prjunnamed_netlist::{Cell, CellRef, Design};
 
-use crate::cell::{CellKind, CellWrapper};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CellIndex {
-    idx: usize,
-}
-
-impl CellIndex {
-    pub fn new(idx: usize) -> Self {
-        CellIndex { idx }
-    }
-
-    #[inline]
-    pub fn index(&self) -> usize {
-        self.idx
-    }
-}
+use crate::cell::{CellIndex, CellKind, CellWrapper};
 
 #[derive(Clone, Debug)]
 pub struct GraphIndex<'a> {
@@ -143,7 +127,7 @@ impl<'a> GraphIndex<'a> {
         let output_fanin_by_name: HashMap<String, Vec<(CellIndex, usize)>> = fanin_map
             .iter()
             .filter_map(|(cell_wrapper, value)| {
-                if let Cell::Output(name, _) = cells_topo[cell_wrapper.idx].get() {
+                if let Cell::Output(name, _) = cells_topo[cell_wrapper.index()].get() {
                     Some((name.clone(), value.clone()))
                 } else {
                     None
@@ -160,7 +144,7 @@ impl<'a> GraphIndex<'a> {
         let input_fanout_by_name: HashMap<String, Vec<(CellIndex, usize)>> = fanin_map
             .iter()
             .filter_map(|(cell_wrapper, value)| {
-                if let Cell::Input(name, _) = cells_topo[cell_wrapper.idx].get() {
+                if let Cell::Input(name, _) = cells_topo[cell_wrapper.index()].get() {
                     Some((name.clone(), value.clone()))
                 } else {
                     None
@@ -224,7 +208,7 @@ impl<'a> GraphIndex<'a> {
             .get(&node_type)
             .map(|v| {
                 v.iter()
-                    .map(|idx| self.cells_topo[idx.idx].clone())
+                    .map(|idx| self.cells_topo[idx.index()].clone())
                     .collect::<Vec<_>>()
             })
             .unwrap_or(vec![])
@@ -241,7 +225,7 @@ impl<'a> GraphIndex<'a> {
                 (
                     k.clone(),
                     v.iter()
-                        .map(|(c, pin)| (self.cells_topo[c.idx].clone(), *pin))
+                        .map(|(c, pin)| (self.cells_topo[c.index()].clone(), *pin))
                         .collect(),
                 )
             })
@@ -255,7 +239,7 @@ impl<'a> GraphIndex<'a> {
                 (
                     k.clone(),
                     v.iter()
-                        .map(|(c, pin)| (self.cells_topo[c.idx].clone(), *pin))
+                        .map(|(c, pin)| (self.cells_topo[c.index()].clone(), *pin))
                         .collect(),
                 )
             })
@@ -269,7 +253,7 @@ impl<'a> GraphIndex<'a> {
             .expect("Cell should be in map");
         self.clean_fanout_map.get(idx).map(|v| {
             v.iter()
-                .map(|idx| self.cells_topo[idx.idx].clone())
+                .map(|idx| self.cells_topo[idx.index()].clone())
                 .collect()
         })
     }
@@ -280,7 +264,7 @@ impl<'a> GraphIndex<'a> {
             .expect("Cell should be in map");
         self.clean_fanin_map.get(idx).map(|v| {
             v.iter()
-                .map(|idx| self.cells_topo[idx.idx].clone())
+                .map(|idx| self.cells_topo[idx.index()].clone())
                 .collect()
         })
     }
@@ -295,7 +279,7 @@ impl<'a> GraphIndex<'a> {
             .expect("Cell should be in map");
         self.fanout_map.get(idx).map(|v| {
             v.iter()
-                .map(|(idx, pin)| (self.cells_topo[idx.idx].clone(), *pin))
+                .map(|(idx, pin)| (self.cells_topo[idx.index()].clone(), *pin))
                 .collect()
         })
     }
@@ -309,7 +293,7 @@ impl<'a> GraphIndex<'a> {
             .expect("Cell should be in map");
         self.fanin_map.get(idx).map(|v| {
             v.iter()
-                .map(|(idx, pin)| (self.cells_topo[idx.idx].clone(), *pin))
+                .map(|(idx, pin)| (self.cells_topo[idx.index()].clone(), *pin))
                 .collect()
         })
     }
