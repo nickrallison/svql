@@ -2,7 +2,6 @@ use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
 use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
-use tracing::trace;
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -189,10 +188,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_value: &Value,
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        trace!(
-            "Checking if values match fan-in: {:?} and {:?}",
-            needle_value, haystack_value
-        );
         let needle_value_repr: &ValueRepr = &needle_value.0;
         let haystack_value_repr: &ValueRepr = &haystack_value.0;
         match (needle_value_repr, haystack_value_repr) {
@@ -264,10 +259,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_net: &prjunnamed_netlist::Net,
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        trace!(
-            "Checking if nets match fan-in: {:?} and {:?}",
-            needle_net, haystack_net
-        );
         let actual_fan_in_haystack_cell: Result<(CellRef<'haystack>, usize), Trit> =
             self.haystack.find_cell(*haystack_net);
         let fan_in_needle_cell: Result<(CellRef<'needle>, usize), Trit> =
@@ -303,10 +294,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_c_net: &prjunnamed_netlist::ControlNet,
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        trace!(
-            "Checking if control nets match fan-in: {:?} and {:?}",
-            needle_c_net, haystack_c_net
-        );
         match (needle_c_net, haystack_c_net) {
             (
                 prjunnamed_netlist::ControlNet::Pos(p_pos_net),
@@ -326,10 +313,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_const: &prjunnamed_netlist::Const,
         _mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        trace!(
-            "Checking if consts match fan-in: {:?} and {:?}",
-            needle_const, haystack_const
-        );
         let mut needle_const_iter = needle_const.clone().into_iter();
         let mut haystack_const_iter = haystack_const.clone().into_iter();
 
@@ -341,39 +324,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         true
     }
 
-    // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    // pub struct FlipFlop {
-    //     pub data: Value,
-    //     /// The clock.  The active edge is rising if it is a [`ControlNet::Pos`], and falling if it is
-    //     /// a [`ControlNet::Neg`].
-    //     pub clock: ControlNet,
-    //     /// Asynchronous reset.
-    //     pub clear: ControlNet,
-    //     /// Synchronous reset.
-    //     pub reset: ControlNet,
-    //     /// Clock enable.
-    //     pub enable: ControlNet,
-    //     /// If true, `reset` has priority over `enable`.  Otherwise, `enable` has priority over `reset`.
-    //     pub reset_over_enable: bool,
-
-    //     /// Must have the same width as `data`.
-    //     pub clear_value: Const,
-    //     /// Must have the same width as `data`.
-    //     pub reset_value: Const,
-    //     /// Must have the same width as `data`.
-    //     pub init_value: Const,
-    // }
-
     fn dffs_match_fan_in(
         &self,
         needle_dff: &FlipFlop,
         haystack_dff: &FlipFlop,
         mapping: &Assignment,
     ) -> bool {
-        trace!(
-            "Checking if DFFs match fan-in: {:?} and {:?}",
-            needle_dff, haystack_dff
-        );
         let data_matches = self.values_match_fan_in(&needle_dff.data, &haystack_dff.data, mapping);
         let clock_matches =
             self.control_nets_match_fan_in(&needle_dff.clock, &haystack_dff.clock, mapping);
@@ -390,23 +346,13 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let init_value_matches =
             self.const_match_fan_in(&needle_dff.init_value, &haystack_dff.init_value, mapping);
 
-        let value_data_matches = data_matches
+        data_matches
             && clock_matches
             && clear_matches
             && reset_matches
             && enable_matches
             && clear_value_matches
             && reset_value_matches
-            && init_value_matches;
-
-        match value_data_matches {
-            true => {
-                trace!("DFFs match fan-in");
-            }
-            false => {
-                trace!("DFFs do not match fan-in");
-            }
-        }
-        value_data_matches
+            && init_value_matches
     }
 }

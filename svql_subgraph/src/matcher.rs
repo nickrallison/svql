@@ -190,7 +190,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     ) {
         let mut topo_ordered_cells: Vec<CellWrapper<'needle>> = self
             .needle_index
-            .topo_cells()
+            .cells_topo()
             .iter()
             .filter(|c| !matches!(c.cell_type(), CellKind::Output))
             .cloned()
