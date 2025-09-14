@@ -3,7 +3,8 @@ use std::{cell::RefCell, collections::BTreeMap, io::Write};
 
 use crate::yosys::{self, CellDetails, MetadataValue, NetDetails, PortDetails};
 use prjunnamed_netlist::{
-    Cell, Const, ControlNet, Design, IoNet, IoValue, MemoryPortRelation, MetaItem, MetaItemRef, Net, Trit, Value,
+    Cell, Const, ControlNet, Design, IoNet, IoValue, MemoryPortRelation, MetaItem, MetaItemRef,
+    Net, Trit, Value,
 };
 
 struct Counter(usize);
@@ -54,12 +55,21 @@ impl NetlistIndexer {
     }
 
     fn synthetic_value(&self, size: usize) -> yosys::BitVector {
-        yosys::BitVector(std::iter::repeat_with(|| self.synthetic_net()).take(size).collect::<Vec<_>>())
+        yosys::BitVector(
+            std::iter::repeat_with(|| self.synthetic_net())
+                .take(size)
+                .collect::<Vec<_>>(),
+        )
     }
 
     fn io_net(&self, net: IoNet) -> yosys::Bit {
         let state = &mut *self.0.borrow_mut();
-        yosys::Bit::Net(*state.io_map.entry(net).or_insert_with(|| state.next.advance()))
+        yosys::Bit::Net(
+            *state
+                .io_map
+                .entry(net)
+                .or_insert_with(|| state.next.advance()),
+        )
     }
 
     fn io_value(&self, value: &IoValue) -> yosys::BitVector {
@@ -129,7 +139,10 @@ fn export_module(mut design: Design) -> yosys::Module {
     design.apply();
 
     for (name, io_value) in design.iter_ios() {
-        ys_module.ports.add(name, PortDetails::new(yosys::PortDirection::Inout, indexer.io_value(&io_value)))
+        ys_module.ports.add(
+            name,
+            PortDetails::new(yosys::PortDirection::Inout, indexer.io_value(&io_value)),
+        )
     }
 
     for cell_ref in design.iter_cells() {
@@ -149,45 +162,52 @@ fn export_module(mut design: Design) -> yosys::Module {
                 .add_to(&format!("${}", cell_index), module)
         };
 
-        let ys_cell_binary = |module: &mut yosys::Module, ty: &str, a: &Value, b: &Value, signed: bool| {
-            CellDetails::new(ty)
-                .param("A_SIGNED", if signed { 1 } else { 0 })
-                .param("A_WIDTH", a.len())
-                .param("B_SIGNED", if signed { 1 } else { 0 })
-                .param("B_WIDTH", b.len())
-                .param("Y_WIDTH", output.len())
-                .input("A", indexer.value(a))
-                .input("B", indexer.value(b))
-                .output("Y", indexer.value(&output))
-                .attrs(map_metadata(cell_ref.metadata()))
-                .add_to(&format!("${}", cell_index), module)
-        };
-
-        let ys_shift_count = |module: &mut yosys::Module, a: &Value, stride: u32| -> yosys::BitVector {
-            if stride == 1 {
-                indexer.value(a)
-            } else if stride == 0 {
-                indexer.value(&Value::zero(1))
-            } else {
-                let stride_bits = stride.ilog2() + 1;
-                let stride = Const::from_uint(stride.into(), stride_bits as usize);
-                let result = indexer.synthetic_value(a.len() + stride.len());
-                CellDetails::new("$mul")
-                    .param("A_SIGNED", 0)
+        let ys_cell_binary =
+            |module: &mut yosys::Module, ty: &str, a: &Value, b: &Value, signed: bool| {
+                CellDetails::new(ty)
+                    .param("A_SIGNED", if signed { 1 } else { 0 })
                     .param("A_WIDTH", a.len())
-                    .param("B_SIGNED", 0)
-                    .param("B_WIDTH", stride.len())
-                    .param("Y_WIDTH", result.len())
+                    .param("B_SIGNED", if signed { 1 } else { 0 })
+                    .param("B_WIDTH", b.len())
+                    .param("Y_WIDTH", output.len())
                     .input("A", indexer.value(a))
-                    .input("B", indexer.value(&Value::from(stride)))
-                    .output("Y", result.clone())
+                    .input("B", indexer.value(b))
+                    .output("Y", indexer.value(&output))
                     .attrs(map_metadata(cell_ref.metadata()))
-                    .add_to(&format!("${}$stride", cell_index), module);
-                result
-            }
-        };
+                    .add_to(&format!("${}", cell_index), module)
+            };
 
-        let ys_cell_shift = |module: &mut yosys::Module, ty: &str, a: &Value, b: &Value, stride: u32, signed: bool| {
+        let ys_shift_count =
+            |module: &mut yosys::Module, a: &Value, stride: u32| -> yosys::BitVector {
+                if stride == 1 {
+                    indexer.value(a)
+                } else if stride == 0 {
+                    indexer.value(&Value::zero(1))
+                } else {
+                    let stride_bits = stride.ilog2() + 1;
+                    let stride = Const::from_uint(stride.into(), stride_bits as usize);
+                    let result = indexer.synthetic_value(a.len() + stride.len());
+                    CellDetails::new("$mul")
+                        .param("A_SIGNED", 0)
+                        .param("A_WIDTH", a.len())
+                        .param("B_SIGNED", 0)
+                        .param("B_WIDTH", stride.len())
+                        .param("Y_WIDTH", result.len())
+                        .input("A", indexer.value(a))
+                        .input("B", indexer.value(&Value::from(stride)))
+                        .output("Y", result.clone())
+                        .attrs(map_metadata(cell_ref.metadata()))
+                        .add_to(&format!("${}$stride", cell_index), module);
+                    result
+                }
+            };
+
+        let ys_cell_shift = |module: &mut yosys::Module,
+                             ty: &str,
+                             a: &Value,
+                             b: &Value,
+                             stride: u32,
+                             signed: bool| {
             let b = ys_shift_count(module, b, stride);
             CellDetails::new(ty)
                 .param("A_SIGNED", if signed { 1 } else { 0 })
@@ -202,23 +222,24 @@ fn export_module(mut design: Design) -> yosys::Module {
                 .add_to(&format!("${}", cell_index), module)
         };
 
-        let ys_control_net_pos = |module: &mut yosys::Module, not_name: &str, cnet: ControlNet| -> yosys::Bit {
-            match cnet {
-                ControlNet::Pos(net) => indexer.net(net),
-                ControlNet::Neg(net) => {
-                    let result = indexer.synthetic_net();
-                    CellDetails::new("$not")
-                        .param("A_SIGNED", 0)
-                        .param("A_WIDTH", 1)
-                        .param("Y_WIDTH", output.len())
-                        .input("A", indexer.value(&net.into()))
-                        .output("Y", result)
-                        .attrs(map_metadata(cell_ref.metadata()))
-                        .add_to(not_name, module);
-                    result
+        let ys_control_net_pos =
+            |module: &mut yosys::Module, not_name: &str, cnet: ControlNet| -> yosys::Bit {
+                match cnet {
+                    ControlNet::Pos(net) => indexer.net(net),
+                    ControlNet::Neg(net) => {
+                        let result = indexer.synthetic_net();
+                        CellDetails::new("$not")
+                            .param("A_SIGNED", 0)
+                            .param("A_WIDTH", 1)
+                            .param("Y_WIDTH", output.len())
+                            .input("A", indexer.value(&net.into()))
+                            .output("Y", result)
+                            .attrs(map_metadata(cell_ref.metadata()))
+                            .add_to(not_name, module);
+                        result
+                    }
                 }
-            }
-        };
+            };
 
         match &*cell_ref.get() {
             Cell::Buf(arg) => ys_cell_unary(&mut ys_module, "$pos", arg),
@@ -271,8 +292,10 @@ fn export_module(mut design: Design) -> yosys::Module {
                 }
             }
             Cell::Aig(arg1, arg2) => {
-                let arg1 = ys_control_net_pos(&mut ys_module, &format!("${}$not1", cell_index), *arg1);
-                let arg2 = ys_control_net_pos(&mut ys_module, &format!("${}$not2", cell_index), *arg2);
+                let arg1 =
+                    ys_control_net_pos(&mut ys_module, &format!("${}$not1", cell_index), *arg1);
+                let arg2 =
+                    ys_control_net_pos(&mut ys_module, &format!("${}$not2", cell_index), *arg2);
                 CellDetails::new("$and")
                     .param("A_SIGNED", 0)
                     .param("A_WIDTH", 1)
@@ -290,21 +313,56 @@ fn export_module(mut design: Design) -> yosys::Module {
             Cell::ULt(arg1, arg2) => ys_cell_binary(&mut ys_module, "$lt", arg1, arg2, false),
             Cell::SLt(arg1, arg2) => ys_cell_binary(&mut ys_module, "$lt", arg1, arg2, true),
 
-            Cell::Shl(arg1, arg2, stride) => ys_cell_shift(&mut ys_module, "$shl", arg1, arg2, *stride, false),
-            Cell::UShr(arg1, arg2, stride) => ys_cell_shift(&mut ys_module, "$shr", arg1, arg2, *stride, false),
-            Cell::SShr(arg1, arg2, stride) => ys_cell_shift(&mut ys_module, "$sshr", arg1, arg2, *stride, true),
-            Cell::XShr(arg1, arg2, stride) => ys_cell_shift(&mut ys_module, "$shiftx", arg1, arg2, *stride, false),
+            Cell::Shl(arg1, arg2, stride) => {
+                ys_cell_shift(&mut ys_module, "$shl", arg1, arg2, *stride, false)
+            }
+            Cell::UShr(arg1, arg2, stride) => {
+                ys_cell_shift(&mut ys_module, "$shr", arg1, arg2, *stride, false)
+            }
+            Cell::SShr(arg1, arg2, stride) => {
+                ys_cell_shift(&mut ys_module, "$sshr", arg1, arg2, *stride, true)
+            }
+            Cell::XShr(arg1, arg2, stride) => {
+                ys_cell_shift(&mut ys_module, "$shiftx", arg1, arg2, *stride, false)
+            }
 
             Cell::Mul(arg1, arg2) => ys_cell_binary(&mut ys_module, "$mul", arg1, arg2, false),
             Cell::UDiv(arg1, arg2) => ys_cell_binary(&mut ys_module, "$div", arg1, arg2, false),
             Cell::UMod(arg1, arg2) => ys_cell_binary(&mut ys_module, "$mod", arg1, arg2, false),
             Cell::SDivTrunc(arg1, arg2) => ys_cell_binary(&mut ys_module, "$div", arg1, arg2, true),
-            Cell::SDivFloor(arg1, arg2) => ys_cell_binary(&mut ys_module, "$divfloor", arg1, arg2, true),
+            Cell::SDivFloor(arg1, arg2) => {
+                ys_cell_binary(&mut ys_module, "$divfloor", arg1, arg2, true)
+            }
             Cell::SModTrunc(arg1, arg2) => ys_cell_binary(&mut ys_module, "$mod", arg1, arg2, true),
-            Cell::SModFloor(arg1, arg2) => ys_cell_binary(&mut ys_module, "$modfloor", arg1, arg2, true),
+            Cell::SModFloor(arg1, arg2) => {
+                ys_cell_binary(&mut ys_module, "$modfloor", arg1, arg2, true)
+            }
 
-            Cell::Match { .. } => unimplemented!("match cells must be lowered first for Yosys JSON export"),
-            Cell::Assign { .. } => unimplemented!("assign cells must be lowered first for Yosys JSON export"),
+            Cell::Match { .. } => {
+                unimplemented!("match cells must be lowered first for Yosys JSON export")
+            }
+            Cell::Assign { .. } => {
+                unimplemented!("assign cells must be lowered first for Yosys JSON export")
+            }
+            Cell::DLatch(dlatch) => {
+                let ys_cell_type = "$dlatch";
+                let mut ys_cell = CellDetails::new(ys_cell_type);
+                if dlatch.has_enable() {
+                    ys_cell = ys_cell
+                        .param("EN_POLARITY", dlatch.enable.is_positive())
+                        .input("EN", indexer.net(dlatch.enable.net()));
+                }
+                ys_cell
+                    .param("WIDTH", output.len())
+                    .input("D", indexer.value(&dlatch.data))
+                    .output("Q", indexer.value(&output))
+                    .attrs(map_metadata(cell_ref.metadata()))
+                    .add_to(&ys_cell_name, &mut ys_module);
+                NetDetails::new(indexer.value(&output))
+                    .attr("init", dlatch.init_value.clone())
+                    .add_to(&format!("{}$ff", ys_cell_name), &mut ys_module);
+                continue; // skip default $out wire (init-less) creation
+            }
 
             Cell::Dff(flip_flop) => {
                 let ys_cell_type = match (
@@ -381,7 +439,9 @@ fn export_module(mut design: Design) -> yosys::Module {
                 for (port_index, port) in memory.write_ports.iter().enumerate() {
                     let wide_log2 = port.wide_log2(memory);
                     for index in 0..(1 << wide_log2) {
-                        let addr = Value::from(Const::from_uint(index, wide_log2)).concat(&port.addr).zext(abits);
+                        let addr = Value::from(Const::from_uint(index, wide_log2))
+                            .concat(&port.addr)
+                            .zext(abits);
                         wr_clk.extend([port.clock.net()]);
                         wr_addr.extend(&addr);
                         wr_clk_polarity.push(port.clock.is_positive());
@@ -415,7 +475,9 @@ fn export_module(mut design: Design) -> yosys::Module {
                 for (port_index, port) in memory.read_ports.iter().enumerate() {
                     let wide_log2 = port.wide_log2(memory);
                     for index in 0..(1 << wide_log2) {
-                        let addr = Value::from(Const::from_uint(index, wide_log2)).concat(&port.addr).zext(abits);
+                        let addr = Value::from(Const::from_uint(index, wide_log2))
+                            .concat(&port.addr)
+                            .zext(abits);
                         rd_addr.extend(&addr);
                         if let Some(ref flip_flop) = port.flip_flop {
                             rd_clk.extend([flip_flop.clock.net()]);
@@ -423,7 +485,9 @@ fn export_module(mut design: Design) -> yosys::Module {
                             rd_clk_polarity.push(flip_flop.clock.is_positive());
                             rd_ce_over_srst.push(!flip_flop.reset_over_enable);
                             for &write_port_index in &write_port_indices {
-                                let (trans, col_x) = if flip_flop.clock == memory.write_ports[write_port_index].clock {
+                                let (trans, col_x) = if flip_flop.clock
+                                    == memory.write_ports[write_port_index].clock
+                                {
                                     match flip_flop.relations[write_port_index] {
                                         MemoryPortRelation::Undefined => (false, true),
                                         MemoryPortRelation::ReadBeforeWrite => (false, false),
@@ -471,9 +535,12 @@ fn export_module(mut design: Design) -> yosys::Module {
                         rd_arst_value.extend(Const::undef(port.data_len));
                         rd_srst_value.extend(Const::undef(port.data_len));
                         rd_init_value.extend(Const::undef(port.data_len));
-                        rd_en = rd_en.concat(&yosys::BitVector(vec![yosys::Bit::One; 1 << wide_log2]));
-                        rd_srst = rd_srst.concat(&yosys::BitVector(vec![yosys::Bit::Zero; 1 << wide_log2]));
-                        rd_arst = rd_arst.concat(&yosys::BitVector(vec![yosys::Bit::Zero; 1 << wide_log2]));
+                        rd_en =
+                            rd_en.concat(&yosys::BitVector(vec![yosys::Bit::One; 1 << wide_log2]));
+                        rd_srst = rd_srst
+                            .concat(&yosys::BitVector(vec![yosys::Bit::Zero; 1 << wide_log2]));
+                        rd_arst = rd_arst
+                            .concat(&yosys::BitVector(vec![yosys::Bit::Zero; 1 << wide_log2]));
                     }
                     rd_ports += 1 << wide_log2;
                 }
@@ -527,8 +594,11 @@ fn export_module(mut design: Design) -> yosys::Module {
             }
 
             Cell::IoBuf(io_buffer) => {
-                let ys_enable =
-                    ys_control_net_pos(&mut ys_module, &format!("${}$en$not", cell_index), io_buffer.enable);
+                let ys_enable = ys_control_net_pos(
+                    &mut ys_module,
+                    &format!("${}$en$not", cell_index),
+                    io_buffer.enable,
+                );
                 let ys_attrs = map_metadata(cell_ref.metadata());
                 CellDetails::new("$tribuf")
                     .param("WIDTH", output.len())
@@ -556,26 +626,37 @@ fn export_module(mut design: Design) -> yosys::Module {
                     ys_cell = ys_cell.input(name, indexer.value(value));
                 }
                 for (name, value_range) in instance.outputs.iter() {
-                    ys_cell = ys_cell.output(name, indexer.value(&Value::from(&output[value_range.clone()])));
+                    ys_cell = ys_cell.output(
+                        name,
+                        indexer.value(&Value::from(&output[value_range.clone()])),
+                    );
                 }
                 for (name, io_value) in instance.ios.iter() {
                     ys_cell = ys_cell.inout(name, indexer.io_value(io_value));
                 }
-                ys_cell.attrs(map_metadata(cell_ref.metadata())).add_to(&ys_cell_name, &mut ys_module);
+                ys_cell
+                    .attrs(map_metadata(cell_ref.metadata()))
+                    .add_to(&ys_cell_name, &mut ys_module);
             }
             Cell::Target(_target_cell) => {
-                unimplemented!("target cells must be converted to instances first for Yosys JSON export")
+                unimplemented!(
+                    "target cells must be converted to instances first for Yosys JSON export"
+                )
             }
 
-            Cell::Input(port_name, _size) => {
-                ys_module.ports.add(port_name, PortDetails::new(yosys::PortDirection::Input, indexer.value(&output)))
-            }
-            Cell::Output(port_name, value) => {
-                ys_module.ports.add(port_name, PortDetails::new(yosys::PortDirection::Output, indexer.value(value)))
-            }
+            Cell::Input(port_name, _size) => ys_module.ports.add(
+                port_name,
+                PortDetails::new(yosys::PortDirection::Input, indexer.value(&output)),
+            ),
+            Cell::Output(port_name, value) => ys_module.ports.add(
+                port_name,
+                PortDetails::new(yosys::PortDirection::Output, indexer.value(value)),
+            ),
             Cell::Name(name, value) | Cell::Debug(name, value) => ys_module.netnames.add(
                 &name.replace(" ", "."),
-                NetDetails::new(indexer.value(value)).attrs(map_metadata(cell_ref.metadata())).attr("hdlname", name),
+                NetDetails::new(indexer.value(value))
+                    .attrs(map_metadata(cell_ref.metadata()))
+                    .attr("hdlname", name),
             ),
         };
 
@@ -597,7 +678,10 @@ pub fn export(writer: &mut impl Write, designs: BTreeMap<String, Design>) -> std
     for (name, design) in designs {
         ys_modules.insert(name, export_module(design));
     }
-    let ys_design = yosys::Design { creator: "prjunnamed".into(), modules: ys_modules.into() };
+    let ys_design = yosys::Design {
+        creator: "prjunnamed".into(),
+        modules: ys_modules.into(),
+    };
 
     let json = JsonValue::from(ys_design);
     json.write_pretty(writer, /*spaces=*/ 4)

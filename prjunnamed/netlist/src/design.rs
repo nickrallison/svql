@@ -10,8 +10,9 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use crate::metadata::{MetaItemIndex, MetaStringIndex, MetadataStore};
 use crate::smt::{SmtBuilder, SmtEngine};
 use crate::{
-    AssignCell, Cell, ControlNet, FlipFlop, Instance, IoBuffer, IoNet, IoValue, MatchCell, Memory,
-    Net, Target, TargetCell, TargetCellPurity, TargetPrototype, Trit, Value, cell::CellRepr,
+    AssignCell, Cell, ControlNet, DLatch, FlipFlop, Instance, IoBuffer, IoNet, IoValue, MatchCell,
+    Memory, Net, Target, TargetCell, TargetCellPurity, TargetPrototype, Trit, Value,
+    cell::CellRepr,
 };
 use crate::{MetaItem, MetaItemRef, MetaStringRef};
 
@@ -787,6 +788,8 @@ impl Design {
             Assign(arg.into());
         add_dff(arg: impl Into<FlipFlop>) -> Value :
             Dff(arg.into());
+        add_dlatch(arg: impl Into<DLatch>) -> Value :
+            DLatch(arg.into());
         add_memory(arg: impl Into<Memory>) -> Value :
             Memory(arg.into());
         add_iobuf(arg: impl Into<IoBuffer>) -> Value :
@@ -1161,6 +1164,7 @@ impl Design {
                 Cell::SModFloor(arg, _) => wide("smod_floor", arg.len()),
                 Cell::Match(_) => custom(format_args!("match")),
                 Cell::Assign(AssignCell { value, .. }) => bitwise("assign", value.len()),
+                Cell::DLatch(DLatch { data, .. }) => bitwise("dlatch", data.len()),
                 Cell::Dff(FlipFlop { data, .. }) => bitwise("dff", data.len()),
                 Cell::Memory(Memory { depth, width, .. }) => {
                     custom(format_args!("memory:{depth}:{width}"))

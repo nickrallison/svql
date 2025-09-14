@@ -21,7 +21,7 @@ mod isomorphic;
 mod smt;
 
 pub use cell::{
-    AssignCell, Cell, FlipFlop, Instance, IoBuffer, MatchCell, Memory, MemoryPortRelation,
+    AssignCell, Cell, DLatch, FlipFlop, Instance, IoBuffer, MatchCell, Memory, MemoryPortRelation,
     MemoryReadFlipFlop, MemoryReadPort, MemoryWritePort, TargetCell,
 };
 pub use design::{CellRef, Design, WithMetadataGuard};

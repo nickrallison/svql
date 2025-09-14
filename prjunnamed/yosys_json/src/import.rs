@@ -1,12 +1,13 @@
+use core::error;
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, btree_map},
     sync::Arc,
 };
 
 use prjunnamed_netlist::{
-    Const, ControlNet, Design, FlipFlop, Instance, IoBuffer, IoNet, IoValue, Net, ParamValue, Target, Trit, Value,
-    Memory, MemoryWritePort, MemoryReadPort, MemoryReadFlipFlop, MemoryPortRelation, WithMetadataGuard, SourcePosition,
-    MetaItem, MetaItemRef,
+    Const, ControlNet, DLatch, Design, FlipFlop, Instance, IoBuffer, IoNet, IoValue, Memory,
+    MemoryPortRelation, MemoryReadFlipFlop, MemoryReadPort, MemoryWritePort, MetaItem, MetaItemRef,
+    Net, ParamValue, SourcePosition, Target, Trit, Value, WithMetadataGuard,
 };
 
 use crate::yosys;
@@ -76,7 +77,9 @@ impl ModuleImporter<'_> {
         let value = value.into();
         assert_eq!(bits.len(), value.len());
         for (&bit, net) in bits.iter().zip(value.iter()) {
-            let yosys::Bit::Net(ynet) = bit else { unreachable!() };
+            let yosys::Bit::Net(ynet) = bit else {
+                unreachable!()
+            };
             assert!(!self.driven_nets.contains(&ynet));
             match self.nets.entry(ynet) {
                 btree_map::Entry::Occupied(e) => {
@@ -108,7 +111,10 @@ impl ModuleImporter<'_> {
                 yosys::Bit::HiZ | yosys::Bit::Undef => Net::UNDEF,
                 yosys::Bit::Zero => Net::ZERO,
                 yosys::Bit::One => Net::ONE,
-                yosys::Bit::Net(ynet) => *self.nets.entry(ynet).or_insert_with(|| self.design.add_void(1).unwrap_net()),
+                yosys::Bit::Net(ynet) => *self
+                    .nets
+                    .entry(ynet)
+                    .or_insert_with(|| self.design.add_void(1).unwrap_net()),
             };
             nets.push(net);
         }
@@ -118,7 +124,9 @@ impl ModuleImporter<'_> {
     fn io_value(&self, bits: &yosys::BitVector) -> IoValue {
         let mut io = vec![];
         for &bit in bits.iter() {
-            let yosys::Bit::Net(ynet) = bit else { unreachable!() };
+            let yosys::Bit::Net(ynet) = bit else {
+                unreachable!()
+            };
             let io_net = *self.io_nets.get(&ynet).unwrap();
             io.push(io_net);
         }
@@ -131,15 +139,26 @@ impl ModuleImporter<'_> {
 
     fn port_control_net(&mut self, cell: &yosys::CellDetails, port: &str) -> ControlNet {
         let net = self.port_value(cell, port).unwrap_net();
-        let polarity = cell.parameters.get(&format!("{port}_POLARITY")).unwrap().as_bool().unwrap();
-        if polarity { ControlNet::Pos(net) } else { ControlNet::Neg(net) }
+        let polarity = cell
+            .parameters
+            .get(&format!("{port}_POLARITY"))
+            .unwrap()
+            .as_bool()
+            .unwrap();
+        if polarity {
+            ControlNet::Pos(net)
+        } else {
+            ControlNet::Neg(net)
+        }
     }
 
     fn init_value(&self, cell: &yosys::CellDetails, port: &str) -> Const {
         let bits = cell.connections.get(port).unwrap();
         let mut res = vec![];
         for &bit in bits.iter() {
-            let yosys::Bit::Net(ynet) = bit else { unreachable!() };
+            let yosys::Bit::Net(ynet) = bit else {
+                unreachable!()
+            };
             res.push(match self.init.get(&ynet) {
                 None => Trit::Undef,
                 Some(&val) => val,
@@ -148,13 +167,25 @@ impl ModuleImporter<'_> {
         Const::from_iter(res)
     }
 
-    fn value_ext(&mut self, cell: &yosys::CellDetails, port: &str, width: usize, signed: bool) -> Value {
-        if signed { self.port_value(cell, port).sext(width) } else { self.port_value(cell, port).zext(width) }
+    fn value_ext(
+        &mut self,
+        cell: &yosys::CellDetails,
+        port: &str,
+        width: usize,
+        signed: bool,
+    ) -> Value {
+        if signed {
+            self.port_value(cell, port).sext(width)
+        } else {
+            self.port_value(cell, port).zext(width)
+        }
     }
 
     fn handle_init(&mut self) -> Result<(), Error> {
         for net_details in self.module.netnames.0.values() {
-            let Some(init) = net_details.attributes.get("init") else { continue };
+            let Some(init) = net_details.attributes.get("init") else {
+                continue;
+            };
             let init = init.as_const()?;
             if init.len() != net_details.bits.len() {
                 Err(yosys::MetadataTypeError)?;
@@ -163,7 +194,9 @@ impl ModuleImporter<'_> {
                 if binit == Trit::Undef {
                     continue;
                 }
-                let yosys::Bit::Net(ynet) = bit else { Err(yosys::MetadataTypeError)? };
+                let yosys::Bit::Net(ynet) = bit else {
+                    Err(yosys::MetadataTypeError)?
+                };
                 match self.init.entry(ynet) {
                     btree_map::Entry::Occupied(e) => {
                         assert_eq!(*e.get(), binit);
@@ -184,7 +217,9 @@ impl ModuleImporter<'_> {
             for (port_name, bits) in cell.connections.iter() {
                 if self.design_io_ports.contains(&(&cell.type_, port_name)) {
                     for &bit in bits.iter() {
-                        let yosys::Bit::Net(net) = bit else { return Err(Error::Semantic) };
+                        let yosys::Bit::Net(net) = bit else {
+                            return Err(Error::Semantic);
+                        };
                         io_net_conns.insert(net);
                     }
                 }
@@ -205,7 +240,9 @@ impl ModuleImporter<'_> {
             if is_inout {
                 let ioval = self.design.add_io(port_name.clone(), port.bits.0.len());
                 for (index, &bit) in port.bits.iter().enumerate() {
-                    let yosys::Bit::Net(net) = bit else { return Err(Error::Semantic) };
+                    let yosys::Bit::Net(net) = bit else {
+                        return Err(Error::Semantic);
+                    };
                     match self.io_nets.entry(net) {
                         btree_map::Entry::Occupied(_) => {
                             return Err(Error::Semantic);
@@ -243,11 +280,13 @@ impl ModuleImporter<'_> {
             if details.hide_name {
                 continue;
             }
-            if details
-                .bits
-                .iter()
-                .any(|bit| if let yosys::Bit::Net(net) = bit { self.io_nets.contains_key(net) } else { false })
-            {
+            if details.bits.iter().any(|bit| {
+                if let yosys::Bit::Net(net) = bit {
+                    self.io_nets.contains_key(net)
+                } else {
+                    false
+                }
+            }) {
                 continue;
             }
             let value = self.value(&details.bits);
@@ -264,9 +303,15 @@ impl ModuleImporter<'_> {
     ) -> WithMetadataGuard<'a> {
         fn parse_position(text: &str) -> Option<SourcePosition> {
             if let Some((line, column)) = text.split_once(".") {
-                Some(SourcePosition { line: line.parse::<u32>().ok()?, column: column.parse::<u32>().ok()? })
+                Some(SourcePosition {
+                    line: line.parse::<u32>().ok()?,
+                    column: column.parse::<u32>().ok()?,
+                })
             } else {
-                Some(SourcePosition { line: text.parse::<u32>().ok()?, column: 0 })
+                Some(SourcePosition {
+                    line: text.parse::<u32>().ok()?,
+                    column: 0,
+                })
             }
         }
 
@@ -278,7 +323,8 @@ impl ModuleImporter<'_> {
                 let Some((filename, loc_text)) = piece.rsplit_once(":") else {
                     continue;
                 };
-                let (start_text, end_text) = loc_text.split_once("-").unwrap_or((loc_text, loc_text));
+                let (start_text, end_text) =
+                    loc_text.split_once("-").unwrap_or((loc_text, loc_text));
                 let Some(start) = parse_position(start_text) else {
                     continue;
                 };
@@ -287,7 +333,11 @@ impl ModuleImporter<'_> {
                 };
 
                 let meta_filename = design.add_metadata_string(filename);
-                items.push(design.add_metadata_item(&MetaItem::Source { file: meta_filename, start, end }));
+                items.push(design.add_metadata_item(&MetaItem::Source {
+                    file: meta_filename,
+                    start,
+                    end,
+                }));
             }
         }
 
@@ -299,7 +349,11 @@ impl ModuleImporter<'_> {
             if let Some(last) = parts.next_back() {
                 for name in parts {
                     let name = design.add_metadata_string(name);
-                    scope = design.add_metadata_item(&MetaItem::NamedScope { name, source: meta_none, parent: scope });
+                    scope = design.add_metadata_item(&MetaItem::NamedScope {
+                        name,
+                        source: meta_none,
+                        parent: scope,
+                    });
                 }
                 let name = design.add_metadata_string(last);
                 let ident = design.add_metadata_item(&MetaItem::Ident { name, scope });
@@ -307,7 +361,10 @@ impl ModuleImporter<'_> {
             }
         } else if !name.starts_with('$') {
             let name = design.add_metadata_string(name);
-            let ident = design.add_metadata_item(&MetaItem::Ident { name, scope: self.scope_top });
+            let ident = design.add_metadata_item(&MetaItem::Ident {
+                name,
+                scope: self.scope_top,
+            });
             items.push(ident);
         }
 
@@ -326,7 +383,6 @@ impl ModuleImporter<'_> {
 
         // panic!("Move this section to caller where cell is mut")
         // panic!("cell: {name:?}, type: {type_:?}, connections: {:?}", cell.connections);
-        
 
         match type_.as_str() {
             "$not" | "$pos" | "$neg" => {
@@ -344,7 +400,8 @@ impl ModuleImporter<'_> {
                 };
                 self.port_drive(cell, "Y", value);
             }
-            "$reduce_and" | "$reduce_or" | "$reduce_xor" | "$reduce_xnor" | "$reduce_bool" | "$logic_not" => {
+            "$reduce_and" | "$reduce_or" | "$reduce_xor" | "$reduce_xnor" | "$reduce_bool"
+            | "$logic_not" => {
                 let width = cell.parameters.get("Y_WIDTH").unwrap().as_i32()? as usize;
                 let a = self.port_value(cell, "A");
                 let net = match type_.as_str() {
@@ -375,8 +432,8 @@ impl ModuleImporter<'_> {
                 }
                 self.port_drive(cell, "Y", value);
             }
-            "$and" | "$or" | "$xor" | "$xnor" | "$add" | "$sub" | "$mul" | "$div" | "$mod" | "$divfloor"
-            | "$modfloor" => {
+            "$and" | "$or" | "$xor" | "$xnor" | "$add" | "$sub" | "$mul" | "$div" | "$mod"
+            | "$divfloor" | "$modfloor" => {
                 let width = cell.parameters.get("Y_WIDTH").unwrap().as_i32()? as usize;
                 let a_signed = cell.parameters.get("A_SIGNED").unwrap().as_bool()?;
                 let b_signed = cell.parameters.get("B_SIGNED").unwrap().as_bool()?;
@@ -461,8 +518,10 @@ impl ModuleImporter<'_> {
                         };
                         if b_signed {
                             let b_inv = self.design.add_not(&b);
-                            let b_neg =
-                                Value::from(&self.design.add_adc(Value::zero(b.len()), &b_inv, Net::ONE)[..b.len()]);
+                            let b_neg = Value::from(
+                                &self.design.add_adc(Value::zero(b.len()), &b_inv, Net::ONE)
+                                    [..b.len()],
+                            );
                             let val_shl = self.design.add_shl(&a, b_neg, 1);
                             self.design.add_mux(b[b.len() - 1], val_shl, val_shr)
                         } else {
@@ -557,7 +616,11 @@ impl ModuleImporter<'_> {
                 let sel = self.port_value(cell, "S");
                 assert_eq!(b.len(), value.len() * sel.len());
                 for (i, s) in sel.iter().enumerate() {
-                    value = self.design.add_mux(s, &b[(i * value.len())..((i + 1) * value.len())], value);
+                    value = self.design.add_mux(
+                        s,
+                        &b[(i * value.len())..((i + 1) * value.len())],
+                        value,
+                    );
                 }
                 self.port_drive(cell, "Y", value);
             }
@@ -569,7 +632,9 @@ impl ModuleImporter<'_> {
                 let io = self.io_value(bits);
                 let value = self.design.add_iobuf(IoBuffer { output, enable, io });
                 for (&bit, net) in bits.iter().zip(value.iter()) {
-                    let yosys::Bit::Net(ynet) = bit else { unreachable!() };
+                    let yosys::Bit::Net(ynet) = bit else {
+                        unreachable!()
+                    };
                     assert!(!self.driven_nets.contains(&ynet));
                     match self.nets.entry(ynet) {
                         btree_map::Entry::Occupied(e) => {
@@ -590,12 +655,18 @@ impl ModuleImporter<'_> {
                     ControlNet::Pos(Net::ONE)
                 };
                 let (clear, clear_value) = if cell.connections.contains_key("ARST") {
-                    (self.port_control_net(cell, "ARST"), cell.parameters.get("ARST_VALUE").unwrap().as_const()?)
+                    (
+                        self.port_control_net(cell, "ARST"),
+                        cell.parameters.get("ARST_VALUE").unwrap().as_const()?,
+                    )
                 } else {
                     (ControlNet::Pos(Net::ZERO), Const::undef(data.len()))
                 };
                 let (reset, reset_value) = if cell.connections.contains_key("SRST") {
-                    (self.port_control_net(cell, "SRST"), cell.parameters.get("SRST_VALUE").unwrap().as_const()?)
+                    (
+                        self.port_control_net(cell, "SRST"),
+                        cell.parameters.get("SRST_VALUE").unwrap().as_const()?,
+                    )
                 } else {
                     (ControlNet::Pos(Net::ZERO), Const::undef(data.len()))
                 };
@@ -614,23 +685,68 @@ impl ModuleImporter<'_> {
                 });
                 self.port_drive(cell, "Q", q);
             }
+            "$dlatch" => {
+                let data = self.port_value(cell, "D");
+                let enable = if cell.connections.contains_key("EN") {
+                    self.port_control_net(cell, "EN")
+                } else {
+                    ControlNet::Pos(Net::ONE)
+                };
+                let init_value = self.init_value(cell, "Q");
+                let q = self.design.add_dlatch(DLatch {
+                    data,
+                    enable,
+                    init_value,
+                });
+                self.port_drive(cell, "Q", q);
+            }
             "$mem_v2" => {
-                let offset = usize::try_from(cell.parameters.get("OFFSET").unwrap().as_i32()?).unwrap();
+                let offset =
+                    usize::try_from(cell.parameters.get("OFFSET").unwrap().as_i32()?).unwrap();
                 let size = usize::try_from(cell.parameters.get("SIZE").unwrap().as_i32()?).unwrap();
                 let depth = offset + size;
-                let abits = usize::try_from(cell.parameters.get("ABITS").unwrap().as_i32()?).unwrap();
-                let width = usize::try_from(cell.parameters.get("WIDTH").unwrap().as_i32()?).unwrap();
+                let abits =
+                    usize::try_from(cell.parameters.get("ABITS").unwrap().as_i32()?).unwrap();
+                let width =
+                    usize::try_from(cell.parameters.get("WIDTH").unwrap().as_i32()?).unwrap();
                 let mut init_value = cell.parameters.get("INIT").unwrap().as_const().unwrap();
                 assert_eq!(init_value.len(), size * width);
                 init_value = Const::undef(offset * width).concat(init_value);
 
-                let mut memory = Memory { depth, width, init_value, write_ports: vec![], read_ports: vec![] };
+                let mut memory = Memory {
+                    depth,
+                    width,
+                    init_value,
+                    write_ports: vec![],
+                    read_ports: vec![],
+                };
 
-                let wr_ports = usize::try_from(cell.parameters.get("WR_PORTS").unwrap().as_i32()?).unwrap();
-                let wr_clk_enable = cell.parameters.get("WR_CLK_ENABLE").unwrap().as_const().unwrap();
-                let wr_clk_polarity = cell.parameters.get("WR_CLK_POLARITY").unwrap().as_const().unwrap();
-                let wr_priority_mask = cell.parameters.get("WR_PRIORITY_MASK").unwrap().as_const().unwrap();
-                let wr_wide_continuation = cell.parameters.get("WR_WIDE_CONTINUATION").unwrap().as_const().unwrap();
+                let wr_ports =
+                    usize::try_from(cell.parameters.get("WR_PORTS").unwrap().as_i32()?).unwrap();
+                let wr_clk_enable = cell
+                    .parameters
+                    .get("WR_CLK_ENABLE")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let wr_clk_polarity = cell
+                    .parameters
+                    .get("WR_CLK_POLARITY")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let wr_priority_mask = cell
+                    .parameters
+                    .get("WR_PRIORITY_MASK")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let wr_wide_continuation = cell
+                    .parameters
+                    .get("WR_WIDE_CONTINUATION")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
                 let wr_clk = self.port_value(cell, "WR_CLK");
                 let wr_en = self.port_value(cell, "WR_EN");
                 let wr_addr = self.port_value(cell, "WR_ADDR");
@@ -655,23 +771,76 @@ impl ModuleImporter<'_> {
                     } else {
                         ControlNet::Neg(wr_clk[index])
                     };
-                    let addr = wr_addr.slice(index * abits..(index + 1) * abits).slice(wide_log2..);
+                    let addr = wr_addr
+                        .slice(index * abits..(index + 1) * abits)
+                        .slice(wide_log2..);
                     let data = wr_data.slice(index * width..end_index * width);
                     let mask = wr_en.slice(index * width..end_index * width);
-                    memory.write_ports.push(MemoryWritePort { clock, addr, data, mask });
+                    memory.write_ports.push(MemoryWritePort {
+                        clock,
+                        addr,
+                        data,
+                        mask,
+                    });
                     index = end_index;
                 }
 
-                let rd_ports = usize::try_from(cell.parameters.get("RD_PORTS").unwrap().as_i32()?).unwrap();
-                let rd_clk_enable = cell.parameters.get("RD_CLK_ENABLE").unwrap().as_const().unwrap();
-                let rd_clk_polarity = cell.parameters.get("RD_CLK_POLARITY").unwrap().as_const().unwrap();
-                let rd_transparency_mask = cell.parameters.get("RD_TRANSPARENCY_MASK").unwrap().as_const().unwrap();
-                let rd_collision_x_mask = cell.parameters.get("RD_COLLISION_X_MASK").unwrap().as_const().unwrap();
-                let rd_wide_continuation = cell.parameters.get("RD_WIDE_CONTINUATION").unwrap().as_const().unwrap();
-                let rd_ce_over_srst = cell.parameters.get("RD_CE_OVER_SRST").unwrap().as_const().unwrap();
-                let rd_arst_value = cell.parameters.get("RD_ARST_VALUE").unwrap().as_const().unwrap();
-                let rd_srst_value = cell.parameters.get("RD_SRST_VALUE").unwrap().as_const().unwrap();
-                let rd_init_value = cell.parameters.get("RD_INIT_VALUE").unwrap().as_const().unwrap();
+                let rd_ports =
+                    usize::try_from(cell.parameters.get("RD_PORTS").unwrap().as_i32()?).unwrap();
+                let rd_clk_enable = cell
+                    .parameters
+                    .get("RD_CLK_ENABLE")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_clk_polarity = cell
+                    .parameters
+                    .get("RD_CLK_POLARITY")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_transparency_mask = cell
+                    .parameters
+                    .get("RD_TRANSPARENCY_MASK")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_collision_x_mask = cell
+                    .parameters
+                    .get("RD_COLLISION_X_MASK")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_wide_continuation = cell
+                    .parameters
+                    .get("RD_WIDE_CONTINUATION")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_ce_over_srst = cell
+                    .parameters
+                    .get("RD_CE_OVER_SRST")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_arst_value = cell
+                    .parameters
+                    .get("RD_ARST_VALUE")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_srst_value = cell
+                    .parameters
+                    .get("RD_SRST_VALUE")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
+                let rd_init_value = cell
+                    .parameters
+                    .get("RD_INIT_VALUE")
+                    .unwrap()
+                    .as_const()
+                    .unwrap();
                 let rd_clk = self.port_value(cell, "RD_CLK");
                 let rd_en = self.port_value(cell, "RD_EN");
                 let rd_srst = self.port_value(cell, "RD_SRST");
@@ -720,9 +889,15 @@ impl ModuleImporter<'_> {
                     } else {
                         None
                     };
-                    let addr = rd_addr.slice(index * abits..(index + 1) * abits).slice(wide_log2..);
+                    let addr = rd_addr
+                        .slice(index * abits..(index + 1) * abits)
+                        .slice(wide_log2..);
                     let data_len = wide * width;
-                    memory.read_ports.push(MemoryReadPort { addr, data_len, flip_flop });
+                    memory.read_ports.push(MemoryReadPort {
+                        addr,
+                        data_len,
+                        flip_flop,
+                    });
                     index = end_index;
                 }
 
@@ -740,6 +915,7 @@ impl ModuleImporter<'_> {
             }
             _ => {
                 if cell.type_.starts_with('$') {
+                    println!("Unsupported cell: {:?}", cell);
                     return Err(Error::Unsupported(format!("{} cell", cell.type_)));
                 }
                 // instance
@@ -750,7 +926,9 @@ impl ModuleImporter<'_> {
                 let mut ios = BTreeMap::new();
                 for (name, bits) in cell.connections.iter() {
                     let direction = *cell.port_directions.get(name).unwrap();
-                    if self.design_io_ports.contains(&(&cell.type_, name)) || direction == yosys::PortDirection::Inout {
+                    if self.design_io_ports.contains(&(&cell.type_, name))
+                        || direction == yosys::PortDirection::Inout
+                    {
                         ios.insert(name.clone(), self.io_value(bits));
                     } else if direction == yosys::PortDirection::Output {
                         let range = next_out..(next_out + bits.len());
@@ -770,7 +948,11 @@ impl ModuleImporter<'_> {
                     parameters.insert(name.clone(), val);
                 }
                 let output = self.design.add_other(Instance {
-                    kind: cell.type_.strip_prefix('\\').unwrap_or(cell.type_.as_str()).to_string(),
+                    kind: cell
+                        .type_
+                        .strip_prefix('\\')
+                        .unwrap_or(cell.type_.as_str())
+                        .to_string(),
                     params: parameters,
                     inputs,
                     outputs,
@@ -789,7 +971,9 @@ impl ModuleImporter<'_> {
             if self.driven_nets.contains(&ynet) {
                 continue;
             }
-            let Some(&net) = self.nets.get(&ynet) else { continue };
+            let Some(&net) = self.nets.get(&ynet) else {
+                continue;
+            };
             self.design.replace_net(
                 net,
                 self.design
@@ -862,7 +1046,9 @@ fn index_io_ports(design: &yosys::Design) -> Result<BTreeSet<(&str, &str)>, Erro
                 io_ports.insert((mod_name, port_name));
                 continue;
             }
-            let Some(net_details) = module.netnames.get(port_name) else { continue };
+            let Some(net_details) = module.netnames.get(port_name) else {
+                continue;
+            };
             if let Some(val) = net_details.attributes.get("iopad_external_pin") {
                 if val.as_bool()? == true {
                     io_ports.insert((mod_name, port_name));

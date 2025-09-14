@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
-use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Trit, Value, ValueRepr};
+use prjunnamed_netlist::{Cell, CellRef, DLatch, FlipFlop, Trit, Value, ValueRepr};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -151,6 +151,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
             (Assign(_p_assign_cell), Assign(_d_assign_cell)) => {
                 todo!("Make Function to match assign cells")
+            }
+            (DLatch(p_dlatch_cell), DLatch(d_dlatch_cell)) => {
+                self.dlatches_match_fan_in(p_dlatch_cell, d_dlatch_cell, mapping)
             }
             (Dff(p_dff_cell), Dff(d_dff_cell)) => {
                 self.dffs_match_fan_in(p_dff_cell, d_dff_cell, mapping)
@@ -322,6 +325,25 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
         }
         true
+    }
+
+    fn dlatches_match_fan_in(
+        &self,
+        needle_dlatch: &DLatch,
+        haystack_dlatch: &DLatch,
+        mapping: &Assignment,
+    ) -> bool {
+        let data_matches =
+            self.values_match_fan_in(&needle_dlatch.data, &haystack_dlatch.data, mapping);
+        let enable_matches =
+            self.control_nets_match_fan_in(&needle_dlatch.enable, &haystack_dlatch.enable, mapping);
+        let init_value_matches = self.const_match_fan_in(
+            &needle_dlatch.init_value,
+            &haystack_dlatch.init_value,
+            mapping,
+        );
+
+        data_matches && enable_matches && init_value_matches
     }
 
     fn dffs_match_fan_in(

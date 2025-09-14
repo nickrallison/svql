@@ -3,18 +3,20 @@ use std::{borrow::Cow, hash::Hash};
 use crate::{ControlNet, Design, Net, TargetCellPurity, Value};
 
 mod decision;
+mod dlatch;
 mod flip_flop;
-mod memory;
-mod io_buffer;
-mod target;
 mod instance;
+mod io_buffer;
+mod memory;
+mod target;
 
-pub use decision::{MatchCell, AssignCell};
+pub use decision::{AssignCell, MatchCell};
+pub use dlatch::DLatch;
 pub use flip_flop::FlipFlop;
-pub use memory::{Memory, MemoryWritePort, MemoryReadPort, MemoryReadFlipFlop, MemoryPortRelation};
-pub use io_buffer::IoBuffer;
-pub use target::TargetCell;
 pub use instance::Instance;
+pub use io_buffer::IoBuffer;
+pub use memory::{Memory, MemoryPortRelation, MemoryReadFlipFlop, MemoryReadPort, MemoryWritePort};
+pub use target::TargetCell;
 
 /// Compact, 16-byte representation for cells common in fine netlists.
 ///
@@ -135,6 +137,7 @@ pub enum Cell {
     Match(MatchCell),
     Assign(AssignCell),
 
+    DLatch(DLatch),
     Dff(FlipFlop),
     Memory(Memory),
     IoBuf(IoBuffer),
@@ -220,6 +223,10 @@ impl Cell {
                 assert!(assign_cell.value.len() >= assign_cell.update.len() + assign_cell.offset);
             }
 
+            Cell::DLatch(dlatch) => {
+                assert_eq!(dlatch.data.len(), dlatch.init_value.len());
+            }
+
             Cell::Dff(flip_flop) => {
                 assert_eq!(flip_flop.data.len(), flip_flop.init_value.len());
                 assert_eq!(flip_flop.data.len(), flip_flop.clear_value.len());
@@ -252,9 +259,13 @@ impl Cell {
                         assert_eq!(flip_flop.reset_value.len(), port.data_len);
                         assert_eq!(flip_flop.init_value.len(), port.data_len);
                         assert_eq!(flip_flop.relations.len(), memory.write_ports.len());
-                        for (write_port_index, &relation) in flip_flop.relations.iter().enumerate() {
+                        for (write_port_index, &relation) in flip_flop.relations.iter().enumerate()
+                        {
                             if relation != MemoryPortRelation::Undefined {
-                                assert_eq!(memory.write_ports[write_port_index].clock, flip_flop.clock);
+                                assert_eq!(
+                                    memory.write_ports[write_port_index].clock,
+                                    flip_flop.clock
+                                );
                             }
                         }
                     }
@@ -293,7 +304,11 @@ impl Cell {
             Cell::And(arg1, arg2) => Some(Cell::And(arg1.slice(range.clone()), arg2.slice(range))),
             Cell::Or(arg1, arg2) => Some(Cell::Or(arg1.slice(range.clone()), arg2.slice(range))),
             Cell::Xor(arg1, arg2) => Some(Cell::Xor(arg1.slice(range.clone()), arg2.slice(range))),
-            Cell::Mux(arg1, arg2, arg3) => Some(Cell::Mux(*arg1, arg2.slice(range.clone()), arg3.slice(range))),
+            Cell::Mux(arg1, arg2, arg3) => Some(Cell::Mux(
+                *arg1,
+                arg2.slice(range.clone()),
+                arg3.slice(range),
+            )),
             Cell::Dff(flip_flop) => Some(Cell::Dff(flip_flop.slice(range))),
             Cell::IoBuf(io_buffer) => Some(Cell::IoBuf(io_buffer.slice(range))),
             _ => None,
@@ -321,14 +336,23 @@ impl CellRepr {
 
             CellRepr::Buf(arg) => Cow::Owned(Cell::Buf(Value::from(arg))),
             CellRepr::Not(arg) => Cow::Owned(Cell::Not(Value::from(arg))),
-            CellRepr::And(arg1, arg2) => Cow::Owned(Cell::And(Value::from(arg1), Value::from(arg2))),
-            CellRepr::Or(arg1, arg2) => Cow::Owned(Cell::Or(Value::from(arg1), Value::from(arg2))),
-            CellRepr::Xor(arg1, arg2) => Cow::Owned(Cell::Xor(Value::from(arg1), Value::from(arg2))),
-            CellRepr::Mux(arg1, arg2, arg3) => Cow::Owned(Cell::Mux(arg1, Value::from(arg2), Value::from(arg3))),
-            CellRepr::Adc(arg1, arg2, arg3) => Cow::Owned(Cell::Adc(Value::from(arg1), Value::from(arg2), arg3)),
-            CellRepr::Aig(arg1, inv1, arg2, inv2) => {
-                Cow::Owned(Cell::Aig(ControlNet::from_net_invert(arg1, inv1), ControlNet::from_net_invert(arg2, inv2)))
+            CellRepr::And(arg1, arg2) => {
+                Cow::Owned(Cell::And(Value::from(arg1), Value::from(arg2)))
             }
+            CellRepr::Or(arg1, arg2) => Cow::Owned(Cell::Or(Value::from(arg1), Value::from(arg2))),
+            CellRepr::Xor(arg1, arg2) => {
+                Cow::Owned(Cell::Xor(Value::from(arg1), Value::from(arg2)))
+            }
+            CellRepr::Mux(arg1, arg2, arg3) => {
+                Cow::Owned(Cell::Mux(arg1, Value::from(arg2), Value::from(arg3)))
+            }
+            CellRepr::Adc(arg1, arg2, arg3) => {
+                Cow::Owned(Cell::Adc(Value::from(arg1), Value::from(arg2), arg3))
+            }
+            CellRepr::Aig(arg1, inv1, arg2, inv2) => Cow::Owned(Cell::Aig(
+                ControlNet::from_net_invert(arg1, inv1),
+                ControlNet::from_net_invert(arg2, inv2),
+            )),
 
             CellRepr::Boxed(ref cell) => Cow::Borrowed(cell),
         }
@@ -340,12 +364,27 @@ impl From<Cell> for CellRepr {
         match value {
             Cell::Buf(arg) if arg.len() == 1 => CellRepr::Buf(arg[0]),
             Cell::Not(arg) if arg.len() == 1 => CellRepr::Not(arg[0]),
-            Cell::And(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => CellRepr::And(arg1[0], arg2[0]),
-            Cell::Or(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => CellRepr::Or(arg1[0], arg2[0]),
-            Cell::Xor(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => CellRepr::Xor(arg1[0], arg2[0]),
-            Cell::Mux(arg1, arg2, arg3) if arg2.len() == 1 && arg3.len() == 1 => CellRepr::Mux(arg1, arg2[0], arg3[0]),
-            Cell::Adc(arg1, arg2, arg3) if arg1.len() == 1 && arg2.len() == 1 => CellRepr::Adc(arg1[0], arg2[0], arg3),
-            Cell::Aig(arg1, arg2) => CellRepr::Aig(arg1.net(), arg1.is_negative(), arg2.net(), arg2.is_negative()),
+            Cell::And(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => {
+                CellRepr::And(arg1[0], arg2[0])
+            }
+            Cell::Or(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => {
+                CellRepr::Or(arg1[0], arg2[0])
+            }
+            Cell::Xor(arg1, arg2) if arg1.len() == 1 && arg2.len() == 1 => {
+                CellRepr::Xor(arg1[0], arg2[0])
+            }
+            Cell::Mux(arg1, arg2, arg3) if arg2.len() == 1 && arg3.len() == 1 => {
+                CellRepr::Mux(arg1, arg2[0], arg3[0])
+            }
+            Cell::Adc(arg1, arg2, arg3) if arg1.len() == 1 && arg2.len() == 1 => {
+                CellRepr::Adc(arg1[0], arg2[0], arg3)
+            }
+            Cell::Aig(arg1, arg2) => CellRepr::Aig(
+                arg1.net(),
+                arg1.is_negative(),
+                arg2.net(),
+                arg2.is_negative(),
+            ),
 
             cell => CellRepr::Boxed(Box::new(cell)),
         }
@@ -422,7 +461,10 @@ impl Cell {
     pub fn output_len(&self) -> usize {
         match self {
             Cell::Buf(arg) | Cell::Not(arg) => arg.len(),
-            Cell::And(arg1, arg2) | Cell::Or(arg1, arg2) | Cell::Xor(arg1, arg2) | Cell::Mux(_, arg1, arg2) => {
+            Cell::And(arg1, arg2)
+            | Cell::Or(arg1, arg2)
+            | Cell::Xor(arg1, arg2)
+            | Cell::Mux(_, arg1, arg2) => {
                 debug_assert_eq!(arg1.len(), arg2.len());
                 arg1.len()
             }
@@ -434,9 +476,10 @@ impl Cell {
 
             Cell::Eq(..) | Cell::ULt(..) | Cell::SLt(..) => 1,
 
-            Cell::Shl(arg1, _, _) | Cell::UShr(arg1, _, _) | Cell::SShr(arg1, _, _) | Cell::XShr(arg1, _, _) => {
-                arg1.len()
-            }
+            Cell::Shl(arg1, _, _)
+            | Cell::UShr(arg1, _, _)
+            | Cell::SShr(arg1, _, _)
+            | Cell::XShr(arg1, _, _) => arg1.len(),
 
             Cell::Mul(arg1, arg2)
             | Cell::UDiv(arg1, arg2)
@@ -452,6 +495,7 @@ impl Cell {
             Cell::Match(match_cell) => match_cell.output_len(),
             Cell::Assign(assign_cell) => assign_cell.output_len(),
 
+            Cell::DLatch(dlatch) => dlatch.output_len(),
             Cell::Dff(flip_flop) => flip_flop.output_len(),
             Cell::Memory(memory) => memory.output_len(),
             Cell::IoBuf(io_buffer) => io_buffer.output_len(),
@@ -466,8 +510,14 @@ impl Cell {
 
     pub fn has_effects(&self, design: &Design) -> bool {
         match self {
-            Cell::IoBuf(_) | Cell::Other(_) | Cell::Input(..) | Cell::Output(..) | Cell::Name(..) => true,
-            Cell::Target(target_cell) => design.target_prototype(&target_cell).purity == TargetCellPurity::HasEffects,
+            Cell::IoBuf(_)
+            | Cell::Other(_)
+            | Cell::Input(..)
+            | Cell::Output(..)
+            | Cell::Name(..) => true,
+            Cell::Target(target_cell) => {
+                design.target_prototype(&target_cell).purity == TargetCellPurity::HasEffects
+            }
             _ => false,
         }
     }
@@ -481,7 +531,9 @@ impl Cell {
             | Cell::Name(..)
             | Cell::Memory(..)
             | Cell::Dff(..) => true,
-            Cell::Target(target_cell) => design.target_prototype(&target_cell).purity != TargetCellPurity::Pure,
+            Cell::Target(target_cell) => {
+                design.target_prototype(&target_cell).purity != TargetCellPurity::Pure
+            }
             _ => false,
         }
     }
@@ -489,9 +541,11 @@ impl Cell {
     pub fn visit(&self, mut f: impl FnMut(Net)) {
         match self {
             Cell::Input(..) => (),
-            Cell::Buf(arg) | Cell::Not(arg) | Cell::Output(_, arg) | Cell::Name(_, arg) | Cell::Debug(_, arg) => {
-                arg.visit(&mut f)
-            }
+            Cell::Buf(arg)
+            | Cell::Not(arg)
+            | Cell::Output(_, arg)
+            | Cell::Name(_, arg)
+            | Cell::Debug(_, arg) => arg.visit(&mut f),
             Cell::And(arg1, arg2)
             | Cell::Or(arg1, arg2)
             | Cell::Xor(arg1, arg2)
@@ -523,6 +577,7 @@ impl Cell {
             }
             Cell::Match(match_cell) => match_cell.visit(&mut f),
             Cell::Assign(assign_cell) => assign_cell.visit(&mut f),
+            Cell::DLatch(dlatch) => dlatch.visit(&mut f),
             Cell::Dff(flip_flop) => flip_flop.visit(&mut f),
             Cell::Memory(memory) => memory.visit(&mut f),
             Cell::IoBuf(io_buffer) => io_buffer.visit(&mut f),
@@ -534,9 +589,11 @@ impl Cell {
     pub fn visit_mut(&mut self, mut f: impl FnMut(&mut Net)) {
         match self {
             Cell::Input(..) => (),
-            Cell::Buf(arg) | Cell::Not(arg) | Cell::Output(_, arg) | Cell::Name(_, arg) | Cell::Debug(_, arg) => {
-                arg.visit_mut(&mut f)
-            }
+            Cell::Buf(arg)
+            | Cell::Not(arg)
+            | Cell::Output(_, arg)
+            | Cell::Name(_, arg)
+            | Cell::Debug(_, arg) => arg.visit_mut(&mut f),
             Cell::And(arg1, arg2)
             | Cell::Or(arg1, arg2)
             | Cell::Xor(arg1, arg2)
@@ -568,6 +625,7 @@ impl Cell {
             }
             Cell::Match(match_cell) => match_cell.visit_mut(&mut f),
             Cell::Assign(assign_cell) => assign_cell.visit_mut(&mut f),
+            Cell::DLatch(dlatch) => dlatch.visit_mut(&mut f),
             Cell::Dff(flip_flop) => flip_flop.visit_mut(&mut f),
             Cell::Memory(memory) => memory.visit_mut(&mut f),
             Cell::IoBuf(io_buffer) => io_buffer.visit_mut(&mut f),

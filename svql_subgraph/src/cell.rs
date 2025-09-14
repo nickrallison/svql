@@ -30,6 +30,7 @@ pub enum CellKind {
     SModFloor,
     Match,
     Assign,
+    DLatch,
     Dff,
     Memory,
     IoBuf,
@@ -67,6 +68,7 @@ impl CellKind {
                 | CellKind::SDivFloor
                 | CellKind::SModTrunc
                 | CellKind::SModFloor
+                | CellKind::DLatch
                 | CellKind::Dff
         )
     }
@@ -114,6 +116,7 @@ impl From<&Cell> for CellKind {
             Cell::SModFloor(..) => CellKind::SModFloor,
             Cell::Match(..) => CellKind::Match,
             Cell::Assign(..) => CellKind::Assign,
+            Cell::DLatch(..) => CellKind::DLatch,
             Cell::Dff(..) => CellKind::Dff,
             Cell::Memory(..) => CellKind::Memory,
             Cell::IoBuf(..) => CellKind::IoBuf,

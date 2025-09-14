@@ -1,11 +1,14 @@
 use std::{borrow::Cow, fmt::Display};
 
 use crate::{
-    metadata::MetaItemIndex, Cell, CellRef, Const, ControlNet, Design, IoNet, IoValue, MemoryPortRelation, Net,
-    TargetOutput, Trit, Value,
+    Cell, CellRef, Const, ControlNet, Design, IoNet, IoValue, MemoryPortRelation, Net,
+    TargetOutput, Trit, Value, metadata::MetaItemIndex,
 };
 
-struct DisplayFn<'a, F: for<'b> Fn(&Design, &mut std::fmt::Formatter<'b>) -> std::fmt::Result>(&'a Design, F);
+struct DisplayFn<'a, F: for<'b> Fn(&Design, &mut std::fmt::Formatter<'b>) -> std::fmt::Result>(
+    &'a Design,
+    F,
+);
 
 impl<F: Fn(&Design, &mut std::fmt::Formatter) -> std::fmt::Result> Display for DisplayFn<'_, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -67,7 +70,9 @@ impl Design {
     pub(crate) fn write_string(f: &mut std::fmt::Formatter, str: &str) -> std::fmt::Result {
         write!(f, "\"")?;
         for byte in str.as_bytes() {
-            if (byte.is_ascii_graphic() || matches!(byte, b' ' | b'\t')) && ![b'\\', b'"'].contains(byte) {
+            if (byte.is_ascii_graphic() || matches!(byte, b' ' | b'\t'))
+                && ![b'\\', b'"'].contains(byte)
+            {
                 write!(f, "{}", *byte as char)?;
             } else {
                 assert!(byte.is_ascii());
@@ -78,7 +83,11 @@ impl Design {
         Ok(())
     }
 
-    pub(crate) fn write_io_net(&self, f: &mut std::fmt::Formatter, io_net: IoNet) -> std::fmt::Result {
+    pub(crate) fn write_io_net(
+        &self,
+        f: &mut std::fmt::Formatter,
+        io_net: IoNet,
+    ) -> std::fmt::Result {
         if io_net.is_floating() {
             write!(f, "&_")
         } else {
@@ -96,7 +105,11 @@ impl Design {
         }
     }
 
-    pub(crate) fn write_io_value(&self, f: &mut std::fmt::Formatter, io_value: &IoValue) -> std::fmt::Result {
+    pub(crate) fn write_io_value(
+        &self,
+        f: &mut std::fmt::Formatter,
+        io_value: &IoValue,
+    ) -> std::fmt::Result {
         if io_value.is_empty() {
             write!(f, "[]")
         } else if io_value.len() == 1 {
@@ -139,31 +152,58 @@ impl Design {
         }
     }
 
-    pub(crate) fn write_control_net(&self, f: &mut std::fmt::Formatter, control_net: ControlNet) -> std::fmt::Result {
+    pub(crate) fn write_control_net(
+        &self,
+        f: &mut std::fmt::Formatter,
+        control_net: ControlNet,
+    ) -> std::fmt::Result {
         if control_net.is_negative() {
             write!(f, "!")?;
         };
         self.write_net(f, control_net.net())
     }
 
-    pub(crate) fn write_value(&self, f: &mut std::fmt::Formatter, value: &Value) -> std::fmt::Result {
+    pub(crate) fn write_value(
+        &self,
+        f: &mut std::fmt::Formatter,
+        value: &Value,
+    ) -> std::fmt::Result {
         enum Chunk {
-            Slice { cell_index: usize, offset: usize, width: usize, repeat: usize },
-            WholeGrainCell { cell_index: usize, width: usize, repeat: usize },
-            NewNet { net: Net, repeat: usize },
+            Slice {
+                cell_index: usize,
+                offset: usize,
+                width: usize,
+                repeat: usize,
+            },
+            WholeGrainCell {
+                cell_index: usize,
+                width: usize,
+                repeat: usize,
+            },
+            NewNet {
+                net: Net,
+                repeat: usize,
+            },
             Const(Const),
         }
         let mut index = 0;
         let mut chunks = vec![];
         while index < value.len() {
-            if value[index].as_cell_index().map(|index| !self.is_valid_cell_index(index)).unwrap_or(false) {
+            if value[index]
+                .as_cell_index()
+                .map(|index| !self.is_valid_cell_index(index))
+                .unwrap_or(false)
+            {
                 // Value contains newly added cells that we can't look up. Don't try to make
                 // the display nicer, just make sure it doesn't panic.
                 let mut repeat = 1;
                 while index + repeat < value.len() && value[index] == value[index + repeat] {
                     repeat += 1;
                 }
-                chunks.push(Chunk::NewNet { net: value[index], repeat });
+                chunks.push(Chunk::NewNet {
+                    net: value[index],
+                    repeat,
+                });
                 index += repeat;
             } else if let Ok((output, index_a, offset_a)) = self.find_cell_output(value[index]) {
                 let count = value[index..]
@@ -180,19 +220,32 @@ impl Design {
                 assert!(count != 0);
                 let mut repeat = 1;
                 while index + (repeat + 1) * count <= value.len()
-                    && value[index..index + count] == value[index + repeat * count..index + (repeat + 1) * count]
+                    && value[index..index + count]
+                        == value[index + repeat * count..index + (repeat + 1) * count]
                 {
                     repeat += 1;
                 }
                 if offset_a == 0 && output.len() == count {
-                    chunks.push(Chunk::WholeGrainCell { cell_index: index_a, width: count, repeat });
+                    chunks.push(Chunk::WholeGrainCell {
+                        cell_index: index_a,
+                        width: count,
+                        repeat,
+                    });
                 } else {
-                    chunks.push(Chunk::Slice { cell_index: index_a, offset: offset_a, width: count, repeat });
+                    chunks.push(Chunk::Slice {
+                        cell_index: index_a,
+                        offset: offset_a,
+                        width: count,
+                        repeat,
+                    });
                 }
                 index += count * repeat;
             } else {
                 let const_value = Const::from_iter(
-                    value[index..].iter().take_while(|net| net.as_const().is_some()).map(|net| net.as_const().unwrap()),
+                    value[index..]
+                        .iter()
+                        .take_while(|net| net.as_const().is_some())
+                        .map(|net| net.as_const().unwrap()),
                 );
                 assert!(!const_value.is_empty());
                 index += const_value.len();
@@ -211,7 +264,12 @@ impl Design {
                 write!(f, " ")?;
             }
             match chunk {
-                Chunk::Slice { cell_index, offset, width, repeat } => {
+                Chunk::Slice {
+                    cell_index,
+                    offset,
+                    width,
+                    repeat,
+                } => {
                     write!(f, "%{cell_index}+{offset}")?;
                     if width != 1 {
                         write!(f, ":{width}")?;
@@ -220,7 +278,11 @@ impl Design {
                         write!(f, "*{repeat}")?;
                     }
                 }
-                Chunk::WholeGrainCell { cell_index, width, repeat } => {
+                Chunk::WholeGrainCell {
+                    cell_index,
+                    width,
+                    repeat,
+                } => {
                     write!(f, "%{cell_index}")?;
                     if width != 1 {
                         write!(f, ":{width}")?;
@@ -257,43 +319,58 @@ impl Design {
         let newline = &format!("\n{prefix}");
 
         let write_metadata = |f: &mut std::fmt::Formatter| -> std::fmt::Result {
-            if metadata != MetaItemIndex::NONE { write!(f, " {metadata}") } else { Ok(()) }
+            if metadata != MetaItemIndex::NONE {
+                write!(f, " {metadata}")
+            } else {
+                Ok(())
+            }
         };
 
-        let write_control = |f: &mut std::fmt::Formatter, name: &str, control_net: ControlNet| -> std::fmt::Result {
+        let write_control = |f: &mut std::fmt::Formatter,
+                             name: &str,
+                             control_net: ControlNet|
+         -> std::fmt::Result {
             write!(f, "{}=", name)?;
             self.write_control_net(f, control_net)
         };
 
-        let write_common = |f: &mut std::fmt::Formatter, name: &str, args: &[&Value]| -> std::fmt::Result {
-            write!(f, "{}", name)?;
-            for arg in args {
-                write!(f, " ")?;
-                self.write_value(f, arg)?;
-            }
-            Ok(())
-        };
-
-        let write_shift =
-            |f: &mut std::fmt::Formatter, name: &str, arg1: &Value, arg2: &Value, stride: u32| -> std::fmt::Result {
-                write!(f, "{} ", name)?;
-                self.write_value(f, arg1)?;
-                write!(f, " ")?;
-                self.write_value(f, arg2)?;
-                write!(f, " #{stride}")?;
+        let write_common =
+            |f: &mut std::fmt::Formatter, name: &str, args: &[&Value]| -> std::fmt::Result {
+                write!(f, "{}", name)?;
+                for arg in args {
+                    write!(f, " ")?;
+                    self.write_value(f, arg)?;
+                }
                 Ok(())
             };
 
-        let write_cell_argument = |f: &mut std::fmt::Formatter, keyword: &str, name: &str| -> std::fmt::Result {
-            write!(f, "  {keyword} ")?;
-            Design::write_string(f, name)?;
-            write!(f, " = ")?;
+        let write_shift = |f: &mut std::fmt::Formatter,
+                           name: &str,
+                           arg1: &Value,
+                           arg2: &Value,
+                           stride: u32|
+         -> std::fmt::Result {
+            write!(f, "{} ", name)?;
+            self.write_value(f, arg1)?;
+            write!(f, " ")?;
+            self.write_value(f, arg2)?;
+            write!(f, " #{stride}")?;
             Ok(())
         };
 
+        let write_cell_argument =
+            |f: &mut std::fmt::Formatter, keyword: &str, name: &str| -> std::fmt::Result {
+                write!(f, "  {keyword} ")?;
+                Design::write_string(f, name)?;
+                write!(f, " = ")?;
+                Ok(())
+            };
+
         let single_output = match &cell {
             Cell::Other(..) => false,
-            Cell::Target(target_cell) if self.target_prototype(target_cell).outputs.len() > 1 => false,
+            Cell::Target(target_cell) if self.target_prototype(target_cell).outputs.len() > 1 => {
+                false
+            }
             Cell::Memory(..) => false,
             _ => true,
         };
@@ -409,7 +486,15 @@ impl Design {
                     write!(f, " at=#{}", assign_cell.offset)?;
                 }
             }
-
+            Cell::DLatch(dlatch) => {
+                write_common(f, "dff", &[&dlatch.data])?;
+                if dlatch.has_enable() {
+                    write_control(f, " en", dlatch.enable)?;
+                }
+                if dlatch.has_init_value() {
+                    write!(f, " init={}", dlatch.init_value)?;
+                }
+            }
             Cell::Dff(flip_flop) => {
                 write_common(f, "dff", &[&flip_flop.data])?;
                 write_control(f, " clk", flip_flop.clock)?;
@@ -457,7 +542,12 @@ impl Design {
                 }
                 let mut port_offset = 0;
                 for read_port in &memory.read_ports {
-                    write!(f, "  %{}:{} = read addr=", index + port_offset, read_port.data_len)?;
+                    write!(
+                        f,
+                        "  %{}:{} = read addr=",
+                        index + port_offset,
+                        read_port.data_len
+                    )?;
                     self.write_value(f, &read_port.addr)?;
                     if let Some(ref flip_flop) = read_port.flip_flop {
                         write_control(f, " clk", flip_flop.clock)?;
@@ -504,7 +594,11 @@ impl Design {
                 }
                 let mut rows = Vec::new();
                 for index in 0..memory.depth {
-                    rows.push(memory.init_value.slice((index * memory.width)..((index + 1) * memory.width)));
+                    rows.push(
+                        memory
+                            .init_value
+                            .slice((index * memory.width)..((index + 1) * memory.width)),
+                    );
                 }
                 let mut index = 0;
                 while index < rows.len() {
@@ -570,7 +664,12 @@ impl Design {
                 }
                 if prototype.outputs.len() > 1 {
                     for target_output in &prototype.outputs {
-                        write!(f, "  %{}:{} = output ", index + target_output.range.start, target_output.range.len())?;
+                        write!(
+                            f,
+                            "  %{}:{} = output ",
+                            index + target_output.range.start,
+                            target_output.range.len()
+                        )?;
                         Design::write_string(f, &target_output.name)?;
                         write!(f, "{newline}")?;
                     }
@@ -620,17 +719,30 @@ impl Design {
 
     pub fn display_control_net(&self, net: impl Into<ControlNet>) -> impl Display + '_ {
         let net = net.into();
-        DisplayFn(self, move |design: &Design, f| design.write_control_net(f, net))
+        DisplayFn(self, move |design: &Design, f| {
+            design.write_control_net(f, net)
+        })
     }
 
-    pub fn display_value<'a, 'b: 'a>(&'a self, value: impl Into<Cow<'b, Value>>) -> impl Display + 'a {
+    pub fn display_value<'a, 'b: 'a>(
+        &'a self,
+        value: impl Into<Cow<'b, Value>>,
+    ) -> impl Display + 'a {
         let value = value.into();
-        DisplayFn(self, move |design: &Design, f| design.write_value(f, &value))
+        DisplayFn(self, move |design: &Design, f| {
+            design.write_value(f, &value)
+        })
     }
 
     pub fn display_cell<'a>(&'a self, cell_ref: CellRef<'a>) -> impl Display + 'a {
         DisplayFn(self, move |design: &Design, f| {
-            design.write_cell(f, "", cell_ref.debug_index(), &*cell_ref.get(), cell_ref.metadata().index())
+            design.write_cell(
+                f,
+                "",
+                cell_ref.debug_index(),
+                &*cell_ref.get(),
+                cell_ref.metadata().index(),
+            )
         })
     }
 }
