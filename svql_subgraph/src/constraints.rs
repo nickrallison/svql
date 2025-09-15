@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
-use prjunnamed_netlist::{Cell, CellRef, DLatch, FlipFlop, Net, Trit, Value};
+use prjunnamed_netlist::{Cell, CellRef, ADLatch, DLatchSr, FlipFlop, Net, Trit, Value};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -152,8 +152,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             (Assign(_p_assign_cell), Assign(_d_assign_cell)) => {
                 todo!("Make Function to match assign cells")
             }
-            (DLatch(p_dlatch_cell), DLatch(d_dlatch_cell)) => {
-                self.dlatches_match_fan_in(p_dlatch_cell, d_dlatch_cell, mapping)
+            (ADLatch(p_adlatch_cell), ADLatch(d_adlatch_cell)) => {
+                self.adlatches_match_fan_in(p_adlatch_cell, d_adlatch_cell, mapping)
+            }
+            (DLatchSr(p_dlatchsr_cell), DLatchSr(d_dlatchsr_cell)) => {
+                self.dlatch_sr_s_match_fan_in(p_dlatchsr_cell, d_dlatchsr_cell, mapping)
             }
             (Dff(p_dff_cell), Dff(d_dff_cell)) => {
                 self.dffs_match_fan_in(p_dff_cell, d_dff_cell, mapping)
@@ -368,23 +371,50 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         true
     }
 
-    fn dlatches_match_fan_in(
+    fn adlatches_match_fan_in(
         &self,
-        needle_dlatch: &DLatch,
-        haystack_dlatch: &DLatch,
+        needle_adlatch: &ADLatch,
+        haystack_adlatch: &ADLatch,
         mapping: &Assignment,
     ) -> bool {
         let data_matches =
-            self.values_match_fan_in(&needle_dlatch.data, &haystack_dlatch.data, mapping);
+            self.values_match_fan_in(&needle_adlatch.data, &haystack_adlatch.data, mapping);
         let enable_matches =
-            self.control_nets_match_fan_in(&needle_dlatch.enable, &haystack_dlatch.enable, mapping);
+            self.control_nets_match_fan_in(&needle_adlatch.enable, &haystack_adlatch.enable, mapping);
+        let arst_matches =
+            self.control_nets_match_fan_in(&needle_adlatch.arst, &haystack_adlatch.arst, mapping);
+        let arst_value_matches =
+            self.const_match_fan_in(&needle_adlatch.arst_value, &haystack_adlatch.arst_value, mapping);
         let init_value_matches = self.const_match_fan_in(
-            &needle_dlatch.init_value,
-            &haystack_dlatch.init_value,
+            &needle_adlatch.init_value,
+            &haystack_adlatch.init_value,
             mapping,
         );
 
-        data_matches && enable_matches && init_value_matches
+        data_matches && enable_matches && arst_matches && arst_value_matches && init_value_matches
+    }
+
+    fn dlatch_sr_s_match_fan_in(
+        &self,
+        needle_dlatch_sr: &DLatchSr,
+        haystack_dlatch_sr: &DLatchSr,
+        mapping: &Assignment,
+    ) -> bool {
+        let data_matches = self.values_match_fan_in(&needle_dlatch_sr.data, &haystack_dlatch_sr.data, mapping);
+        let set_matches =
+            self.values_match_fan_in(&needle_dlatch_sr.set, &haystack_dlatch_sr.set, mapping);
+        let reset_matches =
+            self.values_match_fan_in(&needle_dlatch_sr.reset, &haystack_dlatch_sr.reset, mapping);
+        let enable_matches =
+            self.control_nets_match_fan_in(&needle_dlatch_sr.enable, &haystack_dlatch_sr.enable, mapping);
+        let init_value_matches =
+            self.const_match_fan_in(&needle_dlatch_sr.init_value, &haystack_dlatch_sr.init_value, mapping);
+
+        data_matches
+            && set_matches
+            && reset_matches
+            && enable_matches
+            && init_value_matches
     }
 
     fn dffs_match_fan_in(

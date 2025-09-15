@@ -2,8 +2,6 @@
 
 use std::str::FromStr;
 
-use regex::Match;
-
 use crate::ModuleConfig;
 
 #[derive(Clone, Debug)]

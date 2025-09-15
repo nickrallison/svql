@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ModuleConfig {
     pub flatten: bool,
     pub params: HashMap<String, String>,
     pub other_steps: Vec<String>,
+    pub verific: bool,
 }
-
 
 impl ModuleConfig {
     pub fn new() -> Self {
@@ -26,6 +25,10 @@ impl ModuleConfig {
 
     pub fn with_step(mut self, step: &str) -> Self {
         self.other_steps.push(step.to_string());
+        self
+    }
+    pub fn with_verific(mut self, verific: bool) -> Self {
+        self.verific = verific;
         self
     }
 }

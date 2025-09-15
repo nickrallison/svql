@@ -2,15 +2,18 @@ use std::path::PathBuf;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let needle_module: YosysModule = YosysModule::new(
-        "examples/patterns/basic/and/verilog/and_2_seq.v",
-        "and_2_seq",
-    )?;
+    let needle_module: YosysModule =
+        YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/larger_designs/json/otbn_core.json",
-        "otbn_core",
+        "build/openpiton__chip_0.1/pickle-icarus/openpiton__chip_0.1.v",
+        "chip",
     )?;
+
+    // let design_module: YosysModule = YosysModule::new(
+    //     "examples/fixtures/larger_designs/json/otbn_core.json",
+    //     "otbn_core",
+    // )?;
 
     // let design_module: YosysModule = YosysModule::new(
     //     "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v",
@@ -20,10 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let design_module: YosysModule =
     //     YosysModule::new("examples/needles/basic/and/verilog/and_gate.v", "and_gate")?;
 
+    let module_config = svql_common::ModuleConfig {
+        flatten: false,
+        verific: true,
+        ..Default::default()
+    };
+
     let config = svql_common::Config::builder()
         .match_length(svql_common::MatchLength::First)
         .dedupe(svql_common::Dedupe::Inner)
-        .haystack_flatten(true)
+        .haystack_flatten(false)
+        .haystack_options(module_config.clone())
+        .needle_options(module_config)
         .build();
 
     let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");

@@ -58,11 +58,15 @@ impl YosysModule {
 
         // Read command
         args.push("-p".to_string());
-        args.push(format!(
-            "{} {}",
-            self.design_path().read_command(),
-            self.path().display()
-        ));
+        if !config.verific {
+            args.push(format!(
+                "{} {}",
+                self.design_path().read_command(),
+                self.path().display()
+            ));
+        } else {
+            args.push(format!("verific -sv {}", self.path().display()));
+        }
 
         // Hierarchy
         args.push("-p".to_string());
