@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let design_module: YosysModule = YosysModule::new(
-        "build/openpiton__chip_0.1/pickle-icarus/openpiton__chip_0.1.v",
+        "examples/fixtures/larger_designs/json/openpiton_chip_full.json",
         "chip",
     )?;
 
@@ -41,7 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");
 
     let needle_set = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
-    let design_set = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
+    // let design_set = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
+    let design_set = design_module.import_design_raw()?;
 
     let needle = needle_set
         .modules

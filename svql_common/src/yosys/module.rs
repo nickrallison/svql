@@ -178,6 +178,13 @@ impl YosysModule {
         Ok(design_set)
     }
 
+    pub fn import_design_raw(&self) -> Result<DesignSet, Box<dyn std::error::Error>> {
+        let designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
+
+        let design_set = design_set::DesignSet::new(self.module_name().to_string(), designs)?;
+        Ok(design_set)
+    }
+
     pub fn write_rtlil_to_path(
         &self,
         config: &ModuleConfig,
