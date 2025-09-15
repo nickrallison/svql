@@ -4,7 +4,10 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::yosys::{DesignPath, ModuleConfig};
+use crate::{
+    DesignSet,
+    yosys::{DesignPath, ModuleConfig, design_set},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct YosysModule {
@@ -150,7 +153,7 @@ impl YosysModule {
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<DesignSet, Box<dyn std::error::Error>> {
         let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
         self.import_design_yosys(module_config, &yosys)
     }
@@ -159,7 +162,7 @@ impl YosysModule {
         &self,
         module_config: &ModuleConfig,
         yosys: &Path,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<DesignSet, Box<dyn std::error::Error>> {
         let json_temp_file = tempfile::Builder::new()
             .prefix("svql_prjunnamed_")
             .suffix(".json")
@@ -169,17 +172,10 @@ impl YosysModule {
         let args = self.build_yosys_args(json_temp_file.path(), module_config, OutputFormat::Json);
         self.run_yosys_command(args, yosys)?;
 
-        let mut designs =
-            prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
+        let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
 
-        let design = designs.remove(self.module_name()).ok_or_else(|| {
-            format!(
-                "Design not found in Yosys JSON output: {}",
-                self.path().display()
-            )
-        })?;
-
-        Ok(design)
+        let design_set = design_set::DesignSet::new(self.module_name().to_string(), designs)?;
+        Ok(design_set)
     }
 
     pub fn write_rtlil_to_path(
