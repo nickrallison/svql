@@ -97,13 +97,11 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
                             to_n.get().visit(|net| fan_in.push(net));
                             tracing::event!(tracing::Level::TRACE, "Fan in nodes: {:?}", fan_in);
 
-                            let fan_in_contains_from = fan_in.iter().any(|n| {
-                                if n.index >= 2 {
-                                    (n.index - 2) as usize == from_n.debug_index()
-                                } else {
-                                    false
-                                }
-                            });
+                            let fan_in_contains_from =
+                                fan_in.iter().any(|n| match n.as_cell_index() {
+                                    Ok(idx) => idx == from_n.debug_index(),
+                                    Err(_) => false,
+                                });
 
                             // let result = from_n.debug_index() == to_n.debug_index();
                             tracing::event!(

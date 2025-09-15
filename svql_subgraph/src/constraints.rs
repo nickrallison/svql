@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
-use prjunnamed_netlist::{Cell, CellRef, DLatch, FlipFlop, Trit, Value, ValueRepr};
+use prjunnamed_netlist::{Cell, CellRef, DLatch, FlipFlop, Net, Trit, Value};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -191,69 +191,110 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_value: &Value,
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        let needle_value_repr: &ValueRepr = &needle_value.0;
-        let haystack_value_repr: &ValueRepr = &haystack_value.0;
-        match (needle_value_repr, haystack_value_repr) {
-            (ValueRepr::None, ValueRepr::None) => true,
-            (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
-                self.nets_match_fan_in(p_net, d_net, mapping)
+        let needle_nets_vec = needle_value.iter().collect::<Vec<Net>>();
+        let haystack_nets_vec = haystack_value.iter().collect::<Vec<Net>>();
+
+        if needle_nets_vec.is_empty() && haystack_nets_vec.is_empty() {
+            return true;
+        }
+
+        match self.config.match_length {
+            svql_common::MatchLength::First => {
+                let first_p_net = needle_nets_vec.first().unwrap();
+                let first_d_net = haystack_nets_vec.first().unwrap();
+                return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
             }
-            (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => match self.config.match_length {
-                svql_common::MatchLength::First => {
-                    let first_p_net = p_nets.first().unwrap();
-                    let first_d_net = d_nets.first().unwrap();
-                    return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
-                }
-                svql_common::MatchLength::NeedleSubsetHaystack => {
-                    for p_net in p_nets {
-                        let mut found_match = false;
-                        for d_net in d_nets {
-                            if self.nets_match_fan_in(p_net, d_net, mapping) {
-                                found_match = true;
-                                break;
-                            }
-                        }
-                        if !found_match {
-                            return false;
+            svql_common::MatchLength::NeedleSubsetHaystack => {
+                for p_net in needle_nets_vec.iter() {
+                    let mut found_match = false;
+                    for d_net in haystack_nets_vec.iter() {
+                        if self.nets_match_fan_in(p_net, d_net, mapping) {
+                            found_match = true;
+                            break;
                         }
                     }
-                    return true;
-                }
-                svql_common::MatchLength::Exact => {
-                    if p_nets.len() != d_nets.len() {
+                    if !found_match {
                         return false;
                     }
-                    for (p_net, d_net) in p_nets.iter().zip(d_nets.iter()) {
-                        if !self.nets_match_fan_in(p_net, d_net, mapping) {
-                            return false;
-                        }
-                    }
-                    return true;
                 }
-            },
-            (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => match self.config.match_length {
-                svql_common::MatchLength::First => {
-                    let first_d_net = d_nets.first().unwrap();
-                    return self.nets_match_fan_in(p_net, first_d_net, mapping);
-                }
-                svql_common::MatchLength::NeedleSubsetHaystack => {
-                    for d_net in d_nets {
-                        if self.nets_match_fan_in(p_net, d_net, mapping) {
-                            return true;
-                        }
-                    }
+                return true;
+            }
+            svql_common::MatchLength::Exact => {
+                if needle_nets_vec.len() != haystack_nets_vec.len() {
                     return false;
                 }
-                svql_common::MatchLength::Exact => {
-                    if d_nets.len() != 1 {
+                for (p_net, d_net) in needle_nets_vec.iter().zip(haystack_nets_vec.iter()) {
+                    if !self.nets_match_fan_in(p_net, d_net, mapping) {
                         return false;
                     }
-                    let first_d_net = d_nets.first().unwrap();
-                    return self.nets_match_fan_in(p_net, first_d_net, mapping);
                 }
-            },
-            _ => false,
+                return true;
+            }
         }
+
+        // // let needle_value_repr: &ValueRepr = &needle_value.0;
+        // // let haystack_value_repr: &ValueRepr = &haystack_value.0;
+        // match (needle_value_repr, haystack_value_repr) {
+        //     (ValueRepr::None, ValueRepr::None) => true,
+        //     (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
+        //         self.nets_match_fan_in(p_net, d_net, mapping)
+        //     }
+        //     (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => match self.config.match_length {
+        //         svql_common::MatchLength::First => {
+        //             let first_p_net = p_nets.first().unwrap();
+        //             let first_d_net = d_nets.first().unwrap();
+        //             return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
+        //         }
+        //         svql_common::MatchLength::NeedleSubsetHaystack => {
+        //             for p_net in p_nets {
+        //                 let mut found_match = false;
+        //                 for d_net in d_nets {
+        //                     if self.nets_match_fan_in(p_net, d_net, mapping) {
+        //                         found_match = true;
+        //                         break;
+        //                     }
+        //                 }
+        //                 if !found_match {
+        //                     return false;
+        //                 }
+        //             }
+        //             return true;
+        //         }
+        //         svql_common::MatchLength::Exact => {
+        //             if p_nets.len() != d_nets.len() {
+        //                 return false;
+        //             }
+        //             for (p_net, d_net) in p_nets.iter().zip(d_nets.iter()) {
+        //                 if !self.nets_match_fan_in(p_net, d_net, mapping) {
+        //                     return false;
+        //                 }
+        //             }
+        //             return true;
+        //         }
+        //     },
+        //     (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => match self.config.match_length {
+        //         svql_common::MatchLength::First => {
+        //             let first_d_net = d_nets.first().unwrap();
+        //             return self.nets_match_fan_in(p_net, first_d_net, mapping);
+        //         }
+        //         svql_common::MatchLength::NeedleSubsetHaystack => {
+        //             for d_net in d_nets {
+        //                 if self.nets_match_fan_in(p_net, d_net, mapping) {
+        //                     return true;
+        //                 }
+        //             }
+        //             return false;
+        //         }
+        //         svql_common::MatchLength::Exact => {
+        //             if d_nets.len() != 1 {
+        //                 return false;
+        //             }
+        //             let first_d_net = d_nets.first().unwrap();
+        //             return self.nets_match_fan_in(p_net, first_d_net, mapping);
+        //         }
+        //     },
+        //     _ => false,
+        // }
     }
 
     fn nets_match_fan_in(
