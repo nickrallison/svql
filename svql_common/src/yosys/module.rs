@@ -85,7 +85,7 @@ impl YosysModule {
 
         // Memory
         args.push("-p".to_string());
-        args.push("memory_collect".to_string());
+        args.push("memory".to_string());
 
         // Flatten
         if config.flatten {
