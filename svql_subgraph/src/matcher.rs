@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 use tracing::debug;
 
 use prjunnamed_netlist::Design;
-use svql_common::{Config, DesignSet};
+use svql_common::Config;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -22,8 +22,8 @@ pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
 }
 
 pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
-    pub(crate) needle: &'needle DesignSet,
-    pub(crate) haystack: &'haystack DesignSet,
+    pub(crate) needle: &'needle Design,
+    pub(crate) haystack: &'haystack Design,
     pub(crate) needle_index: &'cfg GraphIndex<'needle>,
     pub(crate) haystack_index: &'cfg GraphIndex<'haystack>,
     pub(crate) config: &'cfg Config,
@@ -31,8 +31,8 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub fn enumerate_all(
-        needle: &'needle DesignSet,
-        haystack: &'haystack DesignSet,
+        needle: &'needle Design,
+        haystack: &'haystack Design,
         config: &'cfg Config,
     ) -> EmbeddingSet<'needle, 'haystack> {
         let needle_index = GraphIndex::build(needle);
@@ -78,8 +78,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             needle_input_mapping_queue,
             0,
         );
-
-        println!("Found {} raw results", results.len());
 
         if self.config.dedupe.all() {
             let mut seen: HashSet<Vec<usize>> = HashSet::new();

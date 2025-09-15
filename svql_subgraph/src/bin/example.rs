@@ -40,29 +40,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");
 
-    let needle = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
-    let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
+    let needle_set = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
+    let design_set = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
 
-    // let design_cells = design.iter_cells().collect::<Vec<_>>();
-
-    // println!("Design has {} cells", design_cells.len());
-
-    // for c in design_cells.iter() {
-    //     if matches!(c.get(), Cow::Borrowed(Cell::And { .. })) {
-    //         println!("{:?}", c.get());
-    //     } else {
-    //         println!("{:?}", c.get());
-    //     }
-    // }
-
-    // let count = design_cells
-    //     .iter()
-    //     .filter(|c| matches!(c.get(), Cow::Borrowed(Cell::And { .. })))
-    //     .count();
-
-    // println!("{:?}", needle);
-
-    // println!("Design has {} AND gates", count);
+    let needle = needle_set
+        .modules
+        .get("and_gate")
+        .ok_or("Needle module not found")?;
+    let design = design_set
+        .modules
+        .get("chip")
+        .ok_or("Design module not found")?;
 
     let embeddings = svql_subgraph::SubgraphMatcher::enumerate_all(&needle, &design, &config);
 
