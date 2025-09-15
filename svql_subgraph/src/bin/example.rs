@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use prjunnamed_netlist::Cell;
+use std::{borrow::Cow, path::PathBuf};
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,6 +42,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let needle = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
     let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
+
+    let design_cells = design.iter_cells().collect::<Vec<_>>();
+
+    println!("Design has {} cells", design_cells.len());
+
+    for c in design_cells.iter() {
+        if matches!(c.get(), Cow::Borrowed(Cell::And { .. })) {
+            println!("{:?}", c.get());
+        } else {
+            println!("{:?}", c.get());
+        }
+    }
+
+    let count = design_cells
+        .iter()
+        .filter(|c| matches!(c.get(), Cow::Borrowed(Cell::And { .. })))
+        .count();
+
+    // println!("{:?}", needle);
+
+    println!("Design has {} AND gates", count);
 
     let embeddings = svql_subgraph::SubgraphMatcher::enumerate_all(&needle, &design, &config);
 
