@@ -49,6 +49,7 @@ which.workspace = true
 contracts.workspace = true
 itertools.workspace = true
 rayon = { workspace = true, optional = true }
+ouroboros.workspace = true
 
 [features]
 default = []

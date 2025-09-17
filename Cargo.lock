@@ -891,6 +891,7 @@ dependencies = [
  "dashmap",
  "itertools",
  "lazy_static",
+ "ouroboros",
  "prjunnamed-netlist",
  "prjunnamed-yosys_json",
  "proc-macro2",

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod constraints;
+mod design_container;
 mod embedding;
 mod mapping;
 mod matcher;
