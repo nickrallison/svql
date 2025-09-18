@@ -88,7 +88,7 @@ impl DesignSet {
         &self.modules
     }
 
-    pub fn get(&self, name: &str) -> Option<&Arc<DesignContainer>> {
-        self.modules.get(name)
+    pub fn get(&self, name: &str) -> Option<&Design> {
+        self.modules.get(name).map(|container| container.design())
     }
 }
