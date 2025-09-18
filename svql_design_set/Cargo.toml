@@ -11,7 +11,7 @@ version.workspace = true
 ###############
 # SVQL
 ###############
-# svql_common.workspace = true
+svql_common.workspace = true
 
 ###############
 # PRJUNNAMED
