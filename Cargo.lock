@@ -836,6 +836,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "svql_design_set"
+version = "0.1.0"
+dependencies = [
+ "ouroboros",
+ "prjunnamed-netlist",
+]
+
+[[package]]
 name = "svql_driver"
 version = "0.1.0"
 dependencies = [

@@ -1,13 +1,13 @@
 use std::{
+    collections::BTreeMap,
     fs::File,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
-use crate::{
-    DesignSet,
-    yosys::{DesignPath, ModuleConfig, design_set},
-};
+use prjunnamed_netlist::Design;
+
+use crate::yosys::{DesignPath, ModuleConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct YosysModule {
@@ -153,7 +153,7 @@ impl YosysModule {
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,
-    ) -> Result<DesignSet, Box<dyn std::error::Error>> {
+    ) -> Result<(String, BTreeMap<String, Design>), Box<dyn std::error::Error>> {
         let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
         self.import_design_yosys(module_config, &yosys)
     }
@@ -162,7 +162,7 @@ impl YosysModule {
         &self,
         module_config: &ModuleConfig,
         yosys: &Path,
-    ) -> Result<DesignSet, Box<dyn std::error::Error>> {
+    ) -> Result<(String, BTreeMap<String, Design>), Box<dyn std::error::Error>> {
         let json_temp_file = tempfile::Builder::new()
             .prefix("svql_prjunnamed_")
             .suffix(".json")
@@ -174,14 +174,16 @@ impl YosysModule {
 
         let designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
 
-        let design_set = design_set::DesignSet::new(self.module_name().to_string(), designs)?;
+        let design_set = (self.module_name().to_string(), designs);
         Ok(design_set)
     }
 
-    pub fn import_design_raw(&self) -> Result<DesignSet, Box<dyn std::error::Error>> {
+    pub fn import_design_raw(
+        &self,
+    ) -> Result<(String, BTreeMap<String, Design>), Box<dyn std::error::Error>> {
         let designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
 
-        let design_set = design_set::DesignSet::new(self.module_name().to_string(), designs)?;
+        let design_set = (self.module_name().to_string(), designs);
         Ok(design_set)
     }
 

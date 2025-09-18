@@ -2,10 +2,11 @@
 resolver = "3"
 
 members = [
+    "svql_common",
+    "svql_design_set",
     "svql_driver",
     "svql_query",
     "svql_subgraph",
-    "svql_common",
 
     # PRJUNNAMED
     "prjunnamed/generic",
@@ -15,14 +16,15 @@ members = [
     "prjunnamed/netlist",
     "prjunnamed/pattern",
     "prjunnamed/siliconblue",
-    "prjunnamed/yosys_json",
+    "prjunnamed/yosys_json"
 ]
 
 default-members = [
+    "svql_common",
+    "svql_design_set",
     "svql_driver",
     "svql_query",
     "svql_subgraph",
-    "svql_common",
 ]
 
 [workspace.package]
@@ -38,6 +40,7 @@ version = "0.1.0"
 # SVQL
 ###############
 svql_common = { path = "svql_common" }
+svql_design_set = { path = "svql_design_set" }
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
 svql_subgraph = { path = "svql_subgraph" }
