@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::cell::CellWrapper;
+use svql_design_set::cell::CellWrapper;
 
 #[derive(Clone, Debug, Default)]
 pub struct Assignment<'needle, 'haystack> {

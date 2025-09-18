@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
-use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
 use prjunnamed_netlist::{ADLatch, Cell, CellRef, DLatchSr, FlipFlop, Net, Trit, Value};
+use svql_design_set::cell::CellWrapper;
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::cell::{CellKind, CellWrapper};
 use crate::mapping::Assignment;
+use svql_design_set::cell::{CellKind, CellWrapper};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct EmbeddingSet<'needle, 'haystack> {
     pub items: Vec<Embedding<'needle, 'haystack>>,
     pub needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,

@@ -909,6 +909,7 @@ dependencies = [
  "regex",
  "rstest",
  "svql_common",
+ "svql_design_set",
  "tempfile",
  "thiserror",
  "tracing",

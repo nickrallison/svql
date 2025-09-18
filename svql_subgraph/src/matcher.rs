@@ -1,73 +1,26 @@
 use std::collections::{HashSet, VecDeque};
+use svql_design_set::design_container::DesignContainer;
 use tracing::debug;
 
 use prjunnamed_netlist::Design;
 use svql_common::Config;
+use svql_design_set::cell::{CellKind, CellWrapper};
+use svql_design_set::graph_index::GraphIndex;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::cell::{CellKind, CellWrapper};
 use crate::embedding::{Embedding, EmbeddingSet};
-use crate::graph_index::GraphIndex;
 use crate::mapping::Assignment;
 use crate::utils::intersect_sets;
 
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
-    needle: &'needle Design,
-    haystack: &'haystack Design,
-    needle_index: GraphIndex<'needle>,
-    haystack_index: GraphIndex<'haystack>,
-    pub(crate) config: &'cfg Config,
-}
-
-pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
-    pub(crate) needle: &'needle Design,
-    pub(crate) haystack: &'haystack Design,
-    pub(crate) needle_index: &'cfg GraphIndex<'needle>,
-    pub(crate) haystack_index: &'cfg GraphIndex<'haystack>,
+    pub(crate) needle: &'needle DesignContainer,
+    pub(crate) haystack: &'haystack DesignContainer,
     pub(crate) config: &'cfg Config,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
-    pub fn enumerate_all(
-        needle: &'needle Design,
-        haystack: &'haystack Design,
-        config: &'cfg Config,
-    ) -> EmbeddingSet<'needle, 'haystack> {
-        let needle_index = GraphIndex::build(needle);
-        let haystack_index = GraphIndex::build(haystack);
-
-        let matcher = SubgraphMatcherCore {
-            needle,
-            haystack,
-            needle_index: &needle_index,
-            haystack_index: &haystack_index,
-            config,
-        };
-
-        matcher.enumerate_embeddings()
-    }
-
-    pub fn enumerate_with_indices(
-        needle: &'needle Design,
-        haystack: &'haystack Design,
-        needle_index: &'cfg GraphIndex<'needle>,
-        haystack_index: &'cfg GraphIndex<'haystack>,
-        config: &'cfg Config,
-    ) -> EmbeddingSet<'needle, 'haystack> {
-        let matcher = SubgraphMatcherCore {
-            needle,
-            haystack,
-            needle_index,
-            haystack_index,
-            config,
-        };
-        matcher.enumerate_embeddings()
-    }
-}
-
-impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub fn enumerate_embeddings(&self) -> EmbeddingSet<'needle, 'haystack> {
         let (needle_input_mapping_queue, needle_internal_mapping_queue) =
             self.build_needle_work_queues();
@@ -91,8 +44,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         EmbeddingSet {
             items: results,
-            needle_input_fanout_by_name: self.needle_index.get_input_fanout_by_name().clone(),
-            needle_output_fanin_by_name: self.needle_index.get_output_fanin_by_name().clone(),
+            needle_input_fanout_by_name: self.needle.index().get_input_fanout_by_name(),
+            needle_output_fanin_by_name: self.needle.index().get_output_fanin_by_name(),
         }
     }
 
