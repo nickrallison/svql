@@ -3,6 +3,7 @@ use crate::cell::{CellIndex, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
 use std::collections::{HashMap, HashSet};
 
+
 #[derive(Clone, Debug)]
 pub struct ConnectivityGraph {
     /// Maps each cell to its fan-in cells with port information

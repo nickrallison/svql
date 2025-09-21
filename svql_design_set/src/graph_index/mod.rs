@@ -1,10 +1,12 @@
 mod cell_registry;
 mod connectivity_graph;
 mod io_mapping;
+mod submodule;
 
 pub use cell_registry::CellRegistry;
 pub use connectivity_graph::ConnectivityGraph;
 pub use io_mapping::IoMapping;
+pub(crate) use submodule::{SubmoduleContainer, SubmoduleKey};
 
 use crate::cell::{CellIndex, CellKind, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
@@ -15,6 +17,7 @@ pub struct GraphIndex<'a> {
     cell_registry: CellRegistry<'a>,
     connectivity: ConnectivityGraph,
     io_mapping: IoMapping,
+    submodules: SubmoduleContainer,
 }
 
 impl<'a> GraphIndex<'a> {
@@ -28,11 +31,13 @@ impl<'a> GraphIndex<'a> {
             connectivity.fanin_map(),
             connectivity.fanout_map(),
         );
+        let submodules = SubmoduleContainer::build(design);
 
         GraphIndex {
             cell_registry,
             connectivity,
             io_mapping,
+            submodules,
         }
     }
 
