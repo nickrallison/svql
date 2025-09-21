@@ -14,3 +14,4 @@ flamegraph.svg
 fusesoc.conf
 ##
 examples/fixtures/larger_designs/json/openpiton_chip.json
+examples/fixtures/larger_designs/json/openpiton_chip_full.json
