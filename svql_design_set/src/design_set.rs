@@ -88,7 +88,13 @@ impl DesignSet {
         &self.modules
     }
 
-    pub fn get(&self, name: &str) -> Option<&Design> {
+    pub fn get(&self, name: &str) -> Option<&DesignContainer> {
+        self.modules.get(name).map(|container| container.as_ref())
+    }
+    pub fn get_index(&self, name: &str) -> Option<&Design> {
+        self.modules.get(name).map(|container| container.design())
+    }
+    pub fn get_design(&self, name: &str) -> Option<&Design> {
         self.modules.get(name).map(|container| container.design())
     }
 }

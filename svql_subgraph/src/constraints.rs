@@ -1,9 +1,8 @@
-use crate::SubgraphMatcherCore;
-use crate::mapping::Assignment;
+use crate::{SubgraphMatcher, mapping::Assignment};
 use prjunnamed_netlist::{ADLatch, Cell, CellRef, DLatchSr, FlipFlop, Net, Trit, Value};
 use svql_design_set::cell::CellWrapper;
 
-impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
         &self,
         p_cell: CellWrapper<'needle>,
@@ -311,9 +310,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
         let actual_fan_in_haystack_cell: Result<(CellRef<'haystack>, usize), Trit> =
-            self.haystack.find_cell(*haystack_net);
+            self.haystack().design().find_cell(*haystack_net);
         let fan_in_needle_cell: Result<(CellRef<'needle>, usize), Trit> =
-            self.needle.find_cell(*needle_net);
+            self.needle.design().find_cell(*needle_net);
 
         let (actual_fan_in_haystack_cell_ref, d_fan_in_idx, fan_in_needle_cell_ref, p_fan_in_idx) =
             match (actual_fan_in_haystack_cell, fan_in_needle_cell) {

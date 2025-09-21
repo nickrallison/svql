@@ -51,10 +51,12 @@ impl<'needle, 'haystack> Match<'needle, 'haystack> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct PartialMatch<'needle, 'haystack> {
     pub(crate) assignment: Assignment<'needle, 'haystack>,
     pub(crate) needle_input_mapping_queue: VecDeque<CellWrapper<'needle>>,
     pub(crate) needle_internal_mapping_queue: VecDeque<CellWrapper<'needle>>,
+    pub(crate) call_stack: Vec<String>,
 }
 
 impl<'needle, 'haystack> PartialMatch<'needle, 'haystack> {

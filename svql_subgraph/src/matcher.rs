@@ -15,24 +15,56 @@ use crate::utils::intersect_sets;
 
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub(crate) needle: &'needle DesignContainer,
-    pub(crate) haystack: &'haystack DesignSet,
+    pub(crate) haystack_key: String,
+    pub(crate) haystack_set: &'haystack DesignSet,
     pub(crate) config: &'cfg Config,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
+    pub fn new(
+        needle: &'needle DesignContainer,
+        haystack_key: String,
+        haystack_set: &'haystack DesignSet,
+        config: &'cfg Config,
+    ) -> Self {
+        Self {
+            needle,
+            haystack_key,
+            haystack_set,
+            config,
+        }
+    }
+
     pub fn get_matches(&self) -> Matches<'needle, 'haystack> {
         let (needle_input_mapping_queue, needle_internal_mapping_queue) =
             self.build_needle_work_queues();
-        let initial_cell_mapping: Assignment<'needle, 'haystack> = Assignment::new();
-        // this is only for the top level, other wise partial matches are needed to find cross module matches
-        let partial_matches = false;
-        let mut results = self.get_matches_rec(
-            initial_cell_mapping,
-            needle_internal_mapping_queue,
-            needle_input_mapping_queue,
-            0,
-            partial_matches,
-        );
+
+        let initial_partial_match = PartialMatch {
+            assignment: Assignment::new(),
+            needle_input_mapping_queue: needle_input_mapping_queue,
+            needle_internal_mapping_queue: needle_internal_mapping_queue,
+            call_stack: vec![self.haystack_key.clone()],
+        };
+
+        let child_partial_matches: Vec<PartialMatch<'needle, 'haystack>> =
+            todo!("get partial matches from child modules (recusively)");
+
+        let partial_matches = vec![initial_partial_match]
+            .into_iter()
+            .chain(child_partial_matches.into_iter())
+            .collect::<Vec<PartialMatch<'needle, 'haystack>>>();
+
+        let mut results = partial_matches
+            .into_iter()
+            .flat_map(|pm| self.get_matches_rec(pm))
+            .collect::<Vec<PartialMatch<'needle, 'haystack>>>();
+
+        let mut results = results
+            .drain(..)
+            .map(|pm| Match {
+                assignment: pm.assignment,
+            })
+            .collect::<Vec<Match<'needle, 'haystack>>>();
 
         if self.config.dedupe.all() {
             let mut seen: HashSet<Vec<usize>> = HashSet::new();
@@ -53,22 +85,15 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 
     fn get_matches_rec(
         &self,
-        cell_mapping: Assignment<'needle, 'haystack>,
-        mut needle_internal_mapping_queue: VecDeque<CellWrapper<'needle>>,
-        needle_input_mapping_queue: VecDeque<CellWrapper<'needle>>,
-        recursion_depth: usize,
-        partial_matches: bool,
+        mut partial_match: PartialMatch<'needle, 'haystack>,
     ) -> Vec<PartialMatch<'needle, 'haystack>> {
         // Base Case
-        let Some(needle_current) = needle_internal_mapping_queue.pop_front() else {
-            return self.recurse_input_cells(
-                cell_mapping,
-                needle_input_mapping_queue,
-                recursion_depth + 1,
-            );
+        let Some(needle_current) = partial_match.needle_internal_mapping_queue.pop_front() else {
+            return self.recurse_input_cells(partial_match);
         };
 
-        let candidates = self.candidates_for_cell(needle_current.clone(), &cell_mapping);
+        let candidates =
+            self.candidates_for_cell(needle_current.clone(), &partial_match.assignment);
 
         #[cfg(feature = "rayon")]
         let candidates_iter = candidates.into_par_iter();
@@ -77,18 +102,21 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         let candidates_iter = candidates.into_iter();
 
         let results = candidates_iter.map(|candidate_cell| {
-            let mut next_assignment = cell_mapping.clone();
-            next_assignment.assign(needle_current.clone(), candidate_cell.clone());
+            let mut new_pm: PartialMatch<'needle, 'haystack> = partial_match.clone();
+            new_pm
+                .assignment
+                .assign(needle_current.clone(), candidate_cell.clone());
 
-            self.get_matches_rec(
-                next_assignment,
-                needle_internal_mapping_queue.clone(),
-                needle_input_mapping_queue.clone(),
-                recursion_depth + 1,
-            )
+            self.get_matches_rec(new_pm)
         });
 
-        let embeddings: Vec<Match<'needle, 'haystack>> = results.flatten().collect();
+        // let embeddings: Vec<Match<'needle, 'haystack>> = results
+        //     .filter_map(|pm| pm.try_into().ok())
+        //     .flatten()
+        //     .collect();
+
+        let embeddings: Vec<PartialMatch<'needle, 'haystack>> = results.flatten().collect();
+        let recursion_depth = partial_match.assignment.len();
         debug!(
             "Depth {} returning {} results",
             recursion_depth,
@@ -99,20 +127,15 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 
     fn recurse_input_cells(
         &self,
-        cell_mapping: Assignment<'needle, 'haystack>,
-        mut needle_input_queue: VecDeque<CellWrapper<'needle>>,
-        recursion_depth: usize,
+        mut partial_match: PartialMatch<'needle, 'haystack>,
     ) -> Vec<PartialMatch<'needle, 'haystack>> {
         // Base Case
-        let Some(needle_current) = needle_input_queue.pop_front() else {
-            let mapping = Match {
-                assignment: cell_mapping,
-            };
-
-            return vec![mapping];
+        let Some(needle_current) = partial_match.needle_input_mapping_queue.pop_front() else {
+            return vec![partial_match];
         };
 
-        let candidates_vec = self.candidates_for_input(needle_current.clone(), &cell_mapping);
+        let candidates_vec =
+            self.candidates_for_input(needle_current.clone(), &partial_match.assignment);
 
         #[cfg(feature = "rayon")]
         let candidates_iter = candidates_vec.into_par_iter();
@@ -121,13 +144,16 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         let candidates_iter = candidates_vec.into_iter();
 
         let results = candidates_iter.map(|candidate_cell| {
-            let mut nm = cell_mapping.clone();
-            nm.assign(needle_current.clone(), candidate_cell.clone());
+            let mut new_pm = partial_match.clone();
+            new_pm
+                .assignment
+                .assign(needle_current.clone(), candidate_cell.clone());
 
-            self.recurse_input_cells(nm, needle_input_queue.clone(), recursion_depth + 1)
+            self.recurse_input_cells(new_pm)
         });
 
-        let flat_results: Vec<Match<'needle, 'haystack>> = results.flatten().collect();
+        let flat_results: Vec<PartialMatch<'needle, 'haystack>> = results.flatten().collect();
+        let recursion_depth = partial_match.assignment.len();
         debug!(
             "Depth {} returning {} results",
             recursion_depth,
@@ -145,7 +171,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         VecDeque<CellWrapper<'needle>>,
     ) {
         let mut topo_ordered_cells: Vec<CellWrapper<'needle>> = self
-            .needle_index
+            .needle
+            .index()
             .cells_topo()
             .iter()
             .filter(|c| !matches!(c.cell_type(), CellKind::Output))
@@ -174,7 +201,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         let current_kind = needle_current.cell_type();
 
         let needle_fan_in = self
-            .needle_index
+            .needle
+            .index()
             .fanin_with_ports(&needle_current)
             .unwrap_or_default();
 
@@ -187,14 +215,15 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         {
             // if no fanin mapped, return all cells of the correct type
             // This happens for the first cells mapped and is not avoidable
-            self.haystack_index
+            self.haystack()
+                .index()
                 .cells_of_type_iter(current_kind)
                 .map(|iter| iter.cloned().collect())
                 .unwrap_or_default()
         } else {
             let haystack_fan_out_sets: Vec<HashSet<CellWrapper<'haystack>>> = mapped_haystack_fanin
                 .iter()
-                .filter_map(|haystack_cell| self.haystack_index.fanout_set(haystack_cell))
+                .filter_map(|haystack_cell| self.haystack().index().fanout_set(haystack_cell))
                 .collect();
 
             let intersection_haystack_fan_out: HashSet<CellWrapper<'haystack>> =
@@ -224,7 +253,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         cell_mapping: &Assignment<'needle, 'haystack>,
     ) -> Vec<CellWrapper<'haystack>> {
         let needle_fan_out = self
-            .needle_index
+            .needle
+            .index()
             .fanout_with_ports(&needle_current)
             .unwrap_or_default();
 
@@ -237,7 +267,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 
         let haystack_fan_in_sets: Vec<HashSet<CellWrapper<'haystack>>> = mapped_haystack_fan_out
             .iter()
-            .filter_map(|haystack_cell| self.haystack_index.fanin_set(haystack_cell))
+            .filter_map(|haystack_cell| self.haystack().index().fanin_set(haystack_cell))
             .collect();
 
         let intersection_haystack_fan_in: HashSet<CellWrapper<'haystack>> =
@@ -249,7 +279,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
                 let mut next_assignment = cell_mapping.clone();
                 next_assignment.assign(needle_current.clone(), haystack_cell.clone());
 
-                let fanout = self.haystack_index.fanout_set(haystack_cell);
+                let fanout = self.haystack().index().fanout_set(haystack_cell);
                 if fanout.is_none() {
                     return false;
                 }
@@ -272,5 +302,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             .collect();
 
         candidates
+    }
+
+    pub(crate) fn haystack(&self) -> &'haystack DesignContainer {
+        self.haystack_set
+            .get(&self.haystack_key)
+            .expect("Haystack module not found in design set")
     }
 }

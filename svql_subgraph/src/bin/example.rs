@@ -45,15 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let design_set = design_module.import_design_raw()?;
 
     let needle = needle_set
-        .modules
+        .1
         .get("and_gate")
         .ok_or("Needle module not found")?;
-    let design = design_set
-        .modules
-        .get("chip")
-        .ok_or("Design module not found")?;
+    let design = design_set.1.get("chip").ok_or("Design module not found")?;
 
-    let embeddings = svql_subgraph::SubgraphMatcher::enumerate_all(&needle, &design, &config);
+    let embeddings = svql_subgraph::SubgraphMatcher::get_matches(&needle, &design, &config);
 
     println!("Found {} embeddings", embeddings.items.len());
 
