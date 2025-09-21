@@ -23,7 +23,7 @@ impl DesignSet {
         }
     }
 
-    fn from_designs(top_module: String, designs: BTreeMap<String, Design>) -> Self {
+    pub fn from_designs(top_module: String, designs: BTreeMap<String, Design>) -> Self {
         let modules = designs
             .into_iter()
             .map(|(name, design)| (name, Arc::new(DesignContainer::build(design))))

@@ -1,5 +1,6 @@
 use rstest::rstest;
 use std::sync::OnceLock;
+use svql_design_set::{DesignSet, design_container::DesignContainer};
 
 use svql_common::{ALL_TEST_CASES, Needle, TestCase};
 use svql_subgraph::SubgraphMatcher;
@@ -26,14 +27,31 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         return Err("Invalid needle".into());
     };
 
-    let needle = yosys_module.import_design(&tc.config.needle_options)?;
+    let needle_set = yosys_module.import_design(&tc.config.needle_options)?;
 
-    let haystack = tc
+    let haystack_set = tc
         .haystack
         .yosys_module
         .import_design(&tc.config.haystack_options)?;
 
-    let embeddings = SubgraphMatcher::enumerate_all(&needle, &haystack, &tc.config);
+    let needle = needle_set
+        .1
+        .get("and_gate")
+        .ok_or("Needle module not found")?;
+
+    let needle_container = DesignContainer::build(needle.clone());
+
+    let haystack_key = haystack_set.0.clone();
+    let haystack_set = DesignSet::from_designs(haystack_set.0, haystack_set.1);
+
+    let subgraph_matcher = svql_subgraph::SubgraphMatcher::new(
+        &needle_container,
+        haystack_key,
+        &haystack_set,
+        &tc.config,
+    );
+
+    let embeddings = subgraph_matcher.get_matches();
 
     if embeddings.items.len() != tc.expected_matches {
         return Err(format!(

@@ -1,6 +1,7 @@
 use prjunnamed_netlist::Cell;
 use std::{borrow::Cow, path::PathBuf};
 use svql_common::YosysModule;
+use svql_design_set::{DesignSet, design_container::DesignContainer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle_module: YosysModule =
@@ -48,9 +49,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .1
         .get("and_gate")
         .ok_or("Needle module not found")?;
-    let design = design_set.1.get("chip").ok_or("Design module not found")?;
 
-    let embeddings = svql_subgraph::SubgraphMatcher::get_matches(&needle, &design, &config);
+    let needle_container = DesignContainer::build(needle.clone());
+
+    let haystack_key = design_set.0.clone();
+    let haystack_set = DesignSet::from_designs(design_set.0, design_set.1);
+
+    let subgraph_matcher = svql_subgraph::SubgraphMatcher::new(
+        &needle_container,
+        haystack_key,
+        &haystack_set,
+        &config,
+    );
+
+    let embeddings = subgraph_matcher.get_matches();
 
     println!("Found {} embeddings", embeddings.items.len());
 
