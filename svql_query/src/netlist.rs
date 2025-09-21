@@ -1,6 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Driver, DriverKey, context::Context, design_container::DesignContainer};
-use svql_subgraph::{Embedding, EmbeddingSet};
+use svql_subgraph::{Match, Matches};
 
 use crate::instance::Instance;
 
@@ -31,9 +31,9 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
     type Hit<'ctx>;
 
     fn from_subgraph<'ctx>(
-        m: &Embedding<'ctx, 'ctx>,
+        m: &Match<'ctx, 'ctx>,
         path: Instance,
-        embedding_set: &EmbeddingSet<'ctx, 'ctx>,
+        embedding_set: &Matches<'ctx, 'ctx>,
     ) -> Self::Hit<'ctx>;
 
     #[contracts::debug_requires(context.get(&Self::driver_key()).is_some(), "Pattern design must be present in context")]

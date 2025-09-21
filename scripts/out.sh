@@ -102,6 +102,9 @@ find target -name "svql_subgraph_generated_tests.rs" -printf "%T+ %p\n" | sort -
 #     > out.md
 
 /home/nick/Projects/svql/.venv/bin/python3 scripts/md_tree.py --root . \
+    --include 'prjunnamed/netlist/src/cell/instance.rs' \
+    --include 'prjunnamed/netlist/src/cell.rs' \
+    --include 'prjunnamed/netlist/src/design.rs' \
     --include 'svql_subgraph/**.rs' \
     --include 'svql_design_set/**.rs' \
     --include 'svql_common/**.rs' \
@@ -113,4 +116,5 @@ find target -name "svql_subgraph_generated_tests.rs" -printf "%T+ %p\n" | sort -
     --section "svql_design_set=svql_design_set" \
     --section "svql_query=svql_query" \
     --section "svql_common=svql_common" \
+    --section "prjunnamed=prjunnamed" \
     > out.md

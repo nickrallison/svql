@@ -1,35 +1,37 @@
 use std::collections::{HashSet, VecDeque};
+use svql_design_set::DesignSet;
 use svql_design_set::design_container::DesignContainer;
 use tracing::debug;
 
-use prjunnamed_netlist::Design;
 use svql_common::Config;
 use svql_design_set::cell::{CellKind, CellWrapper};
-use svql_design_set::graph_index::GraphIndex;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::embedding::{Embedding, EmbeddingSet};
 use crate::mapping::Assignment;
+use crate::match_::{Match, Matches, PartialMatch};
 use crate::utils::intersect_sets;
 
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub(crate) needle: &'needle DesignContainer,
-    pub(crate) haystack: &'haystack DesignContainer,
+    pub(crate) haystack: &'haystack DesignSet,
     pub(crate) config: &'cfg Config,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
-    pub fn enumerate_embeddings(&self) -> EmbeddingSet<'needle, 'haystack> {
+    pub fn get_matches(&self) -> Matches<'needle, 'haystack> {
         let (needle_input_mapping_queue, needle_internal_mapping_queue) =
             self.build_needle_work_queues();
         let initial_cell_mapping: Assignment<'needle, 'haystack> = Assignment::new();
-        let mut results = self.recurse_internal_cells(
+        // this is only for the top level, other wise partial matches are needed to find cross module matches
+        let partial_matches = false;
+        let mut results = self.get_matches_rec(
             initial_cell_mapping,
             needle_internal_mapping_queue,
             needle_input_mapping_queue,
             0,
+            partial_matches,
         );
 
         if self.config.dedupe.all() {
@@ -42,20 +44,21 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             results.retain(|m| seen.insert(m.internal_signature()));
         }
 
-        EmbeddingSet {
+        Matches {
             items: results,
             needle_input_fanout_by_name: self.needle.index().get_input_fanout_by_name(),
             needle_output_fanin_by_name: self.needle.index().get_output_fanin_by_name(),
         }
     }
 
-    fn recurse_internal_cells(
+    fn get_matches_rec(
         &self,
         cell_mapping: Assignment<'needle, 'haystack>,
         mut needle_internal_mapping_queue: VecDeque<CellWrapper<'needle>>,
         needle_input_mapping_queue: VecDeque<CellWrapper<'needle>>,
         recursion_depth: usize,
-    ) -> Vec<Embedding<'needle, 'haystack>> {
+        partial_matches: bool,
+    ) -> Vec<PartialMatch<'needle, 'haystack>> {
         // Base Case
         let Some(needle_current) = needle_internal_mapping_queue.pop_front() else {
             return self.recurse_input_cells(
@@ -77,7 +80,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             let mut next_assignment = cell_mapping.clone();
             next_assignment.assign(needle_current.clone(), candidate_cell.clone());
 
-            self.recurse_internal_cells(
+            self.get_matches_rec(
                 next_assignment,
                 needle_internal_mapping_queue.clone(),
                 needle_input_mapping_queue.clone(),
@@ -85,7 +88,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             )
         });
 
-        let embeddings: Vec<Embedding<'needle, 'haystack>> = results.flatten().collect();
+        let embeddings: Vec<Match<'needle, 'haystack>> = results.flatten().collect();
         debug!(
             "Depth {} returning {} results",
             recursion_depth,
@@ -99,10 +102,10 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         cell_mapping: Assignment<'needle, 'haystack>,
         mut needle_input_queue: VecDeque<CellWrapper<'needle>>,
         recursion_depth: usize,
-    ) -> Vec<Embedding<'needle, 'haystack>> {
+    ) -> Vec<PartialMatch<'needle, 'haystack>> {
         // Base Case
         let Some(needle_current) = needle_input_queue.pop_front() else {
-            let mapping = Embedding {
+            let mapping = Match {
                 assignment: cell_mapping,
             };
 
@@ -124,7 +127,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             self.recurse_input_cells(nm, needle_input_queue.clone(), recursion_depth + 1)
         });
 
-        let flat_results: Vec<Embedding<'needle, 'haystack>> = results.flatten().collect();
+        let flat_results: Vec<Match<'needle, 'haystack>> = results.flatten().collect();
         debug!(
             "Depth {} returning {} results",
             recursion_depth,

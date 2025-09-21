@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::Match;
-use svql_subgraph::{Embedding, cell::CellWrapper};
+use svql_subgraph::{Match, cell::CellWrapper};
 use tracing::debug;
 
 // Macro‑friendly helpers that bind a single bit of a named input or output
@@ -10,7 +10,7 @@ use tracing::debug;
 // supported at the query layer).
 
 pub fn bind_input<'ctx>(
-    m: &Embedding<'ctx, 'ctx>,
+    m: &Match<'ctx, 'ctx>,
     name: &str,
     bit: usize,
     input_fanout_by_name: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
@@ -29,7 +29,7 @@ pub fn bind_input<'ctx>(
 }
 
 pub fn bind_output<'ctx>(
-    m: &Embedding<'ctx, 'ctx>,
+    m: &Match<'ctx, 'ctx>,
     name: &str,
     bit: usize,
     output_fanin_by_name: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
