@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use svql_design_set::cell::CellWrapper;
+use svql_design_set::cell::GlobalCellIndex;
 
 #[derive(Clone, Debug, Default)]
 pub struct Assignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
-    needle_to_haystack: HashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
+    needle_to_haystack: HashMap<GlobalCellIndex<'needle>, GlobalCellIndex<'haystack>>,
     /// Design to Pattern cell mapping
-    haystack_to_needle: HashMap<CellWrapper<'haystack>, CellWrapper<'needle>>,
+    haystack_to_needle: HashMap<GlobalCellIndex<'haystack>, GlobalCellIndex<'needle>>,
 }
 
 impl<'needle, 'haystack> Assignment<'needle, 'haystack> {

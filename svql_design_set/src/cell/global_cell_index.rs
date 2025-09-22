@@ -1,20 +1,4 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CellIndex {
-    idx: usize,
-}
-
-impl CellIndex {
-    pub fn new(idx: usize) -> Self {
-        CellIndex { idx }
-    }
-
-    #[inline]
-    pub fn index(&self) -> usize {
-        self.idx
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GlobalCellIndex<'a> {
     idx: usize,
     module_key: &'a str,
