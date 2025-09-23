@@ -182,6 +182,21 @@ impl YosysModule {
         Ok(design)
     }
 
+    pub fn import_design_raw(
+        &self,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
+
+        let design = designs.remove(self.module_name()).ok_or_else(|| {
+            format!(
+                "Design not found in Yosys JSON output: {}",
+                self.path().display()
+            )
+        })?;
+
+        Ok(design)
+    }
+
     pub fn write_rtlil_to_path(
         &self,
         config: &ModuleConfig,

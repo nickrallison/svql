@@ -50,4 +50,4 @@ export PATH="$PATH:$PITON_ROOT/piton/tools/bin"
 export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
 
 # Genetate Base Netlist
-fusesoc run --target=pickle chip
+# fusesoc run --target=pickle chip

@@ -7,8 +7,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         YosysModule::new("examples/patterns/basic/and/verilog/and_gate.v", "and_gate")?;
 
     let design_module: YosysModule = YosysModule::new(
-        "build/openpiton__chip_0.1/pickle-icarus/openpiton__chip_0.1.v",
-        "chip",
+        "examples/fixtures/larger_designs/json/openpiton_tile_full.json",
+        "tile",
     )?;
 
     // let design_module: YosysModule = YosysModule::new(
@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let module_config = svql_common::ModuleConfig {
         flatten: false,
-        verific: true,
+        verific: false,
         ..Default::default()
     };
 
@@ -41,19 +41,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let yosys = PathBuf::from("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys");
 
     let needle = needle_module.import_design_yosys(&config.needle_options, &yosys)?;
-    let design = design_module.import_design_yosys(&config.haystack_options, &yosys)?;
+    let design = design_module.import_design_raw()?;
 
     let design_cells = design.iter_cells().collect::<Vec<_>>();
 
     println!("Design has {} cells", design_cells.len());
 
-    for c in design_cells.iter() {
-        if matches!(c.get(), Cow::Borrowed(Cell::And { .. })) {
-            println!("{:?}", c.get());
-        } else {
-            println!("{:?}", c.get());
-        }
-    }
+    // for c in design_cells.iter() {
+    //     if matches!(c.get(), Cow::Borrowed(Cell::And { .. })) {
+    //         println!("{:?}", c.get());
+    //     } else {
+    //         println!("{:?}", c.get());
+    //     }
+    // }
 
     let count = design_cells
         .iter()
