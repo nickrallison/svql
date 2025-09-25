@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = svql_common::Config::builder()
         .match_length(svql_common::MatchLength::First)
         .dedupe(svql_common::Dedupe::Inner)
-        .haystack_flatten(false)
+        // .haystack_flatten(false)
         .haystack_options(module_config.clone())
         .needle_options(module_config)
         .build();
