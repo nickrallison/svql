@@ -75,6 +75,7 @@ impl ConfigBuilder {
 
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
+        self.needle_options = self.needle_options.with_flatten(true);
         self
     }
 
@@ -90,10 +91,10 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn needle_flatten(mut self, flatten: bool) -> Self {
-        self.needle_options.flatten = flatten;
-        self
-    }
+    // pub fn needle_flatten(mut self, flatten: bool) -> Self {
+    //     self.needle_options.flatten = flatten;
+    //     self
+    // }
 
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
@@ -112,10 +113,10 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn haystack_flatten(mut self, flatten: bool) -> Self {
-        self.haystack_options.flatten = flatten;
-        self
-    }
+    // pub fn haystack_flatten(mut self, flatten: bool) -> Self {
+    //     self.haystack_options.flatten = flatten;
+    //     self
+    // }
 
     pub fn build(self) -> Config {
         Config {

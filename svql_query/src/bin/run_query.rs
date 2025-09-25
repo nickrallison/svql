@@ -129,7 +129,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cfg = Config::builder()
         .match_length(args.match_length)
-        .haystack_flatten(args.flatten)
         .dedupe(args.dedupe)
         .build();
 

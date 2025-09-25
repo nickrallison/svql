@@ -276,7 +276,7 @@ lazy_static::lazy_static! {
             name: "and_gate_self_dedupe_none",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
-                .haystack_flatten(true)
+                // .haystack_flatten(true)
                 .dedupe(crate::Dedupe::None)
                 .build(),
             needle: &AND_GATE,
@@ -287,7 +287,7 @@ lazy_static::lazy_static! {
             name: "and_gate_self_dedupe_all",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
-                .haystack_flatten(true)
+                // .haystack_flatten(true)
                 .dedupe(crate::Dedupe::All)
                 .build(),
             needle: &AND_GATE,
@@ -298,7 +298,7 @@ lazy_static::lazy_static! {
             name: "small_and_seq_3_and_tree_4_dedupe_none",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
-                .haystack_flatten(true)
+                // .haystack_flatten(true)
                 .dedupe(crate::Dedupe::None)
                 .build(),
             needle: &SMALL_AND_SEQ,
@@ -309,7 +309,7 @@ lazy_static::lazy_static! {
             name: "small_and_seq_3_and_tree_4_dedupe_all",
             config: Config::builder()
                 .match_length(crate::config::MatchLength::Exact)
-                .haystack_flatten(true)
+                // .haystack_flatten(true)
                 .dedupe(crate::Dedupe::All)
                 .build(),
             needle: &SMALL_AND_SEQ,
@@ -349,28 +349,28 @@ lazy_static::lazy_static! {
 
         TestCase {
             name: "async_en_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
             needle: &ASYNC_EN_IL,
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
         TestCase {
             name: "async_mux_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
             needle: &ASYNC_MUX_IL,
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
         // TestCase {
         //     name: "sync_en_in_many_locked_regs",
-        //     config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build();
         //     pattern: &SYNC_EN_IL,
         //     haystack: &MANY_LOCKED_REGS_IL,
         //     expected_matches: 2,
         // },
         // TestCase {
         //     name: "sync_mux_in_many_locked_regs",
-        //     config: Config::builder().match_length(crate::MatchLength::Exact).haystack_flatten(true).build(),
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build();
         //     pattern: &SYNC_MUX_IL,
         //     haystack: &MANY_LOCKED_REGS_IL,
         //     expected_matches: 2,
@@ -381,7 +381,7 @@ lazy_static::lazy_static! {
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
             name: "sdffe_then_and_simple_dedupe_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).haystack_flatten(true).build(),
+            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
             needle: &SDFFE_THEN_AND,
             haystack: &AND_Q_DOUBLE_SDFFE,
             expected_matches: 4,
@@ -391,7 +391,7 @@ lazy_static::lazy_static! {
     pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
             name: "and_any_in_mixed_tree_dedupe_all",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).haystack_flatten(true).build(),
+            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).build(),
             needle: &AND_ANY,
             haystack: &MIXED_AND_TREE,
             expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
