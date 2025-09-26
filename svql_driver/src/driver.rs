@@ -173,6 +173,60 @@ impl Driver {
         Ok((key, design_arc))
     }
 
+    #[contracts::debug_requires(!module_name.is_empty())]
+    pub fn get_or_load_design_raw(
+        &self,
+        design_path: &str,
+        module_name: &str,
+    ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
+        let design_path = Path::new(design_path);
+        let absolute_path = if design_path.is_absolute() {
+            design_path.to_path_buf()
+        } else {
+            self.root_path.join(design_path)
+        };
+
+        let key = DriverKey::new(&absolute_path, module_name.to_string());
+
+        // Try to get from registry first
+        {
+            let registry = self.registry.read().unwrap();
+            if let Some(design) = registry.get(&key) {
+                tracing::event!(tracing::Level::DEBUG, "Design found in registry: {:?}", key);
+                return Ok((key, design.clone()));
+            }
+        }
+
+        // Load and store
+        tracing::event!(
+            tracing::Level::INFO,
+            "Loading design: {} ({})",
+            absolute_path.display(),
+            module_name
+        );
+
+        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+        let design = yosys_module
+            .import_design_raw()
+            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+
+        let design_container = DesignContainer::build(design);
+        let design_arc = Arc::new(design_container);
+
+        {
+            let mut registry = self.registry.write().unwrap();
+            registry.insert(key.clone(), design_arc.clone());
+            tracing::event!(
+                tracing::Level::DEBUG,
+                "Design stored in registry: {:?}",
+                key
+            );
+        }
+
+        Ok((key, design_arc))
+    }
+
     /// Get a design from the registry (returns None if not loaded)
     pub fn get_design(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
         let registry = self.registry.read().unwrap();
