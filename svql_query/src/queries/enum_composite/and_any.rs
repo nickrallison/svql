@@ -1,5 +1,3 @@
-// svql_query/src/queries/enum_composite/and_any.rs
-
 use crate::{
     Match, Search, State, Wire, WithPath,
     composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
@@ -10,8 +8,6 @@ use crate::{
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-// #[cfg(feature = "rayon")]
-// use rayon::prelude::*;
 #[cfg(feature = "parallel")]
 use std::thread;
 
@@ -46,8 +42,6 @@ where
     }
 }
 
-// As a simple container, no connections are enforced.
-// This mirrors the EnumComposite trait surface but remains a no-op.
 impl<S> EnumComposite<S> for AndAny<S> where S: State {}
 
 impl<'ctx> MatchedEnumComposite<'ctx> for AndAny<Match<'ctx>> {}
@@ -63,11 +57,9 @@ impl SearchableEnumComposite for AndAny<Search> {
         let and_mux_context = AndMux::<Search>::context(driver, config)?;
         let and_nor_context = AndNor::<Search>::context(driver, config)?;
 
-        let context = and_gate_context
+        Ok(and_gate_context
             .merge(and_mux_context)
-            .merge(and_nor_context);
-
-        Ok(context)
+            .merge(and_nor_context))
     }
 
     fn query<'ctx>(
@@ -76,20 +68,15 @@ impl SearchableEnumComposite for AndAny<Search> {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
-        // Run individual queries in parallel when Rayon is enabled
         #[cfg(feature = "parallel")]
-        {
+        let (and_gate_matches, and_mux_matches, and_nor_matches) = {
             tracing::event!(
                 tracing::Level::INFO,
-                "AndAny::query: executing with Rayon parallel queries"
+                "AndAny::query: executing with parallel queries"
             );
 
-            let results = std::thread::scope(|scope| {
+            std::thread::scope(|scope| {
                 let and_gate_thread = scope.spawn(|| {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "AndAny::query: spawned thread for and_gate query"
-                    );
                     AndGate::<Search>::query(
                         haystack_key,
                         context,
@@ -99,10 +86,6 @@ impl SearchableEnumComposite for AndAny<Search> {
                 });
 
                 let and_mux_thread = scope.spawn(|| {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "AndAny::query: spawned thread for and_mux query"
-                    );
                     AndMux::<Search>::query(
                         haystack_key,
                         context,
@@ -112,10 +95,6 @@ impl SearchableEnumComposite for AndAny<Search> {
                 });
 
                 let and_nor_thread = scope.spawn(|| {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "AndAny::query: spawned thread for and_nor query"
-                    );
                     AndNor::<Search>::query(
                         haystack_key,
                         context,
@@ -124,158 +103,54 @@ impl SearchableEnumComposite for AndAny<Search> {
                     )
                 });
 
-                let and_gate_matches = and_gate_thread
-                    .join()
-                    .expect("AndAny::query: Failed to join and_gate thread")
-                    .into_iter()
-                    .map(|match_| AndAny::<Match<'ctx>>::Gate(match_));
-
-                let and_mux_matches = and_mux_thread
-                    .join()
-                    .expect("AndAny::query: Failed to join and_mux thread")
-                    .into_iter()
-                    .map(|match_| AndAny::<Match<'ctx>>::Mux(match_));
-
-                let and_nor_matches_iter = and_nor_thread
-                    .join()
-                    .expect("AndAny::query: Failed to join and_nor thread")
-                    .into_iter()
-                    .map(|match_| AndAny::<Match<'ctx>>::Nor(match_));
-
-                and_gate_matches
-                    .chain(and_mux_matches)
-                    .chain(and_nor_matches_iter)
-                    .collect::<Vec<_>>()
-            });
-
-            results
-        }
+                (
+                    and_gate_thread
+                        .join()
+                        .expect("Failed to join and_gate thread"),
+                    and_mux_thread
+                        .join()
+                        .expect("Failed to join and_mux thread"),
+                    and_nor_thread
+                        .join()
+                        .expect("Failed to join and_nor thread"),
+                )
+            })
+        };
 
         #[cfg(not(feature = "parallel"))]
-        {
+        let (and_gate_matches, and_mux_matches, and_nor_matches) = {
             tracing::event!(
                 tracing::Level::INFO,
                 "AndAny::query: executing sequential queries"
             );
 
-            let and_gate_matches = AndGate::<Search>::query(
-                haystack_key,
-                context,
-                path.child("and_gate".to_string()),
-                config,
-            );
+            (
+                AndGate::<Search>::query(
+                    haystack_key,
+                    context,
+                    path.child("and_gate".to_string()),
+                    config,
+                ),
+                AndMux::<Search>::query(
+                    haystack_key,
+                    context,
+                    path.child("and_mux".to_string()),
+                    config,
+                ),
+                AndNor::<Search>::query(
+                    haystack_key,
+                    context,
+                    path.child("and_nor".to_string()),
+                    config,
+                ),
+            )
+        };
 
-            let and_mux_matches = AndMux::<Search>::query(
-                haystack_key,
-                context,
-                path.child("and_mux".to_string()),
-                config,
-            );
-
-            let and_nor_matches = AndNor::<Search>::query(
-                haystack_key,
-                context,
-                path.child("and_nor".to_string()),
-                config,
-            );
-
-            // Convert matches to enum variants
-            let and_gate_results: Vec<Self::Hit<'ctx>> = and_gate_matches
-                .into_iter()
-                .map(AndAny::<Match<'ctx>>::Gate)
-                .collect();
-
-            let and_mux_results: Vec<Self::Hit<'ctx>> = and_mux_matches
-                .into_iter()
-                .map(AndAny::<Match<'ctx>>::Mux)
-                .collect();
-
-            let and_nor_results: Vec<Self::Hit<'ctx>> = and_nor_matches
-                .into_iter()
-                .map(AndAny::<Match<'ctx>>::Nor)
-                .collect();
-
-            and_gate_results
-                .into_iter()
-                .chain(and_mux_results)
-                .chain(and_nor_results)
-                .collect::<Vec<_>>()
-        }
+        and_gate_matches
+            .into_iter()
+            .map(AndAny::<Match<'ctx>>::Gate)
+            .chain(and_mux_matches.into_iter().map(AndAny::<Match<'ctx>>::Mux))
+            .chain(and_nor_matches.into_iter().map(AndAny::<Match<'ctx>>::Nor))
+            .collect()
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use svql_common::{Config, DedupeMode};
-//     use svql_driver::Driver;
-//     use tracing_subscriber;
-//
-//     fn init_test_logger() {
-//         let _ = tracing_subscriber::fmt()
-//             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-//             .with_test_writer()
-//             .try_init();
-//     }
-//
-//     use crate::{
-//         Search, composite::SearchableEnumComposite, instance::Instance,
-//         queries::enum_composite::and_any::AndAny,
-//     };
-//
-//     #[test]
-//     fn test_and_any() {
-//         init_test_logger();
-//         let driver = Driver::new_workspace().expect("Failed to create driver");
-//
-//         let config = Config::builder()
-//             .exact_length()
-//             .dedupe(DedupeMode::AutoMorph)
-//             .build();
-//
-//         let context = AndAny::<Search>::context(&driver, &config)
-//             .expect("Failed to create context for AndAny");
-//
-//         // haystack
-//         let haystack_path = "examples/fixtures/basic/and/json/mixed_and_tree.json";
-//         let haystack_module_name = "mixed_and_tree";
-//         let (haystack_key, haystack) = driver
-//             .get_or_load_design(haystack_path, haystack_module_name.to_string(), &config)
-//             .expect("Failed to get haystack design");
-//
-//         let context = context.with_design(haystack_key.clone(), haystack.clone());
-//
-//         // root path for the composite
-//         let root = Instance::root("and_any".to_string());
-//
-//         // run composite query
-//         let hits = AndAny::<Search>::query(&haystack_key, &context, root, &config);
-//
-//         for h in &hits {
-//             tracing::event!(tracing::Level::TRACE, "Found match: {:#?}", h);
-//         }
-//
-//         let mut gate_cnt = 0usize;
-//         let mut mux_cnt = 0usize;
-//         let mut nor_cnt = 0usize;
-//
-//         for h in hits {
-//             match h {
-//                 AndAny::Gate(_) => gate_cnt += 1,
-//                 AndAny::Mux(_) => mux_cnt += 1,
-//                 AndAny::Nor(_) => nor_cnt += 1,
-//             }
-//         }
-//
-//         tracing::event!(
-//             tracing::Level::TRACE,
-//             "Found {} gate matches, {} mux matches, {} nor matches",
-//             gate_cnt,
-//             mux_cnt,
-//             nor_cnt
-//         );
-//
-//         assert_eq!(gate_cnt, 3, "expected 3 and_gate matches");
-//         assert_eq!(mux_cnt, 2, "expected 2 and_mux matches");
-//         assert_eq!(nor_cnt, 2, "expected 2 and_nor matches");
-//     }
-// }

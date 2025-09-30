@@ -1,9 +1,8 @@
-// svql_query/src/queries/composite/dff_then_and.rs
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use std::thread;
 
 use crate::{
     Connection, Match, Search, State, WithPath,
@@ -53,7 +52,6 @@ where
     S: State,
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        // Define the connection: sdffe.q -> (and_gate.a OR and_gate.b)
         vec![vec![
             Connection {
                 from: self.sdffe.q.clone(),
@@ -87,75 +85,71 @@ impl SearchableComposite for SdffeThenAnd<Search> {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
-        // Run individual queries in parallel when Rayon is enabled
-        #[cfg(feature = "rayon")]
-        {
+        #[cfg(feature = "parallel")]
+        let (sdffe_matches, and_matches) = {
             tracing::event!(
                 tracing::Level::INFO,
-                "SdffeThenAnd::query: executing with Rayon parallel queries"
+                "SdffeThenAnd::query: executing with parallel queries"
             );
 
-            let (sdffe_matches, and_matches) = rayon::join(
-                || {
+            std::thread::scope(|scope| {
+                let sdffe_thread = scope.spawn(|| {
                     Sdffe::<Search>::query(
                         haystack_key,
                         context,
                         path.child("sdffe".to_string()),
                         config,
                     )
-                },
-                || {
+                });
+
+                let and_gate_thread = scope.spawn(|| {
                     AndGate::<Search>::query(
                         haystack_key,
                         context,
                         path.child("and_gate".to_string()),
                         config,
                     )
-                },
-            );
+                });
 
-            // Create composite instances
-            iproduct!(sdffe_matches, and_matches)
-                .par_bridge()
-                .map(|(sdffe, and_gate)| SdffeThenAnd {
-                    path: path.clone(),
-                    sdffe,
-                    and_gate,
-                })
-                .filter(|composite| composite.validate_connections(composite.connections()))
-                .collect::<Vec<_>>()
-        }
+                (
+                    sdffe_thread.join().expect("Failed to join sdffe thread"),
+                    and_gate_thread
+                        .join()
+                        .expect("Failed to join and_gate thread"),
+                )
+            })
+        };
 
-        #[cfg(not(feature = "rayon"))]
-        {
+        #[cfg(not(feature = "parallel"))]
+        let (sdffe_matches, and_matches) = {
             tracing::event!(
                 tracing::Level::INFO,
                 "SdffeThenAnd::query: executing sequential queries"
             );
 
-            // First get individual matches
-            let sdffe_matches = Sdffe::<Search>::query(
-                haystack_key,
-                context,
-                path.child("sdffe".to_string()),
-                config,
-            );
-            let and_matches = AndGate::<Search>::query(
-                haystack_key,
-                context,
-                path.child("and_gate".to_string()),
-                config,
-            );
+            (
+                Sdffe::<Search>::query(
+                    haystack_key,
+                    context,
+                    path.child("sdffe".to_string()),
+                    config,
+                ),
+                AndGate::<Search>::query(
+                    haystack_key,
+                    context,
+                    path.child("and_gate".to_string()),
+                    config,
+                ),
+            )
+        };
 
-            // Create composite instances
-            iproduct!(sdffe_matches, and_matches)
-                .map(|(sdffe, and_gate)| SdffeThenAnd {
-                    path: path.clone(),
-                    sdffe,
-                    and_gate,
-                })
-                .filter(|composite| composite.validate_connections(composite.connections()))
-                .collect::<Vec<_>>()
-        }
+        iproduct!(sdffe_matches, and_matches)
+            .map(|(sdffe, and_gate)| SdffeThenAnd {
+                path: path.clone(),
+                sdffe,
+                and_gate,
+            })
+            .filter(|composite| composite.validate_connections(composite.connections()))
+            .collect()
     }
 }
