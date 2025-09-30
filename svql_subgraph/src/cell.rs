@@ -118,8 +118,6 @@ impl From<&Cell> for CellKind {
             Cell::SModFloor(..) => CellKind::SModFloor,
             Cell::Match(..) => CellKind::Match,
             Cell::Assign(..) => CellKind::Assign,
-            Cell::DLatchSr(..) => CellKind::DLatchSr,
-            Cell::ADLatch(..) => CellKind::ADLatch,
             Cell::Dff(..) => CellKind::Dff,
             Cell::Memory(..) => CellKind::Memory,
             Cell::IoBuf(..) => CellKind::IoBuf,

@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
-use prjunnamed_netlist::{ADLatch, Cell, CellRef, DLatchSr, FlipFlop, Net, Trit, Value};
+use prjunnamed_netlist::{Cell, CellRef, ControlNets, FlipFlop, Net, Trit, Value};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -74,9 +74,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
             (Aig(pa_control_net, pb_control_net), Aig(da_control_net, db_control_net)) => {
                 let a_matches =
-                    self.control_nets_match_fan_in(pa_control_net, da_control_net, mapping);
+                    self.control_net_match_fan_in(pa_control_net, da_control_net, mapping);
                 let b_matches =
-                    self.control_nets_match_fan_in(pb_control_net, db_control_net, mapping);
+                    self.control_net_match_fan_in(pb_control_net, db_control_net, mapping);
                 a_matches && b_matches
             }
             (Eq(pa_value, pb_value), Eq(da_value, db_value)) => {
@@ -151,12 +151,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
             (Assign(_p_assign_cell), Assign(_d_assign_cell)) => {
                 todo!("Make Function to match assign cells")
-            }
-            (ADLatch(p_adlatch_cell), ADLatch(d_adlatch_cell)) => {
-                self.adlatches_match_fan_in(p_adlatch_cell, d_adlatch_cell, mapping)
-            }
-            (DLatchSr(p_dlatchsr_cell), DLatchSr(d_dlatchsr_cell)) => {
-                self.dlatch_sr_s_match_fan_in(p_dlatchsr_cell, d_dlatchsr_cell, mapping)
             }
             (Dff(p_dff_cell), Dff(d_dff_cell)) => {
                 self.dffs_match_fan_in(p_dff_cell, d_dff_cell, mapping)
@@ -339,7 +333,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         todo!("How to handle expected idx");
     }
 
-    fn control_nets_match_fan_in(
+    fn control_net_match_fan_in(
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNet,
         haystack_c_net: &prjunnamed_netlist::ControlNet,
@@ -354,6 +348,31 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 prjunnamed_netlist::ControlNet::Neg(p_neg_net),
                 prjunnamed_netlist::ControlNet::Neg(d_neg_net),
             ) => self.nets_match_fan_in(p_neg_net, d_neg_net, mapping),
+            _ => false,
+        }
+    }
+
+    fn control_nets_match_fan_in(
+        &self,
+        needle_c_net: &prjunnamed_netlist::ControlNets,
+        haystack_c_net: &prjunnamed_netlist::ControlNets,
+        mapping: &Assignment<'needle, 'haystack>,
+    ) -> bool {
+        match (needle_c_net, haystack_c_net) {
+            (
+                prjunnamed_netlist::ControlNets::Pos(p_pos_nets),
+                prjunnamed_netlist::ControlNets::Pos(d_pos_nets),
+            ) => p_pos_nets
+                .iter()
+                .zip(d_pos_nets.iter())
+                .all(|(p_net, d_net)| self.nets_match_fan_in(p_net, d_net, mapping)),
+            (
+                prjunnamed_netlist::ControlNets::Neg(p_neg_nets),
+                prjunnamed_netlist::ControlNets::Neg(d_neg_nets),
+            ) => p_neg_nets
+                .iter()
+                .zip(d_neg_nets.iter())
+                .all(|(p_net, d_net)| self.nets_match_fan_in(p_net, d_net, mapping)),
             _ => false,
         }
     }
@@ -375,61 +394,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         true
     }
 
-    fn adlatches_match_fan_in(
-        &self,
-        needle_adlatch: &ADLatch,
-        haystack_adlatch: &ADLatch,
-        mapping: &Assignment,
-    ) -> bool {
-        let data_matches =
-            self.values_match_fan_in(&needle_adlatch.data, &haystack_adlatch.data, mapping);
-        let enable_matches = self.control_nets_match_fan_in(
-            &needle_adlatch.enable,
-            &haystack_adlatch.enable,
-            mapping,
-        );
-        let arst_matches =
-            self.control_nets_match_fan_in(&needle_adlatch.arst, &haystack_adlatch.arst, mapping);
-        let arst_value_matches = self.const_match_fan_in(
-            &needle_adlatch.arst_value,
-            &haystack_adlatch.arst_value,
-            mapping,
-        );
-        let init_value_matches = self.const_match_fan_in(
-            &needle_adlatch.init_value,
-            &haystack_adlatch.init_value,
-            mapping,
-        );
-
-        data_matches && enable_matches && arst_matches && arst_value_matches && init_value_matches
-    }
-
-    fn dlatch_sr_s_match_fan_in(
-        &self,
-        needle_dlatch_sr: &DLatchSr,
-        haystack_dlatch_sr: &DLatchSr,
-        mapping: &Assignment,
-    ) -> bool {
-        let data_matches =
-            self.values_match_fan_in(&needle_dlatch_sr.data, &haystack_dlatch_sr.data, mapping);
-        let set_matches =
-            self.values_match_fan_in(&needle_dlatch_sr.set, &haystack_dlatch_sr.set, mapping);
-        let reset_matches =
-            self.values_match_fan_in(&needle_dlatch_sr.reset, &haystack_dlatch_sr.reset, mapping);
-        let enable_matches = self.control_nets_match_fan_in(
-            &needle_dlatch_sr.enable,
-            &haystack_dlatch_sr.enable,
-            mapping,
-        );
-        let init_value_matches = self.const_match_fan_in(
-            &needle_dlatch_sr.init_value,
-            &haystack_dlatch_sr.init_value,
-            mapping,
-        );
-
-        data_matches && set_matches && reset_matches && enable_matches && init_value_matches
-    }
-
     fn dffs_match_fan_in(
         &self,
         needle_dff: &FlipFlop,
@@ -438,13 +402,18 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     ) -> bool {
         let data_matches = self.values_match_fan_in(&needle_dff.data, &haystack_dff.data, mapping);
         let clock_matches =
-            self.control_nets_match_fan_in(&needle_dff.clock, &haystack_dff.clock, mapping);
+            self.control_net_match_fan_in(&needle_dff.clock, &haystack_dff.clock, mapping);
         let clear_matches =
             self.control_nets_match_fan_in(&needle_dff.clear, &haystack_dff.clear, mapping);
+        let load_matches =
+            self.control_net_match_fan_in(&needle_dff.load, &haystack_dff.load, mapping);
+        let load_value_matches =
+            self.values_match_fan_in(&needle_dff.load_data, &haystack_dff.load_data, mapping);
+
         let reset_matches =
-            self.control_nets_match_fan_in(&needle_dff.reset, &haystack_dff.reset, mapping);
+            self.control_net_match_fan_in(&needle_dff.reset, &haystack_dff.reset, mapping);
         let enable_matches =
-            self.control_nets_match_fan_in(&needle_dff.enable, &haystack_dff.enable, mapping);
+            self.control_net_match_fan_in(&needle_dff.enable, &haystack_dff.enable, mapping);
         let clear_value_matches =
             self.const_match_fan_in(&needle_dff.clear_value, &haystack_dff.clear_value, mapping);
         let reset_value_matches =
@@ -456,6 +425,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             && clock_matches
             && clear_matches
             && reset_matches
+            && load_matches
+            && load_value_matches
             && enable_matches
             && clear_value_matches
             && reset_value_matches
