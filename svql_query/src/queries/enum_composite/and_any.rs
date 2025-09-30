@@ -10,8 +10,10 @@ use crate::{
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+// #[cfg(feature = "rayon")]
+// use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use std::thread;
 
 #[derive(Debug, Clone)]
 pub enum AndAny<S>
@@ -75,68 +77,81 @@ impl SearchableEnumComposite for AndAny<Search> {
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
         // Run individual queries in parallel when Rayon is enabled
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
             tracing::event!(
                 tracing::Level::INFO,
                 "AndAny::query: executing with Rayon parallel queries"
             );
 
-            let ((and_gate_matches, and_mux_matches), and_nor_matches) = rayon::join(
-                || {
-                    rayon::join(
-                        || {
-                            AndGate::<Search>::query(
-                                haystack_key,
-                                context,
-                                path.child("and_gate".to_string()),
-                                config,
-                            )
-                        },
-                        || {
-                            AndMux::<Search>::query(
-                                haystack_key,
-                                context,
-                                path.child("and_mux".to_string()),
-                                config,
-                            )
-                        },
+            let results = std::thread::scope(|scope| {
+                let and_gate_thread = scope.spawn(|| {
+                    tracing::event!(
+                        tracing::Level::INFO,
+                        "AndAny::query: spawned thread for and_gate query"
+                    );
+                    AndGate::<Search>::query(
+                        haystack_key,
+                        context,
+                        path.child("and_gate".to_string()),
+                        config,
                     )
-                },
-                || {
+                });
+
+                let and_mux_thread = scope.spawn(|| {
+                    tracing::event!(
+                        tracing::Level::INFO,
+                        "AndAny::query: spawned thread for and_mux query"
+                    );
+                    AndMux::<Search>::query(
+                        haystack_key,
+                        context,
+                        path.child("and_mux".to_string()),
+                        config,
+                    )
+                });
+
+                let and_nor_thread = scope.spawn(|| {
+                    tracing::event!(
+                        tracing::Level::INFO,
+                        "AndAny::query: spawned thread for and_nor query"
+                    );
                     AndNor::<Search>::query(
                         haystack_key,
                         context,
                         path.child("and_nor".to_string()),
                         config,
                     )
-                },
-            );
+                });
 
-            // Convert matches to enum variants
-            let and_gate_results: Vec<Self::Hit<'ctx>> = and_gate_matches
-                .into_par_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Gate(match_))
-                .collect();
+                let and_gate_matches = and_gate_thread
+                    .join()
+                    .expect("AndAny::query: Failed to join and_gate thread")
+                    .into_iter()
+                    .map(|match_| AndAny::<Match<'ctx>>::Gate(match_));
 
-            let and_mux_results: Vec<Self::Hit<'ctx>> = and_mux_matches
-                .into_par_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Mux(match_))
-                .collect();
+                let and_mux_matches = and_mux_thread
+                    .join()
+                    .expect("AndAny::query: Failed to join and_mux thread")
+                    .into_iter()
+                    .map(|match_| AndAny::<Match<'ctx>>::Mux(match_));
 
-            let and_nor_results: Vec<Self::Hit<'ctx>> = and_nor_matches
-                .into_par_iter()
-                .map(|match_| AndAny::<Match<'ctx>>::Nor(match_))
-                .collect();
+                let and_nor_matches_iter = and_nor_thread
+                    .join()
+                    .expect("AndAny::query: Failed to join and_nor thread")
+                    .into_iter()
+                    .map(|match_| AndAny::<Match<'ctx>>::Nor(match_));
 
-            and_gate_results
-                .into_iter()
-                .chain(and_mux_results)
-                .chain(and_nor_results)
-                .collect::<Vec<_>>()
+                and_gate_matches
+                    .chain(and_mux_matches)
+                    .chain(and_nor_matches_iter)
+                    .collect::<Vec<_>>()
+            });
+
+            results
         }
 
-        #[cfg(not(feature = "rayon"))]
+        #[cfg(not(feature = "parallel"))]
         {
             tracing::event!(
                 tracing::Level::INFO,

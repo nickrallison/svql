@@ -26,7 +26,7 @@ prjunnamed-netlist.workspace = true
 contracts.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
-rayon = { workspace = true, optional = true }
+# rayon = { workspace = true, optional = true }
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -57,4 +57,4 @@ rstest.workspace = true
 
 [features]
 default = []
-rayon = ["dep:rayon"]
+parallel = []
