@@ -49,5 +49,9 @@ source venv/bin/activate
 export PATH="$PATH:$PITON_ROOT/piton/tools/bin"
 export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
 
-# Genetate Base Netlist
-# fusesoc run --target=pickle chip
+### TILE ###
+fusesoc run --target=pickle tile
+mv build/openpiton__tile_0.1/pickle-icarus/openpiton__tile_0.1 examples/fixtures/larger_designs/verilog/openpiton_tile.v
+yosys -p "verific -sv examples/fixtures/larger_designs/verilog/openpiton_tile.v" -p "hierarchy -top tile" -p proc -p memory -p opt_clean -p "write_json examples/fixtures/larger_designs/json/openpiton_tile.json"
+
+gzip examples/fixtures/larger_designs/json/openpiton_tile.json
