@@ -8,10 +8,5 @@ mod netlist;
 #[proc_macro]
 #[proc_macro_error]
 pub fn composite(input: TokenStream) -> TokenStream {
-    let input2 = proc_macro2::TokenStream::from(input);
-    let ast = composite::parse::parse(input2);
-    let model = composite::analyze::analyze(ast);
-    let ir = composite::lower::lower(model);
-    let output = composite::codegen::codegen(ir);
-    output.into()
+    composite::composite_inner(input)
 }

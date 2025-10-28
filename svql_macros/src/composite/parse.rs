@@ -1,7 +1,7 @@
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, Result, Token, Type, parse2, punctuated::Punctuated};
+use syn::{Ident, Result, Token, Type, bracketed, parse2, punctuated::Punctuated};
 
 #[derive(Clone)]
 pub struct SubPattern {
@@ -20,7 +20,7 @@ pub struct Connection {
 pub struct Ast {
     pub name: Ident,
     pub subs: Vec<SubPattern>,
-    pub connections: Vec<Connection>,
+    pub connections: Vec<Vec<Connection>>,
 }
 
 impl Parse for Ast {
@@ -41,7 +41,7 @@ impl Parse for Ast {
         }
         input.parse::<Token![:]>()?;
         let subs_content;
-        syn::bracketed!(subs_content in input);
+        bracketed!(subs_content in input);
         let subs_punctuated: Punctuated<SubPattern, Token![,]> =
             subs_content.parse_terminated(SubPattern::parse, Token![,])?;
         let subs = subs_punctuated.into_iter().collect();
@@ -49,18 +49,29 @@ impl Parse for Ast {
         // Optional trailing comma after subs array
         let _ = input.parse::<Token![,]>();
 
-        // Check if there's a connections section
+        // Parse "connections: [ ... ]" with nested groups
         let connections = if input.peek(Ident) {
             let conn_kw: Ident = input.parse()?;
             if conn_kw != "connections" {
                 return Err(input.error("expected 'connections' or end of input"));
             }
             input.parse::<Token![:]>()?;
-            let conn_content;
-            syn::bracketed!(conn_content in input);
-            let conn_punctuated: Punctuated<Connection, Token![,]> =
-                conn_content.parse_terminated(Connection::parse, Token![,])?;
-            conn_punctuated.into_iter().collect()
+            let connections_content;
+            bracketed!(connections_content in input);
+            let mut connections = Vec::new();
+            while !connections_content.is_empty() {
+                let group_content;
+                bracketed!(group_content in connections_content);
+                let group_punctuated: Punctuated<Connection, Token![,]> =
+                    group_content.parse_terminated(Connection::parse, Token![,])?;
+                connections.push(group_punctuated.into_iter().collect::<Vec<_>>());
+
+                // Optional comma after group
+                if connections_content.peek(Token![,]) {
+                    connections_content.parse::<Token![,]>()?;
+                }
+            }
+            connections
         } else {
             Vec::new()
         };
@@ -116,7 +127,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn valid_syntax_with_connections() {
+    fn valid_syntax_with_nested_connections() {
         parse(quote! {
             name: TestComposite,
             subs: [
@@ -124,7 +135,13 @@ mod tests {
                 field2: Type2
             ],
             connections: [
-                field1 . out => field2 . inp
+                [
+                    field1 . out => field2 . inp,
+                    field1 . out2 => field2 . inp2
+                ],
+                [
+                    field3 . out => field4 . inp
+                ]
             ]
         });
     }
@@ -136,6 +153,21 @@ mod tests {
             subs: [
                 field1: Type1,
                 field2: Type2
+            ]
+        });
+    }
+
+    #[test]
+    fn valid_syntax_with_single_group() {
+        parse(quote! {
+            name: TestComposite,
+            subs: [
+                field1: Type1
+            ],
+            connections: [
+                [
+                    field1 . out => field1 . inp
+                ]
             ]
         });
     }

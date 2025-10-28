@@ -3,7 +3,7 @@ use super::parse::{Ast, Connection, SubPattern};
 pub struct Model {
     pub name: syn::Ident,
     pub subs: Vec<SubPattern>,
-    pub connections: Vec<Connection>,
+    pub connections: Vec<Vec<Connection>>,
 }
 
 pub fn analyze(ast: Ast) -> Model {

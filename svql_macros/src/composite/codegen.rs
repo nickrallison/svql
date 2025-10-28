@@ -6,7 +6,7 @@ use super::lower::Ir;
 pub fn codegen(ir: Ir) -> TokenStream {
     let name = &ir.name;
     let fields = &ir.subs;
-    let connections = &ir.connections;
+    let connections = &ir.connections; // Now Vec<Vec<ConnectionRef>>
 
     // Generate field declarations
     let field_decls = fields.iter().map(|sub| {
@@ -29,22 +29,28 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     // Field names for various uses
     let field_names_for_find_port = fields.iter().map(|sub| &sub.field_name);
-    let field_names_for_let_binding = fields.iter().map(|sub| &sub.field_name);
+    let parallel_let_binding_fields = fields.iter().map(|sub| &sub.field_name);
+    let sequential_let_binding_fields = fields.iter().map(|sub| &sub.field_name);
     let field_names_for_iproduct = fields.iter().map(|sub| &sub.field_name);
     let field_names_for_map_pattern = fields.iter().map(|sub| &sub.field_name);
     let field_names_for_struct_construction = fields.iter().map(|sub| &sub.field_name);
 
-    // Generate connections
-    let connection_items = connections.iter().map(|conn| {
-        let from_sub = &conn.from_sub;
-        let from_port = &conn.from_port;
-        let to_sub = &conn.to_sub;
-        let to_port = &conn.to_port;
-        quote! {
-            ::svql_query::Connection {
-                from: self.#from_sub.#from_port.clone(),
-                to: self.#to_sub.#to_port.clone(),
+    // Generate connection groups: vec![ vec![conns...], vec![conns...] ]
+    let connection_groups = connections.iter().map(|group| {
+        let group_items = group.iter().map(|conn| {
+            let from_sub = &conn.from_sub;
+            let from_port = &conn.from_port;
+            let to_sub = &conn.to_sub;
+            let to_port = &conn.to_port;
+            quote! {
+                ::svql_query::Connection {
+                    from: self.#from_sub.#from_port.clone(),
+                    to: self.#to_sub.#to_port.clone(),
+                }
             }
+        });
+        quote! {
+            vec![ #(#group_items),* ]
         }
     });
 
@@ -98,9 +104,6 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let query_log_msg = format!("{}::query: executing with parallel queries", name);
     let query_log_msg_seq = format!("{}::query: executing sequential queries", name);
 
-    let parallel_let_binding_fields = fields.iter().map(|sub| &sub.field_name);
-    let sequential_let_binding_fields = fields.iter().map(|sub| &sub.field_name);
-
     quote! {
         #[derive(Debug, Clone)]
         pub struct #name<S>
@@ -139,9 +142,9 @@ pub fn codegen(ir: Ir) -> TokenStream {
             S: ::svql_query::State,
         {
             fn connections(&self) -> Vec<Vec<::svql_query::Connection<S>>> {
-                vec![vec![
-                    #(#connection_items,)*
-                ]]
+                vec![
+                    #(#connection_groups),*
+                ]
             }
         }
 
