@@ -1,10 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
 
 import argparse
 import textwrap
 import fnmatch
 import os
 import sys
+import argparse
 from pathlib import Path
 from typing import Iterable, List, Sequence, Set, Dict
 

@@ -34,7 +34,7 @@
 /// - Empty connections: Allowed (uses `vec![vec![]]`—validation always passes).
 /// - Limitations: Up to ~10 subs (due to `iproduct!` tuple limits); one connection group.
 /// - Discovery: build.rs regexes detect the generated `impl SearchableComposite`.
-
+struct TBD;
 // ...
 
 /// Macro for defining enum_composite queries (disjoint variants over sub-netlists).
@@ -64,5 +64,5 @@
 /// - Variants: Each needs a literal instance name (e.g., `"and_gate"`) for `path.child(inst_name)`.
 /// - Query: Runs sub-queries (parallel or sequential), maps to enum variants, chains results (no validation/connections).
 /// - Discovery: build.rs regexes detect the generated `impl SearchableEnumComposite`.
-
+struct TBD1;
 // ...

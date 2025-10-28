@@ -21,7 +21,7 @@ cargo expand --lib --package svql_query queries::netlist > generated/expanded_ne
 #     --section "svql_common=svql_common" \
 #     > out.md
 
-/home/nick/Projects/svql/.venv/bin/python3 scripts/md_tree.py --root . \
+uv run scripts/md_tree.py --root . \
     --include 'svql_query/**.rs' \
     --include 'generated/**.rs' \
     --include 'Cargo.toml' \
