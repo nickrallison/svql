@@ -45,13 +45,13 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
     let driver = Driver::new_workspace()?;
 
     // FIXED: Use ref patterns to bind name as &str (avoids &&str from matching on &tc.needle)
-    let query_name = match &tc.needle {
+    let query_name: &str = match &tc.needle {
         Needle::Netlist {
-            pattern_query_type: Some(ref name),
+            pattern_query_type: Some(name),
             ..
         } => name,
         Needle::Composite {
-            pattern_query_type: ref name,
+            pattern_query_type: name,
         } => name,
         _ => return Err("Invalid needle type for query test".into()),
     };
@@ -70,7 +70,7 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
     let root = Instance::root("test_root".to_string());
 
     // Build context (needle-specific; merges for composites/enums)
-    // FIXED: Traits now in scope, so context/query calls work
+    // Traits in scope, so context/query calls work
     let ctx = match query_name {
         "svql_query::queries::netlist::basic::and::AndGate" => {
             <AndGate<Search> as SearchableNetlist>::context(&driver, &tc.config.needle_options)
@@ -82,7 +82,7 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             )
         }
         "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
-            // NEW: Arm for macro-generated composite (verifies macro)
+            // Arm for macro-generated composite (verifies macro)
             <SdffeThenAnd2<Search> as SearchableComposite>::context(
                 &driver,
                 &tc.config.needle_options,
@@ -97,10 +97,11 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
 
     let ctx = ctx.with_design(hk.clone(), hd);
 
-    // Run query
-    let hits = match query_name {
+    // FIXED: Compute hit_count directly in match arms (avoids incompatible Vec<T> types for hits)
+    // Each arm runs query and returns len() (common usize type)
+    let hit_count = match query_name {
         "svql_query::queries::netlist::basic::and::AndGate" => {
-            <AndGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config)
+            <AndGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config).len()
         }
         "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
             <SdffeThenAnd<Search> as SearchableComposite>::query(
@@ -109,28 +110,29 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
                 root.clone(),
                 &tc.config,
             )
+            .len()
         }
         "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
-            // NEW: Arm for macro-generated composite (verifies macro)
+            // Arm for macro-generated composite (verifies macro)
             <SdffeThenAnd2<Search> as SearchableComposite>::query(
                 &hk,
                 &ctx,
                 root.clone(),
                 &tc.config,
             )
+            .len()
         }
         "svql_query::queries::enum_composite::and_any::AndAny" => {
             <AndAny<Search> as SearchableEnumComposite>::query(&hk, &ctx, root.clone(), &tc.config)
+                .len()
         }
         _ => return Err(format!("No query handler for query type: {}", query_name).into()),
     };
 
-    if hits.len() != tc.expected_matches {
+    if hit_count != tc.expected_matches {
         return Err(format!(
             "Query test case '{}' failed: expected {} matches, got {}",
-            tc.name,
-            tc.expected_matches,
-            hits.len()
+            tc.name, tc.expected_matches, hit_count
         )
         .into());
     }
