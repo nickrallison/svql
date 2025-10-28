@@ -1,5 +1,4 @@
 use super::analyze::Model;
-use super::parse::{Connection, SubPattern};
 
 #[derive(Clone)] // Explicit for clarity
 pub struct SubPatternRef {

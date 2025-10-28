@@ -1,13 +1,13 @@
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, LitStr, Result, Token, Type, bracketed, parse2, punctuated::Punctuated};
+use syn::{Ident, LitStr, Result, Token, bracketed, parse2, punctuated::Punctuated};
 
 #[derive(Clone)]
 pub struct Variant {
     pub variant_name: Ident,
     pub inst_name: LitStr,
-    pub ty: Type,
+    pub ty: syn::Type,
 }
 
 pub struct Ast {
@@ -33,7 +33,7 @@ impl Parse for Ast {
         }
         input.parse::<Token![:]>()?;
         let variants_content;
-        bracketed!(variants_content in input);
+        syn::bracketed!(variants_content in input); // Outer brackets for the array
         let variants_punctuated: Punctuated<Variant, Token![,]> =
             variants_content.parse_terminated(Variant::parse, Token![,])?;
         let variants = variants_punctuated.into_iter().collect();
@@ -49,10 +49,10 @@ impl Parse for Variant {
     fn parse(input: ParseStream) -> Result<Self> {
         let variant_name = input.parse::<Ident>()?;
         let inst_content;
-        bracketed!(inst_content in input); // FIXED: Parse [ "inst_name" ] as bracketed content
-        let inst_name = inst_content.parse::<LitStr>()?; // Parse the LitStr inside brackets
-        input.parse::<Token![:]>()?;
-        let ty = input.parse::<Type>()?;
+        bracketed!(inst_content in input); // Brackets around LitStr
+        let inst_name = inst_content.parse::<LitStr>()?; // Parse LitStr inside brackets
+        input.parse::<Token![:]>()?; // Colon after brackets
+        let ty = input.parse::<syn::Type>()?;
         Ok(Variant {
             variant_name,
             inst_name,
@@ -78,9 +78,9 @@ mod tests {
         let ts = quote! {
             name: AndAny,
             variants: [
-                Gate [ "and_gate" ] : AndGate,
-                Mux  [ "and_mux" ] : AndMux,
-                Nor  [ "and_nor" ] : AndNor
+                (Gate, "and_gate", AndGate)
+                (Mux, "and_mux",  AndMux),
+                (Nor, "and_nor",  AndNor)
             ]
         };
         let ast = parse(ts);
@@ -88,7 +88,10 @@ mod tests {
         assert_eq!(ast.variants.len(), 3);
         assert_eq!(ast.variants[0].variant_name.to_string(), "Gate");
         assert_eq!(ast.variants[0].inst_name.value(), "and_gate");
-        assert_eq!(ast.variants[0].ty.to_string(), "AndGate");
+        assert_eq!(ast.variants[1].variant_name.to_string(), "Mux");
+        assert_eq!(ast.variants[1].inst_name.value(), "and_mux");
+        assert_eq!(ast.variants[2].variant_name.to_string(), "Nor");
+        assert_eq!(ast.variants[2].inst_name.value(), "and_nor");
     }
 
     #[test]
@@ -112,5 +115,17 @@ mod tests {
         };
         let ast = parse(ts);
         assert_eq!(ast.variants.len(), 0);
+    }
+
+    #[test]
+    fn valid_syntax_with_trailing_comma() {
+        let ts = quote! {
+            name: Trailing,
+            variants: [
+                One [ "one" ] : Type,
+            ]
+        };
+        let ast = parse(ts);
+        assert_eq!(ast.variants.len(), 1);
     }
 }

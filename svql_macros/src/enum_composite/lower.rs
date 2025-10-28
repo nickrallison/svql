@@ -1,5 +1,4 @@
 use super::analyze::Model;
-use super::parse::Variant as ParseVariant;
 
 #[derive(Clone)]
 pub struct VariantRef {
