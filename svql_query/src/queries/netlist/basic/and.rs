@@ -1,4 +1,4 @@
-use crate::netlist;
+use svql_macros::netlist;
 
 netlist! {
     name: AndGate,

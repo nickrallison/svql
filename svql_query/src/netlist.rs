@@ -94,111 +94,111 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
     }
 }
 
-#[macro_export]
-macro_rules! netlist {
-    (
-        name: $name:ident,
-        module_name: $module:expr,
-        file: $file:expr,
-        inputs: [$($input:ident),*],
-        outputs: [$($output:ident),*]
-    ) => {
-        #[derive(Debug, Clone)]
-        pub struct $name<S>
-        where
-            S: $crate::State,
-        {
-            pub path: $crate::instance::Instance,
-            $(pub $input: $crate::Wire<S>,)*
-            $(pub $output: $crate::Wire<S>,)*
-        }
+// #[macro_export]
+// macro_rules! netlist {
+//     (
+//         name: $name:ident,
+//         module_name: $module:expr,
+//         file: $file:expr,
+//         inputs: [$($input:ident),*],
+//         outputs: [$($output:ident),*]
+//     ) => {
+//         #[derive(Debug, Clone)]
+//         pub struct $name<S>
+//         where
+//             S: $crate::State,
+//         {
+//             pub path: $crate::instance::Instance,
+//             $(pub $input: $crate::Wire<S>,)*
+//             $(pub $output: $crate::Wire<S>,)*
+//         }
 
-        impl<S> $name<S>
-        where
-            S: $crate::State,
-        {
-            pub fn new(path: $crate::instance::Instance) -> Self {
-                Self {
-                    path: path.clone(),
-                    $($input: $crate::Wire::new(path.child(stringify!($input).to_string())),)*
-                    $($output: $crate::Wire::new(path.child(stringify!($output).to_string())),)*
-                }
-            }
-        }
+//         impl<S> $name<S>
+//         where
+//             S: $crate::State,
+//         {
+//             pub fn new(path: $crate::instance::Instance) -> Self {
+//                 Self {
+//                     path: path.clone(),
+//                     $($input: $crate::Wire::new(path.child(stringify!($input).to_string())),)*
+//                     $($output: $crate::Wire::new(path.child(stringify!($output).to_string())),)*
+//                 }
+//             }
+//         }
 
-        impl<S> $crate::WithPath<S> for $name<S>
-        where
-            S: $crate::State,
-        {
-            fn find_port(&self, p: &$crate::instance::Instance) -> Option<&$crate::Wire<S>> {
-                let idx  = self.path.height() + 1;
-                match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
-                    $(Some(stringify!($input)) => self.$input.find_port(p),)+
-                    $(Some(stringify!($output)) => self.$output.find_port(p),)+
-                    _ => None,
-                }
-            }
+//         impl<S> $crate::WithPath<S> for $name<S>
+//         where
+//             S: $crate::State,
+//         {
+//             fn find_port(&self, p: &$crate::instance::Instance) -> Option<&$crate::Wire<S>> {
+//                 let idx  = self.path.height() + 1;
+//                 match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
+//                     $(Some(stringify!($input)) => self.$input.find_port(p),)+
+//                     $(Some(stringify!($output)) => self.$output.find_port(p),)+
+//                     _ => None,
+//                 }
+//             }
 
-            fn path(&self) -> $crate::instance::Instance {
-                self.path.clone()
-            }
-        }
+//             fn path(&self) -> $crate::instance::Instance {
+//                 self.path.clone()
+//             }
+//         }
 
-        impl $crate::netlist::NetlistMeta for $name<$crate::Search> {
-            const MODULE_NAME: &'static str = $module;
-            const FILE_PATH: &'static str = $file;
+//         impl $crate::netlist::NetlistMeta for $name<$crate::Search> {
+//             const MODULE_NAME: &'static str = $module;
+//             const FILE_PATH: &'static str = $file;
 
-            const PORTS: &'static [$crate::netlist::PortSpec] = &[
-                $($crate::netlist::PortSpec {
-                    name: stringify!($input),
-                    dir: $crate::netlist::PortDir::In,
-                },)*
-                $($crate::netlist::PortSpec {
-                    name: stringify!($output),
-                    dir: $crate::netlist::PortDir::Out,
-                },)*
-            ];
-        }
+//             const PORTS: &'static [$crate::netlist::PortSpec] = &[
+//                 $($crate::netlist::PortSpec {
+//                     name: stringify!($input),
+//                     dir: $crate::netlist::PortDir::In,
+//                 },)*
+//                 $($crate::netlist::PortSpec {
+//                     name: stringify!($output),
+//                     dir: $crate::netlist::PortDir::Out,
+//                 },)*
+//             ];
+//         }
 
-        impl $crate::netlist::SearchableNetlist for $name<$crate::Search> {
-            type Hit<'ctx> = $name<$crate::Match<'ctx>>;
+//         impl $crate::netlist::SearchableNetlist for $name<$crate::Search> {
+//             type Hit<'ctx> = $name<$crate::Match<'ctx>>;
 
-            fn from_subgraph<'ctx>(
-                m: &svql_subgraph::Embedding<'ctx, 'ctx>,
-                path: $crate::instance::Instance,
-                embedding_set: &svql_subgraph::EmbeddingSet<'ctx, 'ctx>,
-            ) -> Self::Hit<'ctx> {
-                $(
-                    let $input = $crate::binding::bind_input(
-                        m,
-                        stringify!($input),
-                        0,
-                        &embedding_set.needle_input_fanout_by_name
-                    );
-                    let $input = $crate::Wire::with_val(
-                        path.child(stringify!($input).to_string()),
-                        $input
-                    );
-                )*
-                $(
-                    let $output = $crate::binding::bind_output(
-                        m,
-                        stringify!($output),
-                        0,
-                        &embedding_set.needle_output_fanin_by_name
-                    );
-                    let $output = $crate::Wire::with_val(
-                        path.child(stringify!($output).to_string()),
-                        $output
-                    );
-                )*
+//             fn from_subgraph<'ctx>(
+//                 m: &svql_subgraph::Embedding<'ctx, 'ctx>,
+//                 path: $crate::instance::Instance,
+//                 embedding_set: &svql_subgraph::EmbeddingSet<'ctx, 'ctx>,
+//             ) -> Self::Hit<'ctx> {
+//                 $(
+//                     let $input = $crate::binding::bind_input(
+//                         m,
+//                         stringify!($input),
+//                         0,
+//                         &embedding_set.needle_input_fanout_by_name
+//                     );
+//                     let $input = $crate::Wire::with_val(
+//                         path.child(stringify!($input).to_string()),
+//                         $input
+//                     );
+//                 )*
+//                 $(
+//                     let $output = $crate::binding::bind_output(
+//                         m,
+//                         stringify!($output),
+//                         0,
+//                         &embedding_set.needle_output_fanin_by_name
+//                     );
+//                     let $output = $crate::Wire::with_val(
+//                         path.child(stringify!($output).to_string()),
+//                         $output
+//                     );
+//                 )*
 
-                Self::Hit::<'ctx> {
-                    path: path.clone(),
-                    $($input,)*
-                    $($output,)*
-                }
-            }
-        }
-    };
-}
+//                 Self::Hit::<'ctx> {
+//                     path: path.clone(),
+//                     $($input,)*
+//                     $($output,)*
+//                 }
+//             }
+//         }
+//     };
+// }

@@ -1,7 +1,4 @@
 // svql_query/src/bin/example_query.rs
-//
-use std::env;
-use std::path::PathBuf;
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 use svql_query::{
