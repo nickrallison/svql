@@ -1,5 +1,6 @@
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
+use syn::parenthesized;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Result, Token, bracketed, parse2, punctuated::Punctuated};
 
@@ -33,7 +34,7 @@ impl Parse for Ast {
         }
         input.parse::<Token![:]>()?;
         let variants_content;
-        syn::bracketed!(variants_content in input); // Outer brackets for the array
+        bracketed!(variants_content in input); // Outer brackets for the array
         let variants_punctuated: Punctuated<Variant, Token![,]> =
             variants_content.parse_terminated(Variant::parse, Token![,])?;
         let variants = variants_punctuated.into_iter().collect();
@@ -47,12 +48,14 @@ impl Parse for Ast {
 
 impl Parse for Variant {
     fn parse(input: ParseStream) -> Result<Self> {
-        let variant_name = input.parse::<Ident>()?;
-        let inst_content;
-        bracketed!(inst_content in input); // Brackets around LitStr
-        let inst_name = inst_content.parse::<LitStr>()?; // Parse LitStr inside brackets
-        input.parse::<Token![:]>()?; // Colon after brackets
-        let ty = input.parse::<syn::Type>()?;
+        let content;
+        parenthesized!(content in input); // Parenthesized tuple for the variant
+        let variant_name = content.parse::<Ident>()?; // First: Ident (variant name)
+        content.parse::<Token![,]>()?; // Comma after variant name
+        let inst_name = content.parse::<LitStr>()?; // Second: LitStr (inst name)
+        content.parse::<Token![,]>()?; // Comma after inst name
+        let ty = content.parse::<syn::Type>()?; // Third: Type
+        // Closing paren is handled by parenthesized!
         Ok(Variant {
             variant_name,
             inst_name,
@@ -99,7 +102,7 @@ mod tests {
         let ts = quote! {
             name: Single,
             variants: [
-                Only [ "only" ] : Type
+                (Only, "only", Type)
             ]
         };
         let ast = parse(ts);
@@ -122,7 +125,7 @@ mod tests {
         let ts = quote! {
             name: Trailing,
             variants: [
-                One [ "one" ] : Type,
+                (One, "one", Type),
             ]
         };
         let ast = parse(ts);
