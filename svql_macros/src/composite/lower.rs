@@ -1,4 +1,4 @@
-use crate::analyze::Model;
+use super::analyze::Model;
 
 pub struct Ir {}
 

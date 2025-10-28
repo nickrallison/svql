@@ -1,4 +1,4 @@
-use crate::parse::Ast;
+use super::parse::Ast;
 
 pub struct Model {}
 
