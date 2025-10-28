@@ -3,11 +3,19 @@ use std::sync::OnceLock;
 
 use svql_common::{ALL_TEST_CASES, Needle, TestCase};
 use svql_driver::Driver;
+use svql_query::{
+    Search,
+    composite::{SearchableComposite, SearchableEnumComposite},
+    instance::Instance,
+    netlist::SearchableNetlist,
+    queries::{
+        composite::dff_then_and::{SdffeThenAnd, SdffeThenAnd2},
+        enum_composite::and_any::AndAny,
+        netlist::basic::and::AndGate,
+    },
+};
 
-// Include the generated dispatch functions
-mod gen_dispatch {
-    include!(concat!(env!("OUT_DIR"), "/svql_query_query_dispatch.rs"));
-}
+// No generated dispatch—manual match for test cases (mirrors direct SubgraphMatcher call in subgraph tests)
 
 fn init_test_logger() {
     static INIT: OnceLock<()> = OnceLock::new();
@@ -22,7 +30,7 @@ fn init_test_logger() {
 fn query_cases() -> Vec<&'static TestCase> {
     ALL_TEST_CASES
         .iter()
-        .filter(|tc| match tc.needle {
+        .filter(|tc| match &tc.needle {
             Needle::Netlist {
                 pattern_query_type: Some(_),
                 ..
@@ -36,38 +44,95 @@ fn query_cases() -> Vec<&'static TestCase> {
 fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
     let driver = Driver::new_workspace()?;
 
-    let query_name = match tc.needle {
+    // FIXED: Use ref patterns to bind name as &str (avoids &&str from matching on &tc.needle)
+    let query_name = match &tc.needle {
         Needle::Netlist {
-            pattern_query_type: Some(name),
+            pattern_query_type: Some(ref name),
             ..
         } => name,
         Needle::Composite {
-            pattern_query_type: name,
+            pattern_query_type: ref name,
         } => name,
         _ => return Err("Invalid needle type for query test".into()),
     };
 
-    let haystack_path = &tc.haystack.yosys_module.path().display().to_string();
-    let haystack_module = tc.haystack.yosys_module.module_name();
+    let haystack_path = tc.haystack.yosys_module.path().display().to_string();
+    let haystack_module = tc.haystack.yosys_module.module_name().to_string();
 
-    // Use the generated dispatch function
-    match gen_dispatch::run_count_for_type_name(
-        query_name,
-        &driver,
-        haystack_path,
-        haystack_module,
-        &tc.config,
-    ) {
-        Ok(actual) => {
-            if actual != tc.expected_matches {
-                return Err(format!(
-                    "Query test case '{}' failed: expected {} matches, got {}",
-                    tc.name, tc.expected_matches, actual
-                )
-                .into());
-            }
+    // Load haystack (shared for all)
+    let (hk, hd) = driver
+        .get_or_load_design(
+            &haystack_path,
+            &haystack_module,
+            &tc.config.haystack_options,
+        )
+        .map_err(|e| format!("Failed to load haystack: {}", e))?;
+    let root = Instance::root("test_root".to_string());
+
+    // Build context (needle-specific; merges for composites/enums)
+    // FIXED: Traits now in scope, so context/query calls work
+    let ctx = match query_name {
+        "svql_query::queries::netlist::basic::and::AndGate" => {
+            <AndGate<Search> as SearchableNetlist>::context(&driver, &tc.config.needle_options)
         }
-        Err(e) => return Err(format!("Query test case '{}' failed: {}", tc.name, e).into()),
+        "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
+            <SdffeThenAnd<Search> as SearchableComposite>::context(
+                &driver,
+                &tc.config.needle_options,
+            )
+        }
+        "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
+            // NEW: Arm for macro-generated composite (verifies macro)
+            <SdffeThenAnd2<Search> as SearchableComposite>::context(
+                &driver,
+                &tc.config.needle_options,
+            )
+        }
+        "svql_query::queries::enum_composite::and_any::AndAny" => {
+            <AndAny<Search> as SearchableEnumComposite>::context(&driver, &tc.config.needle_options)
+        }
+        _ => return Err(format!("No context handler for query type: {}", query_name).into()),
+    }
+    .map_err(|e| format!("Failed to build context for {}: {}", query_name, e))?;
+
+    let ctx = ctx.with_design(hk.clone(), hd);
+
+    // Run query
+    let hits = match query_name {
+        "svql_query::queries::netlist::basic::and::AndGate" => {
+            <AndGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config)
+        }
+        "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
+            <SdffeThenAnd<Search> as SearchableComposite>::query(
+                &hk,
+                &ctx,
+                root.clone(),
+                &tc.config,
+            )
+        }
+        "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
+            // NEW: Arm for macro-generated composite (verifies macro)
+            <SdffeThenAnd2<Search> as SearchableComposite>::query(
+                &hk,
+                &ctx,
+                root.clone(),
+                &tc.config,
+            )
+        }
+        "svql_query::queries::enum_composite::and_any::AndAny" => {
+            <AndAny<Search> as SearchableEnumComposite>::query(&hk, &ctx, root.clone(), &tc.config)
+        }
+        _ => return Err(format!("No query handler for query type: {}", query_name).into()),
+    };
+
+    if hits.len() != tc.expected_matches {
+        return Err(format!(
+            "Query test case '{}' failed: expected {} matches, got {}",
+            tc.name,
+            tc.expected_matches,
+            hits.len()
+        )
+        .into());
     }
 
     Ok(())
@@ -86,17 +151,5 @@ fn query_all_cases() {
             error_msg.push_str(&format!("\n - {}", failure.as_ref().unwrap_err()));
         }
         panic!("{}", error_msg);
-    }
-}
-
-#[test]
-fn query_known_types_list() {
-    init_test_logger();
-    let known = gen_dispatch::known_query_type_names();
-    assert!(!known.is_empty(), "Should have discovered some query types");
-
-    // Print for debugging
-    for name in known {
-        println!("Known query type: {}", name);
     }
 }

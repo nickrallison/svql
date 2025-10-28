@@ -37,11 +37,9 @@ pub mod parse;
 /// - Empty connections: Allowed (uses `vec![vec![]]`—validation always passes).
 /// - Limitations: Up to ~10 subs (due to `iproduct!` tuple limits); one connection group.
 /// - Discovery: build.rs regexes detect the generated `impl SearchableComposite`.
-/// Macro for defining composite queries (structural patterns with sub-netlists and required connections).
 pub fn composite_inner(ts: TokenStream) -> TokenStream {
     let ast = parse::parse(ts.clone().into());
     let model = analyze::analyze(ast);
     let ir = lower::lower(model);
-    let _ = codegen::codegen(ir);
-    TokenStream::new()
+    codegen::codegen(ir).into()
 }

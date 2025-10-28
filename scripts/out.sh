@@ -23,6 +23,8 @@ cargo expand --lib --package svql_query queries::netlist > generated/expanded_ne
 #     > out.md
 
 uv run scripts/md_tree.py --root . \
+    --include 'svql_common/**.rs' \
+    --include 'svql_subgraph/tests/integration_tests.rs' \
     --include 'svql_query/**.rs' \
     --include 'svql_macros/**.rs' \
     --include 'generated/**.rs' \

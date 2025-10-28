@@ -17,7 +17,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         }
     });
 
-    // Generate field initializers in new()
+    // FIXED: Generate field initializers in new() – use instance method path.child(...) (not static Instance::child)
     let field_inits = fields.iter().map(|sub| {
         let field_name = &sub.field_name;
         let ty = &sub.ty;
@@ -43,7 +43,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
             let to_sub = &conn.to_sub;
             let to_port = &conn.to_port;
             quote! {
-                ::svql_query::Connection {
+                crate::Connection {
                     from: self.#from_sub.#from_port.clone(),
                     to: self.#to_sub.#to_port.clone(),
                 }
@@ -58,7 +58,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let context_calls = fields.iter().map(|sub| {
         let ty = &sub.ty;
         quote! {
-            <#ty<::svql_query::Search>>::context(driver, config)?
+            <#ty<crate::Search>>::context(driver, config)?
         }
     });
 
@@ -69,7 +69,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         let field_name_str = field_name.to_string();
         quote! {
             let #field_name = scope.spawn(|| {
-                <#ty<::svql_query::Search>>::query(
+                <#ty<crate::Search>>::query(
                     haystack_key,
                     context,
                     path.child(#field_name_str.to_string()),
@@ -92,7 +92,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         let ty = &sub.ty;
         let field_name_str = sub.field_name.to_string();
         quote! {
-            <#ty<::svql_query::Search>>::query(
+            <#ty<crate::Search>>::query(
                 haystack_key,
                 context,
                 path.child(#field_name_str.to_string()),
@@ -108,17 +108,17 @@ pub fn codegen(ir: Ir) -> TokenStream {
         #[derive(Debug, Clone)]
         pub struct #name<S>
         where
-            S: ::svql_query::State,
+            S: crate::State,
         {
-            pub path: ::svql_query::instance::Instance,
+            pub path: crate::instance::Instance,
             #(#field_decls,)*
         }
 
         impl<S> #name<S>
         where
-            S: ::svql_query::State,
+            S: crate::State,
         {
-            pub fn new(path: ::svql_query::instance::Instance) -> Self {
+            pub fn new(path: crate::instance::Instance) -> Self {
                 Self {
                     path: path.clone(),
                     #(#field_inits,)*
@@ -126,37 +126,37 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
         }
 
-        impl<S> ::svql_query::WithPath<S> for #name<S>
+        impl<S> crate::WithPath<S> for #name<S>
         where
-            S: ::svql_query::State,
+            S: crate::State,
         {
-            ::svql_query::impl_find_port!(#name, #(#field_names_for_find_port),*);
+            crate::impl_find_port!(#name, #(#field_names_for_find_port),*);
 
-            fn path(&self) -> ::svql_query::instance::Instance {
+            fn path(&self) -> crate::instance::Instance {
                 self.path.clone()
             }
         }
 
-        impl<S> ::svql_query::composite::Composite<S> for #name<S>
+        impl<S> crate::composite::Composite<S> for #name<S>
         where
-            S: ::svql_query::State,
+            S: crate::State,
         {
-            fn connections(&self) -> Vec<Vec<::svql_query::Connection<S>>> {
+            fn connections(&self) -> Vec<Vec<crate::Connection<S>>> {
                 vec![
                     #(#connection_groups),*
                 ]
             }
         }
 
-        impl<'ctx> ::svql_query::composite::MatchedComposite<'ctx> for #name<::svql_query::Match<'ctx>> {}
+        impl<'ctx> crate::composite::MatchedComposite<'ctx> for #name<crate::Match<'ctx>> {}
 
-        impl ::svql_query::composite::SearchableComposite for #name<::svql_query::Search> {
-            type Hit<'ctx> = #name<::svql_query::Match<'ctx>>;
+        impl crate::composite::SearchableComposite for #name<crate::Search> {
+            type Hit<'ctx> = #name<crate::Match<'ctx>>;
 
             fn context(
-                driver: &::svql_driver::Driver,
-                config: &::svql_common::ModuleConfig,
-            ) -> Result<::svql_driver::Context, Box<dyn std::error::Error>> {
+                driver: &svql_driver::Driver,
+                config: &svql_common::ModuleConfig,
+            ) -> Result<svql_driver::Context, Box<dyn std::error::Error>> {
                 let contexts = vec![
                     #(#context_calls,)*
                 ];
@@ -170,10 +170,10 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
 
             fn query<'ctx>(
-                haystack_key: &::svql_driver::DriverKey,
-                context: &'ctx ::svql_driver::Context,
-                path: ::svql_query::instance::Instance,
-                config: &::svql_common::Config,
+                haystack_key: &svql_driver::DriverKey,
+                context: &'ctx svql_driver::Context,
+                path: crate::instance::Instance,
+                config: &svql_common::Config,
             ) -> Vec<Self::Hit<'ctx>> {
                 #[cfg(feature = "parallel")]
                 let (#(#parallel_let_binding_fields),*) = {
@@ -203,10 +203,10 @@ pub fn codegen(ir: Ir) -> TokenStream {
                     )
                 };
 
-                ::itertools::iproduct!(#(#field_names_for_iproduct),*)
+                itertools::iproduct!(#(#field_names_for_iproduct),*)
                     .map(|(#(#field_names_for_map_pattern),*)| #name {
                         path: path.clone(),
-                        #(#field_names_for_struct_construction,)*
+                        #(#field_names_for_struct_construction),*
                     })
                     .filter(|composite| composite.validate_connections(composite.connections()))
                     .collect()
