@@ -4,7 +4,7 @@
 
 rm -rf generated
 mkdir -p generated
-cargo expand --lib --package svql_query queries::netlist > generated/expanded_netlist.rs
+cargo expand --lib --package svql_query queries > generated/expanded.rs
 
 # /home/nick/Projects/svql/.venv/bin/python3 scripts/md_tree.py --root . \
 #     --include 'svql_query/**.rs' \
@@ -24,7 +24,6 @@ cargo expand --lib --package svql_query queries::netlist > generated/expanded_ne
 
 uv run scripts/md_tree.py --root . \
     --include 'svql_common/**.rs' \
-    --include 'svql_subgraph/tests/integration_tests.rs' \
     --include 'svql_query/**.rs' \
     --include 'svql_macros/**.rs' \
     --include 'generated/**.rs' \
