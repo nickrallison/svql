@@ -154,19 +154,19 @@ impl SearchableComposite for SdffeThenAnd<Search> {
     }
 }
 
-// use crate::composite;
+use svql_macros::composite;
 
-// // Generate everything: struct, impls, query, etc.
-// composite! {
-//     name: SdffeThenAnd2,
-//     subs: [
-//         sdffe: Sdffe,
-//         and_gate: AndGate
-//     ],
-//     connections: [
-//         [
-//             sdffe . q => and_gate . a,
-//             sdffe . q => and_gate . b
-//         ]
-//     ]
-// }
+// Generate everything: struct, impls, query, etc.
+composite! {
+    name: SdffeThenAnd2,
+    subs: [
+        sdffe: Sdffe,
+        and_gate: AndGate
+    ],
+    connections: [
+        [
+            sdffe . q => and_gate . a,
+            sdffe . q => and_gate . b
+        ]
+    ]
+}

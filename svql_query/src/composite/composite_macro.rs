@@ -36,6 +36,35 @@
 /// - Empty connections: Allowed (uses `vec![vec![]]`—validation always passes).
 /// - Limitations: Up to ~10 subs (due to `iproduct!` tuple limits); one connection group.
 /// - Discovery: build.rs regexes detect the generated `impl SearchableComposite`.
+/// Macro for defining composite queries (structural patterns with sub-netlists and required connections).
+///
+/// # Usage
+/// ```ignore
+/// composite! {
+///     name: SdffeThenAnd,
+///     subs: [
+///         sdffe: Sdffe,
+///         and_gate: AndGate
+///     ],
+///     connections: [
+///         sdffe . q => and_gate . a,
+///         sdffe . q => and_gate . b
+///     ]
+/// }
+/// ```
+///
+/// This generates:
+/// - A struct `SdffeThenAnd<S>` with a `path` field and sub-pattern fields
+/// - A `new(path)` constructor
+/// - `WithPath<S>` implementation
+/// - `Composite<S>` implementation with the specified connections
+/// - `MatchedComposite<'ctx>` implementation  
+/// - `SearchableComposite` implementation with context merging and parallel/sequential query support
+///
+/// # Connections
+/// All connections are grouped into a single validation set, meaning at least one connection
+/// must be valid for the composite match to be valid. Empty connections (omit the field entirely)
+/// will generate `vec![]` which passes validation trivially.
 struct TBD;
 
 /// Macro for defining enum_composite queries (disjoint variants over sub-netlists).

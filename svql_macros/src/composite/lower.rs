@@ -1,7 +1,16 @@
 use super::analyze::Model;
+use super::parse::{Connection, SubPattern};
 
-pub struct Ir {}
+pub struct Ir {
+    pub name: syn::Ident,
+    pub subs: Vec<SubPattern>,
+    pub connections: Vec<Connection>,
+}
 
-pub fn lower(_model: Model) -> Ir {
-    Ir {}
+pub fn lower(model: Model) -> Ir {
+    Ir {
+        name: model.name,
+        subs: model.subs,
+        connections: model.connections,
+    }
 }

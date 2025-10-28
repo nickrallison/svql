@@ -24,6 +24,7 @@ cargo expand --lib --package svql_query queries::netlist > generated/expanded_ne
 
 uv run scripts/md_tree.py --root . \
     --include 'svql_query/**.rs' \
+    --include 'svql_macros/**.rs' \
     --include 'generated/**.rs' \
     --include 'Cargo.toml' \
     --header-base-level 2 \

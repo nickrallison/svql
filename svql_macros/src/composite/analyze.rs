@@ -1,7 +1,16 @@
-use super::parse::Ast;
+use super::parse::{Ast, Connection, SubPattern};
 
-pub struct Model {}
+pub struct Model {
+    pub name: syn::Ident,
+    pub subs: Vec<SubPattern>,
+    pub connections: Vec<Connection>,
+}
 
-pub fn analyze(_ast: Ast) -> Model {
-    Model {}
+pub fn analyze(ast: Ast) -> Model {
+    // For now, just pass through. Could add validation here later.
+    Model {
+        name: ast.name,
+        subs: ast.subs,
+        connections: ast.connections,
+    }
 }

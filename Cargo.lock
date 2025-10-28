@@ -907,6 +907,7 @@ dependencies = [
  "serde_json",
  "svql_common",
  "svql_driver",
+ "svql_macros",
  "svql_subgraph",
  "syn 2.0.104",
  "thiserror",

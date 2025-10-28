@@ -6,6 +6,7 @@ members = [
     "svql_query",
     "svql_subgraph",
     "svql_common",
+    "svql_macros",
 
     # PRJUNNAMED
     "prjunnamed/generic",
@@ -15,7 +16,7 @@ members = [
     "prjunnamed/netlist",
     "prjunnamed/pattern",
     "prjunnamed/siliconblue",
-    "prjunnamed/yosys_json", "svql_macros",
+    "prjunnamed/yosys_json",
 ]
 
 default-members = [
@@ -40,6 +41,7 @@ version = "0.1.0"
 svql_common = { path = "svql_common" }
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
+svql_macros = { path = "svql_macros" }
 svql_subgraph = { path = "svql_subgraph" }
 
 ###############
