@@ -154,20 +154,19 @@ impl SearchableComposite for SdffeThenAnd<Search> {
     }
 }
 
-// use crate::{
-//     composite,
-//     queries::netlist::basic::{and::AndGate, dff::Sdffe},
-// };
+// use crate::composite;
 
 // // Generate everything: struct, impls, query, etc.
 // composite! {
-//     name: SdffeThenAnd,
+//     name: SdffeThenAnd2,
 //     subs: [
 //         sdffe: Sdffe,
 //         and_gate: AndGate
 //     ],
 //     connections: [
-//         sdffe . q => and_gate . a,
-//         sdffe . q => and_gate . b
+//         [
+//             sdffe . q => and_gate . a,
+//             sdffe . q => and_gate . b
+//         ]
 //     ]
 // }
