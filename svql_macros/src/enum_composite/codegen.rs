@@ -12,7 +12,22 @@ pub fn codegen(ir: Ir) -> TokenStream {
         return quote! {
             #[derive(Debug, Clone)]
             pub enum #name<S> where S: crate::State {}
-            // Minimal impls...
+            // Minimal impls (add if needed)
+            impl<S: crate::State> crate::WithPath<S> for #name<S> {
+                fn find_port(&self, _p: &crate::instance::Instance) -> Option<&crate::Wire<S>> { None }
+                fn path(&self) -> crate::instance::Instance { crate::instance::Instance::root() }
+            }
+            impl<S: crate::State> crate::composite::EnumComposite<S> for #name<S> {}
+            impl<'ctx> crate::composite::MatchedEnumComposite<'ctx> for #name<crate::Match<'ctx>> {}
+            impl crate::composite::SearchableEnumComposite for #name<crate::Search> {
+                type Hit<'ctx> = #name<crate::Match<'ctx>>;
+                fn context(_driver: &svql_driver::Driver, _config: &svql_common::ModuleConfig) -> Result<svql_driver::Context, Box<dyn std::error::Error>> {
+                    Ok(svql_driver::Context::default())
+                }
+                fn query<'ctx>(_haystack_key: &svql_driver::DriverKey, _context: &'ctx svql_driver::Context, _path: crate::instance::Instance, _config: &svql_common::Config) -> Vec<Self::Hit<'ctx>> {
+                    vec![]
+                }
+            }
         };
     }
 
@@ -20,15 +35,12 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let enum_variants = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
         let ty = &v.ty;
-        quote! {
-            #variant_name(#ty<S>)
-        }
+        quote! { #variant_name(#ty<S>) }
     });
 
     // Generate Debug impl (match arms)
     let debug_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
-        let inner = &v.variant_name;
         quote! {
             #name::#variant_name(__self_0) => {
                 ::core::fmt::Formatter::debug_tuple_field1_finish(f, stringify!(#variant_name), &__self_0)
@@ -39,7 +51,6 @@ pub fn codegen(ir: Ir) -> TokenStream {
     // Generate Clone impl (match arms)
     let clone_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
-        let inner = &v.variant_name;
         quote! {
             #name::#variant_name(__self_0) => #name::#variant_name(::core::clone::Clone::clone(__self_0))
         }
@@ -49,27 +60,21 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let withpath_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
         let inner = &v.variant_name;
-        quote! {
-            #name::#variant_name(#inner) => #inner.find_port(p),
-        }
+        quote! { #name::#variant_name(#inner) => #inner.find_port(p) }
     });
     let withpath_path_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
         let inner = &v.variant_name;
-        quote! {
-            #name::#variant_name(#inner) => #inner.path(),
-        }
+        quote! { #name::#variant_name(#inner) => #inner.path() }
     });
 
-    // Generate context merging
+    // Generate context merging (one per variant)
     let context_calls = variants.iter().map(|v| {
         let ty = &v.ty;
-        quote! {
-            <#ty<crate::Search>>::context(driver, config)?
-        }
+        quote! { <#ty<crate::Search>>::context(driver, config)? }
     });
 
-    // Generate parallel spawns and joins
+    // Parallel: Separate iterators for each use site
     let parallel_spawns = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
         let ty = &v.ty;
@@ -79,42 +84,43 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 <#ty<crate::Search>>::query(
                     haystack_key,
                     context,
-                    path.child(#inst_name.to_string()),
+                    path.child(#inst_name.value().to_string()),
                     config,
                 )
             });
         }
     });
-    let parallel_joins = variants.iter().map(|v| {
+    let join_patterns = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
-        let error_msg = format!("Failed to join {} thread", variant_name);
-        quote! {
-            #variant_name.join().expect(#error_msg)
-        }
+        quote! { #variant_name }
+    });
+    let join_values = variants.iter().map(|v| {
+        let variant_name = &v.variant_name;
+        let error_msg = format!("Failed to join {} thread", v.variant_name);
+        quote! { #variant_name.join().expect(#error_msg) }
+    });
+    let chain_mappings_parallel = variants.iter().map(|v| {
+        let variant_name = &v.variant_name;
+        quote! { #variant_name.into_iter().map(#name::<crate::Match<'ctx>>::#variant_name) }
     });
 
-    // Generate sequential queries
-    let sequential_queries = variants.iter().map(|v| {
+    // Sequential: Separate iterators
+    let sequential_lets = variants.iter().map(|v| {
+        let variant_name = &v.variant_name;
         let ty = &v.ty;
         let inst_name = &v.inst_name;
-        let variant_name = &v.variant_name;
         quote! {
-            let #variant_name = <#ty<crate::Search>>::query(
+            let #variant_name: Vec<#ty<crate::Match<'ctx>>> = <#ty<crate::Search>>::query(
                 haystack_key,
                 context,
-                path.child(#inst_name.to_string()),
+                path.child(#inst_name.value().to_string()),
                 config,
             );
         }
     });
-
-    // Generate mapping to enum variants and chaining
-    let chain_mappings = variants.iter().map(|v| {
+    let chain_mappings_sequential = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
-        let ty = &v.variant_name; // Use variant name for mapping
-        quote! {
-            #variant_name.into_iter().map(#name::<crate::Match<'ctx>>::#ty)
-        }
+        quote! { #variant_name.into_iter().map(#name::<crate::Match<'ctx>>::#variant_name) }
     });
 
     let query_log_msg = format!("{}::query: executing with parallel queries", name);
@@ -126,7 +132,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         where
             S: crate::State,
         {
-            #(#enum_variants,)*
+            #(#enum_variants)*
         }
 
         #[automatically_derived]
@@ -186,13 +192,11 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 driver: &svql_driver::Driver,
                 config: &svql_common::ModuleConfig,
             ) -> Result<svql_driver::Context, Box<dyn std::error::Error>> {
-                let contexts = vec![
-                    #(#context_calls,)*
-                ];
+                let contexts = vec![ #(#context_calls,)* ];
                 let mut iter = contexts.into_iter();
                 let mut result = iter.next().ok_or("No variants defined")?;
                 for ctx in iter {
-                    result = result.merge(ctx);
+                    result = result.merge(ctx)?;
                 }
                 Ok(result)
             }
@@ -204,36 +208,34 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 config: &svql_common::Config,
             ) -> Vec<Self::Hit<'ctx>> {
                 #[cfg(feature = "parallel")]
-                let (#(#parallel_joins,)*) = {
-                    ::tracing::event!(
-                        ::tracing::Level::INFO,
-                        #query_log_msg
-                    );
+                {
+                    ::tracing::event!(::tracing::Level::INFO, #query_log_msg);
 
                     ::std::thread::scope(|scope| {
+                        // FIXED: Separate iterators, each used once
                         #(#parallel_spawns)*
 
-                        (
-                            #(#parallel_joins,)*
-                        )
+                        let ( #(#join_patterns,)* ) = ( #(#join_values,)* );
+
+                        // FIXED: Chain and collect immediately (separate iterator, used once)
+                        #(#chain_mappings_parallel,)*
+                            .flatten()
+                            .collect()
                     })
-                };
+                }
 
                 #[cfg(not(feature = "parallel"))]
                 {
-                    ::tracing::event!(
-                        ::tracing::Level::INFO,
-                        #query_log_msg_seq
-                    );
+                    ::tracing::event!(::tracing::Level::INFO, #query_log_msg_seq);
 
-                    #(#sequential_queries)*
-                };
+                    // FIXED: Separate iterators, each used once
+                    #(#sequential_lets)*
 
-                (#(#parallel_joins,)*)  // For parallel case
-                    #(#sequential_queries)*  // For sequential case (already bound)
-
-                #(#chain_mappings)*
-                    .collect()
+                    // FIXED: Chain and collect immediately (separate iterator, used once)
+                    #(#chain_mappings_sequential,)*
+                        .flatten()
+                        .collect()
+                }
             }
         }
     }

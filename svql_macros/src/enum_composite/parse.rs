@@ -1,7 +1,7 @@
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, LitStr, Result, Token, bracketed, parse2, punctuated::Punctuated, Type};
+use syn::{Ident, LitStr, Result, Token, Type, bracketed, parse2, punctuated::Punctuated};
 
 #[derive(Clone)]
 pub struct Variant {
@@ -48,9 +48,9 @@ impl Parse for Ast {
 impl Parse for Variant {
     fn parse(input: ParseStream) -> Result<Self> {
         let variant_name = input.parse::<Ident>()?;
-        input.parse::<Token![(]>()?;  // FIXED: Use Token![(] for opening parenthesis
-        let inst_name = input.parse::<LitStr>()?;
-        input.parse::<Token![)]>()?;  // FIXED: Use Token![)] for closing parenthesis
+        let inst_content;
+        bracketed!(inst_content in input); // FIXED: Parse [ "inst_name" ] as bracketed content
+        let inst_name = inst_content.parse::<LitStr>()?; // Parse the LitStr inside brackets
         input.parse::<Token![:]>()?;
         let ty = input.parse::<Type>()?;
         Ok(Variant {
@@ -70,17 +70,17 @@ pub fn parse(ts: TokenStream) -> Ast {
 
 #[cfg(test)]
 mod tests {
-    use quote::quote;
     use super::*;
+    use quote::quote;
 
     #[test]
     fn valid_syntax() {
         let ts = quote! {
             name: AndAny,
             variants: [
-                Gate ( "and_gate" ) : AndGate,
-                Mux  ( "and_mux" ) : AndMux,
-                Nor  ( "and_nor" ) : AndNor
+                Gate [ "and_gate" ] : AndGate,
+                Mux  [ "and_mux" ] : AndMux,
+                Nor  [ "and_nor" ] : AndNor
             ]
         };
         let ast = parse(ts);
@@ -88,6 +88,7 @@ mod tests {
         assert_eq!(ast.variants.len(), 3);
         assert_eq!(ast.variants[0].variant_name.to_string(), "Gate");
         assert_eq!(ast.variants[0].inst_name.value(), "and_gate");
+        assert_eq!(ast.variants[0].ty.to_string(), "AndGate");
     }
 
     #[test]
@@ -95,11 +96,12 @@ mod tests {
         let ts = quote! {
             name: Single,
             variants: [
-                Only ( "only" ) : Type
+                Only [ "only" ] : Type
             ]
         };
         let ast = parse(ts);
         assert_eq!(ast.variants.len(), 1);
+        assert_eq!(ast.variants[0].inst_name.value(), "only");
     }
 
     #[test]
