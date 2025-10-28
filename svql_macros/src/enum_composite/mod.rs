@@ -1,3 +1,6 @@
+use proc_macro::TokenStream;
+use proc_macro_error::proc_macro_error;
+
 pub mod analyze;
 pub mod codegen;
 pub mod lower;
@@ -30,4 +33,10 @@ pub mod parse;
 /// - Variants: Each needs a literal instance name (e.g., `"and_gate"`) for `path.child(inst_name)`.
 /// - Query: Runs sub-queries (parallel or sequential), maps to enum variants, chains results (no validation/connections).
 /// - Discovery: build.rs regexes detect the generated `impl SearchableEnumComposite`.
-pub struct TBD;
+/// - Limitations: Up to ~10 variants (due to tuple limits in parallel joins); no connections.
+pub fn enum_composite_inner(ts: TokenStream) -> TokenStream {
+    let ast = parse::parse(ts.clone().into());
+    let model = analyze::analyze(ast);
+    let ir = lower::lower(model);
+    codegen::codegen(ir).into()
+}

@@ -16,3 +16,9 @@ pub fn netlist(input: TokenStream) -> TokenStream {
 pub fn composite(input: TokenStream) -> TokenStream {
     composite::composite_inner(input)
 }
+
+#[proc_macro]
+#[proc_macro_error]
+pub fn enum_composite(input: TokenStream) -> TokenStream {
+    enum_composite::enum_composite_inner(input)
+}
