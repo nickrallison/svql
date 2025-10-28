@@ -28,8 +28,6 @@ cargo expand --lib --package svql_query queries::netlist > generated/expanded_ne
     --header-base-level 2 \
     --section "examples=Examples" \
     --section "generated=Generated" \
-    --section "svql_subgraph=svql_subgraph" \
-    --section "svql_driver=svql_driver" \
     --section "svql_query=svql_query" \
     --section "svql_common=svql_common" \
     > out.md
