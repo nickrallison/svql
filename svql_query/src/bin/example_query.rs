@@ -21,12 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .dedupe(Dedupe::None)
         .build();
 
-    let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_full.json";
-    let design_module = "tile";
+    let design_path = "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v";
+    let design_module = "AddrDecode";
 
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
-    let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
+    // let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
+    let (design_key, design_arc) =
+        driver.get_or_load_design(design_path, design_module, &cfg.haystack_options)?;
 
     let cells = design_arc.design().iter_cells().count();
     info!("Design has {} cells", cells);
