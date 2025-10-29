@@ -25,6 +25,10 @@ impl<'a> CellRegistry<'a> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.cells_topo.len()
+    }
+
     fn build_cells_topo(cell_refs_topo: &[CellRef<'a>]) -> Vec<CellWrapper<'a>> {
         cell_refs_topo
             .iter()

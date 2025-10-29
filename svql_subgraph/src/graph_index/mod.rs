@@ -36,6 +36,10 @@ impl<'a> GraphIndex<'a> {
         }
     }
 
+    pub fn num_cells(&self) -> usize {
+        self.cell_registry.len()
+    }
+
     fn build_cell_refs_topo(design: &'a Design) -> Vec<CellRef<'a>> {
         design
             .iter_cells_topo()

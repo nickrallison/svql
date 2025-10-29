@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{YosysModule, config::Config};
+use crate::{Dedupe, MatchLength, YosysModule, config::Config};
 
 #[derive(Debug, Clone)]
 pub enum Needle {
@@ -133,6 +133,10 @@ lazy_static::lazy_static! {
     static ref AND_ANY: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::enum_composite::and_any::AndAny",  // FIXED: Correct module path
     };
+    static ref REC_AND: Needle = Needle::Composite {
+        pattern_query_type: "svql_query::queries::composite::rec_and::RecAnd",
+    };
+
 }
 
 // #####################
@@ -169,6 +173,19 @@ lazy_static::lazy_static! {
             "and_seq",
         ).expect("Failed to create YosysModule for and_seq"),
     };
+    static ref AND_2_SEQ_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_2_seq.v",
+            "and_2_seq",
+        ).expect("Failed to create YosysModule for and_2_seq"),
+    };
+    static ref SINGLE_AND_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/and/verilog/and_gate.v",
+            "and_gate",
+        ).expect("Failed to create YosysModule for single AND"),
+    };
+
     static ref SDFFE_HAYSTACK: Haystack = Haystack {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/ff/rtlil/sdffe.il",
@@ -322,31 +339,8 @@ lazy_static::lazy_static! {
 
     ];
 
-    pub static ref DEDUPE_TEST_CASES: Vec<TestCase> = vec![
-    //     TestCase {
-    //         name: "and_nor_dedupe_none_none",
-    //         config: Config::builder().exact_length().none().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &MIXED_AND_TREE,
-    //         expected_matches: 4,
-    //     },
-    //     TestCase {
-    //         name: "and_nor_dedupe_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_NOR,
-    //         haystack: &MIXED_AND_TREE,
-    //         expected_matches: 2,
-    //     },
-    //     TestCase {
-    //         name: "and_mux_dedupe_auto_morph",
-    //         config: Config::builder().exact_length().auto_morph().flatten().build(),
-    //         pattern: &AND_MUX,
-    //         haystack: &MIXED_AND_TREE,
-    //         expected_matches: 2,
-    //     },
-    ];
 
-        pub static ref SECURITY_TEST_CASES: Vec<TestCase> = vec![
+    pub static ref SECURITY_TEST_CASES: Vec<TestCase> = vec![
         // From many_locked_regs.v there are exactly 2 instances of each:
         // 2 × async_en, 2 × async_mux, 2 × sync_en, 2 × sync_mux
 
@@ -364,20 +358,6 @@ lazy_static::lazy_static! {
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
         },
-        // TestCase {
-        //     name: "sync_en_in_many_locked_regs",
-        //     config: Config::builder().match_length(crate::MatchLength::Exact).build();
-        //     pattern: &SYNC_EN_IL,
-        //     haystack: &MANY_LOCKED_REGS_IL,
-        //     expected_matches: 2,
-        // },
-        // TestCase {
-        //     name: "sync_mux_in_many_locked_regs",
-        //     config: Config::builder().match_length(crate::MatchLength::Exact).build();
-        //     pattern: &SYNC_MUX_IL,
-        //     haystack: &MANY_LOCKED_REGS_IL,
-        //     expected_matches: 2,
-        // },
     ];
 
 
@@ -399,6 +379,43 @@ lazy_static::lazy_static! {
         },
     ];
 
+    pub static ref REC_AND_TEST_CASES: Vec<TestCase> = vec![
+        // Base case: single AND (depth 1 only)
+        TestCase {
+            name: "rec_and_single_dedupe_none",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::None)
+                .build(),
+            needle: &REC_AND,
+            haystack: &SINGLE_AND_HAYSTACK,
+            expected_matches: 2,  // Just the base AND and the port permuations
+        },
+        TestCase {
+            name: "rec_and_single_dedupe_all",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &REC_AND,
+            haystack: &SINGLE_AND_HAYSTACK,
+            expected_matches: 1,  // Dedupe doesn't change for single
+        },
+
+        // Sequential chain (N=3): 2 ANDs, expect 2 base + 1 depth2 = 3
+        TestCase {
+            name: "rec_and_seq_chain_dedupe_none",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::None)
+                .build(),
+            needle: &REC_AND,
+            haystack: &AND_2_SEQ_HAYSTACK,  // Assumes N=3 param; adjust if needed
+            expected_matches: 3,
+        },
+    ];
+
+
     pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
             name: "and_any_in_mixed_tree_dedupe_all",
@@ -411,9 +428,9 @@ lazy_static::lazy_static! {
 
     pub static ref ALL_TEST_CASES: Vec<TestCase> = {
         let mut all = BASIC_TEST_CASES.clone();
-        all.extend(DEDUPE_TEST_CASES.clone());
         all.extend(SECURITY_TEST_CASES.clone());
         all.extend(COMPOSITE_TEST_CASES.clone());
+        all.extend(REC_AND_TEST_CASES.clone());
         all.extend(ENUM_COMPOSITE_TEST_CASES.clone());
         all
     };

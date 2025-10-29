@@ -23,7 +23,9 @@ cargo expand --lib --package svql_query queries > generated/expanded.rs
 #     > out.md
 
 uv run scripts/md_tree.py --root . \
+    --include 'svql_common/**.rs' \
     --include 'svql_query/**.rs' \
+    --include 'examples/**.v' \
     --include 'generated/**.rs' \
     --include 'Cargo.toml' \
     --header-base-level 2 \

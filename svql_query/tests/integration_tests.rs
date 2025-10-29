@@ -14,7 +14,7 @@ use svql_query::{
         netlist::basic::and::AndGate,
     },
 };
-
+use svql_query::queries::composite::rec_and::RecAnd;
 // No generated dispatch—manual match for test cases (mirrors direct SubgraphMatcher call in subgraph tests)
 
 fn init_test_logger() {
@@ -91,6 +91,11 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         "svql_query::queries::enum_composite::and_any::AndAny" => {
             <AndAny<Search> as SearchableEnumComposite>::context(&driver, &tc.config.needle_options)
         }
+        "svql_query::queries::composite::rec_and::RecAnd" => {
+            <RecAnd<Search> as SearchableComposite>::context(&driver, &tc.config.needle_options)
+        }
+
+
         _ => return Err(format!("No context handler for query type: {}", query_name).into()),
     }
     .map_err(|e| format!("Failed to build context for {}: {}", query_name, e))?;
@@ -126,6 +131,10 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             <AndAny<Search> as SearchableEnumComposite>::query(&hk, &ctx, root.clone(), &tc.config)
                 .len()
         }
+        "svql_query::queries::composite::rec_and::RecAnd" => {
+            <RecAnd<Search> as SearchableComposite>::query(&hk, &ctx, root.clone(), &tc.config).len()
+        }
+
         _ => return Err(format!("No query handler for query type: {}", query_name).into()),
     };
 
