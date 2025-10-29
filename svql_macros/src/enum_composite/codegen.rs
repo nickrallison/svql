@@ -211,7 +211,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 let mut iter = contexts.into_iter();
                 let mut result = iter.next().ok_or("No variants defined")?;
                 for ctx in iter {
-                    result = result.merge(ctx)?;
+                    result = result.merge(ctx);
                 }
                 Ok(result)
             }
