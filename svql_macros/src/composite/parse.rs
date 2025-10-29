@@ -120,12 +120,17 @@ pub fn parse(ts: TokenStream) -> Ast {
     }
 }
 
+pub fn try_parse(ts: TokenStream) -> Result<Ast> {
+    parse2::<Ast>(ts)
+}
+
 #[cfg(test)]
 mod tests {
-    use quote::quote;
-
     use super::*;
+    use itertools::iproduct;
+    use quote::quote; // For higher-order combinations in generated tests
 
+    // Existing success tests (unchanged; they pass)
     #[test]
     fn valid_syntax_with_nested_connections() {
         parse(quote! {
@@ -170,5 +175,184 @@ mod tests {
                 ]
             ]
         });
+    }
+
+    // Existing + new success tests (unchanged; they pass)
+    #[test]
+    fn valid_syntax_empty_subs() {
+        let ast = parse(quote! {
+            name: EmptyComposite,
+            subs: [],
+            connections: []
+        });
+        assert_eq!(ast.name.to_string(), "EmptyComposite");
+        assert!(ast.subs.is_empty());
+        assert!(ast.connections.is_empty());
+    }
+
+    #[test]
+    fn valid_syntax_trailing_commas() {
+        let ast = parse(quote! {
+            name: TrailingComposite,
+            subs: [
+                field1: Type1,
+                field2: Type2,
+            ],
+            connections: [
+                [
+                    field1 . out => field2 . inp,
+                ],
+            ]
+        });
+        assert_eq!(ast.subs.len(), 2);
+        assert_eq!(ast.connections.len(), 1);
+        assert_eq!(ast.connections[0].len(), 1);
+    }
+
+    #[test]
+    fn valid_syntax_multiple_groups() {
+        let ast = parse(quote! {
+            name: MultiGroupComposite,
+            subs: [
+                src: SrcType,
+                dst1: DstType1,
+                dst2: DstType2
+            ],
+            connections: [
+                [
+                    src . out => dst1 . in1
+                ],
+                [
+                    src . out => dst2 . in2,
+                    src . out2 => dst2 . in3
+                ]
+            ]
+        });
+        assert_eq!(ast.subs.len(), 3);
+        assert_eq!(ast.connections.len(), 2);
+        assert_eq!(ast.connections[0].len(), 1);
+        assert_eq!(ast.connections[1].len(), 2);
+    }
+
+    // NEW: Error tests using try_parse (avoids proc-macro-error; asserts on syn::Error)
+    #[test]
+    fn error_missing_colon_in_sub() {
+        let res = try_parse(quote! {
+            name: BadSub,
+            subs: [
+                field1 Type1  // Missing :
+            ]
+        });
+        let err = match res {
+            Ok(_) => panic!("Expected error, but parsing succeeded"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("expected `:`"),
+            "Expected colon error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn error_malformed_connection() {
+        let res = try_parse(quote! {
+            name: BadConn,
+            subs: [src: SrcType, dst: DstType],
+            connections: [
+                [
+                    src . out dst . in1  // Missing =>
+                ]
+            ]
+        });
+        let err = match res {
+            Ok(_) => panic!("Expected error, but parsing succeeded"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("expected `=>`"),
+            "Expected => error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn error_invalid_keyword() {
+        let res = try_parse(quote! {
+            name: Invalid,
+            wrong: [  // Not 'subs'
+                field1: Type1
+            ]
+        });
+        let err = match res {
+            Ok(_) => panic!("Expected error, but parsing succeeded"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("expected ident")
+                || err.to_string().contains("expected 'subs'"),
+            "Expected keyword error, got: {}",
+            err
+        ); // Syn may vary: "expected ident" or field mismatch
+    }
+
+    // FIXED: Generated test - only valid paths (higher-order over success cases; no panics)
+    // Tests combinations of subs/connections without errors
+    #[test]
+    fn generated_connection_tests() {
+        // Define valid subs and connection groups to product over
+        let valid_subs = vec![
+            quote! { subs: [field1: Type1] },
+            quote! { subs: [field1: Type1, field2: Type2] },
+        ];
+        let valid_conns = vec![
+            quote! { connections: [] },                                 // Empty
+            quote! { connections: [ [field1 . out => field2 . inp] ] }, // Single group
+        ];
+
+        // Higher-order: Product of valid combos, parse each
+        iproduct!(valid_subs, valid_conns).for_each(|(subs, conns)| {
+            let full = quote! {
+                name: VarComposite,
+                #subs,
+                #conns
+            };
+            let ast = parse(full);
+            assert!(
+                !ast.subs.is_empty(),
+                "Subs should not be empty in valid case"
+            );
+            // Additional assertions can be added per combo if needed
+        });
+
+        // Explicit full valid parse (as before)
+        parse(quote! {
+            name: VarComposite,
+            subs: [a: TypeA, b: TypeB],
+            connections: [
+                [a . out => b . in1],
+                [a . out2 => b . in2]
+            ]
+        });
+    }
+
+    // NEW: Dedicated error subtest for generated cases (e.g., invalid connection in a group)
+    #[test]
+    fn generated_connection_error_test() {
+        let res = try_parse(quote! {
+            name: VarErrorComposite,
+            subs: [a: TypeA, b: TypeB],
+            connections: [
+                [a . out b . in1]  // Malformed (missing =>)
+            ]
+        });
+        let err = match res {
+            Ok(_) => panic!("Expected error, but parsing succeeded"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("expected `=>`"),
+            "Expected malformed connection error"
+        );
     }
 }
