@@ -70,6 +70,24 @@ pub fn codegen(ir: Ir) -> TokenStream {
         quote! { #variant_name(#ty<S>) }
     });
 
+    // Generate Debug impl (match arms)
+    let debug_arms = variants.iter().map(|v| {
+        let variant_name = &v.variant_name;
+        quote! {
+            #name::#variant_name(__self_0) => {
+                ::core::fmt::Formatter::debug_tuple_field1_finish(f, stringify!(#variant_name), &__self_0)
+            }
+        }
+    });
+
+    // Generate Clone impl (match arms)
+    let clone_arms = variants.iter().map(|v| {
+        let variant_name = &v.variant_name;
+        quote! {
+            #name::#variant_name(__self_0) => #name::#variant_name(::core::clone::Clone::clone(__self_0))
+        }
+    });
+
     // Generate WithPath match arms (delegate to inner) - FIXED: Use fresh bound ident
     let withpath_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
@@ -82,20 +100,20 @@ pub fn codegen(ir: Ir) -> TokenStream {
         quote! { #name::#variant_name(#bound) => #bound.path() }
     });
 
-    // Generate context merging (one per variant)
+    // Generate context merging (one per variant) - FIXED: Use fully qualified trait syntax
     let context_calls = variants.iter().map(|v| {
         let ty = &v.ty;
-        quote! { <#ty<crate::Search>>::context(driver, config)? }
+        quote! { <#ty<crate::Search> as crate::netlist::SearchableNetlist>::context(driver, config)? }
     });
 
-    // Parallel: Spawns, joins, and binding patterns
+    // Parallel: Spawns, joins, and binding patterns - FIXED: Use fully qualified trait syntax
     let parallel_spawns = variants.iter().map(|v| {
         let variant_name = &v.variant_name;
         let ty = &v.ty;
         let inst_name = &v.inst_name;
         quote! {
             let #variant_name = scope.spawn(|| {
-                <#ty<crate::Search>>::query(
+                <#ty<crate::Search> as crate::netlist::SearchableNetlist>::query(
                     haystack_key,
                     context,
                     path.child(#inst_name.to_string()),
@@ -112,13 +130,13 @@ pub fn codegen(ir: Ir) -> TokenStream {
         quote! { #variant_name.join().expect(#error_msg) }
     });
 
-    // Sequential: Queries
+    // Sequential: Queries - FIXED: Use fully qualified trait syntax
     let sequential_let_binding_fields = variants.iter().map(|v| &v.variant_name);
     let sequential_queries = variants.iter().map(|v| {
         let ty = &v.ty;
         let inst_name = &v.inst_name;
         quote! {
-            <#ty<crate::Search>>::query(
+            <#ty<crate::Search> as crate::netlist::SearchableNetlist>::query(
                 haystack_key,
                 context,
                 path.child(#inst_name.to_string()),
