@@ -1,3 +1,4 @@
+// svql_macros/src/enum_composite/parse.rs
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
@@ -37,9 +38,6 @@ impl Parse for Ast {
         let variants_punctuated: Punctuated<Variant, Token![,]> =
             variants_content.parse_terminated(Variant::parse, Token![,])?;
         let variants = variants_punctuated.into_iter().collect();
-
-        // Optional trailing comma after variants array
-        let _ = input.parse::<Token![,]>();
 
         Ok(Ast { name, variants })
     }
@@ -205,5 +203,23 @@ mod tests {
     fn test_parse_error_invalid_type() {
         let ts = quote! { (Gate, "and_gate", 123) }; // 123 is not a Type
         let _variant: Variant = parse2(ts).unwrap(); // Should fail and panic via abort
+    }
+
+    // Subtest 8: Parse multiple variants with trailing comma (should fail without fix, pass with robust parsing)
+    #[test]
+    fn test_parse_multiple_variants_trailing_comma() {
+        let ts = quote! {
+            name: AndAnyTrailing,
+            variants: [
+                (Gate, "and_gate", AndGate),
+                (Mux, "and_mux", AndMux),
+                (Nor, "and_nor", AndNor),
+            ]
+        };
+        // This should parse successfully if trailing comma is handled for multi-items
+        let ast = parse(ts);
+        assert_eq!(ast.name.to_string(), "AndAnyTrailing");
+        assert_eq!(ast.variants.len(), 3);
+        assert_eq!(ast.variants[2].inst_name.value(), "and_nor");
     }
 }

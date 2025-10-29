@@ -1,3 +1,4 @@
+// svql_macros/src/enum_composite/lower.rs
 use super::analyze::Model;
 
 #[derive(Clone)]
@@ -18,7 +19,7 @@ pub fn lower(model: Model) -> Ir {
         .into_iter()
         .map(|v| VariantRef {
             variant_name: v.variant_name,
-            inst_name: v.inst_name.value(),
+            inst_name: v.inst_name.value().to_string(),
             ty: v.ty,
         })
         .collect();

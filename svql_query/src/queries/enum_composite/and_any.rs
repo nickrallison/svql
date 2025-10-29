@@ -177,6 +177,7 @@
 
 // // // Optional: Overrides similar to above (e.g., for parallel).
 
+use crate::queries::netlist::basic::and::{AndGate, AndMux, AndNor};
 use svql_macros::enum_composite;
 
 enum_composite! {
@@ -184,6 +185,6 @@ enum_composite! {
     variants: [
         (Gate, "and_gate", AndGate),
         (Mux, "and_mux",  AndMux),
-        (Nor, "and_nor",  AndNor),
+        (Nor, "and_nor",  AndNor)
     ]
 }
