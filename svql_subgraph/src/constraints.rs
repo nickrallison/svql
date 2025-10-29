@@ -309,7 +309,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let fan_in_needle_cell: Result<(CellRef<'needle>, usize), Trit> =
             self.needle.find_cell(*needle_net);
 
-        let (actual_fan_in_haystack_cell_ref, d_fan_in_idx, fan_in_needle_cell_ref, p_fan_in_idx) =
+        let (actual_fan_in_haystack_cell_ref, _d_fan_in_idx, fan_in_needle_cell_ref, _p_fan_in_idx) =
             match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
                 (Ok((d_fan_in_cell_ref, d_bit_idx)), Ok((p_fan_in_cell_ref, p_bit_idx))) => {
                     (d_fan_in_cell_ref, d_bit_idx, p_fan_in_cell_ref, p_bit_idx)
