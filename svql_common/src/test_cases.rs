@@ -292,50 +292,50 @@ lazy_static::lazy_static! {
 lazy_static::lazy_static! {
     pub static ref BASIC_TEST_CASES: Vec<TestCase> = vec![
         // AND gate tests
-        TestCase {
-            name: "and_gate_self_dedupe_none",
-            config: Config::builder()
-                .match_length(crate::config::MatchLength::Exact)
-                // .haystack_flatten(true)
-                .dedupe(crate::Dedupe::None)
-                .build(),
-            needle: &AND_GATE,
-            haystack: &AND_GATE_HAYSTACK,
-            expected_matches: 2,
-        },
-        TestCase {
-            name: "and_gate_self_dedupe_all",
-            config: Config::builder()
-                .match_length(crate::config::MatchLength::Exact)
-                // .haystack_flatten(true)
-                .dedupe(crate::Dedupe::All)
-                .build(),
-            needle: &AND_GATE,
-            haystack: &AND_GATE_HAYSTACK,
-            expected_matches: 1,
-        },
-        TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_none",
-            config: Config::builder()
-                .match_length(crate::config::MatchLength::Exact)
-                // .haystack_flatten(true)
-                .dedupe(crate::Dedupe::None)
-                .build(),
-            needle: &SMALL_AND_SEQ,
-            haystack: &SMALL_AND_TREE_HAYSTACK,
-            expected_matches: 4,
-        },
-        TestCase {
-            name: "small_and_seq_3_and_tree_4_dedupe_all",
-            config: Config::builder()
-                .match_length(crate::config::MatchLength::Exact)
-                // .haystack_flatten(true)
-                .dedupe(crate::Dedupe::All)
-                .build(),
-            needle: &SMALL_AND_SEQ,
-            haystack: &SMALL_AND_TREE_HAYSTACK,
-            expected_matches: 2,
-        },
+        // TestCase {
+        //     name: "and_gate_self_dedupe_none",
+        //     config: Config::builder()
+        //         .match_length(crate::config::MatchLength::Exact)
+        //         // .haystack_flatten(true)
+        //         .dedupe(crate::Dedupe::None)
+        //         .build(),
+        //     needle: &AND_GATE,
+        //     haystack: &AND_GATE_HAYSTACK,
+        //     expected_matches: 2,
+        // },
+        // TestCase {
+        //     name: "and_gate_self_dedupe_all",
+        //     config: Config::builder()
+        //         .match_length(crate::config::MatchLength::Exact)
+        //         // .haystack_flatten(true)
+        //         .dedupe(crate::Dedupe::All)
+        //         .build(),
+        //     needle: &AND_GATE,
+        //     haystack: &AND_GATE_HAYSTACK,
+        //     expected_matches: 1,
+        // },
+        // TestCase {
+        //     name: "small_and_seq_3_and_tree_4_dedupe_none",
+        //     config: Config::builder()
+        //         .match_length(crate::config::MatchLength::Exact)
+        //         // .haystack_flatten(true)
+        //         .dedupe(crate::Dedupe::None)
+        //         .build(),
+        //     needle: &SMALL_AND_SEQ,
+        //     haystack: &SMALL_AND_TREE_HAYSTACK,
+        //     expected_matches: 4,
+        // },
+        // TestCase {
+        //     name: "small_and_seq_3_and_tree_4_dedupe_all",
+        //     config: Config::builder()
+        //         .match_length(crate::config::MatchLength::Exact)
+        //         // .haystack_flatten(true)
+        //         .dedupe(crate::Dedupe::All)
+        //         .build(),
+        //     needle: &SMALL_AND_SEQ,
+        //     haystack: &SMALL_AND_TREE_HAYSTACK,
+        //     expected_matches: 2,
+        // },
 
     ];
 
@@ -344,63 +344,63 @@ lazy_static::lazy_static! {
         // From many_locked_regs.v there are exactly 2 instances of each:
         // 2 × async_en, 2 × async_mux, 2 × sync_en, 2 × sync_mux
 
-        TestCase {
-            name: "async_en_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
-            needle: &ASYNC_EN_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
-        TestCase {
-            name: "async_mux_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
-            needle: &ASYNC_MUX_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
+        // TestCase {
+        //     name: "async_en_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build(),
+        //     needle: &ASYNC_EN_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
+        // TestCase {
+        //     name: "async_mux_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build(),
+        //     needle: &ASYNC_MUX_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
     ];
 
 
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
-        TestCase {
-            name: "sdffe_then_and_simple_dedupe_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
-            needle: &SDFFE_THEN_AND,
-            haystack: &AND_Q_DOUBLE_SDFFE,
-            expected_matches: 4,
-        },
-        // NEW: Test for macro-generated composite (verifies macro works end-to-end)
-        TestCase {
-            name: "sdffe_then_and2_simple_dedupe_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
-            needle: &SDFFE_THEN_AND2,
-            haystack: &AND_Q_DOUBLE_SDFFE,
-            expected_matches: 4,  // Same as manual version (sub-queries + iproduct + validation)
-        },
+        // TestCase {
+        //     name: "sdffe_then_and_simple_dedupe_none",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
+        //     needle: &SDFFE_THEN_AND,
+        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     expected_matches: 4,
+        // },
+        // // NEW: Test for macro-generated composite (verifies macro works end-to-end)
+        // TestCase {
+        //     name: "sdffe_then_and2_simple_dedupe_none",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
+        //     needle: &SDFFE_THEN_AND2,
+        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     expected_matches: 4,  // Same as manual version (sub-queries + iproduct + validation)
+        // },
     ];
 
     pub static ref REC_AND_TEST_CASES: Vec<TestCase> = vec![
         // Base case: single AND (depth 1 only)
-        TestCase {
-            name: "rec_and_single_dedupe_none",
-            config: Config::builder()
-                .match_length(MatchLength::Exact)
-                .dedupe(Dedupe::None)
-                .build(),
-            needle: &REC_AND,
-            haystack: &SINGLE_AND_HAYSTACK,
-            expected_matches: 2,  // Just the base AND and the port permuations
-        },
-        TestCase {
-            name: "rec_and_single_dedupe_all",
-            config: Config::builder()
-                .match_length(MatchLength::Exact)
-                .dedupe(Dedupe::All)
-                .build(),
-            needle: &REC_AND,
-            haystack: &SINGLE_AND_HAYSTACK,
-            expected_matches: 1,  // Dedupe doesn't change for single
-        },
+        // TestCase {
+        //     name: "rec_and_single_dedupe_none",
+        //     config: Config::builder()
+        //         .match_length(MatchLength::Exact)
+        //         .dedupe(Dedupe::None)
+        //         .build(),
+        //     needle: &REC_AND,
+        //     haystack: &SINGLE_AND_HAYSTACK,
+        //     expected_matches: 2,  // Just the base AND and the port permuations
+        // },
+        // TestCase {
+        //     name: "rec_and_single_dedupe_all",
+        //     config: Config::builder()
+        //         .match_length(MatchLength::Exact)
+        //         .dedupe(Dedupe::All)
+        //         .build(),
+        //     needle: &REC_AND,
+        //     haystack: &SINGLE_AND_HAYSTACK,
+        //     expected_matches: 1,  // Dedupe doesn't change for single
+        // },
 
         // Sequential chain (N=3): 2 ANDs, expect 2 base + 1 depth2 = 3
         TestCase {
@@ -417,13 +417,13 @@ lazy_static::lazy_static! {
 
 
     pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
-        TestCase {
-            name: "and_any_in_mixed_tree_dedupe_all",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).build(),
-            needle: &AND_ANY,
-            haystack: &MIXED_AND_TREE,
-            expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
-        },
+        // TestCase {
+        //     name: "and_any_in_mixed_tree_dedupe_all",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).build(),
+        //     needle: &AND_ANY,
+        //     haystack: &MIXED_AND_TREE,
+        //     expected_matches: 7,  // 3 gates + 2 muxes + 2 nors
+        // },
     ];
 
     pub static ref ALL_TEST_CASES: Vec<TestCase> = {

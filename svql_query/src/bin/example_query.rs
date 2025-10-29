@@ -1,6 +1,8 @@
 // svql_query/src/bin/example_query.rs
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
+use svql_query::composite::SearchableComposite;
+use svql_query::queries::composite::rec_and::RecAnd;
 use svql_query::{
     composite::SearchableEnumComposite, instance::Instance,
     queries::enum_composite::and_any::AndAny,
@@ -18,8 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .dedupe(Dedupe::None)
         .build();
 
-    let design_path = "examples/fixtures/larger_designs/verilog/tech.rocksavage.chiselware.addrdecode.AddrDecode_64_64_64.v";
-    let design_module = "AddrDecode";
+    let design_path = "examples/patterns/basic/and/verilog/and_2_seq.v";
+    let design_module = "and_2_seq";
 
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
@@ -32,19 +34,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Design loaded with key: {:#?}", design_key);
 
-    let context = AndAny::context(&driver, &cfg.haystack_options)?;
+    let context = RecAnd::context(&driver, &cfg.haystack_options)?;
     let context = context.with_design(design_key.clone(), design_arc);
 
     let time_start = std::time::Instant::now();
     debug!("Starting query at {:?}", time_start);
-    let and_any_results = AndAny::query(
+    let rec_and_results = RecAnd::query(
         &design_key,
         &context,
-        Instance::root("and_any".to_string()),
+        Instance::root("rec_and".to_string()),
         &cfg,
     );
 
-    let count = and_any_results.len();
+    let count = rec_and_results.len();
 
     println!("{}", count);
 
