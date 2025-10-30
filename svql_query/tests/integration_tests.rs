@@ -1,3 +1,4 @@
+// svql_query/tests/integration_tests.rs
 use rstest::rstest;
 use std::sync::OnceLock;
 use svql_query::queries::composite::rec_or::RecOr;
@@ -13,7 +14,7 @@ use svql_query::{
     queries::{
         composite::dff_then_and::{SdffeThenAnd, SdffeThenAnd2},
         enum_composite::and_any::AndAny,
-        netlist::basic::and::AndGate,
+        netlist::basic::{and::AndGate, not::NotGate}, // ADDED: Import NotGate
     },
 };
 // No generated dispatch—manual match for test cases (mirrors direct SubgraphMatcher call in subgraph tests)
@@ -76,6 +77,10 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         "svql_query::queries::netlist::basic::and::AndGate" => {
             <AndGate<Search> as SearchableNetlist>::context(&driver, &tc.config.needle_options)
         }
+        "svql_query::queries::netlist::basic::not::NotGate" => {
+            // ADDED: NotGate context arm
+            <NotGate<Search> as SearchableNetlist>::context(&driver, &tc.config.needle_options)
+        }
         "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
             <SdffeThenAnd<Search> as SearchableComposite>::context(
                 &driver,
@@ -110,6 +115,10 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
     let hit_count = match query_name {
         "svql_query::queries::netlist::basic::and::AndGate" => {
             <AndGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config).len()
+        }
+        "svql_query::queries::netlist::basic::not::NotGate" => {
+            // ADDED: NotGate query arm
+            <NotGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config).len()
         }
         "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
             <SdffeThenAnd<Search> as SearchableComposite>::query(
