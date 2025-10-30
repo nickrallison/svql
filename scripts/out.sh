@@ -25,6 +25,7 @@ cargo expand --lib --package svql_query queries > generated/expanded.rs
 uv run scripts/md_tree.py --root . \
     --include 'svql_query/**.rs' \
     --include 'examples/**.v' \
+    --include 'examples/**.il' \
     --include 'generated/**.rs' \
     --include 'Cargo.toml' \
     --exclude 'examples/fixtures/larger_designs/**' \

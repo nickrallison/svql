@@ -15,32 +15,32 @@ netlist! {
     name: AsyncDffEnable,
     module_name: "async_en",
     file: "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
-    inputs: [clk, d, resetn, enable],
-    outputs: [q]
+    inputs: [clk, data_in, resetn, write_en],  // FIXED: Use RTLIL port names
+    outputs: [data_out]                         // FIXED: Use RTLIL port name
 }
 
 netlist! {
     name: SyncDffEnable,
     module_name: "sync_en",
     file: "examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il",
-    inputs: [clk, d, resetn, enable],
-    outputs: [q]
+    inputs: [clk, data_in, resetn, write_en],  // FIXED: Use RTLIL port names
+    outputs: [data_out]                         // FIXED: Use RTLIL port name
 }
 
 netlist! {
     name: SyncDffMuxEnable,
     module_name: "sync_mux",
     file: "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
-    inputs: [clk, d, resetn, enable],
-    outputs: [q]
+    inputs: [clk, data_in, resetn, write_en],  // FIXED: Use RTLIL port names
+    outputs: [data_out]                         // FIXED: Use RTLIL port name
 }
 
 netlist! {
     name: AsyncDffMuxEnable,
     module_name: "async_mux",
     file: "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
-    inputs: [clk, d, resetn, enable],
-    outputs: [q]
+    inputs: [clk, data_in, resetn, write_en],  // FIXED: Use RTLIL port names
+    outputs: [data_out]                         // FIXED: Use RTLIL port name
 }
 
 enum_composite! {
@@ -62,10 +62,10 @@ where
     /// This is what should connect to the unlock logic output
     pub fn enable_wire(&self) -> &Wire<S> {
         match self {
-            RegisterAny::AsyncEn(dff) => &dff.enable,
-            RegisterAny::SyncEn(dff) => &dff.enable,
-            RegisterAny::AsyncMux(dff) => &dff.enable,
-            RegisterAny::SyncMux(dff) => &dff.enable,
+            RegisterAny::AsyncEn(dff) => &dff.write_en, // FIXED: enable → write_en
+            RegisterAny::SyncEn(dff) => &dff.write_en,  // FIXED: enable → write_en
+            RegisterAny::AsyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
+            RegisterAny::SyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
         }
     }
 
