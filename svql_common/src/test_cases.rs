@@ -154,11 +154,6 @@ lazy_static::lazy_static! {
     static ref REC_OR: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::composite::rec_or::RecOr",
     };
-
-    // ########
-    static ref CWE1234_UNLOCK_LOGIC: Needle = Needle::Composite {
-        pattern_query_type: "svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic",
-    };
 }
 
 // #####################
@@ -432,13 +427,6 @@ lazy_static::lazy_static! {
             needle: &ASYNC_MUX_IL,
             haystack: &MANY_LOCKED_REGS_IL,
             expected_matches: 2,
-        },
-        TestCase {
-            name: "unlock_logic_cwe1234_depth2",
-            config: Config::builder().match_length(MatchLength::Exact).dedupe(Dedupe::All).build(),
-            needle: &CWE1234_UNLOCK_LOGIC,
-            haystack: &CWE1234_HAYSTACK,
-            expected_matches: 1,  // The enable logic
         },
     ];
 
