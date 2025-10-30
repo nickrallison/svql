@@ -17,6 +17,8 @@ use svql_query::{
         netlist::basic::{and::AndGate, not::NotGate}, // ADDED: Import NotGate
     },
 };
+
+use svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic;
 // No generated dispatch—manual match for test cases (mirrors direct SubgraphMatcher call in subgraph tests)
 
 fn init_test_logger() {
@@ -103,6 +105,12 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         "svql_query::queries::composite::rec_or::RecOr" => {
             <RecOr<Search> as SearchableComposite>::context(&driver, &tc.config.needle_options)
         }
+        "svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic" => {
+            <UnlockLogic<Search> as SearchableComposite>::context(
+                &driver,
+                &tc.config.needle_options,
+            )
+        }
 
         _ => return Err(format!("No context handler for query type: {}", query_name).into()),
     }
@@ -149,6 +157,10 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
         }
         "svql_query::queries::composite::rec_or::RecOr" => {
             <RecOr<Search> as SearchableComposite>::query(&hk, &ctx, root.clone(), &tc.config).len()
+        }
+        "svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic" => {
+            <UnlockLogic<Search> as SearchableComposite>::query(&hk, &ctx, root.clone(), &tc.config)
+                .len()
         }
 
         _ => return Err(format!("No query handler for query type: {}", query_name).into()),
