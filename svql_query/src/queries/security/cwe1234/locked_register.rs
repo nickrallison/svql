@@ -35,6 +35,19 @@ where
             )),
         }
     }
+
+    pub fn cell_wire(&self) -> &crate::Wire<S> {
+        match &self.register {
+            RegisterAny::BasicDff(dff) => &dff.cell,
+        }
+    }
+
+    /// Get a description of the register type for reporting
+    pub fn register_type(&self) -> String {
+        match &self.register {
+            RegisterAny::BasicDff(_) => "BasicDff".to_string(),
+        }
+    }
 }
 
 impl<S> WithPath<S> for LockedRegister<S>
