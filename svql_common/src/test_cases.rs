@@ -410,7 +410,17 @@ lazy_static::lazy_static! {
                 .dedupe(Dedupe::None)
                 .build(),
             needle: &REC_AND,
-            haystack: &AND_2_SEQ_HAYSTACK,  // Assumes N=3 param; adjust if needed
+            haystack: &AND_2_SEQ_HAYSTACK,
+            expected_matches: 8,
+        },
+        TestCase {
+            name: "rec_and_seq_chain_dedupe_inner",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::Inner)
+                .build(),
+            needle: &REC_AND,
+            haystack: &AND_2_SEQ_HAYSTACK,
             expected_matches: 3,
         },
     ];
