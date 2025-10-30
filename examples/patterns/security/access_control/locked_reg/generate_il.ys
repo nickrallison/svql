@@ -1,33 +1,33 @@
 # async_mux
-read_verilog examples/patterns/access_control/locked_register/verilog/async_mux.v
+read_verilog examples/patterns/security/access_control/locked_reg/verilog/async_mux.v
 hierarchy -top async_mux
 proc
 clean
-write_rtlil examples/patterns/access_control/locked_register/rtlil/async_mux.il
+write_rtlil examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il
 # show -format dot -prefix async_mux
 
 # async_en
-read_verilog examples/patterns/access_control/locked_register/verilog/async_en.v
+read_verilog examples/patterns/security/access_control/locked_reg/verilog/async_en.v
 hierarchy -top async_en
 proc
 opt
 clean
-write_rtlil examples/patterns/access_control/locked_register/rtlil/async_en.il
+write_rtlil examples/patterns/security/access_control/locked_reg/rtlil/async_en.il
 # show -format dot -prefix async_en
 
 # sync_mux
-read_verilog examples/patterns/access_control/locked_register/verilog/sync_mux.v
+read_verilog examples/patterns/security/access_control/locked_reg/verilog/sync_mux.v
 hierarchy -top sync_mux
 proc
 clean
-write_rtlil examples/patterns/access_control/locked_register/rtlil/sync_mux.il
+write_rtlil examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il
 # show -format dot -prefix sync_mux
 
 # sync_en
-read_verilog examples/patterns/access_control/locked_register/verilog/sync_en.v
+read_verilog examples/patterns/security/access_control/locked_reg/verilog/sync_en.v
 hierarchy -top sync_en
 proc
 opt
 clean
-write_rtlil examples/patterns/access_control/locked_register/rtlil/sync_en.il
+write_rtlil examples/patterns/security/access_control/locked_reg/rtlil/sync_en.il
 # show -format dot -prefix sync_en

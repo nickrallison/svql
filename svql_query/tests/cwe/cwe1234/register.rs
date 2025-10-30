@@ -1,4 +1,3 @@
-use rstest::rstest;
 use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
@@ -29,7 +28,7 @@ fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
     init_test_logger();
 
     let config = Config::builder()
-        .match_length(MatchLength::Exact)
+        .match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::All)
         .build();
 
@@ -44,6 +43,8 @@ fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
         haystack_module.module_name(),
         &config.haystack_options,
     )?;
+
+    println!("haystack: {:#?}", haystack_design.index().cells_topo());
 
     let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
