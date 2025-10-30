@@ -4,8 +4,10 @@ use std::sync::OnceLock;
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::{
-    Search, composite::SearchableComposite, instance::Instance,
-    queries::security::cwe1234::locked_register::LockedRegister,
+    Search,
+    composite::{SearchableComposite, SearchableEnumComposite},
+    instance::Instance,
+    queries::security::cwe1234::register::RegisterAny,
 };
 
 fn init_test_logger() {
@@ -43,10 +45,10 @@ fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -87,10 +89,10 @@ fn test_locked_register_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -132,10 +134,10 @@ fn test_locked_register_deep() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -176,10 +178,10 @@ fn test_locked_register_fixed() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -219,10 +221,10 @@ fn test_locked_register_sync_reset() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -259,10 +261,10 @@ fn test_locked_register_enabled() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -299,10 +301,10 @@ fn test_locked_register_wide() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -344,10 +346,10 @@ fn test_locked_register_mixed_resets() -> Result<(), Box<dyn std::error::Error>>
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -384,10 +386,10 @@ fn test_locked_register_no_reset() -> Result<(), Box<dyn std::error::Error>> {
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -424,10 +426,10 @@ fn test_locked_register_multi_width() -> Result<(), Box<dyn std::error::Error>> 
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
+    let results = RegisterAny::<Search>::query(
         &haystack_key,
         &context,
         Instance::root("locked_reg".to_string()),
@@ -517,10 +519,10 @@ fn test_locked_register_all_variants_summary() -> Result<(), Box<dyn std::error:
             &config.haystack_options,
         )?;
 
-        let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+        let context = RegisterAny::<Search>::context(&driver, &config.needle_options)?;
         let context = context.with_design(haystack_key.clone(), haystack_design);
 
-        let results = LockedRegister::<Search>::query(
+        let results = RegisterAny::<Search>::query(
             &haystack_key,
             &context,
             Instance::root("locked_reg".to_string()),

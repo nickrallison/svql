@@ -1,4 +1,4 @@
-mod locked_register;
+mod register;
 mod unlock_logic;
 
 use rstest::rstest;

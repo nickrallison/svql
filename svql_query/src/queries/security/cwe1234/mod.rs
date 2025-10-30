@@ -1,16 +1,15 @@
-pub mod locked_register;
 pub mod register;
 pub mod unlock_logic;
 
 use crate::{
     Connection, Match, Search, State, WithPath,
-    composite::{Composite, MatchedComposite, SearchableComposite},
+    composite::{Composite, MatchedComposite, SearchableComposite, SearchableEnumComposite},
     instance::Instance,
+    queries::security::cwe1234::register::RegisterAny,
 };
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-use locked_register::LockedRegister;
 use unlock_logic::UnlockLogic;
 
 /// Complete CWE-1234 pattern: Locked register with bypassable unlock logic
@@ -28,18 +27,18 @@ where
 {
     pub path: Instance,
     pub unlock_logic: UnlockLogic<S>,
-    pub locked_register: LockedRegister<S>,
+    pub locked_register: RegisterAny<S>,
 }
 
 impl<S> Cwe1234<S>
 where
     S: State,
 {
-    pub fn new(path: Instance) -> Self {
+    pub fn new(path: Instance, reg_any: RegisterAny<S>) -> Self {
         Self {
             path: path.clone(),
             unlock_logic: UnlockLogic::new(path.child("unlock_logic".to_string())),
-            locked_register: LockedRegister::new(path.child("locked_register".to_string())),
+            locked_register: reg_any,
         }
     }
 }
@@ -78,25 +77,6 @@ where
 
 impl<'ctx> MatchedComposite<'ctx> for Cwe1234<Match<'ctx>> {}
 
-impl<'ctx> Cwe1234<Match<'ctx>> {
-    /// Get detailed vulnerability information for reporting
-    pub fn vulnerability_report(&self) -> VulnerabilityReport {
-        VulnerabilityReport {
-            or_tree_depth: self.unlock_logic.or_tree_depth(),
-            has_not_in_tree: self.unlock_logic.has_not_in_or_tree(),
-            register_type: self.locked_register.register_type(),
-        }
-    }
-}
-
-/// Detailed report of a CWE-1234 vulnerability instance
-#[derive(Debug, Clone)]
-pub struct VulnerabilityReport {
-    pub or_tree_depth: usize,
-    pub has_not_in_tree: bool,
-    pub register_type: String,
-}
-
 impl SearchableComposite for Cwe1234<Search> {
     type Hit<'ctx> = Cwe1234<Match<'ctx>>;
 
@@ -105,7 +85,7 @@ impl SearchableComposite for Cwe1234<Search> {
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
         let unlock_ctx = UnlockLogic::<Search>::context(driver, config)?;
-        let register_ctx = LockedRegister::<Search>::context(driver, config)?;
+        let register_ctx = RegisterAny::<Search>::context(driver, config)?;
 
         Ok(unlock_ctx.merge(register_ctx))
     }
@@ -125,7 +105,7 @@ impl SearchableComposite for Cwe1234<Search> {
             config,
         );
 
-        let registers = LockedRegister::<Search>::query(
+        let registers = RegisterAny::<Search>::query(
             haystack_key,
             context,
             path.child("locked_register".to_string()),
