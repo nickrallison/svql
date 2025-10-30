@@ -10,7 +10,7 @@ use crate::{
         netlist::basic::{and::AndGate, not::NotGate},
     },
 };
-use svql_common::{Config, Dedupe, MatchLength, ModuleConfig, YosysModule};
+use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
 /// Represents the unlock/bypass logic pattern in CWE1234:

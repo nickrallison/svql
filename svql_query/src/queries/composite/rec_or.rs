@@ -165,7 +165,7 @@ impl SearchableComposite for RecOr<Search> {
 
         // Keep building layers until we can't find any more matches
         loop {
-            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer, layer_num); // CHANGED: all_or_gates
+            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer); // CHANGED: all_or_gates
 
             if next_layer.is_empty() {
                 tracing::event!(
@@ -203,7 +203,6 @@ fn build_next_layer<'ctx>(
     path: &Instance,
     all_or_gates: &[OrGate<Match<'ctx>>], // CHANGED: OrGate / all_or_gates
     prev_layer: &[RecOr<Match<'ctx>>],    // CHANGED: RecOr
-    layer_num: usize,
 ) -> Vec<RecOr<Match<'ctx>>> {
     // CHANGED: RecOr
     let mut next_layer = Vec::new();

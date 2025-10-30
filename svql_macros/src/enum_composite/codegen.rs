@@ -70,24 +70,6 @@ pub fn codegen(ir: Ir) -> TokenStream {
         quote! { #variant_name(#ty<S>) }
     });
 
-    // Generate Debug impl (match arms)
-    let debug_arms = variants.iter().map(|v| {
-        let variant_name = &v.variant_name;
-        quote! {
-            #name::#variant_name(__self_0) => {
-                ::core::fmt::Formatter::debug_tuple_field1_finish(f, stringify!(#variant_name), &__self_0)
-            }
-        }
-    });
-
-    // Generate Clone impl (match arms)
-    let clone_arms = variants.iter().map(|v| {
-        let variant_name = &v.variant_name;
-        quote! {
-            #name::#variant_name(__self_0) => #name::#variant_name(::core::clone::Clone::clone(__self_0))
-        }
-    });
-
     // Generate WithPath match arms (delegate to inner) - FIXED: Use fresh bound ident
     let withpath_arms = variants.iter().map(|v| {
         let variant_name = &v.variant_name;

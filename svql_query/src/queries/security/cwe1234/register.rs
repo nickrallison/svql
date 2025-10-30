@@ -1,10 +1,4 @@
-use crate::{
-    Match, Search, State, Wire, WithPath,
-    instance::Instance,
-    netlist::{self, SearchableNetlist},
-};
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{Context, Driver, DriverKey};
+use crate::{State, Wire, instance::Instance};
 use svql_macros::{enum_composite, netlist};
 
 // ============================================================================

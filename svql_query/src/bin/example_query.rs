@@ -2,11 +2,8 @@
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 use svql_query::composite::SearchableComposite;
+use svql_query::instance::Instance;
 use svql_query::queries::composite::rec_and::RecAnd;
-use svql_query::{
-    composite::SearchableEnumComposite, instance::Instance,
-    queries::enum_composite::and_any::AndAny,
-};
 use tracing::{debug, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,10 +42,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Instance::root("rec_and".to_string()),
         &cfg,
     );
-
-    // for rec_and in &rec_and_results {
-    //     info!("Found RecAnd match {:?}", rec_and);
-    // }
 
     let count = rec_and_results.len();
 

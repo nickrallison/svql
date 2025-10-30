@@ -154,7 +154,7 @@ impl SearchableComposite for RecAnd<Search> {
 
         // Keep building layers until we can't find any more matches
         loop {
-            let next_layer = build_next_layer(&path, &all_and_gates, &current_layer, layer_num);
+            let next_layer = build_next_layer(&path, &all_and_gates, &current_layer);
 
             if next_layer.is_empty() {
                 tracing::event!(
@@ -192,7 +192,6 @@ fn build_next_layer<'ctx>(
     path: &Instance,
     all_and_gates: &[AndGate<Match<'ctx>>],
     prev_layer: &[RecAnd<Match<'ctx>>],
-    layer_num: usize,
 ) -> Vec<RecAnd<Match<'ctx>>> {
     let mut next_layer = Vec::new();
 
