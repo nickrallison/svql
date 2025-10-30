@@ -98,10 +98,6 @@ pub fn parse(ts: TokenStream) -> Ast {
     }
 }
 
-pub fn try_parse(ts: TokenStream) -> Result<Ast> {
-    parse2::<Ast>(ts)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +105,10 @@ mod tests {
     use proc_macro2::TokenStream;
     use quote::quote; // For higher-order combinations
     use syn::{Ident, parse2};
+
+    fn try_parse(ts: TokenStream) -> Result<Ast> {
+        parse2::<Ast>(ts)
+    }
 
     // Existing success tests (unchanged; they pass)
     #[test]

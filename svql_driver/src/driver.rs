@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use prjunnamed_netlist::Design;
 use svql_common::YosysModule;
 use thiserror::Error;
 
@@ -304,26 +303,26 @@ impl Driver {
         registry.clone()
     }
 
-    /// Private helper to load design from path
-    fn load_design_from_path(
-        &self,
-        design_path: &str,
-        module_name: &str,
-        module_config: &svql_common::ModuleConfig,
-    ) -> Result<Design, DriverError> {
-        tracing::event!(
-            tracing::Level::DEBUG,
-            "Loading design from path: {} ({})",
-            design_path,
-            module_name
-        );
-        let yosys_module = YosysModule::new(design_path, module_name)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+    // /// Private helper to load design from path
+    // fn load_design_from_path(
+    //     &self,
+    //     design_path: &str,
+    //     module_name: &str,
+    //     module_config: &svql_common::ModuleConfig,
+    // ) -> Result<Design, DriverError> {
+    //     tracing::event!(
+    //         tracing::Level::DEBUG,
+    //         "Loading design from path: {} ({})",
+    //         design_path,
+    //         module_name
+    //     );
+    //     let yosys_module = YosysModule::new(design_path, module_name)
+    //         .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        let result = yosys_module
-            .import_design_yosys(module_config, &self.yosys_path)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+    //     let result = yosys_module
+    //         .import_design_yosys(module_config, &self.yosys_path)
+    //         .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        Ok(result)
-    }
+    //     Ok(result)
+    // }
 }

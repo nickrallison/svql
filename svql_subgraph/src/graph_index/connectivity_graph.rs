@@ -1,4 +1,3 @@
-use super::CellRegistry;
 use crate::cell::{CellIndex, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
 use std::collections::{HashMap, HashSet};

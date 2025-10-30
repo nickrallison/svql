@@ -120,15 +120,15 @@ pub fn parse(ts: TokenStream) -> Ast {
     }
 }
 
-pub fn try_parse(ts: TokenStream) -> Result<Ast> {
-    parse2::<Ast>(ts)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use itertools::iproduct;
     use quote::quote; // For higher-order combinations in generated tests
+
+    fn try_parse(ts: TokenStream) -> Result<Ast> {
+        parse2::<Ast>(ts)
+    }
 
     // Existing success tests (unchanged; they pass)
     #[test]

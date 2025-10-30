@@ -1,7 +1,7 @@
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;
-use prjunnamed_netlist::{Cell, CellRef, ControlNets, FlipFlop, Net, Trit, Value};
+use prjunnamed_netlist::{Cell, CellRef, FlipFlop, Net, Trit, Value};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) fn check_fanin_constraints(
@@ -166,16 +166,15 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
                 // );
                 return true;
-                todo!("decide how input cells should be matched for fan in")
+                // todo!("decide how input cells should be matched for fan in")
             }
-            (Input(p_name, p_width), d_cell) => {
+            (Input(_p_name, _p_width), _d_cell) => {
                 // panic!(
                 //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
                 // );
                 return true;
-                todo!("decide how input cells should be matched for fan in")
             }
-            (needle_cell, Cell::Other(haystack_instance)) => {
+            (_needle_cell, Cell::Other(_haystack_instance)) => {
                 todo!("decide how other cells should be matched for fan in")
             }
 
@@ -330,7 +329,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         return expected_fan_in_haystack_cell_wrapper == actual_fan_in_haystack_cell_ref.into();
 
-        todo!("How to handle expected idx");
+        // todo!("How to handle expected idx");
     }
 
     fn control_net_match_fan_in(
