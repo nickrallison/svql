@@ -41,7 +41,7 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
             connection.to.path
         );
 
-        // Find the actual wire ports in the composite structure
+        // Find the actual wire ports in the composites structure
         let from_wire = self.find_port(&connection.from.path);
         let to_wire = self.find_port(&connection.to.path);
 
@@ -141,7 +141,7 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
     fn validate_connections(&self, connections: Vec<Vec<Connection<Match<'ctx>>>>) -> bool {
         tracing::event!(
             tracing::Level::TRACE,
-            "Validating {} connection sets for composite",
+            "Validating {} connection sets for composites",
             connections.len()
         );
         for (i, connection_set) in connections.iter().enumerate() {

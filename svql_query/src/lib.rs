@@ -3,11 +3,12 @@ use svql_subgraph::cell::CellWrapper;
 use crate::instance::Instance;
 
 pub mod binding;
-pub mod composite;
+pub mod composites;
+pub mod enum_composites;
 pub mod instance;
-pub mod netlist;
-pub mod queries;
-
+pub mod primitives;
+pub mod security;
+mod traits;
 // ########################
 // Type State Tags
 // ########################
@@ -86,7 +87,8 @@ impl<S> WithPath<S> for Wire<S>
 where
     S: State,
 {
-    #[contracts::debug_ensures(p.height() <= self.path.height() + (p.height() - self.path.height()))]
+    #[contracts::debug_ensures(p.height() <= self.path.height() + (p.height() - self.path.height())
+    )]
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if p.height() < self.path.height() {
             return None;

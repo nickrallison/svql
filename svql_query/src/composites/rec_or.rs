@@ -1,16 +1,16 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
+use crate::traits::netlist::SearchableNetlist;
 use crate::{
+    composites::{Composite, MatchedComposite, SearchableComposite},
+    instance::Instance,
+    queries::netlist::basic::or::OrGate,
     Connection,
-    Match,
+    Match, // CHANGED: Use OrGate instead of AndGate
     Search,
     State,
     WithPath,
-    composite::{Composite, MatchedComposite, SearchableComposite},
-    instance::Instance,
-    netlist::SearchableNetlist,
-    queries::netlist::basic::or::OrGate, // CHANGED: Use OrGate instead of AndGate
 };
 
 #[derive(Debug, Clone)]
@@ -165,7 +165,7 @@ impl SearchableComposite for RecOr<Search> {
 
         // Keep building layers until we can't find any more matches
         loop {
-            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer); // CHANGED: all_or_gates
+            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer, layer_num); // CHANGED: all_or_gates
 
             if next_layer.is_empty() {
                 tracing::event!(
@@ -203,6 +203,7 @@ fn build_next_layer<'ctx>(
     path: &Instance,
     all_or_gates: &[OrGate<Match<'ctx>>], // CHANGED: OrGate / all_or_gates
     prev_layer: &[RecOr<Match<'ctx>>],    // CHANGED: RecOr
+    layer_num: usize,
 ) -> Vec<RecOr<Match<'ctx>>> {
     // CHANGED: RecOr
     let mut next_layer = Vec::new();

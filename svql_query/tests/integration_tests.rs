@@ -1,22 +1,22 @@
 // svql_query/tests/integration_tests.rs
 use rstest::rstest;
 use std::sync::OnceLock;
-use svql_query::queries::composite::rec_or::RecOr;
+use svql_query::composites::rec_or::RecOr;
 
-use svql_common::{ALL_TEST_CASES, Needle, TestCase};
+use svql_common::{Needle, TestCase, ALL_TEST_CASES};
 use svql_driver::Driver;
-use svql_query::queries::composite::rec_and::RecAnd;
+use svql_query::composites::rec_and::RecAnd;
+use svql_query::traits::netlist::SearchableNetlist;
 use svql_query::{
-    Search,
-    composite::{SearchableComposite, SearchableEnumComposite},
+    composites::{SearchableComposite, SearchableEnumComposite},
     instance::Instance,
-    netlist::SearchableNetlist,
     queries::{
-        composite::dff_then_and::{SdffeThenAnd, SdffeThenAnd2},
-        enum_composite::and_any::AndAny,
         netlist::basic::{and::AndGate, not::NotGate}, // ADDED: Import NotGate
     },
+    Search,
 };
+use svql_query::composites::dff_then_and::{SdffeThenAnd, SdffeThenAnd2};
+use svql_query::enum_composites::and_any::AndAny;
 
 fn init_test_logger() {
     static INIT: OnceLock<()> = OnceLock::new();
@@ -80,26 +80,26 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             // ADDED: NotGate context arm
             <NotGate<Search> as SearchableNetlist>::context(&driver, &tc.config.needle_options)
         }
-        "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
+        "svql_query::queries::composites::dff_then_and::SdffeThenAnd" => {
             <SdffeThenAnd<Search> as SearchableComposite>::context(
                 &driver,
                 &tc.config.needle_options,
             )
         }
-        "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
-            // Arm for macro-generated composite (verifies macro)
+        "svql_query::queries::composites::dff_then_and::SdffeThenAnd2" => {
+            // Arm for macro-generated composites (verifies macro)
             <SdffeThenAnd2<Search> as SearchableComposite>::context(
                 &driver,
                 &tc.config.needle_options,
             )
         }
-        "svql_query::queries::enum_composite::and_any::AndAny" => {
+        "svql_query::queries::enum_composites::and_any::AndAny" => {
             <AndAny<Search> as SearchableEnumComposite>::context(&driver, &tc.config.needle_options)
         }
-        "svql_query::queries::composite::rec_and::RecAnd" => {
+        "svql_query::queries::composites::rec_and::RecAnd" => {
             <RecAnd<Search> as SearchableComposite>::context(&driver, &tc.config.needle_options)
         }
-        "svql_query::queries::composite::rec_or::RecOr" => {
+        "svql_query::queries::composites::rec_or::RecOr" => {
             <RecOr<Search> as SearchableComposite>::context(&driver, &tc.config.needle_options)
         }
         "svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic" => {
@@ -108,7 +108,7 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
 
         _ => return Err(format!("No context handler for query type: {}", query_name).into()),
     }
-    .map_err(|e| format!("Failed to build context for {}: {}", query_name, e))?;
+        .map_err(|e| format!("Failed to build context for {}: {}", query_name, e))?;
 
     let ctx = ctx.with_design(hk.clone(), hd);
 
@@ -122,34 +122,34 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             // ADDED: NotGate query arm
             <NotGate<Search> as SearchableNetlist>::query(&hk, &ctx, root.clone(), &tc.config).len()
         }
-        "svql_query::queries::composite::dff_then_and::SdffeThenAnd" => {
+        "svql_query::queries::composites::dff_then_and::SdffeThenAnd" => {
             <SdffeThenAnd<Search> as SearchableComposite>::query(
                 &hk,
                 &ctx,
                 root.clone(),
                 &tc.config,
             )
-            .len()
+                .len()
         }
-        "svql_query::queries::composite::dff_then_and::SdffeThenAnd2" => {
-            // Arm for macro-generated composite (verifies macro)
+        "svql_query::queries::composites::dff_then_and::SdffeThenAnd2" => {
+            // Arm for macro-generated composites (verifies macro)
             <SdffeThenAnd2<Search> as SearchableComposite>::query(
                 &hk,
                 &ctx,
                 root.clone(),
                 &tc.config,
             )
-            .len()
+                .len()
         }
-        "svql_query::queries::enum_composite::and_any::AndAny" => {
+        "svql_query::queries::enum_composites::and_any::AndAny" => {
             <AndAny<Search> as SearchableEnumComposite>::query(&hk, &ctx, root.clone(), &tc.config)
                 .len()
         }
-        "svql_query::queries::composite::rec_and::RecAnd" => {
+        "svql_query::queries::composites::rec_and::RecAnd" => {
             <RecAnd<Search> as SearchableComposite>::query(&hk, &ctx, root.clone(), &tc.config)
                 .len()
         }
-        "svql_query::queries::composite::rec_or::RecOr" => {
+        "svql_query::queries::composites::rec_or::RecOr" => {
             <RecOr<Search> as SearchableComposite>::query(&hk, &ctx, root.clone(), &tc.config).len()
         }
         "svql_query::queries::security::cwe1234::unlock_logic::UnlockLogic" => {
@@ -164,7 +164,7 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             "Query test case '{}' failed: expected {} matches, got {}",
             tc.name, tc.expected_matches, hit_count
         )
-        .into());
+            .into());
     }
 
     Ok(())

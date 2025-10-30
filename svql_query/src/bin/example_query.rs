@@ -1,9 +1,9 @@
 // svql_query/src/bin/example_query.rs
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
-use svql_query::composite::SearchableComposite;
+use svql_query::composites::SearchableComposite;
 use svql_query::instance::Instance;
-use svql_query::queries::composite::rec_and::RecAnd;
+use svql_query::composites::rec_and::RecAnd;
 use tracing::{debug, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

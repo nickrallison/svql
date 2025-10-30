@@ -1,4 +1,4 @@
-// svql_macros/src/enum_composite/codegen.rs
+// svql_macros/src/enum_composites/codegen.rs
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;

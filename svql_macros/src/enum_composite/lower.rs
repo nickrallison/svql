@@ -1,4 +1,4 @@
-// svql_macros/src/enum_composite/lower.rs
+// svql_macros/src/enum_composites/lower.rs
 use super::analyze::Model;
 
 #[derive(Clone)]

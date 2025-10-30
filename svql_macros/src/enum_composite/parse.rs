@@ -1,4 +1,4 @@
-// svql_macros/src/enum_composite/parse.rs
+// svql_macros/src/enum_composites/parse.rs
 use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
@@ -199,7 +199,9 @@ mod tests {
 
     // Subtest 7: Error case - invalid Type (e.g., non-Type token; should abort)
     #[test]
-    #[should_panic(expected = "expected one of: `for`")] // Matches Syn 2.0's verbose type error (substring for robustness)
+    #[should_panic(
+        expected = "expected one of: `for`"
+    )] // Matches Syn 2.0's verbose type error (substring for robustness)
     fn test_parse_error_invalid_type() {
         let ts = quote! { (Gate, "and_gate", 123) }; // 123 is not a Type
         let _variant: Variant = parse2(ts).unwrap(); // Should fail and panic via abort

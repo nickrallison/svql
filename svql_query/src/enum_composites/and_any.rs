@@ -1,6 +1,6 @@
 // use crate::{
 //     Match, Search, State, Wire, WithPath,
-//     composite::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
+//     composites::{EnumComposite, MatchedEnumComposite, SearchableEnumComposite},
 //     instance::Instance,
 //     netlist::SearchableNetlist,
 //     queries::netlist::basic::and::{AndGate, AndMux, AndNor},
@@ -155,18 +155,18 @@
 //     }
 // }
 
-// // svql_query/src/queries/enum_composite/and_any.rs
+// // svql_query/src/queries/enum_composites/and_any.rs
 // //
-// // Enum composite query: Any of AndGate, AndMux, or AndNor.
-// // Generated via enum_composite! macro.
+// // Enum composites query: Any of AndGate, AndMux, or AndNor.
+// // Generated via enum_composites! macro.
 
 // // use crate::{
-// //     enum_composite,
+// //     enum_composites,
 // //     queries::netlist::basic::and::{AndGate, AndMux, AndNor},
 // // };
 
 // // // Generate everything: enum, impls, query, etc.
-// // enum_composite! {
+// // enum_composites! {
 // //     name: AndAny,
 // //     variants: [
 // //         Gate   ( "and_gate" ) : AndGate,

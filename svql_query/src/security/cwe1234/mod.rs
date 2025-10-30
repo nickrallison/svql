@@ -2,19 +2,19 @@ pub mod register;
 pub mod unlock_logic;
 
 use crate::{
-    Connection, Match, Search, State, WithPath,
-    composite::{Composite, MatchedComposite, SearchableComposite, SearchableEnumComposite},
-    instance::Instance,
-    queries::security::cwe1234::register::RegisterAny,
+    composites::{Composite, MatchedComposite, SearchableComposite, SearchableEnumComposite}, instance::Instance, Connection, Match, Search,
+    State,
+    WithPath,
 };
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
 use unlock_logic::UnlockLogic;
+use crate::security::cwe1234::register::RegisterAny;
 
 /// Complete CWE-1234 pattern: Locked register with bypassable unlock logic
 ///
-/// This composite detects the full vulnerability by combining:
+/// This composites detects the full vulnerability by combining:
 /// 1. UnlockLogic: AND gate with OR tree containing negated lock signal
 /// 2. LockedRegister: DFF with enable signal that stores protected data
 ///

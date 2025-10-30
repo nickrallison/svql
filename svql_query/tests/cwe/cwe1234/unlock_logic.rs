@@ -1,16 +1,15 @@
 // svql_query/tests/cwe1234_tests.rs
 
-use rstest::rstest;
 use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::{
-    Search,
-    composite::{Composite, MatchedComposite, SearchableComposite},
+    composites::{Composite, MatchedComposite, SearchableComposite},
     instance::Instance,
-    queries::security::cwe1234::unlock_logic::UnlockLogic,
+    Search,
 };
+use svql_query::security::cwe1234::unlock_logic::UnlockLogic;
 
 fn init_test_logger() {
     static INIT: OnceLock<()> = OnceLock::new();

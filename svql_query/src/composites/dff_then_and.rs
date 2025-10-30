@@ -4,13 +4,7 @@ use svql_driver::{Context, Driver, DriverKey};
 #[cfg(feature = "parallel")]
 use std::thread;
 
-use crate::{
-    Connection, Match, Search, State, WithPath,
-    composite::{Composite, MatchedComposite, SearchableComposite},
-    instance::Instance,
-    netlist::SearchableNetlist,
-    queries::netlist::basic::{and::AndGate, dff::Sdffe},
-};
+use crate::{Search, State, WithPath};
 use itertools::iproduct;
 
 #[derive(Debug, Clone)]
@@ -154,6 +148,8 @@ impl SearchableComposite for SdffeThenAnd<Search> {
     }
 }
 
+use crate::instance::Instance;
+use crate::traits::netlist::SearchableNetlist;
 use svql_macros::composite;
 
 // Generate everything: struct, impls, query, etc.
