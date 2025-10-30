@@ -1,12 +1,18 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-use crate::traits::netlist::SearchableNetlist;
 use crate::{
-    composites::{Composite, MatchedComposite, SearchableComposite}, instance::Instance, queries::netlist::basic::and::AndGate, Connection, Match,
+    Connection,
+    Match,
     Search,
     State,
     WithPath,
+    instance::Instance,
+    primitives::and::AndGate,
+    traits::{
+        composite::{Composite, MatchedComposite, SearchableComposite},
+        netlist::SearchableNetlist,
+    }, // FIXED: traits::netlist
 };
 
 #[derive(Debug, Clone)]

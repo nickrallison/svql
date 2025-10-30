@@ -152,7 +152,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
         }
 
-        impl crate::netlist::NetlistMeta for #name<crate::Search> {
+        impl crate::traits::netlist::NetlistMeta for #name<crate::Search> {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
             const PORTS: &'static [crate::netlist::PortSpec] = &[
@@ -160,7 +160,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
             ];
         }
 
-        impl crate::netlist::SearchableNetlist for #name<crate::Search> {
+        impl crate::traits::netlist::SearchableNetlist for #name<crate::Search> {
             type Hit<'ctx> = #name<crate::Match<'ctx>>;
             fn from_subgraph<'ctx>(
                 m: &svql_subgraph::Embedding<'ctx, 'ctx>,

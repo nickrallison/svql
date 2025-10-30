@@ -137,7 +137,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
         }
 
-        impl<S> crate::composite::Composite<S> for #name<S>
+        impl<S> crate::traits::composite::Composite<S> for #name<S>
         where
             S: crate::State,
         {
@@ -148,9 +148,9 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
         }
 
-        impl<'ctx> crate::composite::MatchedComposite<'ctx> for #name<crate::Match<'ctx>> {}
+        impl<'ctx> crate::traits::composite::MatchedComposite<'ctx> for #name<crate::Match<'ctx>> {}
 
-        impl crate::composite::SearchableComposite for #name<crate::Search> {
+        impl crate::traits::composite::SearchableComposite for #name<crate::Search> {
             type Hit<'ctx> = #name<crate::Match<'ctx>>;
 
             fn context(
