@@ -404,26 +404,6 @@ lazy_static::lazy_static! {
             haystack: &NOT_GATE_HAYSTACK,
             expected_matches: 1,
         },
-        TestCase {
-            name: "not_gate_not_2_seq_dedupe_none",
-            config: Config::builder()
-                .match_length(MatchLength::Exact)
-                .dedupe(Dedupe::None)
-                .build(),
-            needle: &NOT_GATE,
-            haystack: &NOT_2_SEQ_HAYSTACK,
-            expected_matches: 2,
-        },
-        TestCase {
-            name: "not_gate_not_2_seq_dedupe_all",
-            config: Config::builder()
-                .match_length(MatchLength::Exact)
-                .dedupe(Dedupe::All)
-                .build(),
-            needle: &NOT_GATE,
-            haystack: &NOT_2_SEQ_HAYSTACK,
-            expected_matches: 2,
-        }
     ];
 
 

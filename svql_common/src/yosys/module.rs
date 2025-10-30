@@ -98,8 +98,10 @@ impl YosysModule {
         }
 
         // Optimize and clean
-        args.push("-p".to_string());
-        args.push("opt_clean".to_string());
+        if !config.no_optimize {
+            args.push("-p".to_string());
+            args.push("opt_clean".to_string());
+        }
 
         // Other steps
         for step in &config.other_steps {

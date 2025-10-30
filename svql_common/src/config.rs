@@ -113,6 +113,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn haystack_no_optimize(mut self, no_optimize: bool) -> Self {
+        self.haystack_options = self.haystack_options.with_no_optimize(no_optimize);
+        self
+    }
+
     // pub fn haystack_flatten(mut self, flatten: bool) -> Self {
     //     self.haystack_options.flatten = flatten;
     //     self
