@@ -24,13 +24,11 @@ cargo expand --lib --package svql_query queries > generated/expanded.rs
 
 uv run scripts/md_tree.py --root . \
     --include 'svql_common/**.rs' \
+    --include 'svql_subgraph/**.rs' \
     --include 'svql_query/**.rs' \
     --include 'examples/**.v' \
     --include 'generated/**.rs' \
     --include 'Cargo.toml' \
+    --exclude 'examples/fixtures/larger_designs/**' \
     --header-base-level 2 \
-    --section "examples=Examples" \
-    --section "generated=Generated" \
-    --section "svql_query=svql_query" \
-    --section "svql_common=svql_common" \
     > out.md

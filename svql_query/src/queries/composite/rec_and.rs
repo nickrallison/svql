@@ -194,52 +194,39 @@ fn build_next_layer<'ctx>(
     prev_layer: &[RecAnd<Match<'ctx>>],
     layer_num: usize,
 ) -> Vec<RecAnd<Match<'ctx>>> {
-    tracing::event!(
-        tracing::Level::DEBUG,
-        "Building layer {} from {} AND gates and {} previous layer results",
-        layer_num,
-        all_and_gates.len(),
-        prev_layer.len()
-    );
-
     let mut next_layer = Vec::new();
-    let mut valid_count = 0;
-    let total_candidates = all_and_gates.len() * prev_layer.len();
 
-    // Try to connect each AND gate to each previous layer result
     for and_gate in all_and_gates {
         for prev in prev_layer {
-            // Try to create a RecAnd where this and_gate has prev as a child
-            // The connection should be: prev.and.y -> and_gate.a or and_gate.b
+            // Update child's path to be under "child"
+            let mut child = prev.clone();
+            update_rec_and_path(&mut child, path.child("child".to_string()));
+
             let candidate = RecAnd {
                 path: path.clone(),
                 and: and_gate.clone(),
-                child: Some(Box::new(prev.clone())),
+                child: Some(Box::new(child)),
             };
 
-            // Validate the connection
             if candidate.validate_connections(candidate.connections()) {
-                valid_count += 1;
-                tracing::event!(
-                    tracing::Level::TRACE,
-                    "Found valid connection at layer {}: depth={}",
-                    layer_num,
-                    candidate.depth()
-                );
                 next_layer.push(candidate);
             }
         }
     }
 
-    tracing::event!(
-        tracing::Level::DEBUG,
-        "Layer {}: {} valid out of {} candidates ({:.2}%)",
-        layer_num,
-        valid_count,
-        total_candidates,
-        (valid_count as f64 / total_candidates as f64) * 100.0
-    );
-
     next_layer
 }
 
+fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match<'ctx>>, new_path: Instance) {
+    rec_and.path = new_path.clone();
+    let and_path = new_path.child("and".to_string());
+    rec_and.and.path = and_path.clone();
+    rec_and.and.a.path = and_path.child("a".to_string());
+    rec_and.and.b.path = and_path.child("b".to_string());
+    rec_and.and.y.path = and_path.child("y".to_string());
+
+    // Recursively update nested children
+    if let Some(ref mut child) = rec_and.child {
+        update_rec_and_path(child, new_path.child("child".to_string()));
+    }
+}
