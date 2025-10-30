@@ -46,9 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cfg,
     );
 
-    for rec_and in &rec_and_results {
-        info!("Found RecAnd match {:?}", rec_and);
-    }
+    // for rec_and in &rec_and_results {
+    //     info!("Found RecAnd match {:?}", rec_and);
+    // }
 
     let count = rec_and_results.len();
 
