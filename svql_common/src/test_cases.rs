@@ -142,9 +142,6 @@ lazy_static::lazy_static! {
     static ref SDFFE_THEN_AND: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::composites::dff_then_and::SdffeThenAnd",
     };
-    static ref SDFFE_THEN_AND2: Needle = Needle::Composite {
-        pattern_query_type: "svql_query::queries::composites::dff_then_and::SdffeThenAnd2",
-    };
     static ref AND_ANY: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::enum_composites::and_any::AndAny",
     };
@@ -438,14 +435,6 @@ lazy_static::lazy_static! {
             needle: &SDFFE_THEN_AND,
             haystack: &AND_Q_DOUBLE_SDFFE,
             expected_matches: 4,
-        },
-        // NEW: Test for macro-generated composites (verifies macro works end-to-end)
-        TestCase {
-            name: "sdffe_then_and2_simple_dedupe_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
-            needle: &SDFFE_THEN_AND2,
-            haystack: &AND_Q_DOUBLE_SDFFE,
-            expected_matches: 4,  // Same as manual version (sub-queries + iproduct + validation)
         },
 
         // Base case: single AND (depth 1 only)

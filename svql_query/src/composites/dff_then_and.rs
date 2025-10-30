@@ -1,6 +1,7 @@
 use crate::instance::Instance;
 use crate::primitives::and::AndGate;
 use crate::primitives::dff::Sdffe;
+use crate::traits::composite::{Composite, MatchedComposite};
 use crate::traits::netlist::SearchableNetlist;
 use svql_macros::composite;
 

@@ -3,10 +3,9 @@ use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
-use svql_query::{
-    composites::SearchableEnumComposite, instance::Instance, Search,
-};
 use svql_query::security::cwe1234::register::RegisterAny;
+use svql_query::traits::enum_composite::SearchableEnumComposite;
+use svql_query::{Search, instance::Instance};
 
 fn init_test_logger() {
     static INIT: OnceLock<()> = OnceLock::new();
