@@ -90,11 +90,11 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     // Parallel: Spawns, joins, and binding patterns - FIXED: Use fully qualified trait syntax
     let parallel_spawns = variants.iter().map(|v| {
-        let variant_name = &v.variant_name;
+        let var_name = &v.var_name;
         let ty = &v.ty;
         let inst_name = &v.inst_name;
         quote! {
-            let #variant_name = scope.spawn(|| {
+            let #var_name = scope.spawn(|| {
                 <#ty<crate::Search> as crate::netlist::SearchableNetlist>::query(
                     haystack_key,
                     context,
@@ -105,15 +105,15 @@ pub fn codegen(ir: Ir) -> TokenStream {
         }
     });
 
-    let parallel_let_binding_fields = variants.iter().map(|v| &v.variant_name);
+    let parallel_let_binding_fields = variants.iter().map(|v| &v.var_name);
     let parallel_joins = variants.iter().map(|v| {
-        let variant_name = &v.variant_name;
-        let error_msg = format!("Failed to join {} thread", variant_name);
-        quote! { #variant_name.join().expect(#error_msg) }
+        let var_name = &v.var_name;
+        let error_msg = format!("Failed to join {} thread", var_name);
+        quote! { #var_name.join().expect(#error_msg) }
     });
 
     // Sequential: Queries - FIXED: Use fully qualified trait syntax
-    let sequential_let_binding_fields = variants.iter().map(|v| &v.variant_name);
+    let sequential_let_binding_fields = variants.iter().map(|v| &v.var_name);
     let sequential_queries = variants.iter().map(|v| {
         let ty = &v.ty;
         let inst_name = &v.inst_name;
@@ -129,18 +129,20 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
     // FIXED: Inline the extend arms directly in each cfg block to avoid move issues
     let parallel_extend_arms = variants.iter().map(|v| {
+        let var_name = &v.var_name;
         let variant_name = &v.variant_name;
         let bound = format_ident!("hit");
         quote! {
-            all_hits.extend(#variant_name.into_iter().map(|#bound| #name::<crate::Match<'ctx>>::#variant_name(#bound)));
+            all_hits.extend(#var_name.into_iter().map(|#bound| #name::<crate::Match<'ctx>>::#variant_name(#bound)));
         }
     });
 
     let sequential_extend_arms = variants.iter().map(|v| {
+        let var_name = &v.var_name;
         let variant_name = &v.variant_name;
         let bound = format_ident!("hit");
         quote! {
-            all_hits.extend(#variant_name.into_iter().map(|#bound| #name::<crate::Match<'ctx>>::#variant_name(#bound)));
+            all_hits.extend(#var_name.into_iter().map(|#bound| #name::<crate::Match<'ctx>>::#variant_name(#bound)));
         }
     });
 
