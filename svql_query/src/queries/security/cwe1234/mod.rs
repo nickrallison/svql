@@ -17,7 +17,7 @@ use unlock_logic::UnlockLogic;
 ///
 /// This composite detects the full vulnerability by combining:
 /// 1. UnlockLogic: AND gate with OR tree containing negated lock signal
-/// 2. LockedRegister: DFF that stores protected data
+/// 2. LockedRegister: DFF with enable signal that stores protected data
 ///
 /// The vulnerability exists when the unlock logic output connects to the
 /// register's enable input, allowing bypass conditions to override the lock.
@@ -67,16 +67,35 @@ where
     S: State,
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        // Critical connection: unlock logic output must feed the register's enable
-        // This is what creates the vulnerability - bypass can override lock
+        // Critical connection: unlock logic output → register enable
+        // This is the vulnerability - bypass logic controls when data can be written
         vec![vec![Connection {
             from: self.unlock_logic.top_and.y.clone(),
-            to: self.locked_register.cell_wire().clone(),
+            to: self.locked_register.enable_wire().clone(), // FIXED: Use enable_wire()
         }]]
     }
 }
 
 impl<'ctx> MatchedComposite<'ctx> for Cwe1234<Match<'ctx>> {}
+
+impl<'ctx> Cwe1234<Match<'ctx>> {
+    /// Get detailed vulnerability information for reporting
+    pub fn vulnerability_report(&self) -> VulnerabilityReport {
+        VulnerabilityReport {
+            or_tree_depth: self.unlock_logic.or_tree_depth(),
+            has_not_in_tree: self.unlock_logic.has_not_in_or_tree(),
+            register_type: self.locked_register.register_type(),
+        }
+    }
+}
+
+/// Detailed report of a CWE-1234 vulnerability instance
+#[derive(Debug, Clone)]
+pub struct VulnerabilityReport {
+    pub or_tree_depth: usize,
+    pub has_not_in_tree: bool,
+    pub register_type: String,
+}
 
 impl SearchableComposite for Cwe1234<Search> {
     type Hit<'ctx> = Cwe1234<Match<'ctx>>;
@@ -85,7 +104,6 @@ impl SearchableComposite for Cwe1234<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Merge contexts from both sub-patterns
         let unlock_ctx = UnlockLogic::<Search>::context(driver, config)?;
         let register_ctx = LockedRegister::<Search>::context(driver, config)?;
 
@@ -100,7 +118,6 @@ impl SearchableComposite for Cwe1234<Search> {
     ) -> Vec<Self::Hit<'ctx>> {
         tracing::info!("Cwe1234::query: starting complete CWE-1234 vulnerability search");
 
-        // Query both sub-patterns independently
         let unlock_patterns = UnlockLogic::<Search>::query(
             haystack_key,
             context,
@@ -121,14 +138,12 @@ impl SearchableComposite for Cwe1234<Search> {
             registers.len()
         );
 
-        // Combine patterns and validate connections
         let mut results = Vec::new();
         let mut candidates_checked = 0;
         let mut unlock_failures = 0;
         let mut connection_failures = 0;
 
         for unlock_logic in &unlock_patterns {
-            // Pre-validate unlock logic has proper structure
             if !unlock_logic.has_not_in_or_tree() {
                 unlock_failures += 1;
                 continue;
@@ -144,8 +159,6 @@ impl SearchableComposite for Cwe1234<Search> {
                 };
 
                 // Validate the critical connection: unlock output → register enable
-                // This filters out lock_status DFFs (whose enable is just Lock signal)
-                // and keeps only data DFFs (whose enable comes from bypass logic)
                 if !candidate.validate_connections(candidate.connections()) {
                     connection_failures += 1;
                     tracing::trace!(

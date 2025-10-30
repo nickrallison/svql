@@ -9,11 +9,11 @@ use svql_driver::{Context, Driver, DriverKey};
 use super::register::RegisterAny;
 
 /// Represents a locked register in CWE1234:
-/// - A register (DFF) that stores protected data
-/// - Its write enable should be controlled by unlock logic
+/// - A register (DFF) with an enable signal that stores protected data
+/// - Its enable signal should be controlled by unlock logic
 ///
-/// Basic version: uses RegisterAny enum to match different register types
-/// TODO: Add validation that enable connects to unlock logic
+/// This is just a wrapper around RegisterAny that adds semantic meaning
+/// for the CWE-1234 pattern (it's the register being protected).
 #[derive(Debug, Clone)]
 pub struct LockedRegister<S>
 where
@@ -30,22 +30,9 @@ where
     pub fn new(path: Instance) -> Self {
         Self {
             path: path.clone(),
-            register: RegisterAny::BasicDff(super::register::BasicDff::new(
+            register: RegisterAny::AsyncEnable(super::register::AsyncDffEnable::new(
                 path.child("register".to_string()),
             )),
-        }
-    }
-
-    pub fn cell_wire(&self) -> &crate::Wire<S> {
-        match &self.register {
-            RegisterAny::BasicDff(dff) => &dff.cell,
-        }
-    }
-
-    /// Get a description of the register type for reporting
-    pub fn register_type(&self) -> String {
-        match &self.register {
-            RegisterAny::BasicDff(_) => "BasicDff".to_string(),
         }
     }
 }
@@ -72,13 +59,28 @@ where
     S: State,
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        // No connections for basic version
-        // Later: validate that register's enable comes from unlock logic
+        // No internal connections - just wraps a register
         vec![]
     }
 }
 
 impl<'ctx> MatchedComposite<'ctx> for LockedRegister<Match<'ctx>> {}
+
+impl<S> LockedRegister<S>
+where
+    S: State,
+{
+    /// Get the enable wire for connection validation
+    /// This is what should connect to the unlock logic output
+    pub fn enable_wire(&self) -> &crate::Wire<S> {
+        self.register.enable_wire()
+    }
+
+    /// Get a description of the register type for reporting
+    pub fn register_type(&self) -> String {
+        self.register.register_type()
+    }
+}
 
 impl SearchableComposite for LockedRegister<Search> {
     type Hit<'ctx> = LockedRegister<Match<'ctx>>;
