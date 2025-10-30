@@ -82,12 +82,12 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let port_specs = ir.inputs.iter().chain(ir.outputs.iter()).map(|port| {
         let port_name_str = port.name.to_string();
         let dir = if ir.inputs.contains(&port) {
-            quote! { crate::netlist::PortDir::In }
+            quote! { crate::traits::netlist::PortDir::In }
         } else {
-            quote! { crate::netlist::PortDir::Out }
+            quote! { crate::traits::netlist::PortDir::Out }
         };
         quote! {
-            crate::netlist::PortSpec {
+            crate::traits::netlist::PortSpec {
                 name: #port_name_str,
                 dir: #dir,
             }
@@ -155,7 +155,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         impl crate::traits::netlist::NetlistMeta for #name<crate::Search> {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
-            const PORTS: &'static [crate::netlist::PortSpec] = &[
+            const PORTS: &'static [crate::traits::netlist::PortSpec] = &[
                 #(#port_specs),*
             ];
         }

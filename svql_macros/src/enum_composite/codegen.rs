@@ -85,7 +85,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     // Generate context merging (one per variant) - FIXED: Use fully qualified trait syntax
     let context_calls = variants.iter().map(|v| {
         let ty = &v.ty;
-        quote! { <#ty<crate::Search> as crate::netlist::SearchableNetlist>::context(driver, config)? }
+        quote! { <#ty<crate::Search> as crate::traits::netlist::SearchableNetlist>::context(driver, config)? }
     });
 
     // Parallel: Spawns, joins, and binding patterns - FIXED: Use fully qualified trait syntax
@@ -95,7 +95,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         let inst_name = &v.inst_name;
         quote! {
             let #var_name = scope.spawn(|| {
-                <#ty<crate::Search> as crate::netlist::SearchableNetlist>::query(
+                <#ty<crate::Search> as crate::traits::netlist::SearchableNetlist>::query(
                     haystack_key,
                     context,
                     path.child(#inst_name.to_string()),
@@ -118,7 +118,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         let ty = &v.ty;
         let inst_name = &v.inst_name;
         quote! {
-            <#ty<crate::Search> as crate::netlist::SearchableNetlist>::query(
+            <#ty<crate::Search> as crate::traits::netlist::SearchableNetlist>::query(
                 haystack_key,
                 context,
                 path.child(#inst_name.to_string()),

@@ -8,7 +8,7 @@ pub mod enum_composites;
 pub mod instance;
 pub mod primitives;
 pub mod security;
-mod traits;
+pub mod traits;
 // ########################
 // Type State Tags
 // ########################

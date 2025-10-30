@@ -2,15 +2,18 @@ pub mod register;
 pub mod unlock_logic;
 
 use crate::{
-    composites::{Composite, MatchedComposite, SearchableComposite, SearchableEnumComposite}, instance::Instance, Connection, Match, Search,
-    State,
-    WithPath,
+    Connection, Match, Search, State, WithPath,
+    instance::Instance,
+    traits::{
+        composite::{Composite, MatchedComposite, SearchableComposite},
+        enum_composite::SearchableEnumComposite,
+    },
 };
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-use unlock_logic::UnlockLogic;
 use crate::security::cwe1234::register::RegisterAny;
+use unlock_logic::UnlockLogic;
 
 /// Complete CWE-1234 pattern: Locked register with bypassable unlock logic
 ///

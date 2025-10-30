@@ -1,15 +1,14 @@
 // svql_query/src/queries/security/cwe1234/unlock_logic.rs
 
-use crate::{
-    composites::{Composite, MatchedComposite, SearchableComposite}, instance::Instance, netlist::SearchableNetlist, queries::netlist::basic::{and::AndGate, not::NotGate}, Connection,
-    Match,
-    Search,
-    State,
-    WithPath,
-};
+use crate::composites::rec_or::RecOr;
+use crate::instance::Instance;
+use crate::primitives::and::AndGate;
+use crate::primitives::not::NotGate;
+use crate::traits::composite::{Composite, MatchedComposite, SearchableComposite};
+use crate::traits::netlist::SearchableNetlist;
+use crate::{Connection, Match, Search, State, WithPath};
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
-use crate::composites::rec_or::RecOr;
 
 /// Represents the unlock/bypass logic pattern in CWE1234:
 /// - Top-level AND gate (write enable)
