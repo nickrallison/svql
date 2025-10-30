@@ -1,4 +1,4 @@
-// svql_query/tests/security_tests.rs
+// svql_query/tests/cwe1234_tests.rs
 
 use rstest::rstest;
 use std::sync::OnceLock;
@@ -22,8 +22,12 @@ fn init_test_logger() {
     });
 }
 
+// ============================================================================
+// Basic Pattern Tests
+// ============================================================================
+
 #[test]
-fn test_unlock_logic_cwe1234() -> Result<(), Box<dyn std::error::Error>> {
+fn test_cwe1234_simple() -> Result<(), Box<dyn std::error::Error>> {
     init_test_logger();
 
     let config = Config::builder()
@@ -31,107 +35,9 @@ fn test_unlock_logic_cwe1234() -> Result<(), Box<dyn std::error::Error>> {
         .dedupe(Dedupe::All)
         .build();
 
-    // Load the CWE1234 example haystack
     let haystack_module = YosysModule::new(
-        "examples/fixtures/security/access_control/locked_reg/verilog/cwe1234.v",
-        "cwe1234",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    // Build context for UnlockLogic query
-    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    // Query for unlock patterns
-    let results = UnlockLogic::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("unlock".to_string()),
-        &config,
-    );
-
-    // Assertions
-    assert!(
-        !results.is_empty(),
-        "Should find at least one unlock pattern in CWE1234 example (write & (~lock_status | scan_mode | debug_unlocked))"
-    );
-
-    println!("\n=== CWE1234 Unlock Pattern Analysis ===");
-    println!("Found {} unlock pattern(s)\n", results.len());
-
-    // Verify each match has the expected structure
-    for (i, result) in results.iter().enumerate() {
-        println!("Match {}:", i + 1);
-        println!("  - Top AND gate: {}", result.top_and.path.inst_path());
-        println!("  - OR tree depth: {}", result.or_tree_depth());
-        println!("  - OR tree path: {}", result.rec_or.path.inst_path());
-        println!("  - NOT gate path: {}", result.not_gate.path.inst_path());
-
-        // Validate structure
-        assert!(
-            result.top_and.path.inst_path().contains("top_and"),
-            "Match {} should have top_and gate",
-            i + 1
-        );
-
-        assert!(
-            result.rec_or.depth() >= 1,
-            "Match {} should have at least depth-1 OR tree (found depth {})",
-            i + 1,
-            result.rec_or.depth()
-        );
-
-        // Critical validation: NOT gate must be in the OR tree
-        assert!(
-            result.has_not_in_or_tree(),
-            "Match {} MUST have NOT gate feeding into OR tree (this is the vulnerability!)",
-            i + 1
-        );
-
-        // Validate the top-level connection (OR -> AND)
-        assert!(
-            result.validate_connections(result.connections()),
-            "Match {} should have valid OR->AND connection",
-            i + 1
-        );
-
-        println!("  ✓ All validations passed\n");
-    }
-
-    println!("=== Expected Pattern ===");
-    println!("The CWE1234 vulnerability pattern is:");
-    println!("  write & (~lock_status | scan_mode | debug_unlocked)");
-    println!("       ^         ^             ^            ^");
-    println!("       |         |             |            |");
-    println!("    top_and   not_gate    bypass_1     bypass_2");
-    println!("                 |             |            |");
-    println!("                 +-------------+------------+");
-    println!("                              |");
-    println!("                           rec_or (OR tree)");
-    println!("\nThis allows bypassing lock protection via debug modes!\n");
-
-    Ok(())
-}
-
-#[test]
-fn test_unlock_logic_negative_case() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    // Use a design without the unlock pattern (simple AND tree)
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/basic/and/verilog/small_and_tree.v",
-        "small_and_tree",
+        "examples/fixtures/cwes/cwe1234/cwe1234_simple.v",
+        "cwe1234_simple",
     )?;
 
     let driver = Driver::new_workspace()?;
@@ -151,20 +57,32 @@ fn test_unlock_logic_negative_case() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    // Should find 0 matches - this design doesn't have the vulnerability pattern
+    println!("\n=== CWE1234 Simple Pattern Test ===");
+    println!("Pattern: write & (~lock | debug)");
+    println!("Found {} match(es)\n", results.len());
+
     assert_eq!(
         results.len(),
-        0,
-        "Should NOT find unlock pattern in simple AND tree (no NOT->OR->AND structure)"
+        1,
+        "Should find exactly 1 minimal pattern: write & (~lock | debug)"
     );
 
-    println!("\n✓ Negative test passed: No false positives in simple AND tree");
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {}:", i + 1);
+        println!("  - OR depth: {}", result.or_tree_depth());
+        assert!(result.has_not_in_or_tree(), "NOT must be in OR tree");
+        assert!(
+            result.validate_connections(result.connections()),
+            "Connections must be valid"
+        );
+        println!("  ✓ Valid simple bypass pattern\n");
+    }
 
     Ok(())
 }
 
 #[test]
-fn test_unlock_logic_depth_variations() -> Result<(), Box<dyn std::error::Error>> {
+fn test_cwe1234_deep() -> Result<(), Box<dyn std::error::Error>> {
     init_test_logger();
 
     let config = Config::builder()
@@ -173,8 +91,8 @@ fn test_unlock_logic_depth_variations() -> Result<(), Box<dyn std::error::Error>
         .build();
 
     let haystack_module = YosysModule::new(
-        "examples/fixtures/security/access_control/locked_reg/verilog/cwe1234.v",
-        "cwe1234",
+        "examples/fixtures/cwes/cwe1234/cwe1234_deep.v",
+        "cwe1234_deep",
     )?;
 
     let driver = Driver::new_workspace()?;
@@ -194,36 +112,339 @@ fn test_unlock_logic_depth_variations() -> Result<(), Box<dyn std::error::Error>
         &config,
     );
 
-    println!("\n=== OR Tree Depth Analysis ===");
+    println!("\n=== CWE1234 Deep OR Tree Test ===");
+    println!("Pattern: write & (((~lock | scan) | debug) | test_mode)");
+    println!("Found {} match(es)\n", results.len());
 
-    // Collect depth statistics
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find exactly 1 deep OR tree pattern with 4 bypass conditions"
+    );
+
+    let max_depth = results.iter().map(|r| r.or_tree_depth()).max().unwrap_or(0);
+    println!("Maximum OR tree depth: {}", max_depth);
+
+    assert!(
+        max_depth >= 2,
+        "Should have depth >= 2 for deep tree, found {}",
+        max_depth
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
+        assert!(result.has_not_in_or_tree(), "NOT must be in deep OR tree");
+        println!("  ✓ Valid deep tree pattern\n");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_cwe1234_swapped() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_swapped.v",
+        "cwe1234_swapped",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 Swapped Inputs Test ===");
+    println!("Pattern: (scan | ~lock | debug) & write");
+    println!("Tests commutative AND matching\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find exactly 1 pattern even with swapped AND inputs"
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {}:", i + 1);
+        assert!(result.has_not_in_or_tree(), "NOT must be in OR tree");
+        println!("  ✓ Valid swapped input pattern\n");
+    }
+
+    println!("✓ Handles commutative AND gate inputs");
+
+    Ok(())
+}
+
+#[test]
+fn test_cwe1234_combined() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_combined.v",
+        "cwe1234_combined",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 Combined Logic Test ===");
+    println!("Pattern: write & ((~lock & mode_a) | debug)");
+    println!("Tests complex AND/OR combinations\n");
+    println!("Found {} match(es)\n", results.len());
+
+    // Expected: 1 match if pattern is flexible enough to handle AND within OR tree
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find exactly 1 combined logic pattern"
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {}:", i + 1);
+        assert!(result.has_not_in_or_tree(), "NOT must be in OR tree");
+        println!("  ✓ Valid combined logic pattern\n");
+    }
+    println!("✓ Successfully matched complex AND/OR logic");
+
+    Ok(())
+}
+
+// ============================================================================
+// Multiple Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_multi_reg.v",
+        "cwe1234_multi_reg",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 Multiple Registers Test ===");
+    println!("Module has 3 vulnerable registers:");
+    println!("  1. write_1 & (~lock_1 | scan)");
+    println!("  2. write_2 & (~lock_2 | debug)");
+    println!("  3. write_3 & (~lock_3 | scan | debug | test)\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        3,
+        "Should find exactly 3 vulnerable registers"
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
+        assert!(result.has_not_in_or_tree(), "Each must have NOT in OR tree");
+        println!("  ✓ Valid vulnerability\n");
+    }
+
+    println!("✓ All 3 vulnerable registers detected");
+
+    Ok(())
+}
+
+// ============================================================================
+// NOT Position Tests
+// ============================================================================
+
+#[test]
+fn test_cwe1234_not_positions() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_not_positions.v",
+        "cwe1234_not_positions",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 NOT Position Variants Test ===");
+    println!("Tests NOT at different horizontal positions:");
+    println!("  1. (~lock | scan | debug)    - NOT leftmost");
+    println!("  2. (scan | ~lock | debug)    - NOT middle");
+    println!("  3. (scan | debug | ~lock)    - NOT rightmost");
+    println!("  4. ((~lock | scan) | ...)    - NOT nested\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        4,
+        "Should find exactly 4 position variants (one per register)"
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
+        assert!(
+            result.has_not_in_or_tree(),
+            "Must find NOT regardless of position"
+        );
+        println!("  ✓ NOT found at position {}\n", i + 1);
+    }
+
+    println!("✓ All 4 horizontal positions detected");
+
+    Ok(())
+}
+
+#[test]
+fn test_cwe1234_not_deep() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_not_deep.v",
+        "cwe1234_not_deep",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 NOT Depth Variants Test ===");
+    println!("Tests NOT at different vertical depths:");
+    println!("  Depth 1: OR(~lock, bypass)");
+    println!("  Depth 2: OR(OR(~lock, b1), b2)");
+    println!("  Depth 3: OR(OR(OR(~lock, b1), b2), ...)\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        3,
+        "Should find exactly 3 patterns at different depths (one per register)"
+    );
+
     let depths: Vec<usize> = results.iter().map(|r| r.or_tree_depth()).collect();
+    let max_depth = *depths.iter().max().unwrap();
 
-    if !depths.is_empty() {
-        let min_depth = *depths.iter().min().unwrap();
-        let max_depth = *depths.iter().max().unwrap();
-
-        println!("Min OR tree depth: {}", min_depth);
-        println!("Max OR tree depth: {}", max_depth);
-
-        // The CWE1234 example has: ~lock_status | scan_mode | debug_unlocked
-        // This could be represented as:
-        // - Depth 1: single OR with all inputs
-        // - Depth 2: (a | b) | c structure
-        assert!(min_depth >= 1, "Should have at least depth-1 OR tree");
-
-        // Group by depth
-        for depth in min_depth..=max_depth {
-            let count = depths.iter().filter(|&&d| d == depth).count();
-            println!("Depth {}: {} match(es)", depth, count);
+    println!("Depth distribution:");
+    for depth in 1..=max_depth {
+        let count = depths.iter().filter(|&&d| d == depth).count();
+        if count > 0 {
+            println!("  Depth {}: {} match(es)", depth, count);
         }
     }
 
+    assert!(
+        max_depth >= 3,
+        "Should find NOT at depth 3+, max found: {}",
+        max_depth
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        assert!(
+            result.has_not_in_or_tree(),
+            "Match {}: NOT must be found at depth {}",
+            i + 1,
+            result.or_tree_depth()
+        );
+    }
+
+    println!("\n✓ Recursive traversal works at all 3 depths");
+
     Ok(())
 }
 
-#[rstest]
-fn test_unlock_logic_all_components_required() -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn test_cwe1234_not_right() -> Result<(), Box<dyn std::error::Error>> {
     init_test_logger();
 
     let config = Config::builder()
@@ -232,8 +453,8 @@ fn test_unlock_logic_all_components_required() -> Result<(), Box<dyn std::error:
         .build();
 
     let haystack_module = YosysModule::new(
-        "examples/fixtures/security/access_control/locked_reg/verilog/cwe1234.v",
-        "cwe1234",
+        "examples/fixtures/cwes/cwe1234/cwe1234_not_right.v",
+        "cwe1234_not_right",
     )?;
 
     let driver = Driver::new_workspace()?;
@@ -253,45 +474,248 @@ fn test_unlock_logic_all_components_required() -> Result<(), Box<dyn std::error:
         &config,
     );
 
-    println!("\n=== Component Validation ===");
+    println!("\n=== CWE1234 NOT on Right Input Test ===");
+    println!("Tests NOT consistently on right side of OR gates:");
+    println!("  1. OR(bypass, ~lock)");
+    println!("  2. OR(a, OR(b, ~lock))");
+    println!("  3. OR(..., OR(c, ~lock))\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        3,
+        "Should find exactly 3 right-side patterns (one per register)"
+    );
 
     for (i, result) in results.iter().enumerate() {
-        println!("\nMatch {}: Component Check", i + 1);
-
-        // 1. Must have AND gate
-        let has_and = !result.top_and.path.inst_path().is_empty();
-        println!("  ✓ Has top-level AND gate: {}", has_and);
-        assert!(has_and, "Must have top-level AND gate");
-
-        // 2. Must have OR tree
-        let has_or_tree = result.rec_or.depth() >= 1;
-        println!(
-            "  ✓ Has OR tree (depth={}): {}",
-            result.rec_or.depth(),
-            has_or_tree
-        );
-        assert!(has_or_tree, "Must have OR tree");
-
-        // 3. Must have NOT gate
-        let has_not = !result.not_gate.path.inst_path().is_empty();
-        println!("  ✓ Has NOT gate: {}", has_not);
-        assert!(has_not, "Must have NOT gate");
-
-        // 4. Critical: NOT must connect to OR tree
-        let not_in_tree = result.has_not_in_or_tree();
-        println!("  ✓ NOT connects to OR tree: {}", not_in_tree);
-        assert!(
-            not_in_tree,
-            "NOT gate MUST connect to OR tree (this is the CWE1234 vulnerability signature)"
-        );
-
-        // 5. OR must connect to AND
-        let or_to_and = result.validate_connections(result.connections());
-        println!("  ✓ OR connects to AND: {}", or_to_and);
-        assert!(or_to_and, "OR tree must connect to AND gate");
+        println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
+        assert!(result.has_not_in_or_tree(), "Must find NOT on right input");
+        println!("  ✓ NOT found on right side\n");
     }
 
-    println!("\n✓ All components present and properly connected");
+    println!("✓ Both OR inputs (a and b) correctly checked");
+
+    Ok(())
+}
+
+#[test]
+fn test_cwe1234_not_alternating() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v",
+        "cwe1234_not_alternating",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 Alternating Position Test ===");
+    println!("Tests complex zigzag patterns:");
+    println!("  Pattern 1: Left-Right-Left");
+    println!("  Pattern 2: Right-Left-Right\n");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        2,
+        "Should find exactly 2 alternating patterns (one per register)"
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        println!("Match {}:", i + 1);
+        assert!(
+            result.has_not_in_or_tree(),
+            "Must find NOT in alternating structure"
+        );
+        println!("  ✓ Valid alternating pattern\n");
+    }
+
+    println!("✓ Handles 2 complex alternating structures");
+
+    Ok(())
+}
+
+// ============================================================================
+// Negative Test - Fixed Version (No Vulnerability)
+// ============================================================================
+
+#[test]
+fn test_cwe1234_fixed_no_vulnerability() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let haystack_module = YosysModule::new(
+        "examples/fixtures/cwes/cwe1234/cwe1234_fixed.v",
+        "cwe1234_fixed",
+    )?;
+
+    let driver = Driver::new_workspace()?;
+    let (haystack_key, haystack_design) = driver.get_or_load_design(
+        &haystack_module.path().display().to_string(),
+        haystack_module.module_name(),
+        &config.haystack_options,
+    )?;
+
+    let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+    let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let results = UnlockLogic::<Search>::query(
+        &haystack_key,
+        &context,
+        Instance::root("unlock".to_string()),
+        &config,
+    );
+
+    println!("\n=== CWE1234 Fixed (No Vulnerability) Test ===");
+    println!("Pattern: write & ~lock  (NO bypass conditions)");
+    println!("Found {} match(es)\n", results.len());
+
+    assert_eq!(
+        results.len(),
+        0,
+        "FIXED version should have exactly 0 vulnerabilities (no bypass)"
+    );
+
+    println!("✓ No false positives - correctly identifies secure code");
+
+    Ok(())
+}
+
+// ============================================================================
+// Summary Test - Run All Variants
+// ============================================================================
+
+#[test]
+fn test_cwe1234_all_variants_summary() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+
+    println!("\n");
+    println!("╔════════════════════════════════════════════════════════════╗");
+    println!("║        CWE-1234 Pattern Detection Test Suite              ║");
+    println!("╚════════════════════════════════════════════════════════════╝");
+    println!();
+
+    let variants = vec![
+        ("cwe1234_simple.v", "cwe1234_simple", "Simple pattern", 1),
+        ("cwe1234_deep.v", "cwe1234_deep", "Deep OR tree", 1),
+        ("cwe1234_swapped.v", "cwe1234_swapped", "Swapped inputs", 1),
+        (
+            "cwe1234_combined.v",
+            "cwe1234_combined",
+            "Combined logic",
+            1,
+        ),
+        (
+            "cwe1234_multi_reg.v",
+            "cwe1234_multi_reg",
+            "Multiple registers",
+            3,
+        ),
+        (
+            "cwe1234_not_positions.v",
+            "cwe1234_not_positions",
+            "NOT positions",
+            4,
+        ),
+        ("cwe1234_not_deep.v", "cwe1234_not_deep", "NOT depths", 3),
+        (
+            "cwe1234_not_right.v",
+            "cwe1234_not_right",
+            "NOT on right",
+            3,
+        ),
+        (
+            "cwe1234_not_alternating.v",
+            "cwe1234_not_alternating",
+            "Alternating",
+            2,
+        ),
+        ("cwe1234_fixed.v", "cwe1234_fixed", "Fixed (SECURE)", 0),
+    ];
+
+    let config = Config::builder()
+        .match_length(MatchLength::Exact)
+        .dedupe(Dedupe::All)
+        .build();
+
+    let driver = Driver::new_workspace()?;
+
+    println!("┌────────────────────────────────┬──────────┬──────────┬────────┐");
+    println!("│ Variant                        │ Expected │ Found    │ Status │");
+    println!("├────────────────────────────────┼──────────┼──────────┼────────┤");
+
+    let mut all_passed = true;
+
+    for (filename, module_name, description, expected) in variants {
+        let path = format!("examples/fixtures/cwes/cwe1234/{}", filename);
+        let haystack_module = YosysModule::new(&path, module_name)?;
+
+        let (haystack_key, haystack_design) = driver.get_or_load_design(
+            &haystack_module.path().display().to_string(),
+            haystack_module.module_name(),
+            &config.haystack_options,
+        )?;
+
+        let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
+        let context = context.with_design(haystack_key.clone(), haystack_design);
+
+        let results = UnlockLogic::<Search>::query(
+            &haystack_key,
+            &context,
+            Instance::root("unlock".to_string()),
+            &config,
+        );
+
+        let found = results.len();
+        let status = if found == expected {
+            "✓ PASS"
+        } else {
+            "✗ FAIL"
+        };
+
+        if found != expected {
+            all_passed = false;
+        }
+
+        println!(
+            "│ {:<30} │ {:>8} │ {:>8} │ {:<6} │",
+            description, expected, found, status
+        );
+    }
+
+    println!("└────────────────────────────────┴──────────┴──────────┴────────┘");
+    println!();
+
+    assert!(
+        all_passed,
+        "Some tests did not find expected exact number of matches"
+    );
+
+    println!("✓ All CWE-1234 variant tests passed!");
 
     Ok(())
 }
