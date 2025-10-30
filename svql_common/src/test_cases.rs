@@ -53,11 +53,19 @@ lazy_static::lazy_static! {
     };
     static ref OR_GATE: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
-            "examples/patterns/basic/or/verilog/or_gate.v",  // NEW: Assume this file exists
+            "examples/patterns/basic/or/verilog/or_gate.v",
             "or_gate",
         ).expect("Failed to create YosysModule for or_gate"),
         pattern_query_type: Some("svql_query::queries::netlist::basic::or::OrGate"),
     };
+    static ref NOT_GATE: Needle = Needle::Netlist {
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/not/verilog/not_gate.v",
+            "not_gate",
+        ).expect("Failed to create YosysModule for not_gate"),
+        pattern_query_type: Some("svql_query::queries::netlist::basic::not::NotGate"),
+    };
+
     static ref AND_NOR: Needle = Needle::Netlist {
         yosys_module: YosysModule::new(
             "examples/patterns/basic/and/verilog/and_nor.v",
@@ -167,6 +175,7 @@ lazy_static::lazy_static! {
             "and_q_double_sdffe",
         ).expect("Failed to create YosysModule for and_q_double_sdffe"),
     };
+
     static ref AND_TREE_HAYSTACK: Haystack = Haystack {
         yosys_module: YosysModule::new(
             "examples/fixtures/basic/and/verilog/and_tree.v",
@@ -299,6 +308,19 @@ lazy_static::lazy_static! {
             "or_gate",
         ).expect("Failed to create YosysModule for single OR"),
     };
+    static ref NOT_GATE_HAYSTACK: Haystack = Haystack {  // NEW: Self haystack for NOT
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/not/verilog/not_gate.v",
+            "not_gate",
+        ).expect("Failed to create YosysModule for not_gate"),
+    };
+    static ref NOT_2_SEQ_HAYSTACK: Haystack = Haystack {  // NEW: Sequential NOT chain (N=2)
+        yosys_module: YosysModule::new(
+            "examples/patterns/basic/not/verilog/not_2_seq.v",
+            "not_2_seq",
+        ).expect("Failed to create YosysModule for not_2_seq"),
+    };
+
 
 }
 
@@ -362,7 +384,46 @@ lazy_static::lazy_static! {
             haystack: &SMALL_AND_TREE_HAYSTACK,
             expected_matches: 2,
         },
-
+        TestCase {
+            name: "not_gate_self_dedupe_none",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::None)
+                .build(),
+            needle: &NOT_GATE,
+            haystack: &NOT_GATE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "not_gate_self_dedupe_all",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &NOT_GATE,
+            haystack: &NOT_GATE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "not_gate_not_2_seq_dedupe_none",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::None)
+                .build(),
+            needle: &NOT_GATE,
+            haystack: &NOT_2_SEQ_HAYSTACK,
+            expected_matches: 2,
+        },
+        TestCase {
+            name: "not_gate_not_2_seq_dedupe_all",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &NOT_GATE,
+            haystack: &NOT_2_SEQ_HAYSTACK,
+            expected_matches: 2,
+        }
     ];
 
 

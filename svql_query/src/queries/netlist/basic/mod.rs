@@ -1,3 +1,4 @@
 pub mod and;
 pub mod dff;
+pub mod not;
 pub mod or;
