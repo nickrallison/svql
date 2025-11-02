@@ -2,7 +2,7 @@
 use crate::primitives::dff::{
     AsyncResetDff, AsyncResetEnableDff, EnableDff, SimpleDff, SyncResetDff, SyncResetEnableDff,
 };
-use crate::{Match, State, Wire};
+use crate::{State, Wire};
 use svql_macros::enum_composite;
 
 enum_composite! {

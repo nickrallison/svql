@@ -3,14 +3,14 @@ use svql_macros::netlist;
 use crate::{State, Wire};
 
 netlist! {
-    name: XorGate,
-    module_name: "xor_gate",
-    file: "examples/patterns/basic/xor/verilog/xor_gate.v",
+    name: XnorGate,
+    module_name: "xnor_gate",
+    file: "examples/patterns/basic/xnor/verilog/xnor_gate.v",
     inputs: [a, b],
     outputs: [y]
 }
 
-impl<S> XorGate<S>
+impl<S> XnorGate<S>
 where
     S: State,
 {

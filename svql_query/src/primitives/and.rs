@@ -1,5 +1,7 @@
 use svql_macros::netlist;
 
+use crate::{State, Wire};
+
 netlist! {
     name: AndGate,
     module_name: "and_gate",
@@ -22,4 +24,13 @@ netlist! {
     file: "examples/patterns/basic/and/verilog/and_nor.v",
     inputs: [a, b],
     outputs: [y]
+}
+
+impl<S> AndGate<S>
+where
+    S: State,
+{
+    pub fn get_inputs(&self) -> Vec<Wire<S>> {
+        vec![self.a.clone(), self.b.clone()]
+    }
 }

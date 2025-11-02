@@ -1,67 +1,120 @@
-use crate::State;
-use crate::enum_composites::dff_any::DffAny;
-use crate::instance::Instance;
-use crate::primitives::and::AndAny; // Assuming you have AndAny from enum_composites
-use crate::primitives::not::NotGate; // Or use an enum_composite for NOT if variants exist
-use crate::primitives::or::OrAny; // Similarly for OR variants
-use crate::traits::composite::{Composite, SearchableComposite};
-use crate::{Connection, Wire};
+// svql_query/src/enum_composites/logic_tree.rs
+use crate::{
+    Connection, Match, Search, State, Wire, WithPath,
+    enum_composites::combinational::Combinational,
+    instance::Instance,
+    traits::{
+        composite::{Composite, MatchedComposite, SearchableComposite},
+        enum_composite::SearchableEnumComposite,
+    },
+};
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-// ... (keep your existing FsmCore and FsmReg structs)
-
+/// Represents a combinational logic tree with arbitrary gate types at each node
+///
+/// Each input to the root gate can be:
+/// - None: A leaf input (external signal)
+/// - Some(Box<LogicTree>): A recursive sub-tree
+///
+/// This enables matching complex combinational structures like:
+/// - AND trees with mixed OR/XOR sub-trees
+/// - Complex arithmetic/logic expressions
+/// - State machine next-state logic
 #[derive(Debug, Clone)]
 pub struct LogicTree<S>
 where
     S: State,
 {
     pub path: Instance,
-    pub root_gate: Gate<S>, // Root of the logic tree (e.g., final AND/OR for next-state computation)
-    pub inputs: Vec<Wire<S>>, // Inputs to the tree (from FSM inputs or other regs)
-    pub outputs: Vec<Wire<S>>, // Outputs from the tree (to DFF D pins)
-    pub depth: usize,       // Bounded depth to prevent over-matching
-}
-
-#[derive(Debug, Clone)]
-pub enum Gate<S>
-where
-    S: State,
-{
-    And(AndAny<S>),
-    Or(OrAny<S>),
-    Not(NotGate<S>),
-    // Add more: Xor, Mux, etc., as needed
-    Composite(Box<LogicTree<S>>), // For nested sub-trees
+    pub root_gate: Combinational<S>,
+    /// Recursive children - each input can be another LogicTree or a leaf (None)
+    /// Length always matches root_gate.num_inputs()
+    pub inputs: Vec<Option<Box<LogicTree<S>>>>,
+    pub depth: usize,
 }
 
 impl<S> LogicTree<S>
 where
     S: State,
 {
-    pub fn new(path: Instance, max_depth: usize) -> Self {
+    /// Create a leaf LogicTree (gate with all external inputs)
+    pub fn new(path: Instance, root_gate: Combinational<S>) -> Self {
+        let num_inputs = root_gate.num_inputs();
         Self {
             path: path.clone(),
-            root_gate: Gate::And(AndAny::new(path.child("root".to_string()))), // Default to AND; query will refine
-            inputs: vec![],
-            outputs: vec![],
-            depth: max_depth,
+            root_gate,
+            inputs: vec![None; num_inputs],
+            depth: 1,
         }
     }
 
-    /// Add an input wire (e.g., from FSM primary input or another reg's Q)
-    pub fn add_input(&mut self, wire: Wire<S>) {
-        self.inputs.push(wire);
+    /// Create a LogicTree with specific children at each input
+    pub fn with_children(
+        path: Instance,
+        root_gate: Combinational<S>,
+        inputs: Vec<Option<Box<LogicTree<S>>>>,
+    ) -> Self {
+        assert_eq!(
+            inputs.len(),
+            root_gate.num_inputs(),
+            "Number of inputs must match gate's input count"
+        );
+
+        let max_child_depth = inputs
+            .iter()
+            .filter_map(|opt| opt.as_ref().map(|tree| tree.depth))
+            .max()
+            .unwrap_or(0);
+
+        Self {
+            path,
+            root_gate,
+            inputs,
+            depth: 1 + max_child_depth,
+        }
     }
 
-    /// Add an output wire (e.g., to a DFF's D input)
-    pub fn add_output(&mut self, wire: Wire<S>) {
-        self.outputs.push(wire);
+    /// Get the output wire of the root gate
+    pub fn output(&self) -> &Wire<S> {
+        self.root_gate.y()
     }
 
-    /// Get the primary output (e.g., next-state signal)
-    pub fn primary_output(&self) -> Option<&Wire<S>> {
-        self.outputs.first()
+    /// Check if this is a leaf node (all inputs are external)
+    pub fn is_leaf(&self) -> bool {
+        self.inputs.iter().all(|opt| opt.is_none())
+    }
+
+    /// Count total number of gates in the tree
+    pub fn gate_count(&self) -> usize {
+        1 + self
+            .inputs
+            .iter()
+            .filter_map(|opt| opt.as_ref())
+            .map(|tree| tree.gate_count())
+            .sum::<usize>()
+    }
+
+    /// Count number of leaf inputs (external signals)
+    pub fn leaf_input_count(&self) -> usize {
+        self.inputs.iter().filter(|opt| opt.is_none()).count()
+            + self
+                .inputs
+                .iter()
+                .filter_map(|opt| opt.as_ref())
+                .map(|tree| tree.leaf_input_count())
+                .sum::<usize>()
+    }
+
+    /// Get descriptive summary of the tree structure
+    pub fn describe(&self) -> String {
+        format!(
+            "{} tree: depth={}, gates={}, leaves={}",
+            self.root_gate.gate_type(),
+            self.depth,
+            self.gate_count(),
+            self.leaf_input_count()
+        )
     }
 }
 
@@ -70,13 +123,21 @@ where
     S: State,
 {
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        // Delegate to root_gate or inputs/outputs based on path
-        match p.get_item(self.path.height() + 1).as_deref() {
-            Some("root") => self.root_gate.find_port(p),
-            Some("inputs") => self.inputs.iter().find_map(|w| w.find_port(p)),
-            Some("outputs") => self.outputs.iter().find_map(|w| w.find_port(p)),
-            _ => None,
+        // First check root gate
+        if let Some(port) = self.root_gate.find_port(p) {
+            return Some(port);
         }
+
+        // Then recursively check children
+        for child_opt in &self.inputs {
+            if let Some(child) = child_opt {
+                if let Some(port) = child.find_port(p) {
+                    return Some(port);
+                }
+            }
+        }
+
+        None
     }
 
     fn path(&self) -> Instance {
@@ -89,77 +150,40 @@ where
     S: State,
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
-        let mut conns = vec![];
+        let mut all_connections = Vec::new();
 
-        // Connect inputs to root_gate inputs (fan-out as needed)
-        for input in &self.inputs {
-            conns.push(vec![Connection {
-                from: input.clone(),
-                to: self.root_gate.input_wire().clone(), // Assume Gate has input_wire()
-            }]);
+        // Connect each child's output to this gate's corresponding input
+        let root_inputs = self.root_gate.get_inputs();
+
+        for (i, child_opt) in self.inputs.iter().enumerate() {
+            if let Some(child) = child_opt {
+                if i < root_inputs.len() {
+                    all_connections.push(vec![Connection {
+                        from: child.output().clone(),
+                        to: root_inputs[i].clone(),
+                    }]);
+                }
+
+                // Recursively add child's internal connections
+                all_connections.extend(child.connections());
+            }
         }
 
-        // Connect root_gate output to tree outputs
-        if let Some(output) = self.primary_output() {
-            conns.push(vec![Connection {
-                from: self.root_gate.output_wire().clone(), // Assume Gate has output_wire()
-                to: output.clone(),
-            }]);
-        }
-
-        // Recursive connections if Composite variant
-        if let Gate::Composite(subtree) = &self.root_gate {
-            conns.extend_from_slice(&subtree.connections());
-        }
-
-        conns
+        all_connections
     }
 }
 
-// Assume Gate needs WithPath/Composite impls (extend your primitives)
-impl<S> Gate<S>
-where
-    S: State,
-{
-    fn input_wire(&self) -> Wire<S> {
-        // Delegate to inner (e.g., AndAny.a or .b; simplify to first input for now)
-        match self {
-            Gate::And(and) => and.a.clone(), // Or handle multi-input
-            Gate::Or(or) => or.a.clone(),
-            Gate::Not(not) => not.a.clone(),
-            Gate::Composite(tree) => tree.inputs.first().cloned().unwrap_or_default(),
-        }
-    }
-
-    fn output_wire(&self) -> Wire<S> {
-        match self {
-            Gate::And(and) => and.y.clone(),
-            Gate::Or(or) => or.y.clone(),
-            Gate::Not(not) => not.y.clone(),
-            Gate::Composite(tree) => tree.primary_output().cloned().unwrap_or_default(),
-        }
-    }
-}
-
-// For MatchedComposite (validation in Match<'ctx>)
 impl<'ctx> MatchedComposite<'ctx> for LogicTree<Match<'ctx>> {
-    // Add filters, e.g., ensure no sequential elements in logic tree
     fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool + 'ctx>> {
-        vec![Box::new(|tree: &LogicTree<Match<'ctx>>| {
-            // Example: Ensure depth is bounded and no DFFs in tree
-            tree.depth <= 5 && !tree.contains_sequential()
-        })]
+        vec![
+            // Ensure reasonable depth bounds
+            Box::new(|tree: &LogicTree<Match<'ctx>>| tree.depth <= 10),
+            // Ensure we have at least one gate
+            Box::new(|tree: &LogicTree<Match<'ctx>>| tree.gate_count() >= 1),
+        ]
     }
 }
 
-impl<'ctx> LogicTree<Match<'ctx>> {
-    fn contains_sequential(&self) -> bool {
-        // Traverse tree to check for DFF cells (using design_node_ref)
-        false // Placeholder: implement cell type check
-    }
-}
-
-// SearchableComposite impl for querying logic trees
 impl SearchableComposite for LogicTree<Search> {
     type Hit<'ctx> = LogicTree<Match<'ctx>>;
 
@@ -167,11 +191,8 @@ impl SearchableComposite for LogicTree<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Merge contexts for all gate types
-        let and_ctx = AndAny::<Search>::context(driver, config)?;
-        let or_ctx = OrAny::<Search>::context(driver, config)?; // Assume OrAny exists
-        let not_ctx = NotGate::<Search>::context(driver, config)?;
-        Ok(and_ctx.merge(or_ctx).merge(not_ctx))
+        // Use Combinational's context (which already merges all gate types)
+        Combinational::<Search>::context(driver, config)
     }
 
     fn query<'ctx>(
@@ -180,98 +201,258 @@ impl SearchableComposite for LogicTree<Search> {
         path: Instance,
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
-        // Step 1: Query root gates (e.g., final AND/OR for next-state)
-        let root_gates: Vec<_> = AndAny::<Search>::query(
-            // Or use a union query
+        tracing::info!("LogicTree::query: starting combinational logic tree search");
+
+        // Query all combinational gates once
+        let all_gates = Combinational::<Search>::query(
             haystack_key,
             context,
             path.child("root".to_string()),
             config,
-        )
-        .into_iter()
-        .map(|and| Gate::And(and))
-        .chain(
-            OrAny::<Search>::query(
-                haystack_key,
-                context,
-                path.child("root".to_string()),
-                config,
-            )
-            .into_iter()
-            .map(|or| Gate::Or(or)),
-        )
-        .collect();
+        );
 
-        // Step 2: For each root, recursively build tree (bounded depth)
-        let mut results = vec![];
-        for root_gate in root_gates {
-            if let Some(tree) = build_tree_recursive(
-                haystack_key,
-                context,
-                path.clone(),
-                root_gate,
-                1,                                   // Current depth
-                config.max_logic_depth.unwrap_or(5), // Configurable bound
-            ) {
-                results.push(tree);
+        tracing::info!(
+            "LogicTree::query: Found {} total combinational gates",
+            all_gates.len()
+        );
+
+        // Layer 1: All gates as leaves (no children)
+        let mut current_layer: Vec<LogicTree<Match<'ctx>>> = all_gates
+            .iter()
+            .map(|gate| LogicTree::new(path.clone(), gate.clone()))
+            .collect();
+
+        tracing::info!(
+            "LogicTree::query: Layer 1 (base case) has {} matches",
+            current_layer.len()
+        );
+
+        let mut all_results = current_layer.clone();
+        let mut layer_num = 2;
+        const MAX_DEPTH: usize = 5; // Configurable depth limit
+
+        // Iteratively build deeper trees
+        loop {
+            if layer_num > MAX_DEPTH {
+                tracing::info!(
+                    "LogicTree::query: Reached max depth {}, stopping",
+                    MAX_DEPTH
+                );
+                break;
+            }
+
+            let next_layer = build_next_layer(&path, &all_gates, &current_layer);
+
+            if next_layer.is_empty() {
+                tracing::info!(
+                    "LogicTree::query: No more matches at layer {}, stopping",
+                    layer_num
+                );
+                break;
+            }
+
+            tracing::info!(
+                "LogicTree::query: Layer {} has {} matches",
+                layer_num,
+                next_layer.len()
+            );
+
+            all_results.extend(next_layer.iter().cloned());
+            current_layer = next_layer;
+            layer_num += 1;
+        }
+
+        tracing::info!(
+            "LogicTree::query: Total {} matches across {} layers",
+            all_results.len(),
+            layer_num - 1
+        );
+
+        all_results
+    }
+}
+
+/// Build next layer of trees by connecting previous layer as children to new gates
+fn build_next_layer<'ctx>(
+    path: &Instance,
+    all_gates: &[Combinational<Match<'ctx>>],
+    prev_layer: &[LogicTree<Match<'ctx>>],
+) -> Vec<LogicTree<Match<'ctx>>> {
+    let mut next_layer = Vec::new();
+
+    for gate in all_gates {
+        let num_inputs = gate.num_inputs();
+
+        // Try each previous tree as a child at each input position
+        for input_idx in 0..num_inputs {
+            for prev_tree in prev_layer {
+                // Create inputs vector with child at specific position
+                let mut inputs: Vec<Option<Box<LogicTree<Match<'ctx>>>>> = vec![None; num_inputs];
+
+                // Clone and update child path
+                let mut child = prev_tree.clone();
+                update_tree_path(&mut child, path.child(format!("input_{}", input_idx)));
+
+                inputs[input_idx] = Some(Box::new(child));
+
+                let candidate =
+                    LogicTree::with_children(path.clone(), gate.clone(), inputs.clone());
+
+                // Validate connections
+                if candidate.validate_connections(candidate.connections()) {
+                    next_layer.push(candidate);
+                }
             }
         }
-
-        results
     }
+
+    next_layer
 }
 
-/// Recursive builder: Extend tree by finding child gates connected to current output
-fn build_tree_recursive<'ctx>(
-    haystack_key: &DriverKey,
-    context: &'ctx Context,
-    path: Instance,
-    current_gate: Gate<Search>,
-    current_depth: usize,
-    max_depth: usize,
-) -> Option<LogicTree<Match<'ctx>>> {
-    if current_depth > max_depth {
-        return None; // Bound recursion
-    }
+/// Recursively update all paths in a tree
+fn update_tree_path<'ctx>(tree: &mut LogicTree<Match<'ctx>>, new_path: Instance) {
+    tree.path = new_path.clone();
 
-    // Query child gates connected to current_gate's output
-    let child_candidates = query_connected_gates(
-        // Implement this: subgraph query on fan-out
-        haystack_key,
-        context,
-        current_gate.output_wire().path.clone(),
-        config,
-    );
+    // Update root gate path
+    let root_path = new_path.child("root".to_string());
+    update_combinational_path(&mut tree.root_gate, root_path);
 
-    let mut tree = LogicTree::new(path, max_depth);
-    tree.root_gate = current_gate;
-
-    // Add children recursively (simplify: pick first valid child for tree structure)
-    if let Some(child_gate) = child_candidates.first().cloned() {
-        if let Some(child_tree) = build_tree_recursive(
-            haystack_key,
-            context,
-            path.child("child".to_string()),
-            child_gate,
-            current_depth + 1,
-            max_depth,
-        ) {
-            tree.root_gate = Gate::Composite(Box::new(child_tree));
+    // Recursively update children
+    for (i, child_opt) in tree.inputs.iter_mut().enumerate() {
+        if let Some(child) = child_opt {
+            update_tree_path(child, new_path.child(format!("input_{}", i)));
         }
     }
-
-    // TODO: Bind inputs/outputs based on fan-in/fan-out
-    Some(tree)
 }
 
-/// Placeholder: Query gates connected to a specific wire (fan-out subgraph)
-fn query_connected_gates<'ctx>(
-    haystack_key: &DriverKey,
-    context: &'ctx Context,
-    from_wire_path: Instance,
-    config: &Config,
-) -> Vec<Gate<Match<'ctx>>> {
-    // Implement: Use SVQL subgraph matcher to find gates where input connects to from_wire_path
-    // Return matched gates as enum variants
-    vec![] // Placeholder
+/// Update path for a Combinational gate (handles all variants)
+fn update_combinational_path<'ctx>(gate: &mut Combinational<Match<'ctx>>, new_path: Instance) {
+    match gate {
+        Combinational::AndGate(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.b.path = new_path.child("b".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Or(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.b.path = new_path.child("b".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Xor(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.b.path = new_path.child("b".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Xnor(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.b.path = new_path.child("b".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Not(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Buf(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+        Combinational::Mux2(g) => {
+            g.path = new_path.clone();
+            g.a.path = new_path.child("a".to_string());
+            g.b.path = new_path.child("b".to_string());
+            g.sel.path = new_path.child("sel".to_string());
+            g.y.path = new_path.child("y".to_string());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Search; // Add this import
+    use crate::primitives::and::AndGate;
+
+    #[test]
+    fn test_logic_tree_leaf() {
+        let root = Instance::root("test".to_string());
+        let and_gate =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("and".to_string())));
+
+        let tree = LogicTree::new(root.clone(), and_gate);
+
+        assert_eq!(tree.depth, 1);
+        assert!(tree.is_leaf());
+        assert_eq!(tree.gate_count(), 1);
+        assert_eq!(tree.leaf_input_count(), 2); // AND has 2 inputs
+    }
+
+    #[test]
+    fn test_logic_tree_with_one_child() {
+        let root = Instance::root("test".to_string());
+
+        // Create child tree
+        let child_and =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("child_and".to_string())));
+        let child_tree = LogicTree::new(root.child("child".to_string()), child_and);
+
+        // Create parent tree with child at first input
+        let parent_and =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("parent_and".to_string())));
+        let parent_tree = LogicTree::with_children(
+            root.clone(),
+            parent_and,
+            vec![Some(Box::new(child_tree)), None],
+        );
+
+        assert_eq!(parent_tree.depth, 2);
+        assert!(!parent_tree.is_leaf());
+        assert_eq!(parent_tree.gate_count(), 2);
+        assert_eq!(parent_tree.leaf_input_count(), 3); // Child has 2, parent has 1 external
+    }
+
+    #[test]
+    fn test_logic_tree_both_children() {
+        let root = Instance::root("test".to_string());
+
+        // Create two child trees
+        let child1 =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("child1".to_string())));
+        let tree1 = LogicTree::new(root.child("c1".to_string()), child1);
+
+        let child2 =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("child2".to_string())));
+        let tree2 = LogicTree::new(root.child("c2".to_string()), child2);
+
+        // Parent with both children
+        let parent_and =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("parent_and".to_string())));
+        let parent_tree = LogicTree::with_children(
+            root.clone(),
+            parent_and,
+            vec![Some(Box::new(tree1)), Some(Box::new(tree2))],
+        );
+
+        assert_eq!(parent_tree.depth, 2);
+        assert_eq!(parent_tree.gate_count(), 3); // 1 parent + 2 children
+        assert_eq!(parent_tree.leaf_input_count(), 4); // Each child has 2
+    }
+
+    #[test]
+    fn test_logic_tree_describe() {
+        let root = Instance::root("test".to_string());
+        let and_gate =
+            Combinational::AndGate(AndGate::<Search>::new(root.child("and".to_string())));
+        let tree = LogicTree::new(root, and_gate);
+
+        let desc = tree.describe();
+        assert!(desc.contains("AND Gate"));
+        assert!(desc.contains("depth=1"));
+        assert!(desc.contains("gates=1"));
+    }
 }

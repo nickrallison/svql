@@ -3,14 +3,14 @@ use svql_macros::netlist;
 use crate::{State, Wire};
 
 netlist! {
-    name: NotGate,
-    module_name: "not_gate",
-    file: "examples/patterns/basic/not/verilog/not_gate.v",
+    name: BufGate,
+    module_name: "buf_gate",
+    file: "examples/patterns/basic/buf/verilog/buf_gate.v",
     inputs: [a],
     outputs: [y]
 }
 
-impl<S> NotGate<S>
+impl<S> BufGate<S>
 where
     S: State,
 {
