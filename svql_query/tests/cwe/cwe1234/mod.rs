@@ -1,4 +1,3 @@
-mod register;
 mod unlock_logic;
 
 use std::sync::OnceLock;

@@ -1,4 +1,3 @@
-pub mod register;
 pub mod unlock_logic;
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-use crate::security::cwe1234::register::RegisterAny;
+use crate::security::primitives::locked_register::RegisterAny;
 use unlock_logic::UnlockLogic;
 
 /// Complete CWE-1234 pattern: Locked register with bypassable unlock logic
