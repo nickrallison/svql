@@ -6,6 +6,7 @@ rm -rf generated
 mkdir -p generated
 
 uv run scripts/md_tree.py --root . \
+    --include 'svql_macros/**.rs' \
     --include 'svql_query/**.rs' \
     --include 'examples/**.v' \
     --include 'examples/**.il' \

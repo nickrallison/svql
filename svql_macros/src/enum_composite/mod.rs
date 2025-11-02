@@ -1,3 +1,4 @@
+// svql_macros/src/enum_composite/mod.rs
 use proc_macro::TokenStream;
 
 pub mod analyze;
@@ -12,7 +13,23 @@ pub mod parse;
 /// - Parallel: Supports `#[cfg(feature = "parallel")]` for threaded execution (add to your query crate).
 /// - Variants: Each is `(VariantName, "inst_name", Type)` for `path.child(inst_name)`.
 /// - Query: Runs sub-queries (parallel or sequential), maps to enum variants, chains results (no validation).
-/// - For full usage (with imports like `tracing` and query types from `crate::queries`), see `svql_query/src/queries/enum_composites/and_any.rs`.
+///
+/// # NEW: Common Ports
+/// Use `common_ports: { field: "method" }` to auto-generate accessors for shared ports:
+/// ```rust,ignore
+/// enum_composite! {
+///     name: DffAny,
+///     variants: [(Simple, "dff", SimpleDff), (Sync, "sdff", SyncDff)],
+///     common_ports: {
+///         clk: "clock",
+///         d: "data_input",
+///         q: "output"
+///     }
+/// }
+/// // Generates: dff_any.clock() -> &Wire<S>, etc.
+/// ```
+///
+/// For full usage, see `svql_query/src/queries/enum_composites/and_any.rs` or `dff_any.rs`.
 ///
 /// Limitations: Up to ~10 variants (tuple limits in parallel joins); no connections/validation.
 pub fn enum_composite_inner(ts: TokenStream) -> TokenStream {

@@ -1,4 +1,3 @@
-// svql_macros/src/enum_composites/lower.rs
 use super::analyze::Model;
 
 #[derive(Clone)]
@@ -9,9 +8,16 @@ pub struct VariantRef {
     pub ty: syn::Type,
 }
 
+#[derive(Clone)]
+pub struct CommonPortRef {
+    pub field_name: syn::Ident,
+    pub method_name: syn::Ident,
+}
+
 pub struct Ir {
     pub name: syn::Ident,
     pub variants: Vec<VariantRef>,
+    pub common_ports: Vec<CommonPortRef>,
 }
 
 fn to_snake_case(s: &str) -> String {
@@ -43,8 +49,21 @@ pub fn lower(model: Model) -> Ir {
         })
         .collect();
 
+    let common_ports = model
+        .common_ports
+        .into_iter()
+        .map(|cp| {
+            let method_name = syn::Ident::new(&cp.method_name.value(), cp.method_name.span());
+            CommonPortRef {
+                field_name: cp.field_name,
+                method_name,
+            }
+        })
+        .collect();
+
     Ir {
         name: model.name,
         variants,
+        common_ports,
     }
 }
