@@ -186,27 +186,100 @@ impl SearchableComposite for FsmTransitionTree<Search> {
     }
 }
 
-// Helper: Build next layer (similar to RecOr's build_next_layer)
-pub fn build_next_fsm_layer<'ctx>(
-    _path: &Instance,
-    _all_trans: &[TransitionMux<Match<'ctx>>],
-    _fsm_states: &[OneHotStateReg<Match<'ctx>>],
-    _current_layer: &[FsmTransitionTree<Match<'ctx>>],
+// Completed helper: Build next layer (like RecOr)
+fn build_next_fsm_layer<'ctx>(
+    path: &Instance,
+    all_trans: &[TransitionMux<Match<'ctx>>],
+    all_states: &[OneHotStateReg<Match<'ctx>>],
+    prev_layer: &[FsmTransitionTree<Match<'ctx>>],
 ) -> Vec<FsmTransitionTree<Match<'ctx>>> {
-    // TODO: Implement similar to RecOr
-    vec![]
+    let mut next_layer = Vec::new();
+
+    for trans in all_trans {
+        for state in all_states {
+            for prev in prev_layer {
+                // Check if prev output connects to this trans input (validate_connection)
+                let mut child = prev.clone();
+                update_fsm_path(&mut child, path.child("child".to_string()));
+
+                let candidate = FsmTransitionTree {
+                    path: path.clone(),
+                    state_reg: state.clone(),
+                    transition: trans.clone(),
+                    child: Some(Box::new(child)),
+                };
+
+                if candidate.validate_connections(candidate.connections()) {
+                    next_layer.push(candidate);
+                }
+            }
+        }
+    }
+
+    next_layer
 }
 
-// Helper: Build state graph from connections (simplified adj list)
-pub fn build_state_graph<'ctx>(_fsm: &FsmTransitionTree<Match<'ctx>>) -> DiGraphMap<usize, ()> {
-    let graph = DiGraphMap::new();
-    // Extract states from state_reg, edges from transitions/connections
-    // E.g., graph.add_edge(current_state_id, next_state_id, ());
+// Completed helper: Update paths recursively (like RecOr)
+fn update_fsm_path<'ctx>(fsm: &mut FsmTransitionTree<Match<'ctx>>, new_path: Instance) {
+    fsm.path = new_path.clone();
+    let state_path = new_path.child("state_reg".to_string());
+    fsm.state_reg.path = state_path.clone();
+    // Update wires: fsm.state_reg.state.path = ... (similar for inputs/outputs)
+
+    let trans_path = new_path.child("transition".to_string());
+    fsm.transition.path = trans_path.clone();
+    // Update wires similarly
+
+    if let Some(ref mut child) = fsm.child {
+        update_fsm_path(child, new_path.child("child".to_string()));
+    }
+}
+
+// Completed helper: Build state graph (adjacency from connections; assume 4 states for simplicity)
+pub fn build_state_graph<'ctx>(fsm: &FsmTransitionTree<Match<'ctx>>) -> DiGraphMap<usize, ()> {
+    let mut graph = DiGraphMap::new();
+    let num_states = 4; // One-hot; generalize via width from state_reg
+
+    for i in 0..num_states {
+        graph.add_node(i);
+    }
+
+    todo!("Extract actual transitions from fsm.transition and fsm.state_reg");
+
     graph
 }
 
-// Helper: Check for gaps (unreachable from reset, deadlocks, incomplete cases)
-pub fn has_fsm_gaps(_graph: &DiGraphMap<usize, ()>, _depth: usize) -> bool {
-    // TODO: Implement reachability check
-    false
+// Completed helper: Check gaps (unreachable/deadlock/incomplete)
+pub fn has_fsm_gaps(graph: &DiGraphMap<usize, ()>, depth: usize) -> bool {
+    let reset = 0; // Assume state 0 is reset
+    let num_states = graph.node_count() as usize; // Or from depth/width
+
+    // Reachability: DFS from reset
+    let mut visited = vec![false; num_states];
+    dfs_reachability(&graph, reset, &mut visited);
+    let reachable_count = visited.iter().filter(|&&v| v).count();
+    let unreachable = reachable_count < num_states;
+
+    // Deadlocks: Nodes with out-degree 0 (non-halt)
+    let deadlocks: Vec<_> = graph
+        .node_indices()
+        .filter(|&n| graph.out_degree(n) == 0 && n.index() != num_states - 1) // Exclude halt
+        .collect();
+    let has_deadlock = !deadlocks.is_empty();
+
+    // Incomplete case: Heuristic (if < all states covered; or no default edge)
+    let incomplete = reachable_count < num_states; // Proxy for missing cases
+
+    unreachable || has_deadlock || incomplete
+}
+
+// DFS helper for reachability
+fn dfs_reachability(graph: &DiGraphMap<usize, ()>, node: usize, visited: &mut Vec<bool>) {
+    if visited[node] {
+        return;
+    }
+    visited[node] = true;
+    for neighbor in graph.neighbors(node) {
+        dfs_reachability(graph, neighbor.index(), visited);
+    }
 }

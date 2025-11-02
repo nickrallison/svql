@@ -74,7 +74,7 @@ fn test_cwe1245_all_variants() {
         total += 1;
         println!("\n--- Testing {}: {} ---", case.name, case.description);
 
-        let haystack_module = YosysModule::new(case.fixture_path, case.module_name).unwrap();
+        let haystack_module = YosysModule::new(case.fixture_path, case.module_name)?;
         let (haystack_key, haystack_design) = driver
             .get_or_load_design(
                 &haystack_module.path().display().to_string(),

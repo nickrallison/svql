@@ -2,8 +2,8 @@ use std::sync::OnceLock;
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::security::cwe1262::Cwe1262;
-use svql_query::{Search, instance::Instance};
 use svql_query::traits::composite::SearchableComposite;
+use svql_query::{Search, instance::Instance};
 
 #[derive(Debug, Clone)]
 struct Cwe1262TestCase {
@@ -67,11 +67,13 @@ fn test_cwe1262_all_variants() {
         println!("\n--- Testing {}: {} ---", case.name, case.description);
 
         let haystack_module = YosysModule::new(case.fixture_path, case.module_name).unwrap();
-        let (haystack_key, haystack_design) = driver.get_or_load_design(
-            &haystack_module.path().display().to_string(),
-            haystack_module.module_name(),
-            &config.haystack_options,
-        ).unwrap();
+        let (haystack_key, haystack_design) = driver
+            .get_or_load_design(
+                &haystack_module.path().display().to_string(),
+                haystack_module.module_name(),
+                &config.haystack_options,
+            )
+            .unwrap();
 
         let context = Cwe1262::<Search>::context(&driver, &config.needle_options).unwrap();
         let context = context.with_design(haystack_key.clone(), haystack_design);
@@ -87,7 +89,9 @@ fn test_cwe1262_all_variants() {
             results.len(),
             case.expected_matches,
             "Expected {} matches for {}, got {}",
-            case.expected_matches, case.name, results.len()
+            case.expected_matches,
+            case.name,
+            results.len()
         );
 
         for result in &results {

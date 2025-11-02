@@ -74,7 +74,6 @@ impl SearchableComposite for Cwe1245<Search> {
             .filter_map(|tree| {
                 let candidate = Cwe1245::new(path.clone(), tree.clone());
                 if candidate.has_gaps() {
-                    // Custom validation
                     Some(candidate)
                 } else {
                     None
@@ -86,7 +85,7 @@ impl SearchableComposite for Cwe1245<Search> {
 
 impl<'ctx> Cwe1245<Match<'ctx>> {
     pub fn has_gaps(&self) -> bool {
-        let graph = build_state_graph(&self.fsm_tree); // From sub-pattern
+        let graph = build_state_graph(&self.fsm_tree);
         has_fsm_gaps(&graph, self.fsm_tree.depth())
     }
 }
