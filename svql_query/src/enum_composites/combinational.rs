@@ -85,13 +85,13 @@ where
 
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         match self {
-            Combinational::AndGate(gate) => gate.get_inputs(),
-            Combinational::Or(gate) => gate.get_inputs(),
-            Combinational::Xor(gate) => gate.get_inputs(),
-            Combinational::Xnor(gate) => gate.get_inputs(),
-            Combinational::Not(gate) => gate.get_inputs(),
-            Combinational::Buf(gate) => gate.get_inputs(),
-            Combinational::Mux2(gate) => gate.get_inputs(),
+            Combinational::AndGate(g) => vec![g.a.clone(), g.b.clone()],
+            Combinational::Or(g) => vec![g.a.clone(), g.b.clone()],
+            Combinational::Xor(g) => vec![g.a.clone(), g.b.clone()],
+            Combinational::Xnor(g) => vec![g.a.clone(), g.b.clone()],
+            Combinational::Not(g) => vec![g.a.clone()],
+            Combinational::Buf(g) => vec![g.a.clone()],
+            Combinational::Mux2(g) => vec![g.a.clone(), g.b.clone(), g.sel.clone()],
         }
     }
 }
