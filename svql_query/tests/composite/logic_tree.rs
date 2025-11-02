@@ -49,17 +49,20 @@ fn test_logic_tree_single_gate() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("\n=== Single Gate Test ===");
-    println!("Found {} tree(s)", results.len());
-
-    // Should find at least the single AND gate as a leaf tree
-    assert!(
-        !results.is_empty(),
-        "Should find at least 1 tree (the AND gate)"
-    );
-
-    for (i, tree) in results.iter().take(5).enumerate() {
-        println!("Tree {}: {}", i + 1, tree.describe());
+    for tree in &results {
+        println!("Tree: {:#?}", tree);
     }
+    panic!();
+
+    // // Should find at least the single AND gate as a leaf tree
+    // assert!(
+    //     !results.is_empty(),
+    //     "Should find at least 1 tree (the AND gate)"
+    // );
+
+    // for (i, tree) in results.iter().take(5).enumerate() {
+    //     println!("Tree {}: {}", i + 1, tree.describe());
+    // }
 
     Ok(())
 }
@@ -96,23 +99,27 @@ fn test_logic_tree_simple_2level() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("\n=== Simple 2-Level Test ===");
-    println!("Expected: AND of two ORs");
-    println!("Found {} tree(s)", results.len());
-
-    // Should find trees at multiple depths
-    let depths: Vec<_> = results.iter().map(|t| t.depth).collect();
-    let max_depth = depths.iter().max().copied().unwrap_or(0);
-
-    println!("Max depth found: {}", max_depth);
-    assert!(
-        max_depth >= 2,
-        "Should find depth 2 trees (AND with OR children)"
-    );
-
-    // Show some examples
-    for (i, tree) in results.iter().filter(|t| t.depth == 2).take(3).enumerate() {
-        println!("Depth-2 tree {}: {}", i + 1, tree.describe());
+    for tree in &results {
+        println!("Tree: {:#?}", tree);
     }
+    panic!();
+    // println!("Expected: AND of two ORs");
+    // println!("Found {} tree(s)", results.len());
+
+    // // Should find trees at multiple depths
+    // let depths: Vec<_> = results.iter().map(|t| t.depth).collect();
+    // let max_depth = depths.iter().max().copied().unwrap_or(0);
+
+    // println!("Max depth found: {}", max_depth);
+    // assert!(
+    //     max_depth >= 2,
+    //     "Should find depth 2 trees (AND with OR children)"
+    // );
+
+    // // Show some examples
+    // for (i, tree) in results.iter().filter(|t| t.depth == 2).take(3).enumerate() {
+    //     println!("Depth-2 tree {}: {}", i + 1, tree.describe());
+    // }
 
     Ok(())
 }
@@ -149,18 +156,22 @@ fn test_logic_tree_deep_3level() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("\n=== Deep 3-Level Test ===");
-    println!("Found {} tree(s)", results.len());
-
-    let depths: Vec<_> = results.iter().map(|t| t.depth).collect();
-    let max_depth = depths.iter().max().copied().unwrap_or(0);
-
-    println!("Max depth found: {}", max_depth);
-    assert!(max_depth >= 3, "Should find depth 3 trees");
-
-    // Show deepest examples
-    for (i, tree) in results.iter().filter(|t| t.depth >= 3).take(3).enumerate() {
-        println!("Deep tree {}: {}", i + 1, tree.describe());
+    for tree in &results {
+        println!("Tree: {:#?}", tree);
     }
+    panic!();
+    // println!("Found {} tree(s)", results.len());
+
+    // let depths: Vec<_> = results.iter().map(|t| t.depth).collect();
+    // let max_depth = depths.iter().max().copied().unwrap_or(0);
+
+    // println!("Max depth found: {}", max_depth);
+    // assert!(max_depth >= 3, "Should find depth 3 trees");
+
+    // // Show deepest examples
+    // for (i, tree) in results.iter().filter(|t| t.depth >= 3).take(3).enumerate() {
+    //     println!("Deep tree {}: {}", i + 1, tree.describe());
+    // }
 
     Ok(())
 }
@@ -197,10 +208,18 @@ fn test_logic_tree_mixed_gates() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("\n=== Mixed Gate Types Test ===");
-    println!("Found {} tree(s)", results.len());
+    for tree in &results {
+        println!("Tree: {:#?}", tree);
+    }
+    panic!();
+    // println!("Found {} tree(s)", results.len());
 
-    // Verify we find trees with different gate types
-    assert!(!results.is_empty(), "Should find trees with mixed gates");
+    // // Verify we find trees with different gate types
+    // for tree in &results {
+    //     println!("Tree: {:?}", tree);
+    // }
+
+    // assert!(results.is_empty(), "Should find trees with mixed gates");
 
     Ok(())
 }
@@ -237,79 +256,19 @@ fn test_logic_tree_asymmetric() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("\n=== Asymmetric Tree Test ===");
-    println!("Found {} tree(s)", results.len());
-
-    let max_depth = results.iter().map(|t| t.depth).max().unwrap_or(0);
-    println!("Max depth: {}", max_depth);
-
-    assert!(
-        max_depth >= 2,
-        "Should find asymmetric trees with depth >= 2"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn test_logic_tree_summary() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let test_cases = vec![
-        ("single_gate.v", "single_gate", "Single AND gate"),
-        ("simple_2level.v", "simple_2level", "AND of ORs"),
-        ("deep_3level.v", "deep_3level", "3-level deep"),
-        ("mixed_gates.v", "mixed_gates", "Mixed gate types"),
-        (
-            "asymmetric_tree.v",
-            "asymmetric_tree",
-            "Asymmetric branches",
-        ),
-        ("wide_fanin.v", "wide_fanin", "Wide fan-in"),
-        ("xor_chain.v", "xor_chain", "XOR chain"),
-    ];
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let driver = Driver::new_workspace()?;
-
-    println!("\n┌───────────────────────┬────────────┬───────────┐");
-    println!("│ Test Case             │ Trees Found│ Max Depth │");
-    println!("├───────────────────────┼────────────┼───────────┤");
-
-    for (file, module, desc) in test_cases {
-        let path = format!("examples/fixtures/composite/logic_tree/{}", file);
-        let haystack = YosysModule::new(&path, module)?;
-
-        let (haystack_key, haystack_design) = driver.get_or_load_design(
-            &haystack.path().display().to_string(),
-            haystack.module_name(),
-            &config.haystack_options,
-        )?;
-
-        let context = LogicTree::<Search>::context(&driver, &config.needle_options)?;
-        let context = context.with_design(haystack_key.clone(), haystack_design);
-
-        let results = LogicTree::<Search>::query(
-            &haystack_key,
-            &context,
-            Instance::root("logic_tree".to_string()),
-            &config,
-        );
-
-        let max_depth = results.iter().map(|t| t.depth).max().unwrap_or(0);
-
-        println!(
-            "│ {:<21} │ {:>10} │ {:>9} │",
-            desc,
-            results.len(),
-            max_depth
-        );
+    for tree in &results {
+        println!("Tree: {:#?}", tree);
     }
+    panic!();
+    // println!("Found {} tree(s)", results.len());
 
-    println!("└───────────────────────┴────────────┴───────────┘");
+    // let max_depth = results.iter().map(|t| t.depth).max().unwrap_or(0);
+    // println!("Max depth: {}", max_depth);
+
+    // assert!(
+    //     max_depth >= 2,
+    //     "Should find asymmetric trees with depth >= 2"
+    // );
 
     Ok(())
 }
