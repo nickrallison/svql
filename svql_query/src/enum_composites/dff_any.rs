@@ -72,4 +72,10 @@ where
             _ => None,
         }
     }
+    // NEW: Dummy new for compatibility as composite sub (uses first variant)
+    pub fn new(path: crate::instance::Instance) -> Self {
+        // Use Simple variant as dummy for search-time construction
+        // Inner path uses the variant's inst_name
+        DffAny::Simple(SimpleDff::new(path.child("simple_dff".to_string())))
+    }
 }

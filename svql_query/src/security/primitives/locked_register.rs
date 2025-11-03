@@ -44,7 +44,14 @@ enum_composite! {
         (SyncEn, "sync_en", SyncDffEnable),
         (AsyncMux, "async_mux", AsyncDffMuxEnable),
         (SyncMux, "sync_mux", SyncDffMuxEnable)
-    ]
+    ],
+    common_ports: {
+        clk: "clk",
+        data_in: "data_in",
+        data_out: "data_out",
+        resetn: "resetn",
+        write_en: "write_en"
+    }
 }
 
 // Helper methods for RegisterAny<Match>
@@ -87,5 +94,11 @@ where
 
     pub fn new_sync_mux(path: Instance) -> Self {
         LockedRegister::SyncMux(SyncDffMuxEnable::new(path))
+    }
+    // NEW: Dummy new for compatibility as composite sub (uses first variant)
+    pub fn new(path: Instance) -> Self {
+        // Use AsyncEn variant as dummy for search-time construction (via helper)
+        // Inner path uses the variant's inst_name
+        Self::new_async_en(path.child("async_en".to_string()))
     }
 }
