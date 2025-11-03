@@ -22,6 +22,8 @@ end
 
 // Test sequence
 initial begin
+    $dumpfile("cwe1280_vuln.vcd");
+    $dumpvars(0, cwe1280_vuln_tb);
     $display("=== CWE-1280 Vulnerable Version Test ===");
     
     // Initialize

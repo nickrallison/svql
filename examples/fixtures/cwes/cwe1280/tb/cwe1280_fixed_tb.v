@@ -22,6 +22,8 @@ end
 
 // Test sequence
 initial begin
+    $dumpfile("cwe1280_fixed.vcd");
+    $dumpvars(0, cwe1280_fixed_tb);
     $display("=== CWE-1280 Fixed Version Test ===");
     
     // Initialize
