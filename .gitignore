@@ -12,6 +12,7 @@ perf.data*
 flamegraph.svg
 /build
 fusesoc.conf
+obj_dir/
 ##
 examples/fixtures/larger_designs/json/openpiton_chip.json
 examples/fixtures/larger_designs/json/openpiton_chip_full.json
