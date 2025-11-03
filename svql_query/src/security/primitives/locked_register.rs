@@ -38,7 +38,7 @@ netlist! {
 }
 
 enum_composite! {
-    name: RegisterAny,
+    name: LockedRegister,
     variants: [
         (AsyncEn, "async_en", AsyncDffEnable),
         (SyncEn, "sync_en", SyncDffEnable),
@@ -48,7 +48,7 @@ enum_composite! {
 }
 
 // Helper methods for RegisterAny<Match>
-impl<S> RegisterAny<S>
+impl<S> LockedRegister<S>
 where
     S: State,
 {
@@ -56,36 +56,36 @@ where
     /// This is what should connect to the unlock logic output
     pub fn enable_wire(&self) -> &Wire<S> {
         match self {
-            RegisterAny::AsyncEn(dff) => &dff.write_en, // FIXED: enable → write_en
-            RegisterAny::SyncEn(dff) => &dff.write_en,  // FIXED: enable → write_en
-            RegisterAny::AsyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
-            RegisterAny::SyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
+            LockedRegister::AsyncEn(dff) => &dff.write_en, // FIXED: enable → write_en
+            LockedRegister::SyncEn(dff) => &dff.write_en,  // FIXED: enable → write_en
+            LockedRegister::AsyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
+            LockedRegister::SyncMux(dff) => &dff.write_en, // FIXED: enable → write_en
         }
     }
 
     /// Get a description of the register type for reporting
     pub fn register_type(&self) -> String {
         match self {
-            RegisterAny::AsyncEn(_) => "AsyncDffEnable".to_string(),
-            RegisterAny::SyncEn(_) => "SyncDffEnable".to_string(),
-            RegisterAny::AsyncMux(_) => "AsyncDffMuxEnable".to_string(),
-            RegisterAny::SyncMux(_) => "SyncDffMuxEnable".to_string(),
+            LockedRegister::AsyncEn(_) => "AsyncDffEnable".to_string(),
+            LockedRegister::SyncEn(_) => "SyncDffEnable".to_string(),
+            LockedRegister::AsyncMux(_) => "AsyncDffMuxEnable".to_string(),
+            LockedRegister::SyncMux(_) => "SyncDffMuxEnable".to_string(),
         }
     }
 
     pub fn new_async_en(path: Instance) -> Self {
-        RegisterAny::AsyncEn(AsyncDffEnable::new(path))
+        LockedRegister::AsyncEn(AsyncDffEnable::new(path))
     }
 
     pub fn new_sync_en(path: Instance) -> Self {
-        RegisterAny::SyncEn(SyncDffEnable::new(path))
+        LockedRegister::SyncEn(SyncDffEnable::new(path))
     }
 
     pub fn new_async_mux(path: Instance) -> Self {
-        RegisterAny::AsyncMux(AsyncDffMuxEnable::new(path))
+        LockedRegister::AsyncMux(AsyncDffMuxEnable::new(path))
     }
 
     pub fn new_sync_mux(path: Instance) -> Self {
-        RegisterAny::SyncMux(SyncDffMuxEnable::new(path))
+        LockedRegister::SyncMux(SyncDffMuxEnable::new(path))
     }
 }

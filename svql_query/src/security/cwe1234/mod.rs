@@ -11,7 +11,7 @@ use crate::{
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 
-use crate::security::primitives::locked_register::RegisterAny;
+use crate::security::primitives::locked_register::LockedRegister;
 use unlock_logic::UnlockLogic;
 
 /// Complete CWE-1234 pattern: Locked register with bypassable unlock logic
@@ -29,14 +29,14 @@ where
 {
     pub path: Instance,
     pub unlock_logic: UnlockLogic<S>,
-    pub locked_register: RegisterAny<S>,
+    pub locked_register: LockedRegister<S>,
 }
 
 impl<S> Cwe1234<S>
 where
     S: State,
 {
-    pub fn new(path: Instance, reg_any: RegisterAny<S>) -> Self {
+    pub fn new(path: Instance, reg_any: LockedRegister<S>) -> Self {
         Self {
             path: path.clone(),
             unlock_logic: UnlockLogic::new(path.child("unlock_logic".to_string())),
@@ -87,7 +87,7 @@ impl SearchableComposite for Cwe1234<Search> {
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
         let unlock_ctx = UnlockLogic::<Search>::context(driver, config)?;
-        let register_ctx = RegisterAny::<Search>::context(driver, config)?;
+        let register_ctx = LockedRegister::<Search>::context(driver, config)?;
 
         Ok(unlock_ctx.merge(register_ctx))
     }
@@ -107,7 +107,7 @@ impl SearchableComposite for Cwe1234<Search> {
             config,
         );
 
-        let registers = RegisterAny::<Search>::query(
+        let registers = LockedRegister::<Search>::query(
             haystack_key,
             context,
             path.child("locked_register".to_string()),
