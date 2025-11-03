@@ -6,8 +6,10 @@ rm -rf generated
 mkdir -p generated
 
 uv run scripts/md_tree.py --root . \
+    --include 'prjunnamed/netlist/src/design.rs' \
     --include 'svql_macros/**.rs' \
     --include 'svql_query/**.rs' \
+    --include 'svql_subgraph/**.rs' \
     --include 'examples/**.v' \
     --include 'examples/**.il' \
     --include 'Cargo.toml' \
