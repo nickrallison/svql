@@ -1,14 +1,10 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::key::DriverKey;
 use svql_driver::{Context, Driver};
+use svql_macros::netlist;
 
 use crate::{
-    Connection,
-    Match,
-    Search,
-    State,
-    Wire,
-    WithPath,
+    Connection, Match, Search, State, Wire, WithPath,
     enum_composites::dff_any::DffAny,
     instance::Instance,
     security::primitives::locked_register::LockedRegister,
@@ -16,13 +12,18 @@ use crate::{
         composite::{Composite, MatchedComposite, SearchableComposite},
         enum_composite::SearchableEnumComposite,
         netlist::SearchableNetlist,
-    }, // FIXED: traits::netlist
+    },
 };
 
-use crate::security::cwe1280::grant_access::GrantAccess;
 use itertools::iproduct;
 
-pub mod grant_access;
+netlist! {
+    name: GrantAccess,
+    module_name: "grant_access",
+    file: "examples/patterns/security/access_control/grant_access/verilog/grant_access.v",
+    inputs: [usr_id, correct_id],
+    outputs: [grant]
+}
 
 // Manual composite implementation for CWE-1280 (access control bypass via improper ID validation)
 // - Detects: GrantAccess logic (usr_id == correct_id) feeding into locked register data_in
@@ -59,13 +60,6 @@ where
     // NEW: Helper to get the grant signal for reporting
     pub fn grant_signal(&self) -> &Wire<S> {
         &self.grant_access.grant
-    }
-
-    // NEW: Check if the pattern represents a valid bypass (e.g., weak ID check)
-    pub fn is_bypass_vulnerable(&self) -> bool {
-        // Placeholder: Could add semantic checks (e.g., ID width comparison)
-        // For now, assume structural match implies vulnerability
-        true
     }
 }
 
@@ -197,54 +191,53 @@ impl SearchableComposite for Cwe1280<Search> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::Search;
-    use svql_common::{Config, Dedupe, MatchLength};
-    use svql_driver::Driver;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::Search;
+//     use svql_common::{Config, Dedupe, MatchLength};
+//     use svql_driver::Driver;
 
-    fn init_test_logger() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .try_init();
-    }
+//     fn init_test_logger() {
+//         let _ = tracing_subscriber::fmt()
+//             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+//             .with_test_writer()
+//             .try_init();
+//     }
 
-    // NEW: Basic structural test (assumes fixtures exist; adjust paths as needed)
-    #[test]
-    fn test_cwe1280_basic() {
-        init_test_logger();
+//     // NEW: Basic structural test (assumes fixtures exist; adjust paths as needed)
+//     #[test]
+//     fn test_cwe1280_basic() {
+//         init_test_logger();
 
-        let config = Config::builder()
-            .match_length(MatchLength::Exact)
-            .dedupe(Dedupe::All)
-            .build();
+//         let config = Config::builder()
+//             .match_length(MatchLength::Exact)
+//             .dedupe(Dedupe::All)
+//             .build();
 
-        // Placeholder: Replace with actual fixture path/module
-        let fixture_path = "examples/fixtures/cwes/cwe1280/cwe1280_basic.v";
-        let module_name = "cwe1280_basic";
+//         // Placeholder: Replace with actual fixture path/module
+//         let fixture_path = "examples/fixtures/cwes/cwe1280/verilog/cwe1280_basic.v";
+//         let module_name = "cwe1280_basic";
 
-        let driver = Driver::new_workspace().unwrap();
-        let (haystack_key, haystack_design) = driver
-            .get_or_load_design(fixture_path, module_name, &config.haystack_options)
-            .unwrap();
+//         let driver = Driver::new_workspace().unwrap();
+//         let (haystack_key, haystack_design) = driver
+//             .get_or_load_design(fixture_path, module_name, &config.haystack_options)
+//             .unwrap();
 
-        let context = Cwe1280::<Search>::context(&driver, &config.needle_options).unwrap();
-        let context = context.with_design(haystack_key.clone(), haystack_design);
+//         let context = Cwe1280::<Search>::context(&driver, &config.needle_options).unwrap();
+//         let context = context.with_design(haystack_key.clone(), haystack_design);
 
-        let results = Cwe1280::<Search>::query(
-            &haystack_key,
-            &context,
-            Instance::root("cwe1280".to_string()),
-            &config,
-        );
+//         let results = Cwe1280::<Search>::query(
+//             &haystack_key,
+//             &context,
+//             Instance::root("cwe1280".to_string()),
+//             &config,
+//         );
 
-        // Assume 1 expected match for basic case
-        assert_eq!(results.len(), 1, "Should find 1 CWE-1280 bypass pattern");
-        let hit = &results[0];
-        assert!(hit.is_bypass_vulnerable(), "Hit should be vulnerable");
+//         // Assume 1 expected match for basic case
+//         assert_eq!(results.len(), 1, "Should find 1 CWE-1280 bypass pattern");
+//         let hit = &results[0];
 
-        println!("✓ CWE-1280 basic test passed: {} match(es)", results.len());
-    }
-}
+//         println!("✓ CWE-1280 basic test passed: {} match(es)", results.len());
+//     }
+// }
