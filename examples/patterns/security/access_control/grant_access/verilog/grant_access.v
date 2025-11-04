@@ -3,6 +3,6 @@ output wire grant;
 input wire [2:0] usr_id;
 input wire [2:0] correct_id;
 
-grant = (usr_id == correct_id) ? 1'b1 : 1'b0;
+assign grant = (usr_id == correct_id) ? 1'b1 : 1'b0;
 
 endmodule
