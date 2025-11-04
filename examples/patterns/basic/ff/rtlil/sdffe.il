@@ -18,8 +18,6 @@ module \sdffe
   wire \q1
   attribute \src "examples/patterns/basic/ff/verilog/sdffe.v:6.7-6.12"
   wire input 3 \reset
-  attribute \src "examples/patterns/basic/ff/verilog/sdffe.v:14.9-14.16"
-  wire \reset_n
   attribute \src "examples/patterns/basic/ff/verilog/sdffe.v:13.1-16.4"
   cell $dff $procdff$7
     parameter \CLK_POLARITY 1'1
@@ -37,12 +35,12 @@ module \sdffe
     connect \Y $procmux$2_Y
   end
   attribute \full_case 1
-  attribute \src "examples/patterns/basic/ff/verilog/sdffe.v:14.9-14.16|examples/patterns/basic/ff/verilog/sdffe.v:14.5-15.26"
+  attribute \src "examples/patterns/basic/ff/verilog/sdffe.v:14.9-14.14|examples/patterns/basic/ff/verilog/sdffe.v:14.5-15.26"
   cell $mux $procmux$5
     parameter \WIDTH 1
     connect \A $procmux$2_Y
     connect \B 1'0
-    connect \S \reset_n
+    connect \S \reset
     connect \Y $0\q1[0:0]
   end
   connect \q \q1
