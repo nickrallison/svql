@@ -1,17 +1,17 @@
 
-module sdffe
+module adffe
 (
 input clk,
 input d,
-input reset,
+input reset_n,
 input en,
 output q
 );
 
 reg q1;
 
-always @(posedge clk) begin
-    if (reset_n) q1 <= 1'b0;
+always @(posedge clk or negedge reset_n) begin
+    if (!reset) q1 <= 1'b0;
     else if (en) q1 <= d;
 end
 

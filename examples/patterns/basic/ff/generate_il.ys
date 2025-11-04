@@ -1,0 +1,33 @@
+# sdffe
+read_verilog examples/patterns/basic/ff/verilog/sdffe.v
+hierarchy -top sdffe
+proc
+clean
+write_rtlil examples/patterns/basic/ff/rtlil/sdffe.il
+# show -format dot -prefix sdffe
+
+# adffe
+read_verilog examples/patterns/basic/ff/verilog/adffe.v
+hierarchy -top adffe
+proc
+opt
+clean
+write_rtlil examples/patterns/basic/ff/rtlil/adffe.il
+# show -format dot -prefix adffe
+
+# sdff
+read_verilog examples/patterns/basic/ff/verilog/sdff.v
+hierarchy -top sdff
+proc
+clean
+write_rtlil examples/patterns/basic/ff/rtlil/sdff.il
+# show -format dot -prefix sdff
+
+# adff
+read_verilog examples/patterns/basic/ff/verilog/adff.v
+hierarchy -top adff
+proc
+opt
+clean
+write_rtlil examples/patterns/basic/ff/rtlil/adff.il
+# show -format dot -prefix adff

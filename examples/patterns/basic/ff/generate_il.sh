@@ -1,0 +1,1 @@
+yosys examples/patterns/basic/ff/generate_il.ys

@@ -1,19 +1,15 @@
 // svql_query/src/enum_composites/dff_any.rs
-use crate::primitives::dff::{
-    AsyncResetDff, AsyncResetEnableDff, EnableDff, SimpleDff, SyncResetDff, SyncResetEnableDff,
-};
+use crate::primitives::dff::{Adff, Adffe, Sdff, Sdffe};
 use crate::{State, Wire};
 use svql_macros::enum_composite;
 
 enum_composite! {
     name: DffAny,
     variants: [
-        (Simple, "simple_dff", SimpleDff),
-        (SyncReset, "sync_reset_dff", SyncResetDff),
-        (AsyncReset, "async_reset_dff", AsyncResetDff),
-        (SyncResetEnable, "sync_reset_enable_dff", SyncResetEnableDff),
-        (AsyncResetEnable, "async_reset_enable_dff", AsyncResetEnableDff),
-        (Enable, "enable_dff", EnableDff)
+        (Sdffe, "sdffe", Sdffe),
+        (Adffe, "adffe", Adffe),
+        (Sdff, "sdff", Sdff),
+        (Adff, "adff", Adff),
     ],
     common_ports: {
         clk: "clock",
@@ -28,54 +24,34 @@ where
 {
     pub fn dff_type(&self) -> &'static str {
         match self {
-            DffAny::Simple(_) => "Simple DFF",
-            DffAny::SyncReset(_) => "Sync Reset DFF",
-            DffAny::AsyncReset(_) => "Async Reset DFF",
-            DffAny::SyncResetEnable(_) => "Sync Reset+Enable DFF",
-            DffAny::AsyncResetEnable(_) => "Async Reset+Enable DFF",
-            DffAny::Enable(_) => "Enable DFF",
+            DffAny::Sdffe(_) => "Sync Reset Enable DFF",
+            DffAny::Adffe(_) => "Async Reset Enable DFF",
+            DffAny::Sdff(_) => "Sync Reset DFF",
+            DffAny::Adff(_) => "Async Reset DFF",
         }
-    }
-
-    pub fn has_reset(&self) -> bool {
-        matches!(
-            self,
-            DffAny::SyncReset(_)
-                | DffAny::AsyncReset(_)
-                | DffAny::SyncResetEnable(_)
-                | DffAny::AsyncResetEnable(_)
-        )
-    }
-
-    pub fn has_enable(&self) -> bool {
-        matches!(
-            self,
-            DffAny::SyncResetEnable(_) | DffAny::AsyncResetEnable(_) | DffAny::Enable(_)
-        )
     }
 
     pub fn reset_wire(&self) -> Option<&Wire<S>> {
         match self {
-            DffAny::SyncReset(dff) => Some(&dff.srst),
-            DffAny::AsyncReset(dff) => Some(&dff.arst),
-            DffAny::SyncResetEnable(dff) => Some(&dff.srst),
-            DffAny::AsyncResetEnable(dff) => Some(&dff.arst),
+            DffAny::Sdffe(dff) => Some(&dff.reset),
+            DffAny::Adffe(dff) => Some(&dff.reset_n),
+            DffAny::Sdff(dff) => Some(&dff.reset),
+            DffAny::Adff(dff) => Some(&dff.reset_n),
             _ => None,
         }
     }
 
     pub fn enable_wire(&self) -> Option<&Wire<S>> {
         match self {
-            DffAny::SyncResetEnable(dff) => Some(&dff.en),
-            DffAny::AsyncResetEnable(dff) => Some(&dff.en),
-            DffAny::Enable(dff) => Some(&dff.en),
+            DffAny::Sdffe(dff) => Some(&dff.en),
+            DffAny::Adffe(dff) => Some(&dff.en),
             _ => None,
         }
     }
     // NEW: Dummy new for compatibility as composite sub (uses first variant)
     pub fn new(path: crate::instance::Instance) -> Self {
-        // Use Simple variant as dummy for search-time construction
+        // Use SyncReset variant as dummy for search-time construction
         // Inner path uses the variant's inst_name
-        DffAny::Simple(SimpleDff::new(path.child("simple_dff".to_string())))
+        DffAny::Sdffe(Sdffe::new(path.child("sdffe".to_string())))
     }
 }
