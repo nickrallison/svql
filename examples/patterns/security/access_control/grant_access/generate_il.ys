@@ -1,0 +1,7 @@
+
+read_verilog examples/patterns/security/access_control/grant_access/verilog/grant_access.v
+hierarchy -top grant_access
+proc
+clean
+write_rtlil examples/patterns/security/access_control/grant_access/rtlil/grant_access.il
+# show -format dot -prefix grant_access

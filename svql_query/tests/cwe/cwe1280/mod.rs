@@ -52,7 +52,7 @@ mod tests {
         init_test_logger();
 
         let config = Config::builder()
-            .match_length(MatchLength::Exact)
+            .match_length(MatchLength::First)
             .dedupe(Dedupe::None)
             .build();
 

@@ -1,0 +1,16 @@
+# cwe1280_vuln
+read_verilog examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v
+hierarchy -top cwe1280_vuln
+proc
+clean
+write_rtlil examples/fixtures/cwes/cwe1280/rtlil/cwe1280_vuln.il
+# show -format dot -prefix cwe1280_vuln
+
+# cwe1280_fixed
+read_verilog examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v
+hierarchy -top cwe1280_fixed
+proc
+opt
+clean
+write_rtlil examples/fixtures/cwes/cwe1280/rtlil/cwe1280_fixed.il
+# show -format dot -prefix cwe1280_fixed
