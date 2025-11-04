@@ -53,6 +53,7 @@ mod tests {
 
         let config = Config::builder()
             .match_length(MatchLength::First)
+            .pattern_vars_match_design_consts(true)
             .dedupe(Dedupe::None)
             .build();
 
@@ -80,12 +81,6 @@ mod tests {
         case: &Cwe1280TestCase,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture_path = case.fixture_path;
-        // if !Path::new(fixture_path).exists() {
-        //     // Graceful handling: Assume 0 matches if fixture missing
-        //     eprintln!("Fixture missing: {} (expecting 0 matches)", fixture_path);
-        //     panic!("Fixture file, {} not found", fixture_path);
-        //     return Err("Fixture file not found".into());
-        // }
 
         let haystack_module = YosysModule::new(fixture_path, case.module_name)?;
 

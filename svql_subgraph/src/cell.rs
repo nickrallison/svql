@@ -174,9 +174,10 @@ impl<'a> CellWrapper<'a> {
         self.debug_index
     }
 
-    pub fn input_name(&self) -> Option<&'a str> {
+    pub fn input_name(&self) -> Option<&str> {
         match &self.cell {
             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
+            std::borrow::Cow::Owned(Cell::Input(name, _)) => Some(name.as_str()), // NEW
             _ => None,
         }
     }

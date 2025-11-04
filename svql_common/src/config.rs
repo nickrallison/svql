@@ -11,6 +11,7 @@ pub struct Config {
     // pub bind_inputs: bool,
     pub needle_options: ModuleConfig,
     pub haystack_options: ModuleConfig,
+    pub pattern_vars_match_design_consts: bool,
 }
 
 impl Default for Config {
@@ -21,6 +22,7 @@ impl Default for Config {
             // bind_inputs: true,
             needle_options: Default::default(),
             haystack_options: Default::default(),
+            pattern_vars_match_design_consts: true,
         }
     }
 }
@@ -33,6 +35,7 @@ impl Config {
         // bind_inputs: bool,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
+        pattern_vars_match_design_consts: bool,
     ) -> Self {
         Self {
             match_length,
@@ -40,6 +43,7 @@ impl Config {
             // bind_inputs,
             needle_options,
             haystack_options,
+            pattern_vars_match_design_consts,
         }
     }
 
@@ -55,6 +59,7 @@ pub struct ConfigBuilder {
     // bind_inputs: bool,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
+    pub pattern_vars_match_design_consts: bool,
 }
 
 impl ConfigBuilder {
@@ -123,6 +128,11 @@ impl ConfigBuilder {
     //     self
     // }
 
+    pub fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
+        self.pattern_vars_match_design_consts = allow;
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
@@ -130,6 +140,7 @@ impl ConfigBuilder {
             // bind_inputs: self.bind_inputs,
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
+            pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,
         }
     }
 }
