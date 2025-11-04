@@ -1,16 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
-    use std::path::Path;
     use std::sync::OnceLock;
     use svql_common::{Config, Dedupe, MatchLength, YosysModule};
     use svql_driver::Driver;
     use svql_query::{
-        Search,
-        instance::Instance,
-        security::cwe1280::Cwe1280,
-        traits::composite::{Composite, MatchedComposite, SearchableComposite},
+        Search, instance::Instance, security::cwe1280::Cwe1280,
+        traits::composite::SearchableComposite,
     };
 
     fn init_test_logger() {
@@ -45,7 +41,7 @@ mod tests {
             fixture_path: "examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v",
             module_name: "cwe1280_vuln",
             description: "Vulnerable: Weak validation (grant bypass)",
-            expected_matches: 1,
+            expected_matches: 1, // FIXED: Post-port fix, now expects 1 (GrantAccess + LockedRegister chain matches)
         },
     ];
 

@@ -37,7 +37,6 @@ where
             DffAny::Adffe(dff) => Some(&dff.reset_n),
             DffAny::Sdff(dff) => Some(&dff.reset),
             DffAny::Adff(dff) => Some(&dff.reset_n),
-            _ => None,
         }
     }
 

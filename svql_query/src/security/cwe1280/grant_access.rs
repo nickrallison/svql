@@ -1,7 +1,5 @@
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
 netlist! {
     name: GrantAccess,
     module_name: "grant_access",
