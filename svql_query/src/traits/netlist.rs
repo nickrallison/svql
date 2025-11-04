@@ -1,5 +1,5 @@
 use svql_common::{Config, ModuleConfig};
-use svql_driver::{context::Context, design_container::DesignContainer, Driver, DriverKey};
+use svql_driver::{Driver, DriverKey, context::Context, design_container::DesignContainer};
 use svql_subgraph::{Embedding, EmbeddingSet};
 
 use crate::instance::Instance;
@@ -86,7 +86,7 @@ pub trait SearchableNetlist: NetlistMeta + Sized {
                 })
                 .collect();
 
-            tracing::info!(num_hits = hits.len(), "AndGate query complete");
+            tracing::info!(num_hits = hits.len(), "query complete");
 
             hits
         })
