@@ -3,7 +3,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ModuleConfig {
     pub flatten: bool,
-    pub no_optimize: bool,
+    pub opt_clean: bool,
+    pub opt: bool,
     pub params: HashMap<String, String>,
     pub other_steps: Vec<String>,
     pub verific: bool,
@@ -19,8 +20,13 @@ impl ModuleConfig {
         self
     }
 
-    pub fn with_no_optimize(mut self, no_optimize: bool) -> Self {
-        self.no_optimize = no_optimize;
+    pub fn with_opt_clean(mut self, opt_clean: bool) -> Self {
+        self.opt_clean = opt_clean;
+        self
+    }
+
+    pub fn with_opt(mut self, opt: bool) -> Self {
+        self.opt = opt;
         self
     }
 

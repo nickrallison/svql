@@ -118,8 +118,13 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn haystack_no_optimize(mut self, no_optimize: bool) -> Self {
-        self.haystack_options = self.haystack_options.with_no_optimize(no_optimize);
+    pub fn haystack_opt_clean(mut self, opt_clean: bool) -> Self {
+        self.haystack_options = self.haystack_options.with_opt_clean(opt_clean);
+        self
+    }
+
+    pub fn haystack_opt(mut self, opt: bool) -> Self {
+        self.haystack_options = self.haystack_options.with_opt(opt);
         self
     }
 
