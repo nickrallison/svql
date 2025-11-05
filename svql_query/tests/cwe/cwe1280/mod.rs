@@ -52,8 +52,9 @@ mod tests {
         init_test_logger();
 
         let config = Config::builder()
-            .match_length(MatchLength::First)
+            .match_length(MatchLength::NeedleSubsetHaystack)
             .pattern_vars_match_design_consts(true)
+            .haystack_opt(true)
             .dedupe(Dedupe::None)
             .build();
 
@@ -89,6 +90,17 @@ mod tests {
             haystack_module.module_name(),
             &config.haystack_options,
         )?;
+
+        for cell in haystack_design.index().cells_topo() {
+            tracing::trace!(
+                "ID: {}",
+                cell.debug_index()
+            );
+            tracing::trace!(
+                "Haystack cell: {:#?}",
+                cell.get()
+            );
+        }
 
         let context = Cwe1280::<Search>::context(&driver, &config.needle_options)?;
         let context = context.with_design(haystack_key.clone(), haystack_design);
