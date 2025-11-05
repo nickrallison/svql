@@ -93,11 +93,8 @@ mod tests {
 
         for cell in haystack_design.index().cells_topo() {
             tracing::trace!(
-                "ID: {}",
-                cell.debug_index()
-            );
-            tracing::trace!(
-                "Haystack cell: {:#?}",
+                "Id: {}, Haystack cell: \n{:#?}",
+                cell.debug_index(),
                 cell.get()
             );
         }
