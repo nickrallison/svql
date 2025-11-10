@@ -151,14 +151,21 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     ) -> Vec<Embedding<'needle, 'haystack>> {
         // Base Case
         let Some(needle_current) = needle_input_queue.pop_front() else {
-            let mapping = Embedding {
+            return vec![Embedding {
                 assignment: cell_mapping,
-            };
-
-            return vec![mapping];
+            }];
         };
 
         let candidates_vec = self.candidates_for_input(needle_current.clone(), &cell_mapping);
+
+        // NEW: If no candidates but pattern vars can match design consts, skip this input
+        if candidates_vec.is_empty() && self.config.pattern_vars_match_design_consts {
+            tracing::debug!(
+                "Skipping Input '{}' - no haystack match (likely constant in design)",
+                needle_current.input_name().unwrap_or("<unnamed>")
+            );
+            return self.recurse_input_cells(cell_mapping, needle_input_queue, recursion_depth + 1);
+        }
 
         #[cfg(feature = "rayon")]
         let candidates_iter = candidates_vec.into_par_iter();

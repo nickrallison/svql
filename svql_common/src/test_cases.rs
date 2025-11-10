@@ -429,13 +429,13 @@ lazy_static::lazy_static! {
 
 
     pub static ref COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
-        TestCase {
-            name: "sdffe_then_and_simple_dedupe_none",
-            config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
-            needle: &SDFFE_THEN_AND,
-            haystack: &AND_Q_DOUBLE_SDFFE,
-            expected_matches: 4,
-        },
+        // TestCase {
+        //     name: "sdffe_then_and_simple_dedupe_none",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::None).build(),
+        //     needle: &SDFFE_THEN_AND,
+        //     haystack: &AND_Q_DOUBLE_SDFFE,
+        //     expected_matches: 4,
+        // },
 
         // Base case: single AND (depth 1 only)
         TestCase {

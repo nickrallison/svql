@@ -30,3 +30,11 @@ netlist! {
     inputs: [clk, d, reset_n],
     outputs: [q]
 }
+
+netlist! {
+    name: Dffe,
+    module_name: "dffe",
+    file: "examples/patterns/basic/ff/rtlil/dffe.il",
+    inputs: [clk, d, en],
+    outputs: [q]
+}

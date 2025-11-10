@@ -303,33 +303,38 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_net: &prjunnamed_netlist::Net,
         mapping: &Assignment<'needle, 'haystack>,
     ) -> bool {
-        let actual_fan_in_haystack_cell: Result<(CellRef<'haystack>, usize), Trit> =
-            self.haystack.find_cell(*haystack_net);
-        let fan_in_needle_cell: Result<(CellRef<'needle>, usize), Trit> =
-            self.needle.find_cell(*needle_net);
+        let actual_fan_in_haystack_cell = self.haystack.find_cell(*haystack_net);
+        let fan_in_needle_cell = self.needle.find_cell(*needle_net);
 
-        let (actual_fan_in_haystack_cell_ref, _d_fan_in_idx, fan_in_needle_cell_ref, _p_fan_in_idx) =
-            match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
-                (Ok((d_fan_in_cell_ref, d_bit_idx)), Ok((p_fan_in_cell_ref, p_bit_idx))) => {
-                    (d_fan_in_cell_ref, d_bit_idx, p_fan_in_cell_ref, p_bit_idx)
+        match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
+            (Ok((d_fan_in_cell_ref, _d_fan_in_idx)), Ok((p_fan_in_cell_ref, _p_fan_in_idx))) => {
+                let expected_fan_in_haystack_cell_opt =
+                    mapping.get_haystack_cell(p_fan_in_cell_ref.into());
+
+                if expected_fan_in_haystack_cell_opt.is_none() {
+                    return true;
                 }
-                (Err(haystack_trit), Err(needle_trit)) => return haystack_trit == needle_trit,
-                _ => return false,
-            };
 
-        let expected_fan_in_haystack_cell_opt =
-            mapping.get_haystack_cell(fan_in_needle_cell_ref.into());
-
-        if expected_fan_in_haystack_cell_opt.is_none() {
-            // Pattern fan-in cell not mapped yet, so we can't constrain it here.
-            return true;
+                let expected_fan_in_haystack_cell_wrapper =
+                    expected_fan_in_haystack_cell_opt.unwrap();
+                expected_fan_in_haystack_cell_wrapper == d_fan_in_cell_ref.into()
+            }
+            (Err(haystack_trit), Err(needle_trit)) => haystack_trit == needle_trit,
+            (Err(_haystack_const), Ok((needle_cell_ref, _))) => {
+                // NEW: Haystack is constant, needle is variable
+                // Allow if config permits AND needle is an Input (pattern variable)
+                if self.config.pattern_vars_match_design_consts {
+                    let needle_cell: CellWrapper = needle_cell_ref.into();
+                    needle_cell.cell_type().is_input()
+                } else {
+                    false
+                }
+            }
+            (Ok(_), Err(_)) => {
+                // Haystack variable, needle constant - never allow
+                false
+            } // (Err(_), Ok(_)) => false,
         }
-
-        let expected_fan_in_haystack_cell_wrapper = expected_fan_in_haystack_cell_opt.unwrap();
-
-        return expected_fan_in_haystack_cell_wrapper == actual_fan_in_haystack_cell_ref.into();
-
-        // todo!("How to handle expected idx");
     }
 
     fn control_net_match_fan_in(

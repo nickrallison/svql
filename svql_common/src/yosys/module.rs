@@ -96,9 +96,15 @@ impl YosysModule {
             args.push("-p".to_string());
             args.push("flatten".to_string());
         }
+        
+        // Optimize and clean
+        if config.opt {
+            args.push("-p".to_string());
+            args.push("opt".to_string());
+        }
 
         // Optimize and clean
-        if !config.no_optimize {
+        if config.opt_clean {
             args.push("-p".to_string());
             args.push("opt_clean".to_string());
         }
@@ -116,6 +122,12 @@ impl YosysModule {
             OutputFormat::Rtlil => format!("write_rtlil {}", output_path.display()),
         };
         args.push(write_cmd);
+
+        tracing::trace!(
+            "Yosys args for {}: {:?}",
+            self.path().display(),
+            args
+        );
 
         args
     }

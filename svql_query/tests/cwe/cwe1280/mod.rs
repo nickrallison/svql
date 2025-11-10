@@ -52,7 +52,9 @@ mod tests {
         init_test_logger();
 
         let config = Config::builder()
-            .match_length(MatchLength::First)
+            .match_length(MatchLength::NeedleSubsetHaystack)
+            .pattern_vars_match_design_consts(true)
+            .haystack_opt(true)
             .dedupe(Dedupe::None)
             .build();
 
@@ -80,12 +82,6 @@ mod tests {
         case: &Cwe1280TestCase,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture_path = case.fixture_path;
-        // if !Path::new(fixture_path).exists() {
-        //     // Graceful handling: Assume 0 matches if fixture missing
-        //     eprintln!("Fixture missing: {} (expecting 0 matches)", fixture_path);
-        //     panic!("Fixture file, {} not found", fixture_path);
-        //     return Err("Fixture file not found".into());
-        // }
 
         let haystack_module = YosysModule::new(fixture_path, case.module_name)?;
 
@@ -94,6 +90,14 @@ mod tests {
             haystack_module.module_name(),
             &config.haystack_options,
         )?;
+
+        for cell in haystack_design.index().cells_topo() {
+            tracing::trace!(
+                "Id: {}, Haystack cell: \n{:#?}",
+                cell.debug_index(),
+                cell.get()
+            );
+        }
 
         let context = Cwe1280::<Search>::context(&driver, &config.needle_options)?;
         let context = context.with_design(haystack_key.clone(), haystack_design);

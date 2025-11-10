@@ -83,18 +83,19 @@ where
 {
     fn connections(&self) -> Vec<Vec<Connection<S>>> {
         // FIXED: Use accessors for enum subs (data_in(), data_out(), data_input())
-        vec![vec![
-            // Critical vuln connection: Grant signal -> locked reg data_in (bypass via ID match)
-            Connection {
+        vec![
+            // Grant logic output must feed intermediate DFF's data input
+            vec![Connection {
                 from: self.grant_access.grant.clone(),
-                to: self.locked_reg.data_in().clone(),
-            },
-            // Chain: Locked reg out -> secondary DFF in (escalation potential)
-            Connection {
-                from: self.locked_reg.data_out().clone(),
-                to: self.reg_any.data_input().clone(),
-            },
-        ]]
+                to: self.reg_any.data_input().clone(),  // Grant stored in DFF
+            }],
+            // That DFF's output must feed locked register's enable/control
+            vec![Connection {
+                from: self.reg_any.output().clone(),
+                to: self.locked_reg.enable_wire().clone(),  // Stale grant controls access
+            }],
+        ]
+
     }
 }
 

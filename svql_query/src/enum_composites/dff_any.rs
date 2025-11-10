@@ -1,5 +1,5 @@
 // svql_query/src/enum_composites/dff_any.rs
-use crate::primitives::dff::{Adff, Adffe, Sdff, Sdffe};
+use crate::primitives::dff::{Adff, Adffe, Dffe, Sdff, Sdffe};
 use crate::{State, Wire};
 use svql_macros::enum_composite;
 
@@ -10,6 +10,7 @@ enum_composite! {
         (Adffe, "adffe", Adffe),
         (Sdff, "sdff", Sdff),
         (Adff, "adff", Adff),
+        (Dffe, "dffe", Dffe),
     ],
     common_ports: {
         clk: "clock",
@@ -28,6 +29,7 @@ where
             DffAny::Adffe(_) => "Async Reset Enable DFF",
             DffAny::Sdff(_) => "Sync Reset DFF",
             DffAny::Adff(_) => "Async Reset DFF",
+            DffAny::Dffe(_) => "Enable DFF",
         }
     }
 
@@ -37,6 +39,7 @@ where
             DffAny::Adffe(dff) => Some(&dff.reset_n),
             DffAny::Sdff(dff) => Some(&dff.reset),
             DffAny::Adff(dff) => Some(&dff.reset_n),
+            DffAny::Dffe(_) => None,
         }
     }
 
@@ -44,6 +47,7 @@ where
         match self {
             DffAny::Sdffe(dff) => Some(&dff.en),
             DffAny::Adffe(dff) => Some(&dff.en),
+            DffAny::Dffe(dff) => Some(&dff.en),
             _ => None,
         }
     }

@@ -31,3 +31,12 @@ opt
 clean
 write_rtlil examples/patterns/basic/ff/rtlil/adff.il
 # show -format dot -prefix adff
+
+# dffe
+read_verilog examples/patterns/basic/ff/verilog/dffe.v
+hierarchy -top dffe
+proc
+opt
+clean
+write_rtlil examples/patterns/basic/ff/rtlil/dffe.il
+# show -format dot -prefix dffe

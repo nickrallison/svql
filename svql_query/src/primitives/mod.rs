@@ -1,6 +1,7 @@
 pub mod and;
 pub mod buf;
 pub mod dff;
+pub mod eq;
 pub mod mux2;
 pub mod not;
 pub mod or;
