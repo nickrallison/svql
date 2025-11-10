@@ -23,8 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
     // let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
-    let (design_key, design_arc) =
-        driver.get_or_load_design(design_path, design_module, &cfg.haystack_options)?;
+    let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
 
     let cells = design_arc.design().iter_cells().count();
     info!("Design has {} cells", cells);
