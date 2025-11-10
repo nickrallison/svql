@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
@@ -211,22 +211,50 @@ impl SearchableComposite for RecOr<Search> {
     }
 }
 
+fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {
+    let mut cells = Vec::new();
+    let or_cell: &CellWrapper<'ctx> = rec_or
+        .or
+        .y
+        .val
+        .as_ref()
+        .expect("Or cell not found")
+        .design_node_ref
+        .as_ref()
+        .expect("Design node not found");
+    cells.push(or_cell);
+
+    if let Some(ref child) = rec_or.child {
+        cells.extend(rec_or_cells(child));
+    }
+
+    cells
+}
+
 fn build_next_layer<'ctx>(
     path: &Instance,
     all_or_gates: &[OrGate<Match<'ctx>>],
     prev_layer: &[RecOr<Match<'ctx>>],
     haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecOr<Match<'ctx>>> {
-    let mut next_layer = Vec::new();
+    let start_time = std::time::Instant::now();
 
     tracing::event!(
         tracing::Level::INFO,
-        "build_next_layer: Building hashmap of fanouts from previous layer"
+        "build_next_layer: Starting for path={}, prev_layer_size={}, all_or_gates_size={}",
+        path.inst_path(),
+        prev_layer.len(),
+        all_or_gates.len()
     );
-    let mut rec_out_fanout_map: HashMap<CellWrapper<'ctx>, Vec<usize>> = HashMap::new();
-    for index in 0..prev_layer.len() {
-        let rec_or = &prev_layer[index];
-        let top_or_cell: &CellWrapper<'ctx> = rec_or
+
+    let mut next_layer = Vec::new();
+
+    let mut candidates_checked = 0;
+    let mut validations_passed = 0;
+    let validation_start = std::time::Instant::now();
+
+    for prev in prev_layer {
+        let top_or_cell: &CellWrapper<'ctx> = prev
             .or
             .y
             .val
@@ -238,51 +266,66 @@ fn build_next_layer<'ctx>(
         let fanout = haystack_index
             .fanout_set(top_or_cell)
             .expect("Fanout Not found for cell");
-        for fanout_cell in fanout.iter() {
-            rec_out_fanout_map
-                .entry(fanout_cell.clone())
-                .or_insert(vec![])
-                .push(index);
-        }
-    }
 
-    tracing::event!(
-        tracing::Level::INFO,
-        "build_next_layer: Filtering OR gates that connect to previous layer"
-    );
+        for or_gate in all_or_gates {
+            let cell = &or_gate
+                .y
+                .val
+                .as_ref()
+                .expect("Or cell not found")
+                .design_node_ref
+                .as_ref()
+                .expect("Design node not found");
 
-    let mut or_gates_clone = all_or_gates.to_vec();
-    or_gates_clone.retain(|or_gate| {
-        let or_cell: &CellWrapper<'ctx> = or_gate
-            .y
-            .val
-            .as_ref()
-            .expect("Or cell not found")
-            .design_node_ref
-            .as_ref()
-            .expect("Design node not found");
-        rec_out_fanout_map.contains_key(or_cell)
-    });
+            if !fanout.contains(cell) {
+                continue;
+            }
 
-    for or_gate in or_gates_clone {
-        // CHANGED: or_gate
-        for prev in prev_layer {
+            candidates_checked += 1;
+
             // Update child's path to be under "child"
             let mut child = prev.clone();
-            update_rec_or_path(&mut child, path.child("child".to_string())); // CHANGED: update_rec_or_path
+            update_rec_or_path(&mut child, path.child("child".to_string()));
 
             let candidate = RecOr {
-                // CHANGED: RecOr
                 path: path.clone(),
-                or: or_gate.clone(), // CHANGED: or
+                or: or_gate.clone(),
                 child: Some(Box::new(child)),
             };
 
             if candidate.validate_connections(candidate.connections(), haystack_index) {
+                validations_passed += 1;
                 next_layer.push(candidate);
             }
+
+            // Log progress every 1000 candidates to avoid spam
+            // if candidates_checked % 1000 == 0 {
+            tracing::event!(
+                tracing::Level::DEBUG,
+                "build_next_layer: Checked {} candidates so far, {} passed validation",
+                candidates_checked,
+                validations_passed
+            );
+            // }
         }
     }
+
+    let validation_duration = validation_start.elapsed();
+    tracing::event!(
+        tracing::Level::INFO,
+        "build_next_layer: Validation phase took {:?}, checked {} candidates, {} passed",
+        validation_duration,
+        candidates_checked,
+        validations_passed
+    );
+
+    let total_duration = start_time.elapsed();
+    tracing::event!(
+        tracing::Level::INFO,
+        "build_next_layer: Completed in {:?}, returning {} next layer items",
+        total_duration,
+        next_layer.len()
+    );
 
     next_layer
 }
