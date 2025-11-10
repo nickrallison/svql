@@ -46,6 +46,8 @@ fn test_cwe1234_simple() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -66,9 +68,12 @@ fn test_cwe1234_simple() -> Result<(), Box<dyn std::error::Error>> {
     for (i, result) in results.iter().enumerate() {
         println!("Match {}:", i + 1);
         println!("  - OR depth: {}", result.or_tree_depth());
-        assert!(result.has_not_in_or_tree(), "NOT must be in OR tree");
         assert!(
-            result.validate_connections(result.connections()),
+            result.has_not_in_or_tree(haystack_index),
+            "NOT must be in OR tree"
+        );
+        assert!(
+            result.validate_connections(result.connections(), haystack_index),
             "Connections must be valid"
         );
         println!("  ✓ Valid simple bypass pattern\n");
@@ -101,6 +106,8 @@ fn test_cwe1234_deep() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -129,7 +136,10 @@ fn test_cwe1234_deep() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, result) in results.iter().enumerate() {
         println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
-        assert!(result.has_not_in_or_tree(), "NOT must be in deep OR tree");
+        assert!(
+            result.has_not_in_or_tree(haystack_index),
+            "NOT must be in deep OR tree"
+        );
         println!("  ✓ Valid deep tree pattern\n");
     }
 
@@ -160,6 +170,8 @@ fn test_cwe1234_swapped() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -180,7 +192,10 @@ fn test_cwe1234_swapped() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, result) in results.iter().enumerate() {
         println!("Match {}:", i + 1);
-        assert!(result.has_not_in_or_tree(), "NOT must be in OR tree");
+        assert!(
+            result.has_not_in_or_tree(haystack_index),
+            "NOT must be in OR tree"
+        );
         println!("  ✓ Valid swapped input pattern\n");
     }
 
@@ -262,6 +277,8 @@ fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -284,7 +301,10 @@ fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, result) in results.iter().enumerate() {
         println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
-        assert!(result.has_not_in_or_tree(), "Each must have NOT in OR tree");
+        assert!(
+            result.has_not_in_or_tree(haystack_index),
+            "Each must have NOT in OR tree"
+        );
         println!("  ✓ Valid vulnerability\n");
     }
 
@@ -321,6 +341,8 @@ fn test_cwe1234_not_positions() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -345,7 +367,7 @@ fn test_cwe1234_not_positions() -> Result<(), Box<dyn std::error::Error>> {
     for (i, result) in results.iter().enumerate() {
         println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
         assert!(
-            result.has_not_in_or_tree(),
+            result.has_not_in_or_tree(haystack_index),
             "Must find NOT regardless of position"
         );
         println!("  ✓ NOT found at position {}\n", i + 1);
@@ -379,6 +401,8 @@ fn test_cwe1234_not_deep() -> Result<(), Box<dyn std::error::Error>> {
 
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
+
+    let haystack_index = context.get(&haystack_key).unwrap().index();
 
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
@@ -419,7 +443,7 @@ fn test_cwe1234_not_deep() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, result) in results.iter().enumerate() {
         assert!(
-            result.has_not_in_or_tree(),
+            result.has_not_in_or_tree(haystack_index),
             "Match {}: NOT must be found at depth {}",
             i + 1,
             result.or_tree_depth()
@@ -455,6 +479,8 @@ fn test_cwe1234_not_right() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -477,7 +503,10 @@ fn test_cwe1234_not_right() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, result) in results.iter().enumerate() {
         println!("Match {} (depth {}):", i + 1, result.or_tree_depth());
-        assert!(result.has_not_in_or_tree(), "Must find NOT on right input");
+        assert!(
+            result.has_not_in_or_tree(haystack_index),
+            "Must find NOT on right input"
+        );
         println!("  ✓ NOT found on right side\n");
     }
 
@@ -510,6 +539,8 @@ fn test_cwe1234_not_alternating() -> Result<(), Box<dyn std::error::Error>> {
     let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -531,7 +562,7 @@ fn test_cwe1234_not_alternating() -> Result<(), Box<dyn std::error::Error>> {
     for (i, result) in results.iter().enumerate() {
         println!("Match {}:", i + 1);
         assert!(
-            result.has_not_in_or_tree(),
+            result.has_not_in_or_tree(haystack_index),
             "Must find NOT in alternating structure"
         );
         println!("  ✓ Valid alternating pattern\n");

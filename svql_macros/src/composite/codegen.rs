@@ -175,6 +175,9 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 path: crate::instance::Instance,
                 config: &svql_common::Config,
             ) -> Vec<Self::Hit<'ctx>> {
+
+                let haystack_index = context.get(haystack_key).unwrap().index();
+
                 #[cfg(feature = "parallel")]
                 let (#(#parallel_let_binding_fields),*) = {
                     ::tracing::event!(
@@ -208,7 +211,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
                         path: path.clone(),
                         #(#field_names_for_struct_construction),*
                     })
-                    .filter(|composite| composite.validate_connections(composite.connections()))
+                    .filter(|composite| composite.validate_connections(composite.connections(), haystack_index))
                     .collect()
             }
         }

@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
+use svql_subgraph::{GraphIndex, cell::CellWrapper};
 
 use crate::{
     Connection,
@@ -130,6 +133,8 @@ impl SearchableComposite for RecOr<Search> {
             "RecOr::query: starting recursive OR gate search" // CHANGED: OR messages
         );
 
+        let haystack_index = context.get(haystack_key).unwrap().index();
+
         // Query all OR gates once (reuse for all layers)
         let all_or_gates = OrGate::<Search>::query(
             // CHANGED: OrGate
@@ -167,7 +172,12 @@ impl SearchableComposite for RecOr<Search> {
 
         // Keep building layers until we can't find any more matches
         loop {
-            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer);
+            tracing::event!(
+                tracing::Level::INFO,
+                "RecOr::query: Building layer {}", // CHANGED: RecOr
+                layer_num
+            );
+            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer, haystack_index);
 
             if next_layer.is_empty() {
                 tracing::event!(
@@ -205,11 +215,56 @@ fn build_next_layer<'ctx>(
     path: &Instance,
     all_or_gates: &[OrGate<Match<'ctx>>],
     prev_layer: &[RecOr<Match<'ctx>>],
+    haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecOr<Match<'ctx>>> {
-    // CHANGED: RecOr
     let mut next_layer = Vec::new();
 
-    for or_gate in all_or_gates {
+    tracing::event!(
+        tracing::Level::INFO,
+        "build_next_layer: Building hashmap of fanouts from previous layer"
+    );
+    let mut rec_out_fanout_map: HashMap<CellWrapper<'ctx>, Vec<usize>> = HashMap::new();
+    for index in 0..prev_layer.len() {
+        let rec_or = &prev_layer[index];
+        let top_or_cell: &CellWrapper<'ctx> = rec_or
+            .or
+            .y
+            .val
+            .as_ref()
+            .expect("Or top cell not found")
+            .design_node_ref
+            .as_ref()
+            .expect("Design node not found");
+        let fanout = haystack_index
+            .fanout_set(top_or_cell)
+            .expect("Fanout Not found for cell");
+        for fanout_cell in fanout.iter() {
+            rec_out_fanout_map
+                .entry(fanout_cell.clone())
+                .or_insert(vec![])
+                .push(index);
+        }
+    }
+
+    tracing::event!(
+        tracing::Level::INFO,
+        "build_next_layer: Filtering OR gates that connect to previous layer"
+    );
+
+    let mut or_gates_clone = all_or_gates.to_vec();
+    or_gates_clone.retain(|or_gate| {
+        let or_cell: &CellWrapper<'ctx> = or_gate
+            .y
+            .val
+            .as_ref()
+            .expect("Or cell not found")
+            .design_node_ref
+            .as_ref()
+            .expect("Design node not found");
+        rec_out_fanout_map.contains_key(or_cell)
+    });
+
+    for or_gate in or_gates_clone {
         // CHANGED: or_gate
         for prev in prev_layer {
             // Update child's path to be under "child"
@@ -223,7 +278,7 @@ fn build_next_layer<'ctx>(
                 child: Some(Box::new(child)),
             };
 
-            if candidate.validate_connections(candidate.connections()) {
+            if candidate.validate_connections(candidate.connections(), haystack_index) {
                 next_layer.push(candidate);
             }
         }

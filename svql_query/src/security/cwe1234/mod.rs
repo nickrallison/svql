@@ -100,6 +100,8 @@ impl SearchableComposite for Cwe1234<Search> {
     ) -> Vec<Self::Hit<'ctx>> {
         tracing::info!("Cwe1234::query: starting complete CWE-1234 vulnerability search");
 
+        let haystack_index = context.get(haystack_key).unwrap().index();
+
         let unlock_patterns = UnlockLogic::<Search>::query(
             haystack_key,
             context,
@@ -126,7 +128,7 @@ impl SearchableComposite for Cwe1234<Search> {
         let mut connection_failures = 0;
 
         for unlock_logic in &unlock_patterns {
-            if !unlock_logic.has_not_in_or_tree() {
+            if !unlock_logic.has_not_in_or_tree(haystack_index) {
                 unlock_failures += 1;
                 continue;
             }
@@ -141,7 +143,7 @@ impl SearchableComposite for Cwe1234<Search> {
                 };
 
                 // Validate the critical connection: unlock output → register enable
-                if !candidate.validate_connections(candidate.connections()) {
+                if !candidate.validate_connections(candidate.connections(), haystack_index) {
                     connection_failures += 1;
                     tracing::trace!(
                         "Candidate {}: unlock→register connection failed",

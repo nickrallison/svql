@@ -19,7 +19,7 @@ pub trait QueryableState: State {}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Search;
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Match<'ctx> {
     pub pat_node_ref: Option<CellWrapper<'ctx>>,
     pub design_node_ref: Option<CellWrapper<'ctx>>,

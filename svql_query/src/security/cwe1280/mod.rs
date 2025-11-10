@@ -87,15 +87,14 @@ where
             // Grant logic output must feed intermediate DFF's data input
             vec![Connection {
                 from: self.grant_access.grant.clone(),
-                to: self.reg_any.data_input().clone(),  // Grant stored in DFF
+                to: self.reg_any.data_input().clone(), // Grant stored in DFF
             }],
             // That DFF's output must feed locked register's enable/control
             vec![Connection {
                 from: self.reg_any.output().clone(),
-                to: self.locked_reg.enable_wire().clone(),  // Stale grant controls access
+                to: self.locked_reg.enable_wire().clone(), // Stale grant controls access
             }],
         ]
-
     }
 }
 
@@ -132,6 +131,8 @@ impl SearchableComposite for Cwe1280<Search> {
             tracing::Level::INFO,
             "Cwe1280::query: executing sequential queries for access bypass pattern"
         );
+
+        let haystack_index = context.get(haystack_key).unwrap().index();
 
         let grant_accesses = GrantAccess::<Search>::query(
             haystack_key,
@@ -171,7 +172,7 @@ impl SearchableComposite for Cwe1280<Search> {
                 reg_any: ra,
             })
             .filter(|composite| {
-                let valid = composite.validate_connections(composite.connections());
+                let valid = composite.validate_connections(composite.connections(), haystack_index);
                 if valid {
                     tracing::debug!(
                         "Cwe1280: Valid bypass pattern - grant({}) -> locked_reg({}) -> reg_any({})",

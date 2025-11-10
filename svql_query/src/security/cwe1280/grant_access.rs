@@ -10,7 +10,6 @@ netlist! {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
     use std::sync::OnceLock;
     use svql_common::{Config, Dedupe, MatchLength, YosysModule};
     use svql_driver::Driver;
@@ -25,7 +24,7 @@ mod tests {
         name: &'static str,
         fixture_path: &'static str,
         module_name: &'static str,
-        description: &'static str,
+        _description: &'static str,
         expected_matches: usize,
     }
 
@@ -34,14 +33,14 @@ mod tests {
             name: "fixed",
             fixture_path: "examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v",
             module_name: "cwe1280_fixed",
-            description: "Secure version with proper validation",
+            _description: "Secure version with proper validation",
             expected_matches: 1,
         },
         GrantAccessTestCase {
             name: "vuln",
             fixture_path: "examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v",
             module_name: "cwe1280_vuln",
-            description: "Vulnerable version with weak ID check",
+            _description: "Vulnerable version with weak ID check",
             expected_matches: 1,
         },
     ];

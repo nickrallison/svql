@@ -1,5 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
+use svql_subgraph::GraphIndex;
 
 use crate::{
     Connection,
@@ -129,6 +130,8 @@ impl SearchableComposite for RecAnd<Search> {
             "RecAnd::query: starting recursive AND gate search"
         );
 
+        let haystack_index = context.get(haystack_key).unwrap().index();
+
         // Query all AND gates once (reuse for all layers)
         let all_and_gates =
             AndGate::<Search>::query(haystack_key, context, path.child("and".to_string()), config);
@@ -160,7 +163,8 @@ impl SearchableComposite for RecAnd<Search> {
 
         // Keep building layers until we can't find any more matches
         loop {
-            let next_layer = build_next_layer(&path, &all_and_gates, &current_layer);
+            let next_layer =
+                build_next_layer(&path, &all_and_gates, &current_layer, haystack_index);
 
             if next_layer.is_empty() {
                 tracing::event!(
@@ -198,6 +202,7 @@ fn build_next_layer<'ctx>(
     path: &Instance,
     all_and_gates: &[AndGate<Match<'ctx>>],
     prev_layer: &[RecAnd<Match<'ctx>>],
+    haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecAnd<Match<'ctx>>> {
     let mut next_layer = Vec::new();
 
@@ -213,7 +218,7 @@ fn build_next_layer<'ctx>(
                 child: Some(Box::new(child)),
             };
 
-            if candidate.validate_connections(candidate.connections()) {
+            if candidate.validate_connections(candidate.connections(), haystack_index) {
                 next_layer.push(candidate);
             }
         }

@@ -211,6 +211,8 @@ fn run_single_case(
     let context = UnlockLogic::<Search>::context(driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
+    let haystack_index = context.get(&haystack_key).unwrap().index();
+
     let results: Vec<_> = UnlockLogic::<Search>::query(
         &haystack_key,
         &context,
@@ -244,13 +246,13 @@ fn run_single_case(
     // Validate each result (e.g., NOT in OR tree, valid connections)
     for (i, result) in results.iter().enumerate() {
         assert!(
-            result.has_not_in_or_tree(),
+            result.has_not_in_or_tree(haystack_index),
             "{} match {}: NOT must be in OR tree",
             case.name,
             i + 1
         );
         assert!(
-            result.validate_connections(result.connections()),
+            result.validate_connections(result.connections(), haystack_index),
             "{} match {}: Connections must be valid",
             case.name,
             i + 1

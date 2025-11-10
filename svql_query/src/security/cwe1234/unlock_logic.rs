@@ -9,6 +9,7 @@ use crate::traits::netlist::SearchableNetlist;
 use crate::{Connection, Match, Search, State, WithPath};
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
+use svql_subgraph::GraphIndex;
 
 /// Represents the unlock/bypass logic pattern in CWE1234:
 /// - Top-level AND gate (write enable)
@@ -85,20 +86,25 @@ impl<'ctx> UnlockLogic<Match<'ctx>> {
     /// Check if the NOT gate output connects to any level of the RecOr tree.
     /// This is the key validation for the CWE1234 pattern: there must be
     /// a negated lock signal somewhere in the bypass conditions.
-    pub fn has_not_in_or_tree(&self) -> bool {
+    pub fn has_not_in_or_tree(&self, haystack_index: &GraphIndex<'ctx>) -> bool {
         tracing::debug!(
             "Checking if NOT gate (depth={}) connects to OR tree (depth={})",
             1,
             self.rec_or.depth()
         );
-        self.check_not_connects_to_or(&self.rec_or, 1)
+        self.check_not_connects_to_or(&self.rec_or, 1, haystack_index)
     }
 
     /// Recursively check if not_gate.y connects to this OR or any of its children.
     ///
     /// This traverses the entire RecOr tree, checking at each level if the
     /// NOT gate output connects to either input (a or b) of the OR gate.
-    fn check_not_connects_to_or(&self, rec_or: &RecOr<Match<'ctx>>, depth: usize) -> bool {
+    fn check_not_connects_to_or(
+        &self,
+        rec_or: &RecOr<Match<'ctx>>,
+        depth: usize,
+        haystack_index: &GraphIndex<'ctx>,
+    ) -> bool {
         tracing::trace!(
             "Checking OR gate at depth {} (has_child={})",
             depth,
@@ -106,15 +112,21 @@ impl<'ctx> UnlockLogic<Match<'ctx>> {
         );
 
         // Check if not_gate.y connects to this level's OR inputs (a or b)
-        let connects_to_a = self.validate_connection(Connection {
-            from: self.not_gate.y.clone(),
-            to: rec_or.or.a.clone(),
-        });
+        let connects_to_a = self.validate_connection(
+            Connection {
+                from: self.not_gate.y.clone(),
+                to: rec_or.or.a.clone(),
+            },
+            haystack_index,
+        );
 
-        let connects_to_b = self.validate_connection(Connection {
-            from: self.not_gate.y.clone(),
-            to: rec_or.or.b.clone(),
-        });
+        let connects_to_b = self.validate_connection(
+            Connection {
+                from: self.not_gate.y.clone(),
+                to: rec_or.or.b.clone(),
+            },
+            haystack_index,
+        );
 
         if connects_to_a {
             tracing::debug!("NOT gate connects to OR input 'a' at depth {}", depth);
@@ -129,7 +141,7 @@ impl<'ctx> UnlockLogic<Match<'ctx>> {
         // If not connected at this level, recursively check the child
         if let Some(ref child) = rec_or.child {
             tracing::trace!("Recursing into child at depth {}", depth + 1);
-            return self.check_not_connects_to_or(child, depth + 1);
+            return self.check_not_connects_to_or(child, depth + 1, haystack_index);
         }
 
         // No connection found at any level
@@ -168,6 +180,8 @@ impl SearchableComposite for UnlockLogic<Search> {
         config: &Config,
     ) -> Vec<Self::Hit<'ctx>> {
         tracing::info!("UnlockLogic::query: starting CWE1234 unlock pattern search");
+
+        let haystack_index = context.get(haystack_key).unwrap().index();
 
         // Query all three component types
         let and_gates = AndGate::<Search>::query(
@@ -217,7 +231,7 @@ impl SearchableComposite for UnlockLogic<Search> {
                     };
 
                     // First, validate the OR->AND connection
-                    if !candidate.validate_connections(candidate.connections()) {
+                    if !candidate.validate_connections(candidate.connections(), haystack_index) {
                         connection_failures += 1;
                         tracing::trace!(
                             "Candidate {}: OR->AND connection validation failed",
@@ -227,7 +241,7 @@ impl SearchableComposite for UnlockLogic<Search> {
                     }
 
                     // Second, validate the critical NOT->OR tree connection
-                    if !candidate.has_not_in_or_tree() {
+                    if !candidate.has_not_in_or_tree(haystack_index) {
                         not_in_tree_failures += 1;
                         tracing::trace!(
                             "Candidate {}: NOT gate not found in OR tree (depth={})",
