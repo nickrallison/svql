@@ -1,8 +1,8 @@
 // svql_query/src/bin/example_query.rs
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
-use svql_query::composites::rec_and::RecAnd;
 use svql_query::instance::Instance;
+use svql_query::security::cwe1234::Cwe1234;
 use svql_query::traits::composite::SearchableComposite;
 use tracing::{debug, info};
 
@@ -17,8 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .dedupe(Dedupe::None)
         .build();
 
-    let design_path = "examples/patterns/basic/and/verilog/and_2_seq.v";
-    let design_module = "and_2_seq";
+    let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
+    let design_module = "tile";
 
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
@@ -31,19 +31,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Design loaded with key: {:#?}", design_key);
 
-    let context = RecAnd::context(&driver, &cfg.haystack_options)?;
+    let context = Cwe1234::context(&driver, &cfg.haystack_options)?;
     let context = context.with_design(design_key.clone(), design_arc);
 
     let time_start = std::time::Instant::now();
     debug!("Starting query at {:?}", time_start);
-    let rec_and_results = RecAnd::query(
+    let cwe1234_results = Cwe1234::query(
         &design_key,
         &context,
-        Instance::root("rec_and".to_string()),
+        Instance::root("cwe1234".to_string()),
         &cfg,
     );
 
-    let count = rec_and_results.len();
+    let count = cwe1234_results.len();
 
     println!("{}", count);
 
