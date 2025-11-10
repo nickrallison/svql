@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::{GraphIndex, cell::CellWrapper};
@@ -169,6 +167,7 @@ impl SearchableComposite for RecOr<Search> {
 
         let mut all_results = current_layer.clone();
         let mut layer_num = 2;
+        let max_layers = config.max_recursion_depth;
 
         // Keep building layers until we can't find any more matches
         loop {
@@ -198,6 +197,16 @@ impl SearchableComposite for RecOr<Search> {
             all_results.extend(next_layer.iter().cloned());
             current_layer = next_layer;
             layer_num += 1;
+            if let Some(max) = max_layers {
+                if layer_num > max {
+                    tracing::event!(
+                        tracing::Level::INFO,
+                        "RecOr::query: Reached max recursion depth of {}, stopping", // CHANGED: RecOr
+                        max
+                    );
+                    break;
+                }
+            }
         }
 
         tracing::event!(
@@ -266,6 +275,7 @@ fn build_next_layer<'ctx>(
         let fanout = haystack_index
             .fanout_set(top_or_cell)
             .expect("Fanout Not found for cell");
+        let contained_cells = rec_or_cells(prev);
 
         for or_gate in all_or_gates {
             let cell = &or_gate
@@ -277,7 +287,7 @@ fn build_next_layer<'ctx>(
                 .as_ref()
                 .expect("Design node not found");
 
-            if !fanout.contains(cell) {
+            if !fanout.contains(cell) || contained_cells.contains(cell) {
                 continue;
             }
 

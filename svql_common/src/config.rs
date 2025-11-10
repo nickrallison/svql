@@ -12,6 +12,7 @@ pub struct Config {
     pub needle_options: ModuleConfig,
     pub haystack_options: ModuleConfig,
     pub pattern_vars_match_design_consts: bool,
+    pub max_recursion_depth: Option<usize>,
 }
 
 impl Default for Config {
@@ -23,6 +24,7 @@ impl Default for Config {
             needle_options: Default::default(),
             haystack_options: Default::default(),
             pattern_vars_match_design_consts: true,
+            max_recursion_depth: None,
         }
     }
 }
@@ -36,6 +38,7 @@ impl Config {
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
         pattern_vars_match_design_consts: bool,
+        max_recursion_depth: Option<usize>,
     ) -> Self {
         Self {
             match_length,
@@ -44,6 +47,7 @@ impl Config {
             needle_options,
             haystack_options,
             pattern_vars_match_design_consts,
+            max_recursion_depth,
         }
     }
 
@@ -60,6 +64,7 @@ pub struct ConfigBuilder {
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
     pub pattern_vars_match_design_consts: bool,
+    max_recursion_depth: Option<usize>,
 }
 
 impl ConfigBuilder {
@@ -138,6 +143,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
+        self.max_recursion_depth = depth;
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
@@ -146,6 +156,7 @@ impl ConfigBuilder {
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
             pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,
+            max_recursion_depth: self.max_recursion_depth,
         }
     }
 }

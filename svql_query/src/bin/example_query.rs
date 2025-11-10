@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = Config::builder()
         .match_length(MatchLength::First)
         .dedupe(Dedupe::None)
+        .max_recursion_depth(Some(4))
         .build();
 
     let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
