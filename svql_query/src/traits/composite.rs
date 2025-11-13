@@ -176,7 +176,7 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
 
 pub fn filter_out_by_connection<'ctx, S, F, T>(
     haystack_index: &GraphIndex<'ctx>,
-    connection: Connection<Match<'ctx>>,
+    connection: Connection<Search>,
     modules_from: Vec<F>,
     modules_to: Vec<T>,
 ) -> Vec<(F, T)>

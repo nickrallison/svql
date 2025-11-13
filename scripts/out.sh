@@ -19,21 +19,22 @@
 #     --header-base-level 2 \
 #     > out.md
 
-uv run scripts/md_tree.py --root . \
-    --include 'svql_subgraph/**.rs' \
-    --include 'svql_query/**.rs' \
-    --include 'examples/**.v' \
-    --include 'examples/**.il' \
-    --include 'Cargo.toml' \
-    --include '**/Cargo.toml' \
-    --exclude 'examples/fixtures/larger_designs/**' \
-    --header-base-level 2 \
-    > out.md
+# uv run scripts/md_tree.py --root . \
+#     --include 'svql_subgraph/**.rs' \
+#     --include 'svql_query/**.rs' \
+#     --include 'examples/**.v' \
+#     --include 'examples/**.il' \
+#     --include 'Cargo.toml' \
+#     --include '**/Cargo.toml' \
+#     --exclude 'examples/fixtures/larger_designs/**' \
+#     --header-base-level 2 \
+#     > out.md
 
-    uv run scripts/md_tree.py --root . \
+uv run scripts/md_tree.py --root . \
+    --include 'svql_macros/**.rs' \
     --include 'svql_query/**.rs' \
     --include 'Cargo.toml' \
-    --include '**/Cargo.toml' \
+    --include 'svql_query/Cargo.toml' \
     --exclude 'examples/fixtures/larger_designs/**' \
     --header-base-level 2 \
     > out.md

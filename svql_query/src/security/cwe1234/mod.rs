@@ -4,7 +4,7 @@ use crate::{
     Connection, Match, Search, State, WithPath,
     instance::Instance,
     traits::{
-        composite::{Composite, MatchedComposite, SearchableComposite},
+        composite::{Composite, MatchedComposite, SearchableComposite, filter_out_by_connection},
         enum_composite::SearchableEnumComposite,
     },
 };
@@ -41,6 +41,16 @@ where
             path: path.clone(),
             unlock_logic: UnlockLogic::new(path.child("unlock_logic".to_string())),
             locked_register: reg_any,
+        }
+    }
+
+    pub fn connection(
+        unlock_logic: &UnlockLogic<S>,
+        locked_register: &LockedRegister<S>,
+    ) -> Connection<S> {
+        Connection {
+            from: unlock_logic.top_and.y.clone(),
+            to: locked_register.enable_wire().clone(),
         }
     }
 }
@@ -122,54 +132,27 @@ impl SearchableComposite for Cwe1234<Search> {
             registers.len()
         );
 
-        let mut results = Vec::new();
-        let mut candidates_checked = 0;
-        let mut unlock_failures = 0;
-        let mut connection_failures = 0;
-
-        for unlock_logic in &unlock_patterns {
-            if !unlock_logic.has_not_in_or_tree(haystack_index) {
-                unlock_failures += 1;
-                continue;
-            }
-
-            for locked_register in &registers {
-                candidates_checked += 1;
-
-                let candidate = Cwe1234 {
-                    path: path.clone(),
-                    unlock_logic: unlock_logic.clone(),
-                    locked_register: locked_register.clone(),
-                };
-
-                // Validate the critical connection: unlock output → register enable
-                if !candidate.validate_connections(candidate.connections(), haystack_index) {
-                    connection_failures += 1;
-                    tracing::trace!(
-                        "Candidate {}: unlock→register connection failed",
-                        candidates_checked
-                    );
-                    continue;
-                }
-
-                tracing::debug!(
-                    "Valid CWE-1234 vulnerability: OR depth={}, register={}",
-                    candidate.unlock_logic.or_tree_depth(),
-                    candidate.locked_register.register_type(),
-                );
-
-                results.push(candidate);
-            }
-        }
-
-        tracing::info!(
-            "Cwe1234::query: Checked {} candidates, {} unlock failures, {} connection failures, {} vulnerabilities found",
-            candidates_checked,
-            unlock_failures,
-            connection_failures,
-            results.len()
+        let temp_self: Self = Self::new(
+            path.clone(),
+            LockedRegister::new(path.child("locked_register".to_string())),
         );
+        let conn = Cwe1234::connection(&temp_self.unlock_logic, &temp_self.locked_register);
 
-        results
+        let merged_grant_accesses: Vec<(UnlockLogic<Match<'ctx>>, LockedRegister<Match<'ctx>>)> =
+            filter_out_by_connection::<
+                Match<'ctx>,
+                UnlockLogic<Match<'ctx>>,
+                LockedRegister<Match<'ctx>>,
+            >(haystack_index, conn, unlock_patterns, registers);
+
+        // Cartesian product (iproduct) of sub-queries, construct composite, validate connections
+        merged_grant_accesses
+            .into_iter()
+            .map(|(ga, ra)| Cwe1234 {
+                path: path.clone(),
+                unlock_logic: ga,
+                locked_register: ra,
+            })
+            .collect()
     }
 }
