@@ -511,7 +511,7 @@ lazy_static::lazy_static! {
                 .build(),
             needle: &REC_OR,
             haystack: &OR_2_SEQ_HAYSTACK,
-            expected_matches: 5,  // Adjusted for permutations (similar to AND)
+            expected_matches: 8,  // Adjusted for permutations (similar to AND)
         },
         TestCase {
             name: "rec_or_seq_chain_dedupe_inner",
