@@ -105,7 +105,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let query_log_msg_seq = format!("{}::query: executing sequential queries", name);
 
     quote! {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub struct #name<S>
         where
             S: crate::State,

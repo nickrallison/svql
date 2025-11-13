@@ -13,12 +13,12 @@ use crate::{
     instance::Instance,
     primitives::or::OrGate,
     traits::{
-        composite::{Composite, MatchedComposite, SearchableComposite},
+        composite::{Composite, MatchedComposite, SearchableComposite, filter_out_by_connection},
         netlist::SearchableNetlist,
     }, // FIXED: traits::netlist
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RecOr<S>
 where
     S: State,
@@ -288,29 +288,55 @@ fn build_next_layer<'ctx>(
         all_or_gates.len()
     );
 
-    let mut next_layer = Vec::new();
+    // Define connections for OR gate inputs (commutative: check both 'a' and 'b')
+    // Note: Connections are defined at search-time but used for filtering match-time instances
+    let temp_prev = RecOr::<Search>::new(path.clone()); // Dummy for connection definition
+    let temp_or_gate = OrGate::<Search>::new(path.child("temp".to_string())); // Dummy for connection definition
+    let conn_to_a = Connection {
+        from: temp_prev.or.y.clone(),
+        to: temp_or_gate.a.clone(),
+    };
+    let conn_to_b = Connection {
+        from: temp_prev.or.y.clone(),
+        to: temp_or_gate.b.clone(),
+    };
+
+    // Get candidate pairs using filter_out_by_connection (handles parallelism and cell extraction)
+    let pairs_to_a: Vec<(RecOr<Match<'ctx>>, OrGate<Match<'ctx>>)> = filter_out_by_connection(
+        haystack_index,
+        conn_to_a,
+        prev_layer.to_vec(),
+        all_or_gates.to_vec(),
+    );
+    let pairs_to_b: Vec<(RecOr<Match<'ctx>>, OrGate<Match<'ctx>>)> = filter_out_by_connection(
+        haystack_index,
+        conn_to_b,
+        prev_layer.to_vec(),
+        all_or_gates.to_vec(),
+    );
+
+    // Combine and deduplicate pairs (since 'a' and 'b' are commutative, avoid double-counting)
+    let mut all_pairs = pairs_to_a;
+    all_pairs.extend(pairs_to_b);
+    all_pairs.sort_by(|(p1, o1), (p2, o2)| {
+        (p1.path.inst_path().cmp(&p2.path.inst_path()))
+            .then(o1.path.inst_path().cmp(&o2.path.inst_path()))
+    });
+    all_pairs.dedup(); // Remove duplicates based on paths
 
     let mut candidates_checked = 0;
     let mut validations_passed = 0;
     let validation_start = std::time::Instant::now();
 
-    for prev in prev_layer {
-        let top_or_cell: &CellWrapper<'ctx> = prev
-            .or
-            .y
-            .val
-            .as_ref()
-            .expect("Or top cell not found")
-            .design_node_ref
-            .as_ref()
-            .expect("Design node not found");
-        let fanout = haystack_index
-            .fanout_set(top_or_cell)
-            .expect("Fanout Not found for cell");
-        let contained_cells = rec_or_cells(prev);
+    // Process pairs: apply additional filters and build candidates
+    let next_layer: Vec<RecOr<Match<'ctx>>> = all_pairs
+        .into_iter()
+        .filter_map(|(prev, or_gate)| {
+            candidates_checked += 1;
 
-        for or_gate in all_or_gates {
-            let cell = &or_gate
+            // Exclude if the candidate OR gate's output cell is already in the previous RecOr's cells (avoid cycles)
+            let contained_cells = rec_or_cells(&prev);
+            let or_gate_cell = or_gate
                 .y
                 .val
                 .as_ref()
@@ -318,12 +344,9 @@ fn build_next_layer<'ctx>(
                 .design_node_ref
                 .as_ref()
                 .expect("Design node not found");
-
-            if !fanout.contains(cell) || contained_cells.contains(cell) {
-                continue;
+            if contained_cells.contains(&or_gate_cell) {
+                return None;
             }
-
-            candidates_checked += 1;
 
             // Update child's path to be under "child"
             let mut child = prev.clone();
@@ -335,22 +358,15 @@ fn build_next_layer<'ctx>(
                 child: Some(Box::new(child)),
             };
 
+            // Validate connections (additional check beyond fanout)
             if candidate.validate_connections(candidate.connections(), haystack_index) {
                 validations_passed += 1;
-                next_layer.push(candidate);
+                Some(candidate)
+            } else {
+                None
             }
-
-            // Log progress every 1000 candidates to avoid spam
-            // if candidates_checked % 1000 == 0 {
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "build_next_layer: Checked {} candidates so far, {} passed validation",
-                candidates_checked,
-                validations_passed
-            );
-            // }
-        }
-    }
+        })
+        .collect();
 
     let validation_duration = validation_start.elapsed();
     tracing::event!(

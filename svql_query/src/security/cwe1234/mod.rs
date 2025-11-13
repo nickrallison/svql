@@ -139,11 +139,12 @@ impl SearchableComposite for Cwe1234<Search> {
         let conn = Cwe1234::connection(&temp_self.unlock_logic, &temp_self.locked_register);
 
         let merged_grant_accesses: Vec<(UnlockLogic<Match<'ctx>>, LockedRegister<Match<'ctx>>)> =
-            filter_out_by_connection::<
-                Match<'ctx>,
-                UnlockLogic<Match<'ctx>>,
-                LockedRegister<Match<'ctx>>,
-            >(haystack_index, conn, unlock_patterns, registers);
+            filter_out_by_connection::<UnlockLogic<Match<'ctx>>, LockedRegister<Match<'ctx>>>(
+                haystack_index,
+                conn,
+                unlock_patterns,
+                registers,
+            );
 
         // Cartesian product (iproduct) of sub-queries, construct composite, validate connections
         merged_grant_accesses

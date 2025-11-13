@@ -18,8 +18,6 @@ use crate::{
     },
 };
 
-use itertools::iproduct;
-
 #[derive(Debug, Clone)]
 pub struct DelayedGrantAccess<S>
 where
@@ -142,7 +140,7 @@ impl SearchableComposite for DelayedGrantAccess<Search> {
         let conn = DelayedGrantAccess::connection(&temp_self.grant_access, &temp_self.reg_any);
 
         let merged_grant_accesses: Vec<(GrantAccess<Match<'ctx>>, DffAny<Match<'ctx>>)> =
-            filter_out_by_connection::<Match<'ctx>, GrantAccess<Match<'ctx>>, DffAny<Match<'ctx>>>(
+            filter_out_by_connection::<GrantAccess<Match<'ctx>>, DffAny<Match<'ctx>>>(
                 haystack_index,
                 conn,
                 grant_accesses,
@@ -286,11 +284,12 @@ impl SearchableComposite for Cwe1280<Search> {
         let merged_grant_accesses: Vec<(
             DelayedGrantAccess<Match<'ctx>>,
             LockedRegister<Match<'ctx>>,
-        )> = filter_out_by_connection::<
-            Match<'ctx>,
-            DelayedGrantAccess<Match<'ctx>>,
-            LockedRegister<Match<'ctx>>,
-        >(haystack_index, conn, delayed_grant_accesses, locked_regs);
+        )> = filter_out_by_connection::<DelayedGrantAccess<Match<'ctx>>, LockedRegister<Match<'ctx>>>(
+            haystack_index,
+            conn,
+            delayed_grant_accesses,
+            locked_regs,
+        );
 
         // Cartesian product (iproduct) of sub-queries, construct composite, validate connections
         merged_grant_accesses

@@ -115,7 +115,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     });
 
     quote! {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub enum #name<S>
         where
             S: crate::State,

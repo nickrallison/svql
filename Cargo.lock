@@ -902,6 +902,7 @@ dependencies = [
  "prjunnamed-netlist",
  "proc-macro2",
  "quote",
+ "rayon",
  "regex",
  "rstest",
  "serde",

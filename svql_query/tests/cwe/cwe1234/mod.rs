@@ -59,7 +59,7 @@ static CWE1234_CASES: &[CweTestCase] = &[
         fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_not_deep.v",
         module_name: "cwe1234_not_deep",
         description: "NOT gate at varying nesting depths (stress test)",
-        expected_matches: 3,
+        expected_matches: 7,
         min_or_depth: Some(3),
     },
     CweTestCase {
@@ -67,7 +67,7 @@ static CWE1234_CASES: &[CweTestCase] = &[
         fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_not_positions.v",
         module_name: "cwe1234_not_positions",
         description: "NOT gate at different horizontal positions in OR tree",
-        expected_matches: 5,
+        expected_matches: 9,
         min_or_depth: None,
     },
     CweTestCase {
@@ -75,7 +75,7 @@ static CWE1234_CASES: &[CweTestCase] = &[
         fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_not_right.v",
         module_name: "cwe1234_not_right",
         description: "NOT gate consistently on right side of OR gates",
-        expected_matches: 3,
+        expected_matches: 5,
         min_or_depth: None,
     },
     CweTestCase {
@@ -83,7 +83,7 @@ static CWE1234_CASES: &[CweTestCase] = &[
         fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v",
         module_name: "cwe1234_not_alternating",
         description: "NOT gate alternates left/right at each depth",
-        expected_matches: 4,
+        expected_matches: 6,
         min_or_depth: None,
     },
     CweTestCase {

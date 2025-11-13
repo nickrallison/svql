@@ -4,15 +4,16 @@ use crate::composites::rec_or::RecOr;
 use crate::instance::Instance;
 use crate::primitives::and::AndGate;
 use crate::primitives::not::NotGate;
-use crate::traits::composite::{
-    Composite, MatchedComposite, SearchableComposite, filter_out_by_connection,
-};
+use crate::traits::composite::{Composite, MatchedComposite, SearchableComposite};
 use crate::traits::netlist::SearchableNetlist;
 use crate::{Connection, Match, Search, State, WithPath};
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::GraphIndex;
 use svql_subgraph::cell::CellWrapper;
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 /// Represents the unlock/bypass logic pattern in CWE1234:
 /// - Top-level AND gate (write enable)
@@ -213,115 +214,149 @@ impl SearchableComposite for UnlockLogic<Search> {
             not_gates.len()
         );
 
-        // Step 1: Filter RecOr -> AND connections (inlined from filter_out_by_connection)
-        // Connection is FROM RecOr output TO AND input
+        // Step 1: Filter RecOr -> AND connections
         let temp_self: Self = Self::new(path.clone());
         let or_to_and_conn = Connection {
             from: temp_self.rec_or.output().clone(),
-            to: temp_self.top_and.a.clone(), // Will check both a and b below
+            to: temp_self.top_and.a.clone(),
         };
 
-        let mut rec_or_and_pairs: Vec<(RecOr<Match<'ctx>>, AndGate<Match<'ctx>>)> = Vec::new();
+        #[cfg(feature = "parallel")]
+        let or_iter = rec_ors.par_iter();
+        #[cfg(not(feature = "parallel"))]
+        let or_iter = rec_ors.iter();
 
-        for rec_or in rec_ors.iter() {
-            // Get RecOr output cell
-            let from_wire = rec_or
-                .find_port(&or_to_and_conn.from.path)
-                .expect("RecOr output port not found");
-            let from_cell: &CellWrapper<'ctx> = from_wire
-                .val
-                .as_ref()
-                .expect("RecOr output cell not found")
-                .design_node_ref
-                .as_ref()
-                .expect("RecOr design node not found");
-
-            let fanout = haystack_index
-                .fanout_set(from_cell)
-                .expect("Fanout not found for RecOr cell");
-
-            for and_gate in and_gates.iter() {
-                // Check both AND inputs (a and b) for commutative matching
-                let mut connected = false;
-                for and_input_path in [&and_gate.a.path, &and_gate.b.path] {
-                    let to_wire = and_gate
-                        .find_port(and_input_path)
-                        .expect("AND input port not found");
-                    let to_cell: &CellWrapper<'ctx> = to_wire
+        let rec_or_and_pairs: Vec<(RecOr<Match<'ctx>>, AndGate<Match<'ctx>>)> = {
+            or_iter
+                .enumerate()
+                .flat_map(|(rec_or_index, rec_or)| {
+                    // Get RecOr output cell
+                    let from_wire = rec_or
+                        .find_port(&or_to_and_conn.from.path)
+                        .expect("RecOr output port not found");
+                    let from_cell: &CellWrapper<'ctx> = from_wire
                         .val
                         .as_ref()
-                        .expect("AND input cell not found")
+                        .expect("RecOr output cell not found")
                         .design_node_ref
                         .as_ref()
-                        .expect("AND design node not found");
+                        .expect("RecOr design node not found");
 
-                    if fanout.contains(to_cell) {
-                        connected = true;
-                        break;
+                    let fanout = haystack_index
+                        .fanout_set(from_cell)
+                        .expect("Fanout not found for RecOr cell");
+
+                    let pairs: Vec<_> = and_gates
+                        .iter()
+                        .filter_map(|and_gate| {
+                            // Check both AND inputs (a and b) for commutative matching
+                            let connected =
+                                [&and_gate.a.path, &and_gate.b.path]
+                                    .iter()
+                                    .any(|and_input_path| {
+                                        let to_wire = and_gate
+                                            .find_port(and_input_path)
+                                            .expect("AND input port not found");
+                                        let to_cell: &CellWrapper<'ctx> = to_wire
+                                            .val
+                                            .as_ref()
+                                            .expect("AND input cell not found")
+                                            .design_node_ref
+                                            .as_ref()
+                                            .expect("AND design node not found");
+
+                                        fanout.contains(to_cell)
+                                    });
+
+                            if connected {
+                                Some((rec_or.clone(), and_gate.clone()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    if rec_or_index % 50 == 0 {
+                        tracing::debug!(
+                            "UnlockLogic::query: Processing RecOr index {} (parallel)...",
+                            rec_or_index
+                        );
                     }
-                }
 
-                if connected {
-                    rec_or_and_pairs.push((rec_or.clone(), and_gate.clone()));
-                }
-            }
-        }
+                    pairs
+                })
+                .collect()
+        };
 
         tracing::info!(
             "UnlockLogic::query: Found {} valid (RecOr, AND) pairs after connection filtering",
             rec_or_and_pairs.len()
         );
 
-        // Step 2: For each (RecOr, AND) pair, use RecOr's fan-in set to filter NOT gates
-        let mut results = Vec::new();
-        let mut candidates_checked = 0;
-        let mut not_filter_passed = 0;
+        #[cfg(feature = "parallel")]
+        let and_or_iter = rec_or_and_pairs.par_iter();
+        #[cfg(not(feature = "parallel"))]
+        let and_or_iter = rec_or_and_pairs.iter();
 
-        for (rec_or, top_and) in rec_or_and_pairs {
-            let rec_or_fanin = rec_or.fanin_set(haystack_index);
+        let results: Vec<UnlockLogic<Match<'ctx>>> = {
+            and_or_iter
+                .enumerate()
+                .flat_map(|(rec_or_and_index, (rec_or, top_and))| {
+                    let rec_or_fanin = rec_or.fanin_set(haystack_index);
 
-            for not_gate in &not_gates {
-                candidates_checked += 1;
+                    let candidates: Vec<_> = not_gates
+                        .iter()
+                        .filter_map(|not_gate| {
+                            // Check if NOT gate's output is in RecOr's fan-in set
+                            let not_output_cell = not_gate
+                                .y
+                                .val
+                                .as_ref()
+                                .expect("NOT output not found")
+                                .design_node_ref
+                                .as_ref()
+                                .expect("Design node not found");
 
-                // Check if NOT gate's output is in RecOr's fan-in set
-                let not_output_cell = not_gate
-                    .y
-                    .val
-                    .as_ref()
-                    .expect("NOT output not found")
-                    .design_node_ref
-                    .as_ref()
-                    .expect("Design node not found");
+                            if !rec_or_fanin.contains(not_output_cell) {
+                                return None;
+                            }
 
-                if !rec_or_fanin.contains(not_output_cell) {
-                    continue; // NOT does not connect into this RecOr tree
-                }
+                            let candidate = UnlockLogic {
+                                path: path.clone(),
+                                top_and: top_and.clone(),
+                                rec_or: rec_or.clone(),
+                                not_gate: not_gate.clone(),
+                            };
 
-                not_filter_passed += 1;
+                            if candidate
+                                .validate_connections(candidate.connections(), haystack_index)
+                            {
+                                tracing::trace!(
+                                    "Valid unlock pattern found: OR depth={}, AND={}",
+                                    candidate.or_tree_depth(),
+                                    top_and.path.inst_path()
+                                );
+                                Some(candidate)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
 
-                let candidate = UnlockLogic {
-                    path: path.clone(),
-                    top_and: top_and.clone(),
-                    rec_or: rec_or.clone(),
-                    not_gate: not_gate.clone(),
-                };
+                    if rec_or_and_index % 50 == 0 {
+                        tracing::debug!(
+                            "UnlockLogic::query: Processing pair index {} (parallel)...",
+                            rec_or_and_index
+                        );
+                    }
 
-                // Final validation: connections should be valid (pre-filtered, but verify)
-                if candidate.validate_connections(candidate.connections(), haystack_index) {
-                    tracing::debug!(
-                        "Valid unlock pattern found: OR depth={}, AND={}, NOT present",
-                        candidate.or_tree_depth(),
-                        top_and.path.inst_path()
-                    );
-                    results.push(candidate);
-                }
-            }
-        }
+                    candidates
+                })
+                .collect()
+        };
 
         tracing::info!(
-            "UnlockLogic::query: Checked {} candidates, {} passed NOT-in-tree filter, {} final valid",
-            candidates_checked,
-            not_filter_passed,
+            "UnlockLogic::query: Found {} final valid patterns",
             results.len()
         );
 

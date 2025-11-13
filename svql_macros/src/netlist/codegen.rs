@@ -110,7 +110,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
     });
 
     quote! {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub struct #name<S>
         where
             S: crate::State,
