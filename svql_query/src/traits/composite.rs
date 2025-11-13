@@ -1,6 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{DriverKey, context::Context, driver::Driver};
-use svql_subgraph::GraphIndex;
+use svql_subgraph::{GraphIndex, cell::CellWrapper};
 
 use crate::{Connection, Match, Search, State, WithPath, instance::Instance};
 
@@ -174,13 +174,50 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
     }
 }
 
-pub fn filter_out_by_connection<'ctx, S, M1, M2>(
+pub fn filter_out_by_connection<'ctx, S, F, T>(
     haystack_index: &GraphIndex<'ctx>,
     connection: Connection<Match<'ctx>>,
-    modules1: &mut Vec<M1>,
-    modules2: &mut Vec<M2>,
-) where
-    S: State,
+    modules_from: Vec<F>,
+    modules_to: Vec<T>,
+) -> Vec<(F, T)>
+where
+    F: WithPath<Match<'ctx>> + Clone,
+    T: WithPath<Match<'ctx>> + Clone,
 {
-    todo!();
+    let mut next_layer: Vec<(F, T)> = Vec::new();
+
+    for module_f in modules_from.iter() {
+        let from_wire = module_f.find_port(&connection.from.path);
+        let from_cell: &CellWrapper<'ctx> = from_wire
+            .expect("Port cell not found")
+            .val
+            .as_ref()
+            .expect("Or top cell not found")
+            .design_node_ref
+            .as_ref()
+            .expect("Design node not found");
+        let fanout = haystack_index
+            .fanout_set(from_cell)
+            .expect("Fanout Not found for cell");
+
+        for module_t in modules_to.iter() {
+            let to_wire = module_t.find_port(&connection.to.path);
+            let to_cell: &CellWrapper<'ctx> = to_wire
+                .expect("Port cell not found")
+                .val
+                .as_ref()
+                .expect("Or top cell not found")
+                .design_node_ref
+                .as_ref()
+                .expect("Design node not found");
+
+            if !fanout.contains(to_cell) {
+                continue;
+            }
+
+            next_layer.push((module_f.clone(), module_t.clone()));
+        }
+    }
+
+    next_layer
 }
