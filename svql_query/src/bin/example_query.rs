@@ -44,8 +44,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let count = cwe1234_results.len();
+    println!("Found {} Matches", count);
 
-    println!("{}", count);
+    for result in cwe1234_results.iter() {
+        println!("{:?}", result);
+    }
 
     let time_end = std::time::Instant::now();
     debug!("Ending query at {:?}", time_end);
