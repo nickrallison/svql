@@ -231,6 +231,14 @@ impl SearchableComposite for UnlockLogic<Search> {
                 .enumerate()
                 .flat_map(|(rec_or_index, rec_or)| {
                     // Get RecOr output cell
+
+                    if rec_or_index % 50 == 0 {
+                        tracing::debug!(
+                            "UnlockLogic::query: Processing RecOr index {}",
+                            rec_or_index
+                        );
+                    }
+
                     let from_wire = rec_or
                         .find_port(&or_to_and_conn.from.path)
                         .expect("RecOr output port not found");
@@ -276,13 +284,6 @@ impl SearchableComposite for UnlockLogic<Search> {
                         })
                         .collect();
 
-                    if rec_or_index % 50 == 0 {
-                        tracing::debug!(
-                            "UnlockLogic::query: Processing RecOr index {} (parallel)...",
-                            rec_or_index
-                        );
-                    }
-
                     pairs
                 })
                 .collect()
@@ -302,6 +303,13 @@ impl SearchableComposite for UnlockLogic<Search> {
             and_or_iter
                 .enumerate()
                 .flat_map(|(rec_or_and_index, (rec_or, top_and))| {
+                    if rec_or_and_index % 50 == 0 {
+                        tracing::debug!(
+                            "UnlockLogic::query: Processing pair index {}",
+                            rec_or_and_index
+                        );
+                    }
+
                     let rec_or_fanin = rec_or.fanin_set(haystack_index);
 
                     let candidates: Vec<_> = not_gates
@@ -342,14 +350,6 @@ impl SearchableComposite for UnlockLogic<Search> {
                             }
                         })
                         .collect();
-
-                    if rec_or_and_index % 50 == 0 {
-                        tracing::debug!(
-                            "UnlockLogic::query: Processing pair index {} (parallel)...",
-                            rec_or_and_index
-                        );
-                    }
-
                     candidates
                 })
                 .collect()
