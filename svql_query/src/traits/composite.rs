@@ -173,3 +173,14 @@ pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
         true
     }
 }
+
+pub fn filter_out_by_connection<'ctx, S, M1, M2>(
+    haystack_index: &GraphIndex<'ctx>,
+    connection: Connection<Match<'ctx>>,
+    modules1: &mut Vec<M1>,
+    modules2: &mut Vec<M2>,
+) where
+    S: State,
+{
+    todo!();
+}
