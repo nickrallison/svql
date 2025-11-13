@@ -4,7 +4,9 @@ use crate::composites::rec_or::RecOr;
 use crate::instance::Instance;
 use crate::primitives::and::AndGate;
 use crate::primitives::not::NotGate;
-use crate::traits::composite::{Composite, MatchedComposite, SearchableComposite};
+use crate::traits::composite::{
+    Composite, MatchedComposite, SearchableComposite, filter_out_by_connection,
+};
 use crate::traits::netlist::SearchableNetlist;
 use crate::{Connection, Match, Search, State, WithPath};
 use svql_common::{Config, ModuleConfig};
@@ -183,21 +185,19 @@ impl SearchableComposite for UnlockLogic<Search> {
 
         let haystack_index = context.get(haystack_key).unwrap().index();
 
-        // Query all three component types
+        // Query all components
         let and_gates = AndGate::<Search>::query(
             haystack_key,
             context,
             path.child("top_and".to_string()),
             config,
         );
-
         let rec_ors = RecOr::<Search>::query(
             haystack_key,
             context,
             path.child("rec_or".to_string()),
             config,
         );
-
         let not_gates = NotGate::<Search>::query(
             haystack_key,
             context,
@@ -212,61 +212,75 @@ impl SearchableComposite for UnlockLogic<Search> {
             not_gates.len()
         );
 
-        // Try all combinations (cartesian product)
+        // Step 1: Use filter_out_by_connection to get (AND, RecOr) pairs where RecOr output connects to AND input
+        let temp_self: Self = Self::new(path.clone());
+        let or_to_and_conn = Connection {
+            from: temp_self.rec_or.output().clone(),
+            to: temp_self.top_and.a.clone(), // Note: This assumes 'a' input; adjust if commutative handling is needed
+        };
+        let and_rec_or_pairs: Vec<(AndGate<Match<'ctx>>, RecOr<Match<'ctx>>)> =
+            filter_out_by_connection::<Match<'ctx>, AndGate<Match<'ctx>>, RecOr<Match<'ctx>>>(
+                haystack_index,
+                or_to_and_conn,
+                and_gates,
+                rec_ors,
+            );
+
+        tracing::info!(
+            "UnlockLogic::query: Found {} valid (AND, RecOr) pairs after connection filtering",
+            and_rec_or_pairs.len()
+        );
+
+        // Step 2: For each (AND, RecOr) pair, compute RecOr's fan-in set and filter NOT gates
         let mut results = Vec::new();
         let mut candidates_checked = 0;
-        let mut connection_failures = 0;
-        let mut not_in_tree_failures = 0;
+        let mut not_filter_passed = 0;
 
-        for top_and in &and_gates {
-            for rec_or in &rec_ors {
-                for not_gate in &not_gates {
-                    candidates_checked += 1;
+        for (top_and, rec_or) in and_rec_or_pairs {
+            let rec_or_fanin = rec_or.fanin_set(haystack_index);
 
-                    let candidate = UnlockLogic {
-                        path: path.clone(),
-                        top_and: top_and.clone(),
-                        rec_or: rec_or.clone(),
-                        not_gate: not_gate.clone(),
-                    };
+            for not_gate in &not_gates {
+                candidates_checked += 1;
 
-                    // First, validate the OR->AND connection
-                    if !candidate.validate_connections(candidate.connections(), haystack_index) {
-                        connection_failures += 1;
-                        tracing::trace!(
-                            "Candidate {}: OR->AND connection validation failed",
-                            candidates_checked
-                        );
-                        continue;
-                    }
+                // Check if NOT gate's output is in RecOr's fan-in set
+                let not_output_cell = not_gate
+                    .y
+                    .val
+                    .as_ref()
+                    .expect("NOT output not found")
+                    .design_node_ref
+                    .as_ref()
+                    .expect("Design node not found");
 
-                    // Second, validate the critical NOT->OR tree connection
-                    if !candidate.has_not_in_or_tree(haystack_index) {
-                        not_in_tree_failures += 1;
-                        tracing::trace!(
-                            "Candidate {}: NOT gate not found in OR tree (depth={})",
-                            candidates_checked,
-                            rec_or.depth()
-                        );
-                        continue;
-                    }
+                if !rec_or_fanin.contains(not_output_cell) {
+                    continue; // NOT does not connect into this RecOr tree
+                }
 
+                not_filter_passed += 1;
+
+                let candidate = UnlockLogic {
+                    path: path.clone(),
+                    top_and: top_and.clone(),
+                    rec_or: rec_or.clone(),
+                    not_gate: not_gate.clone(),
+                };
+
+                // Final validation: Ensure connections are still valid (though OR->AND is pre-filtered)
+                if candidate.validate_connections(candidate.connections(), haystack_index) {
                     tracing::debug!(
                         "Valid unlock pattern found: OR depth={}, AND={}, NOT present",
                         candidate.or_tree_depth(),
                         top_and.path.inst_path()
                     );
-
                     results.push(candidate);
                 }
             }
         }
 
         tracing::info!(
-            "UnlockLogic::query: Checked {} candidates, {} failed OR->AND, {} failed NOT-in-tree, {} valid",
+            "UnlockLogic::query: Checked {} candidates, {} passed NOT-in-tree filter, {} final valid",
             candidates_checked,
-            connection_failures,
-            not_in_tree_failures,
+            not_filter_passed,
             results.len()
         );
 

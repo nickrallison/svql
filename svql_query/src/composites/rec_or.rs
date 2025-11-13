@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::{GraphIndex, cell::CellWrapper};
@@ -217,6 +219,36 @@ impl SearchableComposite for RecOr<Search> {
         );
 
         all_results
+    }
+}
+
+impl<'ctx> RecOr<Match<'ctx>> {
+    pub fn fanin_set(&self, haystack_index: &GraphIndex<'ctx>) -> HashSet<CellWrapper<'ctx>> {
+        let mut all_cells = HashSet::new();
+        self.collect_cells(&mut all_cells);
+        let mut fanin = HashSet::new();
+        for cell in &all_cells {
+            if let Some(fanin_set) = haystack_index.fanin_set(cell) {
+                fanin.extend(fanin_set.iter().cloned());
+            }
+        }
+        fanin
+    }
+
+    fn collect_cells(&self, cells: &mut HashSet<CellWrapper<'ctx>>) {
+        let or_cell = self
+            .or
+            .y
+            .val
+            .as_ref()
+            .expect("OR cell not found")
+            .design_node_ref
+            .as_ref()
+            .expect("Design node not found");
+        cells.insert(or_cell.clone());
+        if let Some(ref child) = self.child {
+            child.collect_cells(cells);
+        }
     }
 }
 
