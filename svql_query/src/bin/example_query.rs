@@ -18,11 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_recursion_depth(Some(4))
         .build();
 
-    // let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
-    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
-    let design_module = "cwe1234_not_alternating";
+    // let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
+    // let design_module = "cwe1234_not_alternating";
+
+    let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
     // let design_path = "/Users/nick/Downloads/openpiton_tile_flat.json";
-    // let design_module = "tile";
+    let design_module = "tile";
 
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
