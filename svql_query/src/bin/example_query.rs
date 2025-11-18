@@ -18,7 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_recursion_depth(Some(4))
         .build();
 
-    let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
+    // let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
+    let design_path = "/Users/nick/Downloads/openpiton_tile_flat.json";
     let design_module = "tile";
 
     info!("Loading design from {}:{}", design_path, design_module);

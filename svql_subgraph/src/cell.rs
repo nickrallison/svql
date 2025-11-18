@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::hash::Hash;
+use std::{borrow::Cow, fmt::Debug};
 
 use prjunnamed_netlist::{Cell, CellRef};
 
@@ -153,11 +153,21 @@ impl CellIndex {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CellWrapper<'a> {
     cell: Cow<'a, Cell>,
     // cell_ref: CellRef<'a>,
     debug_index: usize,
+}
+
+impl Debug for CellWrapper<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "CellWrapper {{ cell: {:?}, debug_index: {} }}",
+            self.cell, self.debug_index
+        )
+    }
 }
 
 impl<'a> CellWrapper<'a> {
