@@ -18,19 +18,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_recursion_depth(Some(4))
         .build();
 
+    let driver = Driver::new_workspace()?;
+
     // let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
     // let design_module = "cwe1234_not_alternating";
+    // let (design_key, design_arc) =
+    //     driver.get_or_load_design(design_path, design_module, &cfg.haystack_options)?;
 
     let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
     // let design_path = "/Users/nick/Downloads/openpiton_tile_flat.json";
     let design_module = "tile";
+    let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
 
     info!("Loading design from {}:{}", design_path, design_module);
-    let driver = Driver::new_workspace()?;
-    let (design_key, design_arc) =
-        driver.get_or_load_design(design_path, design_module, &cfg.haystack_options)?;
-    // let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
-
     let cells = design_arc.design().iter_cells().count();
     info!("Design has {} cells", cells);
 
@@ -52,7 +52,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Found {} Matches", count);
 
     for result in cwe1234_results.iter() {
-        println!("{:#?}", result);
+        let locked_reg = &result.locked_register;
+
+        let data_out = &locked_reg
+            .data_out()
+            .val
+            .as_ref()
+            .unwrap()
+            .design_node_ref
+            .as_ref()
+            .unwrap();
+
+        println!("{:#?}", data_out);
     }
 
     let time_end = std::time::Instant::now();
