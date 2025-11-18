@@ -37,7 +37,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Design loaded with key: {:#?}", design_key);
 
     let context = Cwe1234::context(&driver, &cfg.haystack_options)?;
-    let context = context.with_design(design_key.clone(), design_arc);
+    let context = context.with_design(design_key.clone(), design_arc.clone());
+
+    let index = design_arc.index();
 
     let time_start = std::time::Instant::now();
     debug!("Starting query at {:?}", time_start);
@@ -62,6 +64,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .design_node_ref
             .as_ref()
             .unwrap();
+
+        let unlock_ors = &result.unlock_logic.rec_or;
+        let ors = unlock_ors.fanin_set(index);
+
+        for o in ors.iter() {
+            println!("Unlock OR Node: {:#?}", o);
+        }
 
         println!("{:#?}", data_out);
     }
