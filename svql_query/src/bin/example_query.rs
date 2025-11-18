@@ -19,13 +19,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     // let design_path = "/home/nick/Downloads/hackatdac21/generated/openpiton_tile_flat.json";
-    let design_path = "/Users/nick/Downloads/openpiton_tile_flat.json";
-    let design_module = "tile";
+    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
+    let design_module = "cwe1234_not_alternating";
+    // let design_path = "/Users/nick/Downloads/openpiton_tile_flat.json";
+    // let design_module = "tile";
 
     info!("Loading design from {}:{}", design_path, design_module);
     let driver = Driver::new_workspace()?;
+    let (design_key, design_arc) =
+        driver.get_or_load_design(design_path, design_module, &cfg.haystack_options)?;
     // let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
-    let (design_key, design_arc) = driver.get_or_load_design_raw(design_path, design_module)?;
 
     let cells = design_arc.design().iter_cells().count();
     info!("Design has {} cells", cells);
