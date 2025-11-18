@@ -1,8 +1,8 @@
 use std::fmt::Formatter;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::{borrow::Cow, fmt::Debug};
 
-use prjunnamed_netlist::{Cell, CellRef};
+use prjunnamed_netlist::{Cell, CellRef, MetaItemRef};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CellKind {
@@ -153,20 +153,44 @@ impl CellIndex {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub struct CellWrapper<'a> {
     cell: Cow<'a, Cell>,
-    // cell_ref: CellRef<'a>,
     debug_index: usize,
+    metadata: MetaItemRef<'a>,
 }
+
+// impl Debug for CellWrapper<'_> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "CellWrapper {{ cell: {:?}, debug_index: {}, metadata: {:?} }}",
+//             self.cell, self.debug_index, self.metadata
+//         )
+//     }
+// }
 
 impl Debug for CellWrapper<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "CellWrapper {{ cell: {:?}, debug_index: {} }}",
-            self.cell, self.debug_index
-        )
+        f.debug_struct("CellWrapper")
+            .field("cell_type", &self.cell_type())
+            .field("metadata", &self.metadata)
+            .finish()
+    }
+}
+
+impl<'a> PartialEq for CellWrapper<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.debug_index == other.debug_index && self.cell == other.cell
+    }
+}
+
+impl Eq for CellWrapper<'_> {}
+
+impl<'a> Hash for CellWrapper<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cell.hash(state);
+        self.debug_index.hash(state);
     }
 }
 
@@ -182,6 +206,10 @@ impl<'a> CellWrapper<'a> {
     // }
     pub fn debug_index(&self) -> usize {
         self.debug_index
+    }
+
+    pub fn debug_info(&self) -> MetaItemRef<'a> {
+        self.metadata
     }
 
     pub fn input_name(&self) -> Option<&str> {
@@ -205,6 +233,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
         CellWrapper {
             cell: val.get(),
             debug_index: val.debug_index(),
+            metadata: val.metadata(),
         }
     }
 }

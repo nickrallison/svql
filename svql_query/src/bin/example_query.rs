@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Found {} Matches", count);
 
     for result in cwe1234_results.iter() {
-        println!("{:?}", result);
+        println!("{:#?}", result);
     }
 
     let time_end = std::time::Instant::now();
