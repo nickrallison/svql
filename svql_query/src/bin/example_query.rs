@@ -63,13 +63,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .design_node_ref
             .as_ref()
-            .unwrap();
+            .unwrap()
+            .debug_info();
 
         let unlock_ors = &result.unlock_logic.rec_or;
         let ors = unlock_ors.fanin_set(index);
 
         for o in ors.iter() {
-            println!("Unlock OR Node: {:#?}", o);
+            println!("Unlock OR Node: {:#?}", o.debug_info());
         }
 
         println!("{:#?}", data_out);

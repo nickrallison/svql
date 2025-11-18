@@ -201,9 +201,6 @@ impl<'a> CellWrapper<'a> {
     pub fn get(&'a self) -> &'a Cell {
         self.cell.as_ref()
     }
-    // pub fn cell_ref(&'a self) -> CellRef<'a> {
-    //     self.cell_ref
-    // }
     pub fn debug_index(&self) -> usize {
         self.debug_index
     }
