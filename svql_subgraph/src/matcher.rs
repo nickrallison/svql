@@ -275,7 +275,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 // Handle backedges
                 let needle_fanout = self.needle_index.fanout_set(&needle_current);
 
-                // Check if we need to perform the expensive check (avoid clone if no mapped successors)
                 let has_mapped_successor = needle_fanout.as_ref().map_or(false, |sets| {
                     sets.iter()
                         .any(|p| cell_mapping.get_haystack_cell(p.clone()).is_some())
@@ -287,7 +286,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
                     if let Some(fanout_cells) = needle_fanout {
                         for p_succ in fanout_cells {
-                            // If successor is mapped, verify the connection
                             if let Some(d_succ) = cell_mapping.get_haystack_cell(p_succ.clone()) {
                                 if !self.check_fanin_constraints(p_succ, d_succ, &temp_mapping) {
                                     return false;
