@@ -101,6 +101,30 @@ lazy_static::lazy_static! {
         ).expect("Failed to create YosysModule for small_and_seq"),
         pattern_query_type: None,
     };
+
+    // ----------
+    static ref DFF_LOOP_TOGGLE: Needle = Needle::Netlist {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/dff_loop_toggle.v",
+            "dff_loop_toggle",
+        ).expect("Failed to create YosysModule for dff_loop_toggle"),
+        pattern_query_type: None,
+    };
+    static ref DFF_NOT: Needle = Needle::Netlist {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/dff_not.v",
+            "dff_not",
+        ).expect("Failed to create YosysModule for dff_not"),
+        pattern_query_type: None,
+    };
+    static ref NOT_DFF: Needle = Needle::Netlist {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/not_dff.v",
+            "not_dff",
+        ).expect("Failed to create YosysModule for not_dff"),
+        pattern_query_type: None,
+    };
+
 }
 
 // SECURITY: locked_reg (RTLIL patterns)
@@ -315,6 +339,25 @@ lazy_static::lazy_static! {
         ).expect("Failed to create YosysModule for not_2_seq"),
     };
 
+    static ref DFF_LOOP_TOGGLE_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/dff_loop_toggle.v",
+            "dff_loop_toggle",
+        ).expect("Failed to create YosysModule for dff_loop_toggle"),
+    };
+    static ref DFF_NOT_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/dff_not.v",
+            "dff_not",
+        ).expect("Failed to create YosysModule for dff_not"),
+    };
+    static ref NOT_DFF_HAYSTACK: Haystack = Haystack {
+        yosys_module: YosysModule::new(
+            "examples/fixtures/basic/ff/verilog/not_dff.v",
+            "not_dff",
+        ).expect("Failed to create YosysModule for not_dff"),
+    };
+
 
 }
 
@@ -402,6 +445,100 @@ lazy_static::lazy_static! {
                 .build(),
             needle: &NOT_GATE,
             haystack: &NOT_GATE_HAYSTACK,
+            expected_matches: 1,
+        },
+
+        // --------------
+        // examples/fixtures/basic/ff/verilog/dff_loop_toggle.v
+        // --------------
+        TestCase {
+            name: "dff_loop_toggle_to_dff_loop_toggle",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_LOOP_TOGGLE,
+            haystack: &DFF_LOOP_TOGGLE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "dff_loop_toggle_to_dff_not",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_LOOP_TOGGLE,
+            haystack: &DFF_NOT_HAYSTACK,
+            expected_matches: 0,
+        },
+        TestCase {
+            name: "dff_loop_toggle_to_not_dff",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_LOOP_TOGGLE,
+            haystack: &NOT_DFF_HAYSTACK,
+            expected_matches: 0,
+        },
+        TestCase {
+            name: "dff_not_to_dff_loop_toggle",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_NOT,
+            haystack: &DFF_LOOP_TOGGLE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "dff_not_to_dff_not",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_NOT,
+            haystack: &DFF_NOT_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "dff_not_to_not_dff",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &DFF_NOT,
+            haystack: &NOT_DFF_HAYSTACK,
+            expected_matches: 0,
+        },
+        TestCase {
+            name: "not_dff_to_dff_loop_toggle",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &NOT_DFF,
+            haystack: &DFF_LOOP_TOGGLE_HAYSTACK,
+            expected_matches: 1,
+        },
+        TestCase {
+            name: "not_dff_to_dff_not",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &NOT_DFF,
+            haystack: &DFF_NOT_HAYSTACK,
+            expected_matches: 0,
+        },
+        TestCase {
+            name: "not_dff_to_not_dff",
+            config: Config::builder()
+                .match_length(MatchLength::Exact)
+                .dedupe(Dedupe::All)
+                .build(),
+            needle: &NOT_DFF,
+            haystack: &NOT_DFF_HAYSTACK,
             expected_matches: 1,
         },
     ];

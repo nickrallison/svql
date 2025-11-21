@@ -43,7 +43,7 @@
 uv run scripts/md_tree.py --root . \
     --include 'examples/**.v' \
     --include 'svql_common/src/**.rs' \
-    --include 'svql_subgraph/src/**.rs' \
+    --include 'svql_subgraph/**.rs' \
     --include 'Cargo.toml' \
     --include 'svql_subgraph/Cargo.toml' \
     --exclude 'examples/fixtures/larger_designs/**' \
