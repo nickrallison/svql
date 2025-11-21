@@ -158,7 +158,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let candidates_vec = self.candidates_for_input(needle_current.clone(), &cell_mapping);
 
-        // NEW: If no candidates but pattern vars can match design consts, skip this input
         if candidates_vec.is_empty() && self.config.pattern_vars_match_design_consts {
             tracing::debug!(
                 "Skipping Input '{}' - no haystack match (likely constant in design)",
@@ -354,7 +353,10 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     }
                 })
             })
-            .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
+            // Allows Inputs to collide with existing gates.
+            // This is necessary for Cycle detection where an Input 'd'
+            // essentially maps to an existing gate in the loop.
+            // .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
             .collect();
 
         candidates
