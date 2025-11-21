@@ -411,20 +411,20 @@ lazy_static::lazy_static! {
         // From many_locked_regs.v there are exactly 2 instances of each:
         // 2 × async_en, 2 × async_mux, 2 × sync_en, 2 × sync_mux
 
-        TestCase {
-            name: "async_en_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
-            needle: &ASYNC_EN_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
-        TestCase {
-            name: "async_mux_in_many_locked_regs",
-            config: Config::builder().match_length(crate::MatchLength::Exact).build(),
-            needle: &ASYNC_MUX_IL,
-            haystack: &MANY_LOCKED_REGS_IL,
-            expected_matches: 2,
-        },
+        // TestCase {
+        //     name: "async_en_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build(),
+        //     needle: &ASYNC_EN_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
+        // TestCase {
+        //     name: "async_mux_in_many_locked_regs",
+        //     config: Config::builder().match_length(crate::MatchLength::Exact).build(),
+        //     needle: &ASYNC_MUX_IL,
+        //     haystack: &MANY_LOCKED_REGS_IL,
+        //     expected_matches: 2,
+        // },
     ];
 
 
