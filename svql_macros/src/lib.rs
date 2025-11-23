@@ -7,8 +7,8 @@ use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 
 mod composite;
-mod variant;
 mod netlist;
+mod variant;
 
 #[proc_macro]
 #[proc_macro_error]
