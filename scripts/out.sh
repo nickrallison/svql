@@ -33,6 +33,7 @@
 uv run scripts/md_tree.py --root . \
     --include 'svql_subgraph/src/**.rs' \
     --include 'svql_query/src/**.rs' \
+    --include 'prjunnamed/netlist/**.rs' \
     --include 'Cargo.toml' \
     --include 'svql_subgraph/Cargo.toml' \
     --include 'svql_query/Cargo.toml' \
