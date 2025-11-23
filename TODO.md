@@ -30,7 +30,7 @@
 - [ ] **Simplify Executor / Driver**
     - *Current:* The current driver handles loading of haystacks / keeping them in memory, but does no query optimization / parallelization.
     - *Goal:* Ideally query execution could happen inside the driver, and the macro just calls the driver and returns the results.
-    - *Concept:*
+    - *Concept:* This is not syntactically valid but conveys the API it should satisfy.
         ```rust
         fn query<Query>(q: Query<Search>) -> Vec<Query<Result>> {
             todo!()
