@@ -1,3 +1,8 @@
+//! Procedural macros for SVQL.
+//!
+//! This crate defines macros for defining netlists, composites, and enum composites
+//! to simplify SVQL query construction.
+
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 

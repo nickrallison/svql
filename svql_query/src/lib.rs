@@ -1,3 +1,8 @@
+//! Core query definitions and structures for SVQL.
+//!
+//! This crate provides the building blocks for constructing SVQL queries, including
+//! bindings, instances, primitives, and state management for search and match operations.
+
 use svql_subgraph::cell::CellWrapper;
 
 use crate::instance::Instance;
