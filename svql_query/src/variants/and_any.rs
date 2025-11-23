@@ -1,9 +1,9 @@
 use crate::primitives::and::AndGate;
 use crate::primitives::and::AndMux;
 use crate::primitives::and::AndNor;
-use svql_macros::enum_composite;
+use svql_macros::variant;
 
-enum_composite! {
+variant! {
     name: AndAny,
     variants: [
         (Gate, "and_gate", AndGate),

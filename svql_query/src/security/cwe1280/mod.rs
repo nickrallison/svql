@@ -9,12 +9,12 @@ use crate::traits::composite::filter_out_by_connection;
 use crate::traits::netlist::SearchableNetlist;
 use crate::{
     Connection, Match, Search, State, Wire, WithPath,
-    enum_composites::dff_any::DffAny,
+    variants::dff_any::DffAny,
     instance::Instance,
     security::primitives::locked_register::LockedRegister,
     traits::{
         composite::{Composite, MatchedComposite, SearchableComposite},
-        enum_composite::SearchableEnumComposite,
+        variant::SearchableVariant,
     },
 };
 
@@ -102,7 +102,7 @@ impl SearchableComposite for DelayedGrantAccess<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Merge contexts from all subs (GrantAccess is netlist; others are enum_composites)
+        // Merge contexts from all subs (GrantAccess is netlist; others are variants)
         let access_ctx = GrantAccess::<Search>::context(driver, config)?;
         let reg_ctx = DffAny::<Search>::context(driver, config)?;
 
@@ -238,7 +238,7 @@ impl SearchableComposite for Cwe1280<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Merge contexts from all subs (GrantAccess is netlist; others are enum_composites)
+        // Merge contexts from all subs (GrantAccess is netlist; others are variants)
         let delayed_grant_access_ctx = DelayedGrantAccess::<Search>::context(driver, config)?;
         let locked_ctx = LockedRegister::<Search>::context(driver, config)?;
 

@@ -5,13 +5,13 @@ use svql_query::composites::rec_or::RecOr;
 use svql_query::primitives::and::AndGate;
 use svql_query::primitives::not::NotGate;
 use svql_query::traits::composite::SearchableComposite;
-use svql_query::traits::enum_composite::SearchableEnumComposite;
+use svql_query::traits::variant::SearchableVariant;
 
 use svql_common::{ALL_TEST_CASES, Needle, TestCase};
 use svql_driver::Driver;
 use svql_query::composites::dff_then_and::SdffeThenAnd;
 use svql_query::composites::rec_and::RecAnd;
-use svql_query::enum_composites::and_any::AndAny;
+use svql_query::variants::and_any::AndAny;
 use svql_query::traits::netlist::SearchableNetlist;
 use svql_query::{Search, instance::Instance};
 
@@ -83,8 +83,8 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
                 &tc.config.needle_options,
             )
         }
-        "svql_query::queries::enum_composites::and_any::AndAny" => {
-            <AndAny<Search> as SearchableEnumComposite>::context(&driver, &tc.config.needle_options)
+        "svql_query::variants::and_any::AndAny" => {
+            <AndAny<Search> as SearchableVariant>::context(&driver, &tc.config.needle_options)
         }
         "svql_query::queries::composites::rec_and::RecAnd" => {
             <RecAnd<Search> as SearchableComposite>::context(&driver, &tc.config.needle_options)
@@ -121,8 +121,8 @@ fn run_case(tc: &TestCase) -> Result<(), Box<dyn std::error::Error>> {
             )
             .len()
         }
-        "svql_query::queries::enum_composites::and_any::AndAny" => {
-            <AndAny<Search> as SearchableEnumComposite>::query(&hk, &ctx, root.clone(), &tc.config)
+        "svql_query::variants::and_any::AndAny" => {
+            <AndAny<Search> as SearchableVariant>::query(&hk, &ctx, root.clone(), &tc.config)
                 .len()
         }
         "svql_query::queries::composites::rec_and::RecAnd" => {

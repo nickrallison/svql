@@ -9,7 +9,7 @@ use crate::instance::Instance;
 
 pub mod binding;
 pub mod composites;
-pub mod enum_composites;
+pub mod variants;
 pub mod instance;
 pub mod primitives;
 pub mod security;

@@ -3,7 +3,7 @@
 // use std::sync::OnceLock;
 // use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 // use svql_driver::Driver;
-// use svql_query::enum_composites::logic_tree::LogicTree;
+// use svql_query::variants::logic_tree::LogicTree;
 // use svql_query::traits::composite::SearchableComposite;
 // use svql_query::{Search, instance::Instance};
 

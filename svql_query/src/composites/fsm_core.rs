@@ -1,5 +1,5 @@
 // use crate::State;
-// use crate::enum_composites::dff_any::DffAny;
+// use crate::variants::dff_any::DffAny;
 // use crate::instance::Instance;
 
 // #[derive(Debug, Clone)]

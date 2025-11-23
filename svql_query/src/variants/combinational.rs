@@ -1,5 +1,5 @@
-// svql_query/src/enum_composites/combinational.rs
-// Enum composite for detecting various combinational logic gates.
+// svql_query/src/variants/combinational.rs
+// Variant for detecting various combinational logic gates.
 // Covers basic gates: AND variants, OR, XOR, NOT, BUF, MUX2.
 // Useful for analyzing pure combinational paths (no state/flops).
 
@@ -11,16 +11,16 @@ use crate::primitives::or::OrGate;
 use crate::primitives::xnor::XnorGate;
 use crate::primitives::xor::XorGate;
 use crate::{State, Wire};
-use svql_macros::enum_composite;
+use svql_macros::variant;
 
-// Enum composite for various combinational gates.
+// Variant for various combinational gates.
 // Matches any of the specified gate types in the netlist.
 //
 // # Common Ports
 // - `input_a`: Primary input (always present; for single-input gates like NOT/BUF).
 // - `input_b`: Secondary input (for dual-input gates like AND/OR/XOR; optional).
 // - `output`: The gate's output wire.
-enum_composite! {
+variant! {
     name: Combinational,
     variants: [
         // AND variants (multi-style implementations)

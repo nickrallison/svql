@@ -7,7 +7,7 @@ use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 
 mod composite;
-mod enum_composite;
+mod variant;
 mod netlist;
 
 #[proc_macro]
@@ -24,6 +24,6 @@ pub fn composite(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 #[proc_macro_error]
-pub fn enum_composite(input: TokenStream) -> TokenStream {
-    enum_composite::enum_composite_inner(input)
+pub fn variant(input: TokenStream) -> TokenStream {
+    variant::variant_inner(input)
 }

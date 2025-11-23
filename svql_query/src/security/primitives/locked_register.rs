@@ -1,5 +1,5 @@
 use crate::{State, Wire, instance::Instance};
-use svql_macros::{enum_composite, netlist};
+use svql_macros::{variant, netlist};
 
 // ============================================================================
 // Pattern Definitions using netlist! macro
@@ -37,7 +37,7 @@ netlist! {
     outputs: [data_out]                         // FIXED: Use RTLIL port name
 }
 
-enum_composite! {
+variant! {
     name: LockedRegister,
     variants: [
         (AsyncEn, "async_en", AsyncDffEnable),

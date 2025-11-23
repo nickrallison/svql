@@ -5,7 +5,7 @@ use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::primitives::uninit_reg::UninitRegEn;
 use svql_query::traits::composite::SearchableComposite;
-use svql_query::traits::enum_composite::SearchableEnumComposite;
+use svql_query::traits::variant::SearchableVariant;
 use svql_query::traits::netlist::SearchableNetlist;
 use svql_query::{instance::Instance, security::cwe1280::Cwe1280};
 use tracing::{debug, info};

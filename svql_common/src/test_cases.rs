@@ -180,7 +180,7 @@ lazy_static::lazy_static! {
         pattern_query_type: "svql_query::queries::composites::dff_then_and::SdffeThenAnd",
     };
     static ref AND_ANY: Needle = Needle::Composite {
-        pattern_query_type: "svql_query::queries::enum_composites::and_any::AndAny",
+        pattern_query_type: "svql_query::variants::and_any::AndAny",
     };
     static ref REC_AND: Needle = Needle::Composite {
         pattern_query_type: "svql_query::queries::composites::rec_and::RecAnd",
@@ -677,7 +677,7 @@ lazy_static::lazy_static! {
     ];
 
 
-    pub static ref ENUM_COMPOSITE_TEST_CASES: Vec<TestCase> = vec![
+    pub static ref VARIANT_TEST_CASES: Vec<TestCase> = vec![
         TestCase {
             name: "and_any_in_mixed_tree_dedupe_all",
             config: Config::builder().match_length(crate::MatchLength::Exact).dedupe(crate::Dedupe::All).build(),
@@ -691,7 +691,7 @@ lazy_static::lazy_static! {
         let mut all = BASIC_TEST_CASES.clone();
         all.extend(SECURITY_TEST_CASES.clone());
         all.extend(COMPOSITE_TEST_CASES.clone());
-        all.extend(ENUM_COMPOSITE_TEST_CASES.clone());
+        all.extend(VARIANT_TEST_CASES.clone());
         all
     };
 }

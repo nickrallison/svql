@@ -140,16 +140,16 @@ pub fn codegen(ir: Ir) -> TokenStream {
             }
         }
 
-        impl<S> crate::traits::enum_composite::EnumComposite<S> for #name<S>
+        impl<S> crate::traits::variant::Variant<S> for #name<S>
         where
             S: crate::State,
         {
         }
 
-        impl<'ctx> crate::traits::enum_composite::MatchedEnumComposite<'ctx> for #name<crate::Match<'ctx>> {
+        impl<'ctx> crate::traits::variant::MatchedVariant<'ctx> for #name<crate::Match<'ctx>> {
         }
 
-        impl crate::traits::enum_composite::SearchableEnumComposite for #name<crate::Search> {
+        impl crate::traits::variant::SearchableVariant for #name<crate::Search> {
             type Hit<'ctx> = #name<crate::Match<'ctx>>;
 
             fn context(

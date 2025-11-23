@@ -5,7 +5,7 @@ use crate::{
     instance::Instance,
     traits::{
         composite::{Composite, MatchedComposite, SearchableComposite, filter_out_by_connection},
-        enum_composite::SearchableEnumComposite,
+        variant::SearchableVariant,
     },
 };
 use svql_common::{Config, ModuleConfig};

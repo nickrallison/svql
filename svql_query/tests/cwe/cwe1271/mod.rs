@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::security::cwe1271::Cwe1271;
-use svql_query::traits::enum_composite::SearchableEnumComposite;
+use svql_query::traits::variant::SearchableVariant;
 use svql_query::{Search, instance::Instance};
 
 #[derive(Debug, Clone)]

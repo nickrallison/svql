@@ -1,9 +1,9 @@
-// svql_query/src/enum_composites/dff_any.rs
+// svql_query/src/variants/dff_any.rs
 use crate::primitives::dff::{Adff, Adffe, Dffe, Sdff, Sdffe};
 use crate::{State, Wire};
-use svql_macros::enum_composite;
+use svql_macros::variant;
 
-enum_composite! {
+variant! {
     name: DffAny,
     variants: [
         (Sdffe, "sdffe", Sdffe),
