@@ -158,7 +158,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let candidates_vec = self.candidates_for_input(needle_current.clone(), &cell_mapping);
 
-        // NEW: If no candidates but pattern vars can match design consts, skip this input
         if candidates_vec.is_empty() && self.config.pattern_vars_match_design_consts {
             tracing::debug!(
                 "Skipping Input '{}' - no haystack match (likely constant in design)",
@@ -257,12 +256,45 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let candidates: Vec<CellWrapper<'haystack>> = unfiltered_candidates
             .into_iter()
+            // .filter(|haystack_cell| {
+            //     self.check_fanin_constraints(
+            //         needle_current.clone(),
+            //         haystack_cell.clone(),
+            //         cell_mapping,
+            //     )
             .filter(|haystack_cell| {
-                self.check_fanin_constraints(
+                if !self.check_fanin_constraints(
                     needle_current.clone(),
                     haystack_cell.clone(),
                     cell_mapping,
-                )
+                ) {
+                    return false;
+                }
+
+                // Handle backedges
+                let needle_fanout = self.needle_index.fanout_set(&needle_current);
+
+                let has_mapped_successor = needle_fanout.as_ref().map_or(false, |sets| {
+                    sets.iter()
+                        .any(|p| cell_mapping.get_haystack_cell(p.clone()).is_some())
+                });
+
+                if has_mapped_successor {
+                    let mut temp_mapping = cell_mapping.clone();
+                    temp_mapping.assign(needle_current.clone(), haystack_cell.clone());
+
+                    if let Some(fanout_cells) = needle_fanout {
+                        for p_succ in fanout_cells {
+                            if let Some(d_succ) = cell_mapping.get_haystack_cell(p_succ.clone()) {
+                                if !self.check_fanin_constraints(p_succ, d_succ, &temp_mapping) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                true
             })
             .filter(|haystack_cell| haystack_cell.cell_type() == current_kind)
             .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
@@ -321,7 +353,10 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     }
                 })
             })
-            .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
+            // Allows Inputs to collide with existing gates.
+            // This is necessary for Cycle detection where an Input 'd'
+            // essentially maps to an existing gate in the loop.
+            // .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
             .collect();
 
         candidates
