@@ -1,3 +1,8 @@
+//! Context management for SVQL designs.
+//!
+//! This module defines the `Context` type, which holds a collection of loaded designs
+//! keyed by their `DriverKey`.
+
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -5,6 +10,7 @@ use std::sync::Arc;
 use crate::DriverKey;
 use crate::design_container::DesignContainer;
 
+/// A collection of loaded designs available for querying.
 #[derive(Debug, Clone)]
 pub struct Context {
     designs: HashMap<DriverKey, Arc<DesignContainer>>,

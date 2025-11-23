@@ -1,3 +1,8 @@
+//! Macros for defining composite queries.
+//!
+//! Composite queries allow combining multiple sub-queries (instances) into a larger
+//! query structure, supporting hierarchical pattern matching.
+
 use proc_macro::TokenStream;
 
 pub mod analyze;

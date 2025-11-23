@@ -1,3 +1,5 @@
+//! The main driver for loading designs and managing the SVQL environment.
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -8,6 +10,7 @@ use thiserror::Error;
 use crate::design_container::DesignContainer;
 use crate::{Context, DriverKey};
 
+/// Errors that can occur during driver operations.
 #[derive(Debug, Error)]
 pub enum DriverError {
     #[error("Failed to find yosys binary: {0}")]
@@ -18,6 +21,7 @@ pub enum DriverError {
     DesignLoading(String),
 }
 
+/// The main driver struct for managing designs and Yosys interactions.
 #[derive(Debug, Clone)]
 pub struct Driver {
     registry: Arc<RwLock<HashMap<DriverKey, Arc<DesignContainer>>>>,
@@ -303,26 +307,4 @@ impl Driver {
         registry.clone()
     }
 
-    // /// Private helper to load design from path
-    // fn load_design_from_path(
-    //     &self,
-    //     design_path: &str,
-    //     module_name: &str,
-    //     module_config: &svql_common::ModuleConfig,
-    // ) -> Result<Design, DriverError> {
-    //     tracing::event!(
-    //         tracing::Level::DEBUG,
-    //         "Loading design from path: {} ({})",
-    //         design_path,
-    //         module_name
-    //     );
-    //     let yosys_module = YosysModule::new(design_path, module_name)
-    //         .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-
-    //     let result = yosys_module
-    //         .import_design_yosys(module_config, &self.yosys_path)
-    //         .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-
-    //     Ok(result)
-    // }
 }

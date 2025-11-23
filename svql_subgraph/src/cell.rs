@@ -1,9 +1,12 @@
+//! Cell definitions and wrappers for subgraph matching.
+
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::{borrow::Cow, fmt::Debug};
 
 use prjunnamed_netlist::{Cell, CellRef, MetaItemRef};
 
+/// Enumeration of supported cell types for matching.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CellKind {
     Buf,
@@ -137,6 +140,7 @@ impl std::fmt::Display for CellKind {
     }
 }
 
+/// A lightweight index wrapper for cells.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CellIndex {
     idx: usize,
@@ -153,22 +157,13 @@ impl CellIndex {
     }
 }
 
+/// A wrapper around a cell reference that provides equality and hashing based on debug index.
 #[derive(Clone)]
 pub struct CellWrapper<'a> {
     cell: Cow<'a, Cell>,
     debug_index: usize,
     metadata: MetaItemRef<'a>,
 }
-
-// impl Debug for CellWrapper<'_> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(
-//             f,
-//             "CellWrapper {{ cell: {:?}, debug_index: {}, metadata: {:?} }}",
-//             self.cell, self.debug_index, self.metadata
-//         )
-//     }
-// }
 
 impl Debug for CellWrapper<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

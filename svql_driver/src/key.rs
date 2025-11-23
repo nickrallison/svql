@@ -1,6 +1,9 @@
+//! Unique identifiers for loaded designs.
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// A unique key identifying a loaded design by its file path and module name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DriverKey {
     pub path: PathBuf,

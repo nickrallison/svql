@@ -1,8 +1,11 @@
+//! Structures representing found subgraph embeddings.
+
 use std::collections::HashMap;
 
 use crate::cell::{CellKind, CellWrapper};
 use crate::mapping::Assignment;
 
+/// A collection of embeddings found during a search.
 #[derive(Clone, Debug, Default)]
 pub struct EmbeddingSet<'needle, 'haystack> {
     pub items: Vec<Embedding<'needle, 'haystack>>,
@@ -10,6 +13,7 @@ pub struct EmbeddingSet<'needle, 'haystack> {
     pub needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
 }
 
+/// A single embedding of the needle graph into the haystack graph.
 #[derive(Clone, Debug, Default)]
 pub struct Embedding<'needle, 'haystack> {
     pub assignment: Assignment<'needle, 'haystack>,

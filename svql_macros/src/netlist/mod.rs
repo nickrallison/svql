@@ -1,3 +1,8 @@
+//! Macros for defining netlist queries.
+//!
+//! Netlist queries define structural patterns to match against a design's netlist,
+//! specifying instances, ports, and connections.
+
 use proc_macro::TokenStream;
 
 pub mod analyze;

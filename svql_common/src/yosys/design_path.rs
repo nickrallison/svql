@@ -1,9 +1,15 @@
+//! Handling of design file paths and types.
+
 use std::path::{Path, PathBuf};
 
+/// Represents a path to a design file, categorized by its type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DesignPath {
+    /// A Verilog file (.v).
     Verilog(PathBuf),
+    /// An RTLIL file (.il).
     Rtlil(PathBuf),
+    /// A JSON file (.json).
     Json(PathBuf),
 }
 

@@ -6,12 +6,17 @@ use crate::ModuleConfig;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// The length of the match to find.
     pub match_length: MatchLength,
+    /// How to deduplicate matches.
     pub dedupe: Dedupe,
-    // pub bind_inputs: bool,
+    /// Configuration for the needle (pattern) module.
     pub needle_options: ModuleConfig,
+    /// Configuration for the haystack (target) module.
     pub haystack_options: ModuleConfig,
+    /// Whether pattern variables can match design constants.
     pub pattern_vars_match_design_consts: bool,
+    /// Maximum recursion depth for the search.
     pub max_recursion_depth: Option<usize>,
 }
 
@@ -20,7 +25,6 @@ impl Default for Config {
         Self {
             match_length: MatchLength::First,
             dedupe: Dedupe::None,
-            // bind_inputs: true,
             needle_options: Default::default(),
             haystack_options: Default::default(),
             pattern_vars_match_design_consts: true,
@@ -34,7 +38,6 @@ impl Config {
     pub fn new(
         match_length: MatchLength,
         dedupe: Dedupe,
-        // bind_inputs: bool,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
         pattern_vars_match_design_consts: bool,
@@ -60,7 +63,6 @@ impl Config {
 pub struct ConfigBuilder {
     match_length: MatchLength,
     dedupe: Dedupe,
-    // bind_inputs: bool,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
     pub pattern_vars_match_design_consts: bool,
@@ -77,11 +79,6 @@ impl ConfigBuilder {
         self.dedupe = value;
         self
     }
-
-    // pub fn bind_inputs(mut self, value: bool) -> Self {
-    //     self.bind_inputs = value;
-    //     self
-    // }
 
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
@@ -101,10 +98,6 @@ impl ConfigBuilder {
         self
     }
 
-    // pub fn needle_flatten(mut self, flatten: bool) -> Self {
-    //     self.needle_options.flatten = flatten;
-    //     self
-    // }
 
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
@@ -133,11 +126,6 @@ impl ConfigBuilder {
         self
     }
 
-    // pub fn haystack_flatten(mut self, flatten: bool) -> Self {
-    //     self.haystack_options.flatten = flatten;
-    //     self
-    // }
-
     pub fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
@@ -161,11 +149,15 @@ impl ConfigBuilder {
     }
 }
 
+/// Defines how much of the pattern must match the target.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum MatchLength {
+    /// Stop after the first match.
     #[default]
     First,
+    /// The needle must be a subgraph of the haystack.
     NeedleSubsetHaystack,
+    /// The needle must exactly match the haystack.
     Exact,
 }
 
@@ -194,11 +186,15 @@ impl FromStr for MatchLength {
     }
 }
 
+/// Defines the deduplication strategy for matches.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Dedupe {
+    /// No deduplication.
     None,
+    /// Deduplicate based on inner matches.
     #[default]
     Inner,
+    /// Deduplicate all matches.
     All,
 }
 
@@ -214,7 +210,6 @@ impl Dedupe {
     }
 }
 
-// from str
 impl FromStr for Dedupe {
     type Err = ();
 

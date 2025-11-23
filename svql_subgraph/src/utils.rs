@@ -1,6 +1,9 @@
+//! Utility functions for the subgraph matcher.
+
 use std::collections::HashSet;
 use std::hash::Hash;
 
+/// Computes the intersection of a vector of sets.
 pub fn intersect_sets<T: Eq + Hash + Clone>(mut items: Vec<HashSet<T>>) -> HashSet<T> {
     let Some(first_fanin) = items.pop() else {
         return HashSet::new();

@@ -1,7 +1,10 @@
+//! Bi-directional mapping between needle and haystack cells.
+
 use std::collections::HashMap;
 
 use crate::cell::CellWrapper;
 
+/// Maintains the current state of cell assignments during the search.
 #[derive(Clone, Debug, Default)]
 pub struct Assignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping

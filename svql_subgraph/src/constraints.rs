@@ -1,3 +1,8 @@
+//! Fan-in and connectivity constraints for subgraph matching.
+//!
+//! This module implements the logic to check if a candidate cell in the haystack
+//! satisfies the connectivity requirements of the needle cell.
+
 use crate::SubgraphMatcherCore;
 use crate::cell::CellWrapper;
 use crate::mapping::Assignment;

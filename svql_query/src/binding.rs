@@ -1,14 +1,15 @@
+//! Helper functions for binding query ports to matches.
+//!
+//! This module provides functions to bind input and output ports of a query
+//! to the corresponding cells in the matched design.
+
 use std::collections::HashMap;
 
 use crate::Match;
 use svql_subgraph::{Embedding, cell::CellWrapper};
 use tracing::debug;
 
-// Macro‑friendly helpers that bind a single bit of a named input or output
-// into our `Match<'p, 'd>` payload. A codegen macro can call these for each
-// declared port (and iterate width as needed if/when multi‑bit ports are
-// supported at the query layer).
-
+/// Binds a named input port bit to a match.
 pub fn bind_input<'ctx>(
     m: &Embedding<'ctx, 'ctx>,
     name: &str,
@@ -28,6 +29,7 @@ pub fn bind_input<'ctx>(
     }
 }
 
+/// Binds a named output port bit to a match.
 pub fn bind_output<'ctx>(
     m: &Embedding<'ctx, 'ctx>,
     name: &str,

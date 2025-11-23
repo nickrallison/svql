@@ -1,3 +1,8 @@
+//! Core subgraph isomorphism matching algorithm.
+//!
+//! This module implements the Ullmann-like backtracking algorithm to find
+//! embeddings of the needle graph in the haystack graph.
+
 use std::collections::{HashSet, VecDeque};
 use tracing::debug;
 
@@ -13,6 +18,7 @@ use crate::graph_index::GraphIndex;
 use crate::mapping::Assignment;
 use crate::utils::intersect_sets;
 
+/// The main entry point for subgraph matching.
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     needle: &'needle Design,
     haystack: &'haystack Design,
@@ -21,6 +27,7 @@ pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub(crate) config: &'cfg Config,
 }
 
+/// Internal state for the matching algorithm.
 pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) needle: &'needle Design,
     pub(crate) haystack: &'haystack Design,

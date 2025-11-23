@@ -1,3 +1,8 @@
+//! Macros for defining enum composite queries.
+//!
+//! Enum composites allow defining a query that matches one of several possible
+//! sub-queries (variants), enabling polymorphic pattern matching.
+
 // svql_macros/src/enum_composite/mod.rs
 use proc_macro::TokenStream;
 

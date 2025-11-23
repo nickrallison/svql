@@ -1,3 +1,5 @@
+//! Wrapper for Yosys modules and execution.
+
 use std::{
     fs::File,
     path::{Path, PathBuf},
@@ -6,6 +8,7 @@ use std::{
 
 use crate::yosys::{DesignPath, ModuleConfig};
 
+/// Represents a specific module within a design file to be processed by Yosys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct YosysModule {
     path: DesignPath,

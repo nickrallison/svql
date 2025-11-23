@@ -1,16 +1,22 @@
+//! Common test cases and definitions for SVQL.
+//!
+//! This module defines the structures for test cases, needles (patterns), and haystacks (targets),
+//! and provides a collection of pre-defined test cases.
+
 use std::path::Path;
 
 use crate::{Dedupe, MatchLength, YosysModule, config::Config};
 
+/// Represents a pattern to search for (the "needle").
 #[derive(Debug, Clone)]
 pub enum Needle {
+    /// A netlist pattern loaded from a Yosys module.
     Netlist {
         yosys_module: YosysModule,
         pattern_query_type: Option<&'static str>,
     },
-    Composite {
-        pattern_query_type: &'static str,
-    },
+    /// A composite pattern defined in code.
+    Composite { pattern_query_type: &'static str },
 }
 
 impl Needle {
@@ -26,17 +32,24 @@ impl Needle {
     }
 }
 
+/// Represents a target design to search in (the "haystack").
 #[derive(Debug, Clone)]
 pub struct Haystack {
     pub yosys_module: YosysModule,
 }
 
+/// A complete test case definition.
 #[derive(Debug, Clone)]
 pub struct TestCase {
+    /// The name of the test case.
     pub name: &'static str,
+    /// The configuration for the search.
     pub config: Config,
+    /// The pattern to search for.
     pub needle: &'static Needle,
+    /// The target design to search in.
     pub haystack: &'static Haystack,
+    /// The expected number of matches.
     pub expected_matches: usize,
 }
 

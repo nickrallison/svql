@@ -1,8 +1,12 @@
+//! Container for holding a design and its graph index.
+
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
 use svql_subgraph::graph_index::GraphIndex;
 
-// #[derive(Debug)]
+/// A self-referencing struct that holds a `Design` and its corresponding `GraphIndex`.
+///
+/// The `GraphIndex` borrows from the `Design`, so they must be kept together.
 #[self_referencing]
 pub struct DesignContainer {
     design: Design,

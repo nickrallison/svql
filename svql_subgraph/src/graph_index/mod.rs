@@ -1,3 +1,8 @@
+//! Graph indexing and connectivity analysis.
+//!
+//! This module provides efficient data structures for querying graph connectivity,
+//! cell types, and I/O mappings.
+
 mod cell_registry;
 mod connectivity_graph;
 mod io_mapping;
@@ -10,6 +15,7 @@ use crate::cell::{CellIndex, CellKind, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
 use std::collections::{HashMap, HashSet};
 
+/// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
 pub struct GraphIndex<'a> {
     cell_registry: CellRegistry<'a>,

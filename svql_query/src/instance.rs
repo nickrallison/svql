@@ -1,5 +1,8 @@
+//! Hierarchical instance path representation.
+
 use std::sync::Arc;
 
+/// Represents a hierarchical path to an instance in the design.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Instance {
     pub inst: Arc<str>,

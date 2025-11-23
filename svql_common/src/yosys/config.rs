@@ -1,12 +1,21 @@
+//! Configuration for Yosys module processing.
+
 use std::collections::HashMap;
 
+/// Configuration options for processing a Yosys module.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ModuleConfig {
+    /// Whether to flatten the module.
     pub flatten: bool,
+    /// Whether to run `opt_clean`.
     pub opt_clean: bool,
+    /// Whether to run `opt`.
     pub opt: bool,
+    /// Parameters to set on the module.
     pub params: HashMap<String, String>,
+    /// Additional Yosys commands to run.
     pub other_steps: Vec<String>,
+    /// Whether to use Verific for parsing.
     pub verific: bool,
 }
 
