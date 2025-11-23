@@ -206,6 +206,9 @@ def generate_markdown(
             # Binary or non‑utf‑8 files – fall back to a safe representation.
             content = f.read_bytes().hex()
             lines.append("\n# (binary file – shown as hex)\n")
+
+        content = "".join(['\t' + line for line in content.splitlines(keepends=True)])
+
         lines.append(content.rstrip("\n"))  # avoid extra blank line at end
         lines.append("```")
         lines.append("")  # blank line between sections
