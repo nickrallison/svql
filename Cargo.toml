@@ -59,6 +59,7 @@ prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
 ###############
 # OTHER LIBRARIES
 ###############
+ahash = "0.8.8"
 argparse = "0.2"
 contracts = "0.6.6"
 dashmap = "6.1.0"

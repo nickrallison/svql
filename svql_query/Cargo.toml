@@ -24,6 +24,7 @@ prjunnamed-netlist.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
+ahash.workspace = true
 contracts.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
