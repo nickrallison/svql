@@ -12,13 +12,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::None)
+        .max_recursion_depth(Some(3))
         .build();
 
     let driver = Driver::new_workspace()?;
 
     // Example: Load a design that might contain the vulnerability
-    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
-    let design_module = "cwe1234_not_alternating";
+    let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
+    let design_module = "tile";
 
     info!("Loading design...");
     let (haystack_key, haystack_design) =

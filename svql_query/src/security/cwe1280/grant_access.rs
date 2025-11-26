@@ -14,7 +14,10 @@ pub struct GrantAccess<S: State> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Search, instance::Instance, security::cwe1280::grant_access::GrantAccess, traits::Query,
+        Search,
+        instance::Instance,
+        security::cwe1280::grant_access::GrantAccess,
+        traits::{Query, Searchable},
     };
     use std::sync::OnceLock;
     use svql_common::{Config, Dedupe, MatchLength, YosysModule};
