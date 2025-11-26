@@ -98,7 +98,6 @@ impl ConfigBuilder {
         self
     }
 
-
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
         self
