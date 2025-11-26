@@ -1,9 +1,12 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-netlist! {
-    name: EqGate,
-    module_name: "eq_gate",
-    file: "examples/patterns/basic/eq/verilog/eq_gate.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/eq/verilog/eq_gate.v",
+    name = "eq_gate"
+)]
+pub struct EqGate<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }

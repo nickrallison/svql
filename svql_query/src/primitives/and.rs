@@ -1,35 +1,37 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: AndGate,
-    module_name: "and_gate",
-    file: "examples/patterns/basic/and/verilog/and_gate.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/and/verilog/and_gate.v",
+    name = "and_gate"
+)]
+pub struct AndGate<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }
 
-netlist! {
-    name: AndMux,
-    module_name: "and_mux",
-    file: "examples/patterns/basic/and/verilog/and_mux.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/and/verilog/and_mux.v",
+    name = "and_mux"
+)]
+pub struct AndMux<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }
 
-netlist! {
-    name: AndNor,
-    module_name: "and_nor",
-    file: "examples/patterns/basic/and/verilog/and_nor.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/and/verilog/and_nor.v",
+    name = "and_nor"
+)]
+pub struct AndNor<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> AndGate<S>
-where
-    S: State,
-{
+impl<S: State> AndGate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone(), self.b.clone()]
     }

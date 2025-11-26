@@ -9,6 +9,10 @@
     "github.copilot.enable": {
         "*": true,
         "prjunnamed": false,
-    }
+    },
+    "rust-analyzer.cargo.extraArgs": ["--locked"],
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.linkedProjects": ["Cargo.toml"]
+
 
 }

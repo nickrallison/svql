@@ -1,19 +1,16 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: NotGate,
-    module_name: "not_gate",
-    file: "examples/patterns/basic/not/verilog/not_gate.v",
-    inputs: [a],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/not/verilog/not_gate.v",
+    name = "not_gate"
+)]
+pub struct NotGate<S: State> {
+    pub a: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> NotGate<S>
-where
-    S: State,
-{
+impl<S: State> NotGate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone()]
     }

@@ -1,233 +1,40 @@
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{DriverKey, context::Context, driver::Driver};
-use svql_subgraph::{GraphIndex, cell::CellWrapper};
+use crate::{State, Wire};
 
-use crate::{Connection, Match, Search, State, WithPath, instance::Instance};
-
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
-
-pub trait Composite<S>: WithPath<S>
-where
-    S: State,
-{
-    fn connections(&self) -> Vec<Vec<Connection<S>>>;
+/// Implemented by Composites to define internal connectivity.
+pub trait Topology<S: State> {
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>);
 }
 
-pub trait SearchableComposite: Composite<Search> {
-    type Hit<'ctx>;
-
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>>;
-
-    fn query<'ctx>(
-        haystack_key: &DriverKey,
-        context: &'ctx Context,
-        path: Instance,
-        config: &Config,
-    ) -> Vec<Self::Hit<'ctx>>;
+pub struct ConnectionBuilder<'a, S: State> {
+    // Outer Vec = AND (All groups must be satisfied)
+    // Inner Vec = OR  (At least one pair in the group must connect)
+    // Option::None = The port does not exist on the current variant
+    pub constraints: Vec<Vec<(Option<&'a Wire<S>>, Option<&'a Wire<S>>)>>,
 }
 
-pub trait MatchedComposite<'ctx>: Composite<Match<'ctx>> {
-    fn other_filters(&self) -> Vec<Box<dyn Fn(&Self) -> bool + '_>> {
-        vec![]
+impl<'a, S: State> ConnectionBuilder<'a, S> {
+    /// Adds a mandatory connection.
+    /// If either 'from' or 'to' is None, this constraint evaluates to FALSE.
+    pub fn connect<A, B>(&mut self, from: A, to: B)
+    where
+        A: Into<Option<&'a Wire<S>>>,
+        B: Into<Option<&'a Wire<S>>>,
+    {
+        self.constraints.push(vec![(from.into(), to.into())]);
     }
 
-    /// Validate that a connection represents a valid design connectivity
-    /// where the source and destination refer to the same design cell/bit
-    fn validate_connection(
-        &self,
-        connection: Connection<Match<'ctx>>,
-        haystack_graph_index: &GraphIndex<'ctx>,
-    ) -> bool {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "Validating connection: from={:?} to={:?}",
-            connection.from.path,
-            connection.to.path
-        );
+    /// Adds a flexible connection group (CNF).
+    /// At least one pair in the list must be valid and connected.
+    pub fn connect_any<A, B>(&mut self, options: &[(A, B)])
+    where
+        A: Into<Option<&'a Wire<S>>> + Clone,
+        B: Into<Option<&'a Wire<S>>> + Clone,
+    {
+        let group = options
+            .iter()
+            .map(|(a, b)| (a.clone().into(), b.clone().into()))
+            .collect();
 
-        // Find the actual wire ports in the composites structure
-        let from_wire = self.find_port(&connection.from.path);
-        let to_wire = self.find_port(&connection.to.path);
-
-        tracing::event!(
-            tracing::Level::TRACE,
-            "Found from port: {:?}",
-            from_wire.is_some()
-        );
-        tracing::event!(
-            tracing::Level::TRACE,
-            "Found to port: {:?}",
-            to_wire.is_some()
-        );
-
-        match (from_wire, to_wire) {
-            (Some(from), Some(to)) => {
-                let from_match = &from.val;
-                let to_match = &to.val;
-
-                tracing::event!(
-                    tracing::Level::TRACE,
-                    "From match present: {:?}",
-                    from_match.is_some()
-                );
-                tracing::event!(
-                    tracing::Level::TRACE,
-                    "To match present: {:?}",
-                    to_match.is_some()
-                );
-
-                match (from_match, to_match) {
-                    (Some(from_val), Some(to_val)) => {
-                        let from_node = from_val.design_node_ref.as_ref();
-                        let to_node = to_val.design_node_ref.as_ref();
-
-                        tracing::event!(
-                            tracing::Level::TRACE,
-                            "From node present: {:?}",
-                            from_node.is_some()
-                        );
-                        tracing::event!(
-                            tracing::Level::TRACE,
-                            "To node present: {:?}",
-                            to_node.is_some()
-                        );
-
-                        if let (Some(from_n), Some(to_n)) = (from_node, to_node) {
-                            let fan_in_contains_from = haystack_graph_index
-                                .fanin_set(to_n)
-                                .map_or(false, |fanin_set| fanin_set.contains(from_n));
-
-                            tracing::event!(
-                                tracing::Level::TRACE,
-                                "Nodes equal: {}",
-                                fan_in_contains_from
-                            );
-                            fan_in_contains_from
-                        } else {
-                            tracing::event!(
-                                tracing::Level::TRACE,
-                                "Connection validation failed - missing node references"
-                            );
-                            false
-                        }
-                    }
-                    _ => {
-                        tracing::event!(
-                            tracing::Level::TRACE,
-                            "Connection validation failed - missing match values"
-                        );
-                        false
-                    }
-                }
-            }
-            _ => {
-                tracing::event!(
-                    tracing::Level::TRACE,
-                    "Connection validation failed - could not find ports"
-                );
-                false
-            }
-        }
+        self.constraints.push(group);
     }
-
-    /// Validate all connection sets - at least one connection in each set must be valid
-    fn validate_connections(
-        &self,
-        connections: Vec<Vec<Connection<Match<'ctx>>>>,
-        haystack_graph_index: &GraphIndex<'ctx>,
-    ) -> bool {
-        tracing::event!(
-            tracing::Level::TRACE,
-            "Validating {} connection sets for composites",
-            connections.len()
-        );
-        for (i, connection_set) in connections.iter().enumerate() {
-            tracing::event!(
-                tracing::Level::TRACE,
-                "Checking connection set {}: {} connections",
-                i,
-                connection_set.len()
-            );
-            let mut valid = false;
-            for conn in connection_set {
-                if self.validate_connection(conn.clone(), haystack_graph_index) {
-                    tracing::event!(tracing::Level::TRACE, "Connection set {} is valid", i);
-                    valid = true;
-                    break;
-                }
-            }
-            if !valid {
-                tracing::event!(
-                    tracing::Level::TRACE,
-                    "Connection set {} failed validation",
-                    i
-                );
-                return false;
-            }
-        }
-        tracing::event!(
-            tracing::Level::TRACE,
-            "All connection sets passed validation"
-        );
-        true
-    }
-}
-
-pub fn filter_out_by_connection<'ctx, F, T>(
-    haystack_index: &GraphIndex<'ctx>,
-    connection: Connection<Search>,
-    modules_from: Vec<F>,
-    modules_to: Vec<T>,
-) -> Vec<(F, T)>
-where
-    F: WithPath<Match<'ctx>> + Clone + Send + Sync,
-    T: WithPath<Match<'ctx>> + Clone + Send + Sync,
-{
-    #[cfg(feature = "parallel")]
-    let from_iter = modules_from.into_par_iter();
-    #[cfg(not(feature = "parallel"))]
-    let from_iter = modules_from.into_iter();
-
-    let results = from_iter
-        .flat_map(|module_f| {
-            let from_wire = module_f.find_port(&connection.from.path);
-            let from_cell: &CellWrapper<'ctx> = from_wire
-                .expect("Port cell not found")
-                .val
-                .as_ref()
-                .expect("From cell not found")
-                .design_node_ref
-                .as_ref()
-                .expect("Design node not found");
-            let fanout = haystack_index
-                .fanout_set(from_cell)
-                .expect("Fanout not found for cell");
-
-            modules_to
-                .iter()
-                .filter_map(|module_t| {
-                    let to_wire = module_t.find_port(&connection.to.path);
-                    let to_cell: &CellWrapper<'ctx> = to_wire
-                        .expect("Port cell not found")
-                        .val
-                        .as_ref()
-                        .expect("To cell not found")
-                        .design_node_ref
-                        .as_ref()
-                        .expect("Design node not found");
-
-                    if fanout.contains(to_cell) {
-                        Some((module_f.clone(), module_t.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<(F, T)>>()
-        })
-        .collect();
-    return results;
 }

@@ -1,10 +1,12 @@
+use crate::State;
 use crate::security::primitives::uninit_reg::{UninitReg, UninitRegEn};
 use svql_macros::variant;
 
-variant! {
-    name: Cwe1271,
-    variants: [
-        (UninitRegEn, "uninit_reg_en", UninitRegEn),
-        (UninitReg, "uninit_reg", UninitReg)
-    ]
+#[variant(ports(clk, data_in, data_out))]
+pub enum Cwe1271<S: State> {
+    #[variant(map(clk = "clk", data_in = "data_in", data_out = "data_out"))]
+    WithEnable(UninitRegEn<S>),
+
+    #[variant(map(clk = "clk", data_in = "data_in", data_out = "data_out"))]
+    Basic(UninitReg<S>),
 }

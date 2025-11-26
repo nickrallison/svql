@@ -1,16 +1,15 @@
-// svql_query/src/queries/security/cwe1234/unlock_logic.rs
-
 use crate::composites::rec_or::RecOr;
 use crate::instance::Instance;
 use crate::primitives::and::AndGate;
 use crate::primitives::not::NotGate;
-use crate::traits::composite::{Composite, MatchedComposite, SearchableComposite};
-use crate::traits::netlist::SearchableNetlist;
-use crate::{Connection, Match, Search, State, WithPath};
+use crate::traits::{
+    Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection,
+};
+use crate::{Connection, Match, Search, State, Wire};
+use std::sync::Arc;
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::GraphIndex;
-use svql_subgraph::cell::CellWrapper;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -30,25 +29,23 @@ where
     pub not_gate: NotGate<S>, // Negated lock signal
 }
 
-impl<S> UnlockLogic<S>
+impl<S> Component<S> for UnlockLogic<S>
 where
     S: State,
 {
-    pub fn new(path: Instance) -> Self {
-        Self {
-            path: path.clone(),
-            top_and: AndGate::new(path.child("top_and".to_string())),
-            rec_or: RecOr::new(path.child("rec_or".to_string())),
-            not_gate: NotGate::new(path.child("not_gate".to_string())),
-        }
+    fn path(&self) -> &Instance {
+        &self.path
     }
-}
 
-impl<S> WithPath<S> for UnlockLogic<S>
-where
-    S: State,
-{
-    fn find_port(&self, p: &Instance) -> Option<&crate::Wire<S>> {
+    fn type_name(&self) -> &'static str {
+        "UnlockLogic"
+    }
+
+    fn children(&self) -> Vec<&dyn Component<S>> {
+        vec![&self.top_and, &self.rec_or, &self.not_gate]
+    }
+
+    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         let idx = self.path.height() + 1;
         match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
             Some("top_and") => self.top_and.find_port(p),
@@ -58,114 +55,41 @@ where
         }
     }
 
-    fn path(&self) -> Instance {
-        self.path.clone()
+    fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
+        None
     }
 }
 
-impl<S> Composite<S> for UnlockLogic<S>
+impl<S> Topology<S> for UnlockLogic<S>
 where
     S: State,
 {
-    fn connections(&self) -> Vec<Vec<Connection<S>>> {
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
         // The OR tree output must connect to one of the AND inputs
-        vec![vec![
-            Connection {
-                from: self.rec_or.output().clone(),
-                to: self.top_and.a.clone(),
-            },
-            Connection {
-                from: self.rec_or.output().clone(),
-                to: self.top_and.b.clone(),
-            },
-        ]]
-        // Note: NOT gate to OR tree connection is validated separately
-        // via has_not_in_or_tree() because it can connect at any depth
+        ctx.connect_any(&[
+            (Some(self.rec_or.output()), Some(&self.top_and.a)),
+            (Some(self.rec_or.output()), Some(&self.top_and.b)),
+        ]);
     }
 }
 
-impl<'ctx> MatchedComposite<'ctx> for UnlockLogic<Match<'ctx>> {}
-
-impl<'ctx> UnlockLogic<Match<'ctx>> {
-    /// Check if the NOT gate output connects to any level of the RecOr tree.
-    /// This is the key validation for the CWE1234 pattern: there must be
-    /// a negated lock signal somewhere in the bypass conditions.
-    pub fn has_not_in_or_tree(&self, haystack_index: &GraphIndex<'ctx>) -> bool {
-        tracing::debug!(
-            "Checking if NOT gate (depth={}) connects to OR tree (depth={})",
-            1,
-            self.rec_or.depth()
-        );
-        self.check_not_connects_to_or(&self.rec_or, 1, haystack_index)
-    }
-
-    /// Recursively check if not_gate.y connects to this OR or any of its children.
-    ///
-    /// This traverses the entire RecOr tree, checking at each level if the
-    /// NOT gate output connects to either input (a or b) of the OR gate.
-    fn check_not_connects_to_or(
-        &self,
-        rec_or: &RecOr<Match<'ctx>>,
-        depth: usize,
-        haystack_index: &GraphIndex<'ctx>,
-    ) -> bool {
-        tracing::trace!(
-            "Checking OR gate at depth {} (has_child={})",
-            depth,
-            rec_or.child.is_some()
-        );
-
-        // Check if not_gate.y connects to this level's OR inputs (a or b)
-        let connects_to_a = self.validate_connection(
-            Connection {
-                from: self.not_gate.y.clone(),
-                to: rec_or.or.a.clone(),
-            },
-            haystack_index,
-        );
-
-        let connects_to_b = self.validate_connection(
-            Connection {
-                from: self.not_gate.y.clone(),
-                to: rec_or.or.b.clone(),
-            },
-            haystack_index,
-        );
-
-        if connects_to_a {
-            tracing::debug!("NOT gate connects to OR input 'a' at depth {}", depth);
-            return true;
+impl Searchable for UnlockLogic<Search> {
+    fn instantiate(base_path: Instance) -> Self {
+        Self {
+            path: base_path.clone(),
+            top_and: AndGate::new(base_path.child("top_and")),
+            rec_or: RecOr::new(base_path.child("rec_or")),
+            not_gate: NotGate::new(base_path.child("not_gate")),
         }
-
-        if connects_to_b {
-            tracing::debug!("NOT gate connects to OR input 'b' at depth {}", depth);
-            return true;
-        }
-
-        // If not connected at this level, recursively check the child
-        if let Some(ref child) = rec_or.child {
-            tracing::trace!("Recursing into child at depth {}", depth + 1);
-            return self.check_not_connects_to_or(child, depth + 1, haystack_index);
-        }
-
-        // No connection found at any level
-        tracing::debug!(
-            "NOT gate does not connect to OR tree (searched {} levels)",
-            depth
-        );
-        false
-    }
-
-    /// Get the depth of the OR tree for debugging/reporting
-    pub fn or_tree_depth(&self) -> usize {
-        self.rec_or.depth()
     }
 }
 
-impl SearchableComposite for UnlockLogic<Search> {
-    type Hit<'ctx> = UnlockLogic<Match<'ctx>>;
+impl UnlockLogic<Search> {
+    pub fn new(path: Instance) -> Self {
+        <Self as Searchable>::instantiate(path)
+    }
 
-    fn context(
+    pub fn context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
@@ -176,36 +100,26 @@ impl SearchableComposite for UnlockLogic<Search> {
 
         Ok(and_ctx.merge(or_ctx).merge(not_ctx))
     }
+}
 
-    fn query<'ctx>(
-        haystack_key: &DriverKey,
-        context: &'ctx Context,
-        path: Instance,
+impl Query for UnlockLogic<Search> {
+    type Matched<'a> = UnlockLogic<Match<'a>>;
+
+    fn query<'a>(
+        &self,
+        driver: &Driver,
+        context: &'a Context,
+        key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx>> {
+    ) -> Vec<Self::Matched<'a>> {
         tracing::info!("UnlockLogic::query: starting CWE1234 unlock pattern search");
 
-        let haystack_index = context.get(haystack_key).unwrap().index();
+        let haystack_index = context.get(key).unwrap().index();
 
         // Query all components
-        let and_gates = AndGate::<Search>::query(
-            haystack_key,
-            context,
-            path.child("top_and".to_string()),
-            config,
-        );
-        let rec_ors = RecOr::<Search>::query(
-            haystack_key,
-            context,
-            path.child("rec_or".to_string()),
-            config,
-        );
-        let not_gates = NotGate::<Search>::query(
-            haystack_key,
-            context,
-            path.child("not_gate".to_string()),
-            config,
-        );
+        let and_gates = self.top_and.query(driver, context, key, config);
+        let rec_ors = self.rec_or.query(driver, context, key, config);
+        let not_gates = self.not_gate.query(driver, context, key, config);
 
         tracing::info!(
             "UnlockLogic::query: Found {} AND gates, {} RecOR trees, {} NOT gates",
@@ -215,10 +129,10 @@ impl SearchableComposite for UnlockLogic<Search> {
         );
 
         // Step 1: Filter RecOr -> AND connections
-        let temp_self: Self = Self::new(path.clone());
+        // We use the Search instance (self) to define the connection pattern
         let or_to_and_conn = Connection {
-            from: temp_self.rec_or.output().clone(),
-            to: temp_self.top_and.a.clone(),
+            from: self.rec_or.output().clone(),
+            to: self.top_and.a.clone(), // Just a placeholder for the path
         };
 
         #[cfg(feature = "parallel")]
@@ -226,12 +140,10 @@ impl SearchableComposite for UnlockLogic<Search> {
         #[cfg(not(feature = "parallel"))]
         let or_iter = rec_ors.iter();
 
-        let rec_or_and_pairs: Vec<(RecOr<Match<'ctx>>, AndGate<Match<'ctx>>)> = {
+        let rec_or_and_pairs: Vec<(RecOr<Match<'a>>, AndGate<Match<'a>>)> = {
             or_iter
                 .enumerate()
                 .flat_map(|(rec_or_index, rec_or)| {
-                    // Get RecOr output cell
-
                     if rec_or_index % 50 == 0 {
                         tracing::debug!(
                             "UnlockLogic::query: Processing RecOr index {}",
@@ -242,14 +154,7 @@ impl SearchableComposite for UnlockLogic<Search> {
                     let from_wire = rec_or
                         .find_port(&or_to_and_conn.from.path)
                         .expect("RecOr output port not found");
-                    let from_cell: &CellWrapper<'ctx> = from_wire
-                        .val
-                        .as_ref()
-                        .expect("RecOr output cell not found")
-                        .design_node_ref
-                        .as_ref()
-                        .expect("RecOr design node not found");
-
+                    let from_cell = &from_wire.inner;
                     let fanout = haystack_index
                         .fanout_set(from_cell)
                         .expect("Fanout not found for RecOr cell");
@@ -257,24 +162,11 @@ impl SearchableComposite for UnlockLogic<Search> {
                     let pairs: Vec<_> = and_gates
                         .iter()
                         .filter_map(|and_gate| {
-                            // Check both AND inputs (a and b) for commutative matching
-                            let connected =
-                                [&and_gate.a.path, &and_gate.b.path]
-                                    .iter()
-                                    .any(|and_input_path| {
-                                        let to_wire = and_gate
-                                            .find_port(and_input_path)
-                                            .expect("AND input port not found");
-                                        let to_cell: &CellWrapper<'ctx> = to_wire
-                                            .val
-                                            .as_ref()
-                                            .expect("AND input cell not found")
-                                            .design_node_ref
-                                            .as_ref()
-                                            .expect("AND design node not found");
-
-                                        fanout.contains(to_cell)
-                                    });
+                            // Check both AND inputs (a and b)
+                            let connected = [&and_gate.a, &and_gate.b].iter().any(|to_wire| {
+                                let to_cell = &to_wire.inner;
+                                fanout.contains(to_cell)
+                            });
 
                             if connected {
                                 Some((rec_or.clone(), and_gate.clone()))
@@ -290,7 +182,7 @@ impl SearchableComposite for UnlockLogic<Search> {
         };
 
         tracing::info!(
-            "UnlockLogic::query: Found {} valid (RecOr, AND) pairs after connection filtering",
+            "UnlockLogic::query: Found {} valid (RecOr, AND) pairs",
             rec_or_and_pairs.len()
         );
 
@@ -299,7 +191,7 @@ impl SearchableComposite for UnlockLogic<Search> {
         #[cfg(not(feature = "parallel"))]
         let and_or_iter = rec_or_and_pairs.iter();
 
-        let results: Vec<UnlockLogic<Match<'ctx>>> = {
+        let results: Vec<UnlockLogic<Match<'a>>> = {
             and_or_iter
                 .enumerate()
                 .flat_map(|(rec_or_and_index, (rec_or, top_and))| {
@@ -315,39 +207,43 @@ impl SearchableComposite for UnlockLogic<Search> {
                     let candidates: Vec<_> = not_gates
                         .iter()
                         .filter_map(|not_gate| {
-                            // Check if NOT gate's output is in RecOr's fan-in set
-                            let not_output_cell = not_gate
-                                .y
-                                .val
-                                .as_ref()
-                                .expect("NOT output not found")
-                                .design_node_ref
-                                .as_ref()
-                                .expect("Design node not found");
+                            let not_output_cell = &not_gate.y.inner;
 
                             if !rec_or_fanin.contains(not_output_cell) {
                                 return None;
                             }
 
                             let candidate = UnlockLogic {
-                                path: path.clone(),
+                                path: self.path.clone(),
                                 top_and: top_and.clone(),
                                 rec_or: rec_or.clone(),
                                 not_gate: not_gate.clone(),
                             };
 
-                            if candidate
-                                .validate_connections(candidate.connections(), haystack_index)
-                            {
-                                tracing::trace!(
-                                    "Valid unlock pattern found: OR depth={}, AND={}",
-                                    candidate.or_tree_depth(),
-                                    top_and.path.inst_path()
-                                );
-                                Some(candidate)
-                            } else {
-                                None
+                            // Validate connections using Topology trait
+                            let mut builder = ConnectionBuilder {
+                                constraints: Vec::new(),
+                            };
+                            candidate.define_connections(&mut builder);
+
+                            let mut valid = true;
+                            for group in builder.constraints {
+                                let mut group_satisfied = false;
+                                for (from, to) in group {
+                                    if let (Some(f), Some(t)) = (from, to) {
+                                        if validate_connection(f, t, haystack_index) {
+                                            group_satisfied = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if !group_satisfied {
+                                    valid = false;
+                                    break;
+                                }
                             }
+
+                            if valid { Some(candidate) } else { None }
                         })
                         .collect();
                     candidates
@@ -359,7 +255,12 @@ impl SearchableComposite for UnlockLogic<Search> {
             "UnlockLogic::query: Found {} final valid patterns",
             results.len()
         );
-
         results
+    }
+}
+
+impl<'ctx> UnlockLogic<Match<'ctx>> {
+    pub fn or_tree_depth(&self) -> usize {
+        self.rec_or.depth()
     }
 }

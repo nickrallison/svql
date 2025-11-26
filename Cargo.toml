@@ -77,7 +77,7 @@ regex = "1.11.1"
 rstest = "0.26.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.104"
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "extra-traits"] }
 tempfile = "3.20.0"
 thiserror = "2.0"
 tracing = "0.1.41"

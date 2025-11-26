@@ -1,13 +1,15 @@
-use crate::primitives::and::AndGate;
-use crate::primitives::and::AndMux;
-use crate::primitives::and::AndNor;
+use crate::State;
+use crate::primitives::and::{AndGate, AndMux, AndNor};
 use svql_macros::variant;
 
-variant! {
-    name: AndAny,
-    variants: [
-        (Gate, "and_gate", AndGate),
-        (Mux, "and_mux",  AndMux),
-        (Nor, "and_nor",  AndNor)
-    ]
+#[variant(ports(a, b, y))]
+pub enum AndAny<S: State> {
+    #[variant(map(a = "a", b = "b", y = "y"))]
+    Gate(AndGate<S>),
+
+    #[variant(map(a = "a", b = "b", y = "y"))]
+    Mux(AndMux<S>),
+
+    #[variant(map(a = "a", b = "b", y = "y"))]
+    Nor(AndNor<S>),
 }

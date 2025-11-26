@@ -1,28 +1,26 @@
-// svql_query/src/variants/dff_any.rs
 use crate::primitives::dff::{Adff, Adffe, Dffe, Sdff, Sdffe};
 use crate::{State, Wire};
 use svql_macros::variant;
 
-variant! {
-    name: DffAny,
-    variants: [
-        (Sdffe, "sdffe", Sdffe),
-        (Adffe, "adffe", Adffe),
-        (Sdff, "sdff", Sdff),
-        (Adff, "adff", Adff),
-        (Dffe, "dffe", Dffe),
-    ],
-    common_ports: {
-        clk: "clock",
-        d: "data_input",
-        q: "output"
-    }
+#[variant(ports(clk, d, q))]
+pub enum DffAny<S: State> {
+    #[variant(map(clk = "clk", d = "d", q = "q"))]
+    Sdffe(Sdffe<S>),
+
+    #[variant(map(clk = "clk", d = "d", q = "q"))]
+    Adffe(Adffe<S>),
+
+    #[variant(map(clk = "clk", d = "d", q = "q"))]
+    Sdff(Sdff<S>),
+
+    #[variant(map(clk = "clk", d = "d", q = "q"))]
+    Adff(Adff<S>),
+
+    #[variant(map(clk = "clk", d = "d", q = "q"))]
+    Dffe(Dffe<S>),
 }
 
-impl<S> DffAny<S>
-where
-    S: State,
-{
+impl<S: State> DffAny<S> {
     pub fn dff_type(&self) -> &'static str {
         match self {
             DffAny::Sdffe(_) => "Sync Reset Enable DFF",
@@ -30,6 +28,7 @@ where
             DffAny::Sdff(_) => "Sync Reset DFF",
             DffAny::Adff(_) => "Async Reset DFF",
             DffAny::Dffe(_) => "Enable DFF",
+            _ => "Unknown",
         }
     }
 
@@ -40,6 +39,7 @@ where
             DffAny::Sdff(dff) => Some(&dff.reset),
             DffAny::Adff(dff) => Some(&dff.reset_n),
             DffAny::Dffe(_) => None,
+            _ => None,
         }
     }
 
@@ -50,11 +50,5 @@ where
             DffAny::Dffe(dff) => Some(&dff.en),
             _ => None,
         }
-    }
-    // NEW: Dummy new for compatibility as composite sub (uses first variant)
-    pub fn new(path: crate::instance::Instance) -> Self {
-        // Use SyncReset variant as dummy for search-time construction
-        // Inner path uses the variant's inst_name
-        DffAny::Sdffe(Sdffe::new(path.child("sdffe".to_string())))
     }
 }

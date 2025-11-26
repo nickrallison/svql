@@ -1,21 +1,15 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::{GraphIndex, cell::CellWrapper};
 
 use crate::{
-    Connection,
-    Match,
-    Search,
-    State,
-    WithPath,
+    Match, Search, State, Wire,
     instance::Instance,
     primitives::or::OrGate,
-    traits::{
-        composite::{Composite, MatchedComposite, SearchableComposite},
-        netlist::SearchableNetlist,
-    }, // FIXED: traits::netlist
+    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
 };
 
 #[derive(Debug, Clone)]
@@ -24,7 +18,7 @@ where
     S: State,
 {
     pub path: Instance,
-    pub or: OrGate<S>, // CHANGED: 'or' instead of 'and'
+    pub or: OrGate<S>,
     pub child: Option<Box<Self>>,
 }
 
@@ -32,166 +26,146 @@ impl<S> RecOr<S>
 where
     S: State,
 {
-    pub fn new(path: Instance) -> Self {
-        Self {
-            path: path.clone(),
-            or: OrGate::new(path.child("or".to_string())), // CHANGED: "or" path
-            child: None,
-        }
-    }
-
     pub fn with_child(path: Instance, or: OrGate<S>, child: Self) -> Self {
         Self {
             path,
-            or, // CHANGED: 'or' field
+            or,
             child: Some(Box::new(child)),
         }
     }
 
-    /// Get the depth of this recursive structure (1 for just an OR gate, 2+ for nested)
     pub fn depth(&self) -> usize {
         1 + self.child.as_ref().map(|c| c.depth()).unwrap_or(0)
     }
 
-    /// Get the output wire of the top-level OR gate
-    pub fn output(&self) -> &crate::Wire<S> {
+    pub fn output(&self) -> &Wire<S> {
         &self.or.y
     }
 }
 
-impl<S> WithPath<S> for RecOr<S>
+impl<S> Component<S> for RecOr<S>
 where
     S: State,
 {
-    fn find_port(&self, p: &Instance) -> Option<&crate::Wire<S>> {
-        // First, check if the path is for our OR gate
+    fn path(&self) -> &Instance {
+        &self.path
+    }
+
+    fn type_name(&self) -> &'static str {
+        "RecOr"
+    }
+
+    fn children(&self) -> Vec<&dyn Component<S>> {
+        let mut kids: Vec<&dyn Component<S>> = vec![&self.or];
+        if let Some(c) = &self.child {
+            kids.push(c.as_ref());
+        }
+        kids
+    }
+
+    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if let Some(port) = self.or.find_port(p) {
-            // CHANGED: self.or
             return Some(port);
         }
-
-        // Otherwise, check if it's for our child
         if let Some(ref child) = self.child {
             if let Some(port) = child.find_port(p) {
                 return Some(port);
             }
         }
-
         None
     }
 
-    fn path(&self) -> Instance {
-        self.path.clone()
+    fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
+        None
     }
 }
 
-impl<S> Composite<S> for RecOr<S>
+impl<S> Topology<S> for RecOr<S>
 where
     S: State,
 {
-    fn connections(&self) -> Vec<Vec<Connection<S>>> {
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
         if let Some(ref child) = self.child {
-            // Connection from child's output to this or's input (either a or b)
-            vec![vec![
-                Connection {
-                    from: child.or.y.clone(), // CHANGED: child.or.y
-                    to: self.or.a.clone(),
-                },
-                Connection {
-                    from: child.or.y.clone(), // CHANGED: child.or.y
-                    to: self.or.b.clone(),
-                },
-            ]]
-        } else {
-            // No connections for base case
-            vec![]
+            ctx.connect_any(&[
+                (Some(&child.or.y), Some(&self.or.a)),
+                (Some(&child.or.y), Some(&self.or.b)),
+            ]);
         }
     }
 }
 
-impl<'ctx> MatchedComposite<'ctx> for RecOr<Match<'ctx>> {}
+impl Searchable for RecOr<Search> {
+    fn instantiate(base_path: Instance) -> Self {
+        Self {
+            path: base_path.clone(),
+            or: OrGate::new(base_path.child("or")),
+            child: None,
+        }
+    }
+}
 
-impl SearchableComposite for RecOr<Search> {
-    type Hit<'ctx> = RecOr<Match<'ctx>>;
+impl RecOr<Search> {
+    pub fn new(path: Instance) -> Self {
+        <Self as Searchable>::instantiate(path)
+    }
 
-    fn context(
+    pub fn context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Only need context for OR gates
-        OrGate::<Search>::context(driver, config) // CHANGED: OrGate
+        OrGate::<Search>::context(driver, config)
     }
+}
 
-    fn query<'ctx>(
-        haystack_key: &DriverKey,
-        context: &'ctx Context,
-        path: Instance,
+impl Query for RecOr<Search> {
+    type Matched<'a> = RecOr<Match<'a>>;
+
+    fn query<'a>(
+        &self,
+        driver: &Driver,
+        context: &'a Context,
+        key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx>> {
+    ) -> Vec<Self::Matched<'a>> {
         tracing::event!(
             tracing::Level::INFO,
-            "RecOr::query: starting recursive OR gate search" // CHANGED: OR messages
+            "RecOr::query: starting recursive OR gate search"
         );
 
-        let haystack_index = context.get(haystack_key).unwrap().index();
+        let haystack_index = context.get(key).unwrap().index();
 
-        // Query all OR gates once (reuse for all layers)
-        let all_or_gates = OrGate::<Search>::query(
-            // CHANGED: OrGate
-            haystack_key,
-            context,
-            path.child("or".to_string()), // CHANGED: "or" path
-            config,
-        );
+        let or_query = OrGate::<Search>::instantiate(self.path.child("or"));
+        let all_or_gates = or_query.query(driver, context, key, config);
 
         tracing::event!(
             tracing::Level::INFO,
-            "RecOr::query: Found {} total OR gates in design", // CHANGED: OR
+            "RecOr::query: Found {} total OR gates in design",
             all_or_gates.len()
         );
 
-        // Layer 1: Just OR gates (base case - no child)
-        let mut current_layer: Vec<RecOr<Match<'ctx>>> = all_or_gates
+        let mut current_layer: Vec<RecOr<Match<'a>>> = all_or_gates
             .iter()
             .map(|or_gate| RecOr {
-                // CHANGED: RecOr / or_gate
-                path: path.clone(),
-                or: or_gate.clone(), // CHANGED: or
+                path: self.path.clone(),
+                or: or_gate.clone(),
                 child: None,
             })
             .collect();
 
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecOr::query: Layer 1 (base case) has {} matches", // CHANGED: RecOr
-            current_layer.len()
-        );
-
         let mut all_results = current_layer.clone();
         let mut layer_num = 2;
-        let max_layers = config.max_recursion_depth;
 
-        // Keep building layers until we can't find any more matches
         loop {
-            tracing::event!(
-                tracing::Level::INFO,
-                "RecOr::query: Building layer {}", // CHANGED: RecOr
-                layer_num
-            );
-            let next_layer = build_next_layer(&path, &all_or_gates, &current_layer, haystack_index);
+            let next_layer =
+                build_next_layer(&self.path, &all_or_gates, &current_layer, haystack_index);
 
             if next_layer.is_empty() {
-                tracing::event!(
-                    tracing::Level::INFO,
-                    "RecOr::query: No more matches at layer {}, stopping", // CHANGED: RecOr
-                    layer_num
-                );
                 break;
             }
 
             tracing::event!(
                 tracing::Level::INFO,
-                "RecOr::query: Layer {} has {} matches", // CHANGED: RecOr
+                "RecOr::query: Layer {} has {} matches",
                 layer_num,
                 next_layer.len()
             );
@@ -199,24 +173,13 @@ impl SearchableComposite for RecOr<Search> {
             all_results.extend(next_layer.iter().cloned());
             current_layer = next_layer;
             layer_num += 1;
-            if let Some(max) = max_layers {
+
+            if let Some(max) = config.max_recursion_depth {
                 if layer_num > max {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "RecOr::query: Reached max recursion depth of {}, stopping", // CHANGED: RecOr
-                        max
-                    );
                     break;
                 }
             }
         }
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecOr::query: Total {} matches across {} layers", // CHANGED: RecOr
-            all_results.len(),
-            layer_num - 1
-        );
 
         all_results
     }
@@ -236,15 +199,7 @@ impl<'ctx> RecOr<Match<'ctx>> {
     }
 
     fn collect_cells(&self, cells: &mut HashSet<CellWrapper<'ctx>>) {
-        let or_cell = self
-            .or
-            .y
-            .val
-            .as_ref()
-            .expect("OR cell not found")
-            .design_node_ref
-            .as_ref()
-            .expect("Design node not found");
+        let or_cell = &self.or.y.inner;
         cells.insert(or_cell.clone());
         if let Some(ref child) = self.child {
             child.collect_cells(cells);
@@ -254,15 +209,7 @@ impl<'ctx> RecOr<Match<'ctx>> {
 
 fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {
     let mut cells = Vec::new();
-    let or_cell: &CellWrapper<'ctx> = rec_or
-        .or
-        .y
-        .val
-        .as_ref()
-        .expect("Or cell not found")
-        .design_node_ref
-        .as_ref()
-        .expect("Design node not found");
+    let or_cell = &rec_or.or.y.inner;
     cells.push(or_cell);
 
     if let Some(ref child) = rec_or.child {
@@ -278,56 +225,24 @@ fn build_next_layer<'ctx>(
     prev_layer: &[RecOr<Match<'ctx>>],
     haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecOr<Match<'ctx>>> {
-    let start_time = std::time::Instant::now();
-
-    tracing::event!(
-        tracing::Level::INFO,
-        "build_next_layer: Starting for path={}, prev_layer_size={}, all_or_gates_size={}",
-        path.inst_path(),
-        prev_layer.len(),
-        all_or_gates.len()
-    );
-
     let mut next_layer = Vec::new();
 
-    let mut candidates_checked = 0;
-    let mut validations_passed = 0;
-    let validation_start = std::time::Instant::now();
-
     for prev in prev_layer {
-        let top_or_cell: &CellWrapper<'ctx> = prev
-            .or
-            .y
-            .val
-            .as_ref()
-            .expect("Or top cell not found")
-            .design_node_ref
-            .as_ref()
-            .expect("Design node not found");
+        let top_or_cell = &prev.or.y.inner;
         let fanout = haystack_index
             .fanout_set(top_or_cell)
             .expect("Fanout Not found for cell");
         let contained_cells = rec_or_cells(prev);
 
         for or_gate in all_or_gates {
-            let cell = &or_gate
-                .y
-                .val
-                .as_ref()
-                .expect("Or cell not found")
-                .design_node_ref
-                .as_ref()
-                .expect("Design node not found");
+            let cell = &or_gate.y.inner;
 
-            if !fanout.contains(cell) || contained_cells.contains(cell) {
+            if !fanout.contains(cell) || contained_cells.contains(&cell) {
                 continue;
             }
 
-            candidates_checked += 1;
-
-            // Update child's path to be under "child"
             let mut child = prev.clone();
-            update_rec_or_path(&mut child, path.child("child".to_string()));
+            update_rec_or_path(&mut child, path.child("child"));
 
             let candidate = RecOr {
                 path: path.clone(),
@@ -335,57 +250,46 @@ fn build_next_layer<'ctx>(
                 child: Some(Box::new(child)),
             };
 
-            if candidate.validate_connections(candidate.connections(), haystack_index) {
-                validations_passed += 1;
-                next_layer.push(candidate);
+            let mut builder = ConnectionBuilder {
+                constraints: Vec::new(),
+            };
+            candidate.define_connections(&mut builder);
+
+            let mut valid = true;
+            for group in builder.constraints {
+                let mut group_satisfied = false;
+                for (from, to) in group {
+                    if let (Some(f), Some(t)) = (from, to) {
+                        if validate_connection(f, t, haystack_index) {
+                            group_satisfied = true;
+                            break;
+                        }
+                    }
+                }
+                if !group_satisfied {
+                    valid = false;
+                    break;
+                }
             }
 
-            // Log progress every 1000 candidates to avoid spam
-            // if candidates_checked % 1000 == 0 {
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "build_next_layer: Checked {} candidates so far, {} passed validation",
-                candidates_checked,
-                validations_passed
-            );
-            // }
+            if valid {
+                next_layer.push(candidate);
+            }
         }
     }
-
-    let validation_duration = validation_start.elapsed();
-    tracing::event!(
-        tracing::Level::INFO,
-        "build_next_layer: Validation phase took {:?}, checked {} candidates, {} passed",
-        validation_duration,
-        candidates_checked,
-        validations_passed
-    );
-
-    let total_duration = start_time.elapsed();
-    tracing::event!(
-        tracing::Level::INFO,
-        "build_next_layer: Completed in {:?}, returning {} next layer items",
-        total_duration,
-        next_layer.len()
-    );
 
     next_layer
 }
 
-fn update_rec_or_path<'ctx>(
-    // CHANGED: rec_or
-    rec_or: &mut RecOr<Match<'ctx>>, // CHANGED: RecOr
-    new_path: Instance,
-) {
+fn update_rec_or_path<'ctx>(rec_or: &mut RecOr<Match<'ctx>>, new_path: Instance) {
     rec_or.path = new_path.clone();
-    let or_path = new_path.child("or".to_string()); // CHANGED: "or" / or_path
-    rec_or.or.path = or_path.clone(); // CHANGED: rec_or.or
-    rec_or.or.a.path = or_path.child("a".to_string());
-    rec_or.or.b.path = or_path.child("b".to_string());
-    rec_or.or.y.path = or_path.child("y".to_string());
+    let or_path = new_path.child("or");
+    rec_or.or.path = or_path.clone();
+    rec_or.or.a.path = or_path.child("a");
+    rec_or.or.b.path = or_path.child("b");
+    rec_or.or.y.path = or_path.child("y");
 
-    // Recursively update nested children
     if let Some(ref mut child) = rec_or.child {
-        update_rec_or_path(child, new_path.child("child".to_string())); // CHANGED: update_rec_or_path
+        update_rec_or_path(child, new_path.child("child"));
     }
 }

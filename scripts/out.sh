@@ -8,7 +8,6 @@
 
 uv run scripts/md_tree.py --root . \
     --include 'svql_*/src/**.rs' \
-    --include 'prjunnamed/netlist/**.rs' \
     --include 'README.md' \
     --include 'TODO.md' \
     --include 'Cargo.toml' \

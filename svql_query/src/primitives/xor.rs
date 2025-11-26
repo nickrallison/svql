@@ -1,19 +1,17 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: XorGate,
-    module_name: "xor_gate",
-    file: "examples/patterns/basic/xor/verilog/xor_gate.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/xor/verilog/xor_gate.v",
+    name = "xor_gate"
+)]
+pub struct XorGate<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> XorGate<S>
-where
-    S: State,
-{
+impl<S: State> XorGate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone(), self.b.clone()]
     }

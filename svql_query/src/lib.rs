@@ -1,161 +1,111 @@
 //! Core query definitions and structures for SVQL.
-//!
-//! This crate provides the building blocks for constructing SVQL queries, including
-//! bindings, instances, primitives, and state management for search and match operations.
 
+extern crate self as svql_query;
+
+use std::sync::Arc;
 use svql_subgraph::cell::CellWrapper;
-
-use crate::instance::Instance;
 
 pub mod binding;
 pub mod composites;
-pub mod variants;
 pub mod instance;
 pub mod primitives;
 pub mod security;
 pub mod traits;
-// ########################
-// Type State Tags
-// ########################
+pub mod variants;
 
-// ------------  Compile–time state tags  ------------
-pub trait State: Clone {}
-pub trait QueryableState: State {}
+pub use instance::Instance;
 
-#[derive(Debug, Clone, Copy, Default)]
+// Re-export dependencies used by macros
+pub use itertools;
+pub use svql_common;
+pub use svql_driver;
+pub use svql_subgraph;
+
+use crate::traits::Component;
+
+// --- State Markers ---
+
+pub trait State: Clone + std::fmt::Debug + PartialEq {
+    type WireInner: Clone + std::fmt::Debug + PartialEq;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Search;
+impl State for Search {
+    type WireInner = ();
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Match<'ctx> {
     pub pat_node_ref: Option<CellWrapper<'ctx>>,
     pub design_node_ref: Option<CellWrapper<'ctx>>,
 }
 
-impl State for Search {}
-impl State for Match<'_> {}
-impl QueryableState for Search {}
-
-// ########################
-// Helpers
-// ########################
-
-#[macro_export]
-macro_rules! impl_find_port {
-    ($ty:ident, $($field:ident),+) => {
-        fn find_port(&self, p: &Instance) -> Option<&$crate::Wire<S>> {
-            let idx  = self.path.height() + 1;
-            match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
-                $(Some(stringify!($field)) => self.$field.find_port(p),)+
-                _ => None,
-            }
-        }
-    };
+impl<'ctx> State for Match<'ctx> {
+    type WireInner = CellWrapper<'ctx>;
 }
 
-// ########################
-// Core Traits & Containers
-// ########################
+// --- Wire ---
 
-pub trait WithPath<S>: Sized
+#[derive(Clone, Debug, PartialEq)]
+pub struct Wire<S: State>
 where
-    S: State,
-{
-    fn find_port(&self, p: &Instance) -> Option<&Wire<S>>;
-    fn path(&self) -> Instance;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Wire<S>
-where
-    S: State,
+    S::WireInner: Clone + std::fmt::Debug + PartialEq,
 {
     pub path: Instance,
-    pub val: Option<S>,
+    pub inner: S::WireInner,
 }
 
-impl<S> Wire<S>
-where
-    S: State,
-{
-    pub fn with_val(path: Instance, val: S) -> Self {
-        Self {
-            path,
-            val: Some(val),
+impl<S: State> Wire<S> {
+    pub fn new(path: Instance, inner: S::WireInner) -> Self {
+        Self { path, inner }
+    }
+    pub fn path(&self) -> &Instance {
+        &self.path
+    }
+}
+
+impl<'ctx> Wire<Match<'ctx>> {
+    pub fn cell(&self) -> &CellWrapper<'ctx> {
+        &self.inner
+    }
+}
+
+impl<S: State> Component<S> for Wire<S> {
+    fn path(&self) -> &Instance {
+        &self.path
+    }
+    fn type_name(&self) -> &'static str {
+        "Wire"
+    }
+
+    fn children(&self) -> Vec<&dyn Component<S>> {
+        vec![]
+    }
+
+    fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
+        if path.starts_with(&self.path) {
+            Some(self)
+        } else {
+            None
         }
     }
 
-    pub fn new(path: Instance) -> Self {
-        Self { path, val: None }
-    }
-}
-
-impl<S> WithPath<S> for Wire<S>
-where
-    S: State,
-{
-    #[contracts::debug_ensures(p.height() <= self.path.height() + (p.height() - self.path.height())
-    )]
-    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        if p.height() < self.path.height() {
-            return None;
+    fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
+        if rel_path.is_empty() {
+            Some(self)
+        } else {
+            None
         }
-
-        let item = p
-            .get_item(p.height())
-            .expect("WithPath::find_port(p): cannot find item");
-        let self_name = self
-            .path
-            .get_item(self.path.height())
-            .expect("WithPath::find_port(p): cannot find item");
-
-        if item == self_name { Some(self) } else { None }
-    }
-
-    fn path(&self) -> Instance {
-        self.path.clone()
     }
 }
 
-// ########################
-// Containers
-// ########################
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+// --- Legacy / Helper Exports ---
+#[derive(Debug, Clone, PartialEq)]
 pub struct Connection<S>
 where
     S: State,
 {
     pub from: Wire<S>,
     pub to: Wire<S>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::Arc;
-    use tracing_subscriber;
-
-    fn init_test_logger() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .try_init();
-    }
-
-    // ###############
-    // Instance Tests
-    // ###############
-    #[test]
-    fn test_instance() {
-        init_test_logger();
-        let inst = Instance::root("test".to_string());
-        let child1 = inst.child("child1".to_string());
-        let child2 = child1.child("child2".to_string());
-        assert_eq!(inst.inst_path(), "test");
-        assert_eq!(child1.inst_path(), "test.child1");
-        assert_eq!(child2.inst_path(), "test.child1.child2");
-        assert_eq!(child2.get_item(0), Some(Arc::from("test".to_string())));
-        assert_eq!(child2.get_item(1), Some(Arc::from("child1".to_string())));
-        assert_eq!(child2.get_item(2), Some(Arc::from("child2".to_string())));
-        assert_eq!(child2.get_item(3), None);
-    }
 }

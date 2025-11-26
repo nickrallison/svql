@@ -1,23 +1,24 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-netlist! {
-    name: GrantAccess,
-    module_name: "grant_access",
-    file: "examples/patterns/security/access_control/grant_access/rtlil/grant_access.il",
-    inputs: [usr_id, correct_id],
-    outputs: [grant]
+#[netlist(
+    file = "examples/patterns/security/access_control/grant_access/rtlil/grant_access.il",
+    name = "grant_access"
+)]
+pub struct GrantAccess<S: State> {
+    pub usr_id: Wire<S>,
+    pub correct_id: Wire<S>,
+    pub grant: Wire<S>,
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        Search, instance::Instance, security::cwe1280::grant_access::GrantAccess, traits::Query,
+    };
     use std::sync::OnceLock;
     use svql_common::{Config, Dedupe, MatchLength, YosysModule};
     use svql_driver::Driver;
-
-    use crate::{
-        Search, instance::Instance, security::cwe1280::grant_access::GrantAccess,
-        traits::netlist::SearchableNetlist,
-    };
 
     #[derive(Debug, Clone)]
     struct GrantAccessTestCase {
@@ -72,9 +73,10 @@ mod tests {
         let context = context.with_design(haystack_key.clone(), haystack_design);
 
         let results = GrantAccess::<Search>::query(
-            &haystack_key,
+            &GrantAccess::<Search>::instantiate(Instance::root("grant_access".to_string())),
+            driver,
             &context,
-            Instance::root("grant_access".to_string()),
+            &haystack_key,
             config,
         );
 

@@ -1,40 +1,44 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-netlist! {
-    name: Sdffe,
-    module_name: "sdffe",
-    file: "examples/patterns/basic/ff/verilog/sdffe.v",
-    inputs: [clk, d, reset, en],
-    outputs: [q]
+#[netlist(file = "examples/patterns/basic/ff/verilog/sdffe.v", name = "sdffe")]
+pub struct Sdffe<S: State> {
+    pub clk: Wire<S>,
+    pub d: Wire<S>,
+    pub reset: Wire<S>,
+    pub en: Wire<S>,
+    pub q: Wire<S>,
 }
 
-netlist! {
-    name: Adffe,
-    module_name: "adffe",
-    file: "examples/patterns/basic/ff/rtlil/adffe.il",
-    inputs: [clk, d, reset_n, en],
-    outputs: [q]
-}
-netlist! {
-    name: Sdff,
-    module_name: "sdff",
-    file: "examples/patterns/basic/ff/rtlil/sdff.il",
-    inputs: [clk, d, reset],
-    outputs: [q]
+#[netlist(file = "examples/patterns/basic/ff/rtlil/adffe.il", name = "adffe")]
+pub struct Adffe<S: State> {
+    pub clk: Wire<S>,
+    pub d: Wire<S>,
+    pub reset_n: Wire<S>,
+    pub en: Wire<S>,
+    pub q: Wire<S>,
 }
 
-netlist! {
-    name: Adff,
-    module_name: "adff",
-    file: "examples/patterns/basic/ff/rtlil/adff.il",
-    inputs: [clk, d, reset_n],
-    outputs: [q]
+#[netlist(file = "examples/patterns/basic/ff/rtlil/sdff.il", name = "sdff")]
+pub struct Sdff<S: State> {
+    pub clk: Wire<S>,
+    pub d: Wire<S>,
+    pub reset: Wire<S>,
+    pub q: Wire<S>,
 }
 
-netlist! {
-    name: Dffe,
-    module_name: "dffe",
-    file: "examples/patterns/basic/ff/rtlil/dffe.il",
-    inputs: [clk, d, en],
-    outputs: [q]
+#[netlist(file = "examples/patterns/basic/ff/rtlil/adff.il", name = "adff")]
+pub struct Adff<S: State> {
+    pub clk: Wire<S>,
+    pub d: Wire<S>,
+    pub reset_n: Wire<S>,
+    pub q: Wire<S>,
+}
+
+#[netlist(file = "examples/patterns/basic/ff/rtlil/dffe.il", name = "dffe")]
+pub struct Dffe<S: State> {
+    pub clk: Wire<S>,
+    pub d: Wire<S>,
+    pub en: Wire<S>,
+    pub q: Wire<S>,
 }

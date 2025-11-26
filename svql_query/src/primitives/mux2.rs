@@ -1,19 +1,18 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: Mux2Gate,
-    module_name: "mux2_gate",
-    file: "examples/patterns/basic/mux2/verilog/mux2_gate.v",
-    inputs: [a, b, sel],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/mux2/verilog/mux2_gate.v",
+    name = "mux2_gate"
+)]
+pub struct Mux2Gate<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub sel: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> Mux2Gate<S>
-where
-    S: State,
-{
+impl<S: State> Mux2Gate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone(), self.b.clone(), self.sel.clone()]
     }

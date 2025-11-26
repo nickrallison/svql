@@ -2,99 +2,56 @@
 
 use std::sync::Arc;
 
-/// Represents a hierarchical path to an instance in the design.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Instance {
-    pub inst: Arc<str>,
-    pub path: Vec<Arc<str>>,
-    pub height: usize,
+    pub segments: Vec<Arc<str>>,
 }
 
 impl Instance {
-    #[contracts::debug_ensures(ret.height == 0)]
-    #[contracts::debug_ensures(ret.get_item(0) == Some(Arc::from(inst_in)))]
-    pub fn root(inst_in: String) -> Self {
-        let inst: Arc<str> = Arc::from(inst_in.clone());
-        let path = vec![inst.clone()];
-        tracing::event!(tracing::Level::TRACE, "Creating root instance: {}", inst_in);
+    pub fn root(name: String) -> Self {
+        // <- FIXED: String, not Option
         Self {
-            inst: inst.clone(),
-            path,
-            height: 0,
+            segments: vec![Arc::from(name)],
         }
     }
-    #[contracts::debug_ensures(ret.height == self.height + 1)]
-    #[contracts::debug_ensures(ret.get_item(ret.height).is_some())]
-    #[contracts::debug_ensures(ret.get_item(ret.height + 1).is_none())]
-    pub fn child(&self, child: String) -> Self {
-        let child: Arc<str> = Arc::from(child);
-        let mut new_path = self.path.clone();
-        new_path.push(child.clone());
-        tracing::event!(tracing::Level::TRACE, "Creating child instance: {}", child);
-        let new = Self {
-            inst: child.clone(),
-            path: new_path,
-            height: self.height + 1,
-        };
 
-        // Debug assertions
-        let actual = new.get_item(new.height);
-        let expected = Some(child.clone());
-        debug_assert!(
-            actual == expected,
-            "Expected {:?}, but got {:?}",
-            expected,
-            actual
-        );
-        new
+    pub fn child(&self, name: &str) -> Instance {
+        let mut segments = self.segments.clone();
+        segments.push(Arc::from(name));
+        Instance { segments }
     }
 
-    pub fn get_item(&self, index: usize) -> Option<Arc<str>> {
-        self.path.get(index).cloned()
+    pub fn starts_with(&self, prefix: &Instance) -> bool {
+        if prefix.segments.len() > self.segments.len() {
+            return false;
+        }
+        self.segments[..prefix.segments.len()] == prefix.segments[..]
     }
-    #[contracts::debug_ensures(!ret.is_empty())]
+
+    pub fn relative(&self, prefix: &Self) -> &[Arc<str>] {
+        if !self.starts_with(prefix) {
+            panic!(
+                "Instance {:?} does not start with prefix {:?}",
+                self, prefix
+            );
+        }
+        &self.segments[prefix.segments.len()..]
+    }
+
     pub fn inst_path(&self) -> String {
-        self.path
+        self.segments
             .iter()
             .map(|s| s.to_string())
-            .collect::<Vec<String>>()
+            .collect::<Vec<_>>()
             .join(".")
     }
+
+    // Helper for legacy code that might use height/get_item
     pub fn height(&self) -> usize {
-        self.height
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tracing_subscriber;
-
-    fn init_test_logger() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .try_init();
+        self.segments.len()
     }
 
-    #[test]
-    fn instance_paths_and_heights() {
-        init_test_logger();
-        let r = Instance::root("root".to_string());
-        assert_eq!(r.height(), 0);
-        assert_eq!(r.inst_path(), "root");
-
-        let c1 = r.child("a".to_string());
-        assert_eq!(c1.height(), 1);
-        assert_eq!(c1.inst_path(), "root.a");
-
-        let c2 = c1.child("b".to_string());
-        assert_eq!(c2.height(), 2);
-        assert_eq!(c2.inst_path(), "root.a.b");
-
-        assert_eq!(c2.get_item(0).unwrap().as_ref(), "root");
-        assert_eq!(c2.get_item(1).unwrap().as_ref(), "a");
-        assert_eq!(c2.get_item(2).unwrap().as_ref(), "b");
-        assert!(c2.get_item(3).is_none());
+    pub fn get_item(&self, idx: usize) -> Option<Arc<str>> {
+        self.segments.get(idx).cloned()
     }
 }

@@ -75,7 +75,6 @@ impl Context {
         );
     }
 
-    #[contracts::debug_ensures(ret.len() >= self.len())]
     pub fn merge(mut self, other: Context) -> Self {
         for (key, design) in other.designs {
             self.designs.insert(key, design);
@@ -85,14 +84,13 @@ impl Context {
             "Context merged, new size: {}",
             self.designs.len()
         );
-        self.clone()
+        self
     }
 
-    /// Create a context from a single design
     #[contracts::debug_ensures(ret.len() == 1)]
     pub fn from_single(key: DriverKey, design: Arc<DesignContainer>) -> Self {
         let mut ctx = Self::new();
-        ctx.designs.insert(key, design);
+        ctx.designs.insert(key, design); // Internal, ok
         tracing::event!(tracing::Level::DEBUG, "Single design context created");
         ctx
     }

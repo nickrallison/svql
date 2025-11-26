@@ -1,19 +1,16 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: BufGate,
-    module_name: "buf_gate",
-    file: "examples/patterns/basic/buf/verilog/buf_gate.v",
-    inputs: [a],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/buf/verilog/buf_gate.v",
+    name = "buf_gate"
+)]
+pub struct BufGate<S: State> {
+    pub a: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> BufGate<S>
-where
-    S: State,
-{
+impl<S: State> BufGate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone()]
     }

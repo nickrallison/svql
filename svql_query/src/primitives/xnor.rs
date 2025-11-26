@@ -1,19 +1,17 @@
+use crate::{State, Wire};
 use svql_macros::netlist;
 
-use crate::{State, Wire};
-
-netlist! {
-    name: XnorGate,
-    module_name: "xnor_gate",
-    file: "examples/patterns/basic/xnor/verilog/xnor_gate.v",
-    inputs: [a, b],
-    outputs: [y]
+#[netlist(
+    file = "examples/patterns/basic/xnor/verilog/xnor_gate.v",
+    name = "xnor_gate"
+)]
+pub struct XnorGate<S: State> {
+    pub a: Wire<S>,
+    pub b: Wire<S>,
+    pub y: Wire<S>,
 }
 
-impl<S> XnorGate<S>
-where
-    S: State,
-{
+impl<S: State> XnorGate<S> {
     pub fn get_inputs(&self) -> Vec<Wire<S>> {
         vec![self.a.clone(), self.b.clone()]
     }
