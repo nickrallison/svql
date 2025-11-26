@@ -1,4 +1,4 @@
-mod grant_access;
+pub mod grant_access;
 
 use crate::{
     State,

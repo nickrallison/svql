@@ -2,7 +2,7 @@ use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 use svql_query::Search;
 use svql_query::instance::Instance;
-use svql_query::security::cwe1280::Cwe1280;
+use svql_query::security::cwe1234::Cwe1234;
 use svql_query::traits::{Query, Searchable};
 use tracing::{Level, info};
 
@@ -17,8 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let driver = Driver::new_workspace()?;
 
     // Example: Load a design that might contain the vulnerability
-    let design_path = "examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v";
-    let design_module = "cwe1280_vuln";
+    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
+    let design_module = "cwe1234_not_alternating";
 
     info!("Loading design...");
     let (haystack_key, haystack_design) =
@@ -31,11 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
     info!("Building context...");
-    let context = Cwe1280::<Search>::context(&driver, &config.needle_options)?;
+    let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
     info!("Instantiating query...");
-    let query = Cwe1280::<Search>::instantiate(Instance::root("cwe1280".to_string()));
+    let query = Cwe1234::<Search>::instantiate(Instance::root("cwe1234".to_string()));
 
     info!("Executing query...");
     let results = query.query(&driver, &context, &haystack_key, &config);

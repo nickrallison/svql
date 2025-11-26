@@ -9,7 +9,6 @@ use crate::{Connection, Match, Search, State, Wire};
 use std::sync::Arc;
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::GraphIndex;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -75,18 +74,18 @@ where
 
 impl Searchable for UnlockLogic<Search> {
     fn instantiate(base_path: Instance) -> Self {
-        Self {
-            path: base_path.clone(),
-            top_and: AndGate::new(base_path.child("top_and")),
-            rec_or: RecOr::new(base_path.child("rec_or")),
-            not_gate: NotGate::new(base_path.child("not_gate")),
-        }
+        Self::new(base_path)
     }
 }
 
 impl UnlockLogic<Search> {
     pub fn new(path: Instance) -> Self {
-        <Self as Searchable>::instantiate(path)
+        Self {
+            path: path.clone(),
+            top_and: AndGate::new(path.child("top_and")),
+            rec_or: RecOr::new(path.child("rec_or")),
+            not_gate: NotGate::new(path.child("not_gate")),
+        }
     }
 
     pub fn context(

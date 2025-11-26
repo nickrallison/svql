@@ -24,14 +24,6 @@ impl<S> RecAnd<S>
 where
     S: State,
 {
-    pub fn with_child(path: Instance, and: AndGate<S>, child: Self) -> Self {
-        Self {
-            path,
-            and,
-            child: Some(Box::new(child)),
-        }
-    }
-
     /// Get the depth of this recursive structure (1 for just an AND gate, 2+ for nested)
     pub fn depth(&self) -> usize {
         1 + self.child.as_ref().map(|c| c.depth()).unwrap_or(0)
@@ -80,9 +72,6 @@ where
     }
 
     fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-        // Manual composites usually delegate via find_port,
-        // but if accessed via relative path, we'd need logic here.
-        // For now, returning None is safe as long as find_port handles absolute paths.
         None
     }
 }
@@ -104,17 +93,17 @@ where
 
 impl Searchable for RecAnd<Search> {
     fn instantiate(base_path: Instance) -> Self {
-        Self {
-            path: base_path.clone(),
-            and: AndGate::new(base_path.child("and")),
-            child: None,
-        }
+        Self::new(base_path)
     }
 }
 
 impl RecAnd<Search> {
     pub fn new(path: Instance) -> Self {
-        <Self as Searchable>::instantiate(path)
+        Self {
+            path: path.clone(),
+            and: AndGate::new(path.child("and")),
+            child: None,
+        }
     }
 
     pub fn context(

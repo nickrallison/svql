@@ -26,14 +26,6 @@ impl<S> RecOr<S>
 where
     S: State,
 {
-    pub fn with_child(path: Instance, or: OrGate<S>, child: Self) -> Self {
-        Self {
-            path,
-            or,
-            child: Some(Box::new(child)),
-        }
-    }
-
     pub fn depth(&self) -> usize {
         1 + self.child.as_ref().map(|c| c.depth()).unwrap_or(0)
     }
@@ -96,17 +88,17 @@ where
 
 impl Searchable for RecOr<Search> {
     fn instantiate(base_path: Instance) -> Self {
-        Self {
-            path: base_path.clone(),
-            or: OrGate::new(base_path.child("or")),
-            child: None,
-        }
+        Self::new(base_path)
     }
 }
 
 impl RecOr<Search> {
     pub fn new(path: Instance) -> Self {
-        <Self as Searchable>::instantiate(path)
+        Self {
+            path: path.clone(),
+            or: OrGate::new(path.child("or")),
+            child: None,
+        }
     }
 
     pub fn context(
