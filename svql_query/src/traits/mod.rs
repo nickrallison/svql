@@ -3,11 +3,16 @@ pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
+
 use svql_common::Config;
-use svql_driver::{Context, Driver, DriverKey};
+use svql_driver::{Context, DriverKey};
 use svql_subgraph::GraphIndex;
 
-use crate::{Instance, Match, State, Wire};
+use crate::{
+    Match, Search, State, Wire,
+    instance::Instance,
+    ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
+};
 
 /// Base trait for all query components (Netlists, Composites, Variants, Wires).
 pub trait Component<S: State> {
@@ -20,68 +25,92 @@ pub trait Component<S: State> {
 }
 
 /// Trait for components that can be instantiated in the Search state.
-pub trait Searchable: Sized {
+pub trait Searchable: Sized + Component<Search> {
     fn instantiate(base_path: Instance) -> Self;
 }
 
-/// Trait for executing a query against the design.
-pub trait Query {
-    type Matched<'a>;
+/// Legacy Query trait: Compatible with existing macros/manual impls.
+/// Use for `query(driver, ...)`.
+pub trait Query: Component<Search> + Searchable {
+    type Matched<'a>: Component<Match<'a>>;
 
+    /// Legacy query dispatcher (current implementation).
     fn query<'a>(
         &self,
-        driver: &Driver,
-        ctx: &'a Context,
+        driver: &::svql_driver::Driver,
+        context: &'a Context,
         key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Matched<'a>>;
 }
 
-// --- Topology & Connections ---
-
-/// Implemented by Composites to define internal connectivity.
-pub trait Topology<S: State> {
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>);
-}
-
-pub struct ConnectionBuilder<'a, S: State> {
-    pub constraints: Vec<Vec<(Option<&'a Wire<S>>, Option<&'a Wire<S>>)>>,
-}
-
-impl<'a, S: State> ConnectionBuilder<'a, S> {
-    pub fn connect<A, B>(&mut self, from: A, to: B)
-    where
-        A: Into<Option<&'a Wire<S>>>,
-        B: Into<Option<&'a Wire<S>>>,
-    {
-        self.constraints.push(vec![(from.into(), to.into())]);
+/// PlannedQuery supertrait: Enables optimized planner execution.
+/// Implement alongside `Query` for caching/DAG benefits.
+/// Defaults use legacy `Query::query` as fallback (TODO: bridge).
+pub trait PlannedQuery: Query {
+    /// Generate LogicalPlan tree for this query.
+    fn to_ir(&self, _config: &Config) -> LogicalPlan {
+        todo!("PlannedQuery::to_ir: Generate plan tree (e.g., Scan/Join from structure)")
     }
 
-    pub fn connect_any<A, B>(&mut self, options: &[(A, B)])
-    where
-        A: Into<Option<&'a Wire<S>>> + Clone,
-        B: Into<Option<&'a Wire<S>>> + Clone,
-    {
-        let group = options
-            .iter()
-            .map(|(a, b)| (a.clone().into(), b.clone().into()))
-            .collect();
+    /// Canonical DAG (shared subplans).
+    fn dag_ir(&self, config: &Config) -> QueryDag {
+        crate::ir::canonicalize_to_dag(self.to_ir(config))
+    }
 
-        self.constraints.push(group);
+    /// Reconstruct Matched from flat execution result cursor.
+    ///
+    /// Takes &mut cursor so sub-components can consume cells sequentially.
+    fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
+        todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
+    }
+
+    /// Map relative path (e.g., ["logic", "y"]) to schema column index.
+    fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
+        None
+    }
+
+    /// Expected output schema (column paths).
+    fn expected_schema(&self) -> Schema {
+        Schema { columns: vec![] }
+    }
+
+    fn query_planned<'a, 'b, T: Executor>(
+        &self,
+        executor: &'b T,
+        ctx: &'a Context,
+        _key: &DriverKey,
+        config: &Config,
+    ) -> Vec<Self::Matched<'a>>
+    where
+        'b: 'a,
+    {
+        let dag = self.dag_ir(config);
+        let exec_res = executor.execute_dag(&dag, ctx);
+        let expected = self.expected_schema();
+        let mapping = compute_schema_mapping(&expected, &exec_res.schema);
+
+        let mut results = Vec::new();
+        for row in exec_res.rows {
+            let mut cursor = ResultCursor::new(row, mapping.clone());
+            results.push(self.reconstruct(&mut cursor));
+        }
+        results
     }
 }
 
+// Re-export for convenience
+pub use composite::{ConnectionBuilder, Topology};
+pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
+
+/// Validate connection in haystack (used by legacy/composite validation).
 pub fn validate_connection<'ctx>(
     from: &Wire<Match<'ctx>>,
     to: &Wire<Match<'ctx>>,
     haystack_index: &GraphIndex<'ctx>,
 ) -> bool {
-    // 'from' is the Source cell (e.g. AND gate driving Y)
-    // 'to' is the Sink cell (e.g. DFF receiving D)
-    // Check if 'from' drives 'to' in the haystack.
     let from_cell = &from.inner;
     let to_cell = &to.inner;
-
     haystack_index
         .fanout_set(from_cell)
         .map_or(false, |set| set.contains(to_cell))

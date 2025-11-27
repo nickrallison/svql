@@ -3,7 +3,7 @@ use crate::instance::Instance;
 use crate::primitives::and::AndGate;
 use crate::primitives::not::NotGate;
 use crate::traits::{
-    Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection,
+    Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology, validate_connection,
 };
 use crate::{Connection, Match, Search, State, Wire};
 use std::sync::Arc;
@@ -256,6 +256,10 @@ impl Query for UnlockLogic<Search> {
         );
         results
     }
+}
+
+impl PlannedQuery for UnlockLogic<Search> {
+    // Default implementation (todo!) is sufficient for compilation
 }
 
 impl<'ctx> UnlockLogic<Match<'ctx>> {

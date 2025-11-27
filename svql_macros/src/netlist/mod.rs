@@ -44,8 +44,13 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut find_port_arms = Vec::new();
     let mut field_defs = Vec::new();
 
+    // For PlannedQuery
+    let mut schema_cols = Vec::new();
+    let mut col_indices = Vec::new();
+    let mut reconstruct_fields = Vec::new();
+
     if let Fields::Named(ref mut fields) = item_struct.fields {
-        for field in fields.named.iter_mut() {
+        for (idx, field) in fields.named.iter_mut().enumerate() {
             let ident = field.ident.as_ref().unwrap();
             let name_str = ident.to_string();
             let ty = &field.ty;
@@ -104,6 +109,18 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             // For find_port_inner()
             find_port_arms.push(quote! {
                 #wire_name => self.#ident.find_port_inner(tail)
+            });
+
+            // For PlannedQuery
+            schema_cols.push(wire_name.clone());
+            col_indices.push(quote! {
+                #wire_name => Some(#idx)
+            });
+            reconstruct_fields.push(quote! {
+                #ident: ::svql_query::Wire::new(
+                    self.#ident.path().clone(),
+                    cursor.next_cell()
+                )
             });
         }
     }
@@ -220,6 +237,41 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                         #(#field_matches),*
                     }
                 }).collect()
+            }
+        }
+
+        impl ::svql_query::traits::PlannedQuery for #struct_name<::svql_query::Search> {
+            fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+                use ::svql_query::traits::netlist::NetlistMeta;
+                ::svql_query::ir::LogicalPlan::Scan {
+                    key: Self::driver_key(),
+                    config: config.clone(),
+                    schema: self.expected_schema(),
+                }
+            }
+
+            fn expected_schema(&self) -> ::svql_query::ir::Schema {
+                ::svql_query::ir::Schema {
+                    columns: vec![ #(#schema_cols.to_string()),* ]
+                }
+            }
+
+            fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
+                let next = match rel_path.first() {
+                    Some(arc_str) => arc_str.as_ref(),
+                    None => return None,
+                };
+                match next {
+                    #(#col_indices),*,
+                    _ => None
+                }
+            }
+
+            fn reconstruct<'a>(&self, cursor: &mut ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
+                #struct_name {
+                    path: self.path.clone(),
+                    #(#reconstruct_fields),*
+                }
             }
         }
     };

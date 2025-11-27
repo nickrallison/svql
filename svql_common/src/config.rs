@@ -1,10 +1,13 @@
 //! Configuration for the subgraph isomorphism search.
 
-use std::str::FromStr;
+use std::{
+    hash::{Hash, Hasher},
+    str::FromStr,
+};
 
 use crate::ModuleConfig;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
     /// The length of the match to find.
     pub match_length: MatchLength,
@@ -59,6 +62,17 @@ impl Config {
     }
 }
 
+impl Hash for Config {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Stub: Hash key fields (e.g., match_length, dedupe)
+        self.match_length.hash(state);
+        self.dedupe.hash(state);
+        self.needle_options.hash(state);
+        self.pattern_vars_match_design_consts.hash(state);
+        self.max_recursion_depth.hash(state);
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct ConfigBuilder {
     match_length: MatchLength,
@@ -97,7 +111,6 @@ impl ConfigBuilder {
             .insert(param.to_string(), value.to_string());
         self
     }
-
 
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;

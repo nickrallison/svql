@@ -9,7 +9,10 @@ use crate::{
     Match, Search, State, Wire,
     instance::Instance,
     primitives::or::OrGate,
-    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
+    traits::{
+        Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology,
+        validate_connection,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -175,6 +178,10 @@ impl Query for RecOr<Search> {
 
         all_results
     }
+}
+
+impl PlannedQuery for RecOr<Search> {
+    // Default implementation (todo!) is sufficient for compilation
 }
 
 impl<'ctx> RecOr<Match<'ctx>> {

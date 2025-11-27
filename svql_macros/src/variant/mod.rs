@@ -170,14 +170,35 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate query blocks using Search type
     let query_blocks = variant_names.iter().zip(variant_types.iter()).map(|(v_name, v_type)| {
-		        let search_type = common::replace_generic_with_search(v_type);
-		        quote! {
-		            let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
-		            let results = sub_query.query(driver, context, key, config);
-		            // Use fully qualified enum variant with Match<'a>
-		            all_results.extend(results.into_iter().map(#enum_name::<::svql_query::Match<'a>>::#v_name));
-		        }
-		    });
+        let search_type = common::replace_generic_with_search(v_type);
+        quote! {
+            let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
+            let results = sub_query.query(driver, context, key, config);
+            // Use fully qualified enum variant with Match<'a>
+            all_results.extend(results.into_iter().map(#enum_name::<::svql_query::Match<'a>>::#v_name));
+        }
+    });
+
+    // PlannedQuery logic
+    let plan_inputs = variant_names.iter().zip(variant_types.iter()).map(|(_v_name, v_type)| {
+        let search_type = common::replace_generic_with_search(v_type);
+        quote! {
+            {
+                let sub = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
+                Box::new(sub.to_ir(config))
+            }
+        }
+    });
+
+    let reconstruct_arms = variant_names.iter().enumerate().zip(variant_types.iter()).map(|((idx, v_name), v_type)| {
+        let search_type = common::replace_generic_with_search(v_type);
+        quote! {
+            #idx => {
+                let sub = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
+                #enum_name::<::svql_query::Match<'a>>::#v_name(sub.reconstruct(cursor))
+            }
+        }
+    });
 
     let expanded = quote! {
         #expanded_enum
@@ -253,6 +274,38 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let mut all_results = Vec::new();
                 #(#query_blocks)*
                 all_results
+            }
+        }
+
+        impl ::svql_query::traits::PlannedQuery for #enum_name<::svql_query::Search> {
+            fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+                let inputs = vec![ #(#plan_inputs),* ];
+                // Note: Schema handling for variants is simplified here.
+                // Ideally we check compatibility or use the first variant's schema.
+                // For now, we assume the first variant defines the schema.
+                let schema = if let Some(first) = inputs.first() {
+                    match &**first {
+                        ::svql_query::ir::LogicalPlan::Scan { schema, .. } => schema.clone(),
+                        ::svql_query::ir::LogicalPlan::Join { schema, .. } => schema.clone(),
+                        ::svql_query::ir::LogicalPlan::Union { schema, .. } => schema.clone(),
+                    }
+                } else {
+                    ::svql_query::ir::Schema { columns: vec![] }
+                };
+
+                ::svql_query::ir::LogicalPlan::Union {
+                    inputs,
+                    schema,
+                    tag_results: true,
+                }
+            }
+
+            fn reconstruct<'a>(&self, cursor: &mut ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
+                let variant_idx = cursor.next_variant();
+                match variant_idx {
+                    #(#reconstruct_arms),*,
+                    _ => panic!("Invalid variant index in cursor"),
+                }
             }
         }
     };

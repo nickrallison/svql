@@ -20,8 +20,14 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut field_defs = Vec::new();
     let mut context_calls = Vec::new();
 
+    // For PlannedQuery
+    let mut plan_inputs = Vec::new();
+    let mut reconstruct_calls = Vec::new();
+    let mut get_col_arms = Vec::new();
+    let mut schema_calls = Vec::new();
+
     if let Fields::Named(ref mut fields) = item_struct.fields {
-        for field in fields.named.iter_mut() {
+        for (_idx, field) in fields.named.iter_mut().enumerate() {
             let ident = field.ident.as_ref().unwrap();
             let name_str = ident.to_string();
             let ty = &field.ty;
@@ -62,8 +68,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 let search_ty = common::replace_generic_with_search(ty);
 
                 instantiate_fields.push(quote! {
-	                    #ident: <#search_ty as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
-	                });
+                        #ident: <#search_ty as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
+                    });
 
                 query_calls.push(quote! {
                     let #ident = self.#ident.query(driver, context, key, config);
@@ -72,10 +78,38 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 construct_fields.push(quote! { #ident: #ident });
 
                 // Generate context call for this submodule
-                // FIXED: Wrapped #search_ty in <...> to avoid "comparison operators cannot be chained"
                 context_calls.push(quote! {
                     let sub_ctx = <#search_ty>::context(driver, options)?;
                     ctx = ctx.merge(sub_ctx);
+                });
+
+                // PlannedQuery logic
+                plan_inputs.push(quote! {
+                    Box::new(self.#ident.to_ir(config))
+                });
+
+                reconstruct_calls.push(quote! {
+                    #ident: self.#ident.reconstruct(cursor)
+                });
+
+                // For get_column_index, we need to offset by previous children's schema size
+                // This is dynamic, so we generate code to calculate it
+                get_col_arms.push(quote! {
+                    #name_str => {
+                        let sub_idx = self.#ident.get_column_index(tail)?;
+                        // Calculate offset
+                        let mut offset = 0;
+                        // Iterate previous fields to sum their schema lengths
+                        // This is a bit inefficient O(N^2) but N is small (number of submodules)
+                        #(
+                            offset += self.#query_names.expected_schema().columns.len();
+                        )*
+                        Some(offset + sub_idx)
+                    }
+                });
+
+                schema_calls.push(quote! {
+                    schema.columns.extend(self.#ident.expected_schema().columns);
                 });
             } else {
                 children_refs.push(quote! { &self.#ident });
@@ -93,6 +127,24 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let iproduct_macro = quote! { ::svql_query::itertools::iproduct! };
     let iter_vars: Vec<_> = query_names.iter().collect();
+
+    // Helper to generate the offset calculation logic for get_column_index
+    // We need to regenerate the arms with the correct offsets
+    let mut get_col_arms_final = Vec::new();
+    for (i, name) in query_names.iter().enumerate() {
+        let name_str = name.to_string();
+        let prev_names = &query_names[0..i];
+        get_col_arms_final.push(quote! {
+            #name_str => {
+                let sub_idx = self.#name.get_column_index(tail)?;
+                let mut offset = 0;
+                #(
+                    offset += self.#prev_names.expected_schema().columns.len();
+                )*
+                Some(offset + sub_idx)
+            }
+        });
+    }
 
     let expanded = quote! {
         #[derive(Clone, Debug)]
@@ -198,6 +250,89 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                         true
                     })
                     .collect()
+            }
+        }
+
+        impl ::svql_query::traits::PlannedQuery for #struct_name<::svql_query::Search> {
+            fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+                use ::svql_query::traits::Topology;
+
+                // 1. Collect sub-plans
+                let inputs = vec![ #(#plan_inputs),* ];
+
+                // 2. Extract constraints using ConnectionBuilder
+                let mut builder = ::svql_query::traits::ConnectionBuilder { constraints: Vec::new() };
+                self.define_connections(&mut builder);
+
+                let mut join_constraints = Vec::new();
+
+                // Helper to map Wire -> (child_idx, col_idx)
+                // We need to find which child the wire belongs to
+                let map_wire = |wire: &::svql_query::Wire<::svql_query::Search>| -> Option<(usize, usize)> {
+                    let wire_path = wire.path();
+                    // Unrolled loop to avoid heterogeneous Vec issues
+                    let mut child_idx = 0;
+                    #(
+                        // Use fully qualified trait call here to avoid "no method named path" errors
+                        if wire_path.starts_with(::svql_query::traits::Component::path(&self.#query_names)) {
+                            let rel = wire_path.relative(::svql_query::traits::Component::path(&self.#query_names));
+                            if let Some(col) = self.#query_names.get_column_index(rel) {
+                                return Some((child_idx, col));
+                            }
+                        }
+                        child_idx += 1;
+                    )*
+                    None
+                };
+
+                for group in builder.constraints {
+                    let mut or_group = Vec::new();
+                    for (from_opt, to_opt) in group {
+                        if let (Some(from), Some(to)) = (from_opt, to_opt) {
+                            if let (Some(src), Some(dst)) = (map_wire(from), map_wire(to)) {
+                                or_group.push((src, dst));
+                            }
+                        }
+                    }
+                    if !or_group.is_empty() {
+                        if or_group.len() == 1 {
+                            join_constraints.push(::svql_query::ir::JoinConstraint::Eq(or_group[0].0, or_group[0].1));
+                        } else {
+                            join_constraints.push(::svql_query::ir::JoinConstraint::Or(or_group));
+                        }
+                    }
+                }
+
+                ::svql_query::ir::LogicalPlan::Join {
+                    inputs,
+                    constraints: join_constraints,
+                    schema: self.expected_schema(),
+                }
+            }
+
+            fn expected_schema(&self) -> ::svql_query::ir::Schema {
+                let mut schema = ::svql_query::ir::Schema { columns: Vec::new() };
+                #(#schema_calls)*
+                schema
+            }
+
+            fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
+                let next = match rel_path.first() {
+                    Some(arc_str) => arc_str.as_ref(),
+                    None => return None,
+                };
+                let tail = &rel_path[1..];
+                match next {
+                    #(#get_col_arms_final),*,
+                    _ => None
+                }
+            }
+
+            fn reconstruct<'a>(&self, cursor: &mut ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
+                #struct_name {
+                    #path_ident: self.#path_ident.clone(),
+                    #(#reconstruct_calls),*
+                }
             }
         }
     };

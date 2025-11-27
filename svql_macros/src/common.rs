@@ -3,6 +3,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Expr, GenericArgument, Lit, Meta, PathArguments, Token, Type};
 
+#[allow(dead_code)]
 pub fn get_attribute_value(attrs: &[Attribute], attr_name: &str, key: &str) -> Option<String> {
     for attr in attrs {
         if attr.path().is_ident(attr_name) {
@@ -27,6 +28,7 @@ pub fn get_attribute_value(attrs: &[Attribute], attr_name: &str, key: &str) -> O
     None
 }
 
+#[allow(dead_code)]
 pub fn has_attribute(attrs: &[Attribute], attr_name: &str) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident(attr_name))
 }

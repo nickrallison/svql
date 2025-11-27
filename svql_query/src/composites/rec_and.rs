@@ -7,7 +7,10 @@ use crate::{
     Match, Search, State, Wire,
     instance::Instance,
     primitives::and::AndGate,
-    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
+    traits::{
+        Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology,
+        validate_connection,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -208,6 +211,10 @@ impl Query for RecAnd<Search> {
 
         all_results
     }
+}
+
+impl PlannedQuery for RecAnd<Search> {
+    // Default implementation (todo!) is sufficient for compilation
 }
 
 fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {

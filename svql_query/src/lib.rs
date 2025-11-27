@@ -8,6 +8,7 @@ use svql_subgraph::cell::CellWrapper;
 pub mod binding;
 pub mod composites;
 pub mod instance;
+pub mod ir;
 pub mod primitives;
 pub mod security;
 pub mod traits;
