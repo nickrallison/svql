@@ -34,7 +34,7 @@ pub enum LogicalPlanNode {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct QueryDag {
     pub nodes: Vec<LogicalPlanNode>,
     pub root: PlanNodeId,
@@ -93,7 +93,6 @@ fn node_hash(plan: &LogicalPlan) -> NodeHash {
     std::mem::discriminant(plan).hash(&mut hasher);
     NodeHash(hasher.finish())
 }
-
 fn canonicalize_rec(
     plan: &LogicalPlan,
     node_map: &mut AHashMap<NodeHash, PlanNodeId>,
@@ -104,6 +103,7 @@ fn canonicalize_rec(
         return id;
     }
 
+    // Recurse children first
     let input_ids = match plan {
         LogicalPlan::Scan {
             key,
@@ -153,19 +153,19 @@ pub struct FlatResult<'a> {
 
 pub struct ExecutionResult<'a> {
     pub schema: Schema,
-    pub rows: Box<dyn Iterator<Item = FlatResult<'a>> + Send + 'a>,
+    pub rows: Vec<FlatResult<'a>>,
 }
 
 #[derive(Debug)]
 pub struct ResultCursor<'a> {
-    row: &'a FlatResult<'a>,
-    mapping: &'a [usize],
+    row: FlatResult<'a>,
+    mapping: Vec<usize>,
     logical_ptr: usize,
     variant_ptr: usize,
 }
 
 impl<'a> ResultCursor<'a> {
-    pub fn new(row: &'a FlatResult<'a>, mapping: &'a [usize]) -> Self {
+    pub fn new(row: FlatResult<'a>, mapping: Vec<usize>) -> Self {
         Self {
             row,
             mapping,

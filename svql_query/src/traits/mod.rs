@@ -59,7 +59,7 @@ pub trait PlannedQuery: Query {
     }
 
     /// Reconstruct Matched from flat execution result cursor.
-    fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
+    fn reconstruct<'a>(&self, cursor: ResultCursor<'a>) -> Self::Matched<'a> {
         todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
     }
 
@@ -73,24 +73,25 @@ pub trait PlannedQuery: Query {
         Schema { columns: vec![] }
     }
 
-    /// Planner-optimized query: Uses DAG + Executor (caching/indexes).
-    /// WIP: Falls back to legacy for now.
-    fn query_planned<'a, T: Executor>(
+    fn query_planned<'a, 'b, T: Executor>(
         &self,
-        executor: &'a T,
+        executor: &'b T,
         ctx: &'a Context,
         _key: &DriverKey,
-        _config: &Config,
-    ) -> Vec<Self::Matched<'a>> {
-        let dag = self.dag_ir(_config);
+        config: &Config,
+    ) -> Vec<Self::Matched<'a>>
+    where
+        'b: 'a,
+    {
+        let dag = self.dag_ir(config);
         let exec_res = executor.execute_dag(&dag, ctx);
         let expected = self.expected_schema();
         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
-        let mut rows = exec_res.rows;
+
         let mut results = Vec::new();
-        while let Some(row) = rows.next() {
-            let mut cursor = ResultCursor::new(&row, &mapping);
-            results.push(self.reconstruct(&mut cursor));
+        for row in exec_res.rows {
+            let cursor = ResultCursor::new(row, mapping.clone());
+            results.push(self.reconstruct(cursor));
         }
         results
     }
