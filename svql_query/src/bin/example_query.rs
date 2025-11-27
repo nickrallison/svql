@@ -2,8 +2,9 @@ use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 use svql_query::Search;
 use svql_query::instance::Instance;
+use svql_query::ir::NaiveExecutor;
 use svql_query::security::cwe1234::Cwe1234;
-use svql_query::traits::{Query, Searchable};
+use svql_query::traits::{PlannedQuery, Query, Searchable};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,9 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let driver = Driver::new_workspace()?;
 
-    // Example: Load a design that might contain the vulnerability
-    let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
-    let design_module = "tile";
+    // let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
+    // let design_module = "tile";
+
+    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
+    let design_module = "cwe1234_not_alternating";
 
     info!("Loading design...");
     let (haystack_key, haystack_design) =
@@ -39,7 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let query = Cwe1234::<Search>::instantiate(Instance::root("cwe1234".to_string()));
 
     info!("Executing query...");
-    let results = query.query(&driver, &context, &haystack_key, &config);
+    let executor = NaiveExecutor;
+    let results = query.query_planned(&executor, &context, &haystack_key, &config);
+    // let results = query.query(&driver, &context, &haystack_key, &config);
 
     info!("Found {} matches", results.len());
 
