@@ -13,6 +13,16 @@ use crate::{
     },
 };
 
+// #[recursive_composite]
+// pub struct RecAnd<S: State> {
+//     #[path]
+//     pub path: Instance,
+//     #[submodule]
+//     pub and: AndGate<S>,
+//     #[recursive_submodule]
+//     pub child: Option<Box<Self>>,
+// }
+
 #[derive(Debug, Clone)]
 pub struct RecAnd<S>
 where
