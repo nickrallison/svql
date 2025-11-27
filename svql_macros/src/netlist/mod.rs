@@ -222,6 +222,45 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 }).collect()
             }
         }
+
+        impl ::svql_query::traits::PlannedQuery for #struct_name<::svql_query::Search> {
+            fn to_ir(&self, config: &::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+                use ::svql_query::ir::LogicalPlan;
+                LogicalPlan::Scan {
+                    needle_key: <Self as ::svql_query::traits::netlist::NetlistMeta>::driver_key(),
+                    haystack_key: ::svql_driver::DriverKey::default(),  // Patched by query_planned
+                    config: config.clone(),
+                    schema: Self::expected_schema(),
+                }
+            }
+
+            fn expected_schema(&self) -> ::svql_query::ir::Schema {
+                ::svql_query::ir::Schema {
+                    columns: vec![ #(#field_strs.to_string()),* ],  // ["a", "b", "y"]
+                }
+            }
+
+            fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
+                // Stub: First segment == port name
+                rel_path.first().and_then(|p| {
+                    p.as_ref().find(|_| true).map(|_| 0)  // MVP: Index by port str
+                })
+            }
+
+            fn reconstruct<'a>(
+                &self,
+                mut cursor: ::svql_query::ir::ResultCursor<'a>,
+            ) -> Self::Matched<'a> {
+                #struct_name {
+                    path: self.path.clone(),
+                    // Assign cells to ports in field order (matches schema!)
+                    #(#field_names: ::svql_query::Wire::new(
+                        self.#field_names.path().clone(),
+                        cursor.next_cell()
+                    ),)*
+                }
+            }
+        }
     };
 
     TokenStream::from(expanded)

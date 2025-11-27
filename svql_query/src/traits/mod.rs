@@ -11,7 +11,10 @@ use svql_subgraph::GraphIndex;
 use crate::{
     Match, Search, State, Wire,
     instance::Instance,
-    ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
+    ir::{
+        Executor, LogicalPlan, LogicalPlanNode, QueryDag, ResultCursor, Schema,
+        canonicalize_to_dag, compute_schema_mapping,
+    },
 };
 
 /// Base trait for all query components (Netlists, Composites, Variants, Wires).
@@ -49,51 +52,55 @@ pub trait Query: Component<Search> + Searchable {
 /// Defaults use legacy `Query::query` as fallback (TODO: bridge).
 pub trait PlannedQuery: Query {
     /// Generate LogicalPlan tree for this query.
-    fn to_ir(&self, _config: &Config) -> LogicalPlan {
-        todo!("PlannedQuery::to_ir: Generate plan tree (e.g., Scan/Join from structure)")
-    }
+    fn to_ir(&self, _config: &Config) -> LogicalPlan;
 
     /// Canonical DAG (shared subplans).
     fn dag_ir(&self, config: &Config) -> QueryDag {
-        crate::ir::canonicalize_to_dag(self.to_ir(config))
+        canonicalize_to_dag(self.to_ir(config))
     }
 
     /// Reconstruct Matched from flat execution result cursor.
-    fn reconstruct<'a>(&self, cursor: ResultCursor<'a>) -> Self::Matched<'a> {
-        todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
-    }
+    fn reconstruct<'a>(&self, cursor: ResultCursor<'a>) -> Self::Matched<'a>;
 
     /// Map relative path (e.g., ["logic", "y"]) to schema column index.
-    fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
-        None
-    }
+    fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize>;
 
     /// Expected output schema (column paths).
-    fn expected_schema(&self) -> Schema {
-        Schema { columns: vec![] }
-    }
+    fn expected_schema(&self) -> Schema;
 
     fn query_planned<'a, 'b, T: Executor>(
         &self,
         executor: &'b T,
         ctx: &'a Context,
-        _key: &DriverKey,
+        key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Matched<'a>>
     where
         'b: 'a,
     {
-        let dag = self.dag_ir(config);
+        let mut dag = self.dag_ir(config);
+        // Patch haystack_key into all Scans
+        patch_haystack_keys(&mut dag, key);
         let exec_res = executor.execute_dag(&dag, ctx);
         let expected = self.expected_schema();
         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
 
-        let mut results = Vec::new();
-        for row in exec_res.rows {
-            let cursor = ResultCursor::new(row, mapping.clone());
-            results.push(self.reconstruct(cursor));
+        exec_res
+            .rows
+            .into_iter()
+            .map(|row| {
+                let cursor = ResultCursor::new(row, mapping.clone());
+                self.reconstruct(cursor)
+            })
+            .collect()
+    }
+}
+
+fn patch_haystack_keys(dag: &mut QueryDag, key: &DriverKey) {
+    for node in &mut dag.nodes {
+        if let LogicalPlanNode::Scan { haystack_key, .. } = node {
+            *haystack_key = key.clone();
         }
-        results
     }
 }
 

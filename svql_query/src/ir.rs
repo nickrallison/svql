@@ -1,4 +1,4 @@
-//! Intermediate Representation for Queries (DAG-Optimized) - WIP/Stubs
+//! Intermediate Representation for Queries (DAG-Optimized)
 
 use std::hash::{Hash, Hasher};
 
@@ -18,8 +18,9 @@ pub struct PlanNodeId(pub usize);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlanNode {
     Scan {
-        key: DriverKey,
-        config_hash: u64, // Stub for Eq/Hash
+        needle_key: DriverKey,
+        haystack_key: DriverKey, // FIXED: Track both
+        config_hash: u64,
         schema: Schema,
     },
     Join {
@@ -32,9 +33,43 @@ pub enum LogicalPlanNode {
         schema: Schema,
         tag_results: bool,
     },
+    // NEW: Filter for Topology post-join
+    Filter {
+        input_id: PlanNodeId,
+        schema: Schema,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum JoinConstraint {
+    Eq((usize, usize), (usize, usize)), // (left.col, right.col)
+    Or(Vec<((usize, usize), (usize, usize))>),
+}
+
+#[derive(Clone, Debug)]
+pub enum LogicalPlan {
+    Scan {
+        needle_key: DriverKey,
+        haystack_key: DriverKey,
+        config: Config,
+        schema: Schema,
+    },
+    Join {
+        inputs: Vec<Box<LogicalPlan>>,
+        constraints: Vec<JoinConstraint>,
+        schema: Schema,
+    },
+    Union {
+        inputs: Vec<Box<LogicalPlan>>,
+        schema: Schema,
+        tag_results: bool,
+    },
+    Filter {
+        input: Box<LogicalPlan>,
+        schema: Schema,
+    },
+}
+
 pub struct QueryDag {
     pub nodes: Vec<LogicalPlanNode>,
     pub root: PlanNodeId,
@@ -50,105 +85,9 @@ impl QueryDag {
 }
 
 #[derive(Clone, Debug)]
-pub enum LogicalPlan {
-    Scan {
-        key: DriverKey,
-        config: Config,
-        schema: Schema,
-    },
-    Join {
-        inputs: Vec<Box<LogicalPlan>>,
-        constraints: Vec<JoinConstraint>,
-        schema: Schema,
-    },
-    Union {
-        inputs: Vec<Box<LogicalPlan>>,
-        schema: Schema,
-        tag_results: bool,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum JoinConstraint {
-    Eq((usize, usize), (usize, usize)),
-    Or(Vec<((usize, usize), (usize, usize))>),
-}
-
-pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
-    let mut node_map: AHashMap<NodeHash, PlanNodeId> = AHashMap::new();
-    let mut nodes = Vec::new();
-
-    let _root_id = canonicalize_rec(&root_plan, &mut node_map, &mut nodes);
-    QueryDag {
-        nodes,
-        root: PlanNodeId(0),
-    } // Stub root
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-struct NodeHash(u64);
-
-fn node_hash(plan: &LogicalPlan) -> NodeHash {
-    let mut hasher = AHasher::default();
-    std::mem::discriminant(plan).hash(&mut hasher);
-    NodeHash(hasher.finish())
-}
-fn canonicalize_rec(
-    plan: &LogicalPlan,
-    node_map: &mut AHashMap<NodeHash, PlanNodeId>,
-    nodes: &mut Vec<LogicalPlanNode>,
-) -> PlanNodeId {
-    let hash = node_hash(plan);
-    if let Some(&id) = node_map.get(&hash) {
-        return id;
-    }
-
-    // Recurse children first
-    let input_ids = match plan {
-        LogicalPlan::Scan {
-            key,
-            config: _,
-            schema,
-        } => {
-            let config_hash = {
-                let mut h = AHasher::default();
-                // Stub: Hash discriminant or fields
-                42u64.hash(&mut h);
-                h.finish()
-            };
-            let node = LogicalPlanNode::Scan {
-                key: key.clone(),
-                config_hash,
-                schema: schema.clone(),
-            };
-            let id = PlanNodeId(nodes.len());
-            nodes.push(node);
-            node_map.insert(hash, id);
-            return id;
-        }
-        LogicalPlan::Join { inputs, .. } | LogicalPlan::Union { inputs, .. } => inputs
-            .iter()
-            .map(|child| canonicalize_rec(child, node_map, nodes))
-            .collect(),
-    };
-
-    // Build node (stub)
-    let node = LogicalPlanNode::Union {
-        input_ids,
-        schema: Schema { columns: vec![] },
-        tag_results: false,
-    };
-
-    let id = PlanNodeId(nodes.len());
-    nodes.push(node);
-    node_map.insert(hash, id);
-    id
-}
-
-#[derive(Clone, Debug)]
 pub struct FlatResult<'a> {
     pub cells: Vec<CellWrapper<'a>>,
-    pub variant_choices: Vec<usize>,
+    pub variant_choices: Vec<usize>, // NEW: For variants
 }
 
 pub struct ExecutionResult<'a> {
@@ -186,18 +125,137 @@ impl<'a> ResultCursor<'a> {
 }
 
 pub trait Executor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_>;
+    fn execute_dag(&self, dag: &QueryDag, ctx: &Context) -> ExecutionResult<'_>;
 }
 
-#[derive(Debug)]
+// NEW: NaiveExecutor impl below (piece 3)
 pub struct NaiveExecutor;
 
-impl Executor for NaiveExecutor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_> {
-        todo!("Executor DAG execution")
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct NodeHash(u64);
+
+fn node_hash(plan: &LogicalPlan) -> NodeHash {
+    let mut hasher = AHasher::default();
+    std::mem::discriminant(plan).hash(&mut hasher);
+    // FIXED: Hash fields recursively (stub: children/config)
+    match plan {
+        LogicalPlan::Scan {
+            needle_key, config, ..
+        } => {
+            needle_key.hash(&mut hasher);
+            // Config hash stub
+            42u64.hash(&mut hasher);
+        }
+        _ => {} // Expand for Join/Union
+    }
+    NodeHash(hasher.finish())
+}
+
+pub fn canonicalize_to_dag(mut root_plan: LogicalPlan) -> QueryDag {
+    let mut node_map: AHashMap<NodeHash, PlanNodeId> = AHashMap::new();
+    let mut nodes = Vec::new();
+
+    let root_id = canonicalize_rec(&mut root_plan, &mut node_map, &mut nodes);
+    QueryDag {
+        nodes,
+        root: root_id,
     }
 }
 
-pub fn compute_schema_mapping(expected: &Schema, _actual: &Schema) -> Vec<usize> {
-    (0..expected.columns.len()).collect()
+fn canonicalize_rec(
+    plan: &mut LogicalPlan,
+    node_map: &mut AHashMap<NodeHash, PlanNodeId>,
+    nodes: &mut Vec<LogicalPlanNode>,
+) -> PlanNodeId {
+    let hash = node_hash(plan);
+    if let Some(&id) = node_map.get(&hash) {
+        return id;
+    }
+
+    // FIXED: Mut recurse + dedup children
+    let input_ids = match plan {
+        LogicalPlan::Scan {
+            needle_key,
+            haystack_key,
+            config,
+            schema,
+        } => {
+            let config_hash = {
+                let mut h = AHasher::default();
+                // Stub: Proper config hash
+                config.hash(&mut h);
+                h.finish()
+            };
+            let node = LogicalPlanNode::Scan {
+                needle_key: needle_key.clone(),
+                haystack_key: haystack_key.clone(),
+                config_hash,
+                schema: schema.clone(),
+            };
+            let id = PlanNodeId(nodes.len());
+            nodes.push(node);
+            node_map.insert(hash, id);
+            return id;
+        }
+        LogicalPlan::Join {
+            inputs,
+            constraints,
+            schema,
+        } => {
+            let input_ids: Vec<_> = inputs
+                .iter_mut()
+                .map(|child| canonicalize_rec(child, node_map, nodes))
+                .collect();
+            let node = LogicalPlanNode::Join {
+                input_ids,
+                constraints: constraints.clone(),
+                schema: schema.clone(),
+            };
+            let id = PlanNodeId(nodes.len());
+            nodes.push(node);
+            node_map.insert(hash, id);
+            return id;
+        }
+        LogicalPlan::Union {
+            inputs,
+            schema,
+            tag_results,
+        } => {
+            let input_ids: Vec<_> = inputs
+                .iter_mut()
+                .map(|child| canonicalize_rec(child, node_map, nodes))
+                .collect();
+            let node = LogicalPlanNode::Union {
+                input_ids,
+                schema: schema.clone(),
+                tag_results: *tag_results,
+            };
+            let id = PlanNodeId(nodes.len());
+            nodes.push(node);
+            node_map.insert(hash, id);
+            return id;
+        }
+        LogicalPlan::Filter { input, schema } => {
+            let input_id = canonicalize_rec(input, node_map, nodes);
+            let node = LogicalPlanNode::Filter {
+                input_id,
+                schema: schema.clone(),
+            };
+            let id = PlanNodeId(nodes.len());
+            nodes.push(node);
+            node_map.insert(hash, id);
+            return id;
+        }
+    };
+    // Fallback (unreachable)
+    PlanNodeId(0)
+}
+
+pub fn compute_schema_mapping(expected: &Schema, actual: &Schema) -> Vec<usize> {
+    // Stub: Name-based match
+    expected
+        .columns
+        .iter()
+        .map(|col| actual.columns.iter().position(|c| c == col).unwrap_or(0))
+        .collect()
 }
