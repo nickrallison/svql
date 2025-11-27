@@ -112,7 +112,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[derive(Clone, Debug)]
         // FIXED: Use #generics instead of #ty_generics to include bounds (S: State)
-        pub struct #struct_name #generics #where_clause {
+        pub struct #struct_name #generics {
             pub path: ::svql_query::instance::Instance,
             #(#field_defs),*
         }

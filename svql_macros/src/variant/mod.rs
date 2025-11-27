@@ -189,7 +189,8 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let port_cell_binds: Vec<proc_macro2::TokenStream> = common_ports
         .iter()
         .zip(&port_cell_idents)
-        .map(|(port, cell_ident)| {
+        .map(|(_, cell_ident)| {
+            // Changed |(port, cell_ident)| to |(_, cell_ident)| since `port` is unused
             quote! {
                 let #cell_ident: ::svql_subgraph::cell::CellWrapper<'a> = cursor.next_cell();
             }

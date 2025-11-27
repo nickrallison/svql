@@ -103,6 +103,12 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let path_ident = path_field.expect("Composite struct must have a #[path] field");
 
+    let match_arms = if find_port_arms.is_empty() {
+        quote! { _ => None }
+    } else {
+        quote! { #(#find_port_arms),* _ => None }
+    };
+
     // Schema: Flatten submodule ports under names (e.g., ["logic", "reg"])
     let schema_columns: Vec<proc_macro2::TokenStream> = query_names
         .iter()
@@ -136,9 +142,13 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #[derive(Clone, Debug)]
-        pub struct #struct_name #generics #where_clause {
+        pub struct #struct_name #generics {  // Removed #where_clause to avoid duplication
+            pub path: ::svql_query::instance::Instance,
             #(#field_defs),*
         }
+
+
+
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
             fn path(&self) -> &::svql_query::instance::Instance {
@@ -166,10 +176,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 };
                 let tail = &rel_path[1..];
                 match next {
-                    #(#find_port_arms),*,
-                    _ => None,
+                    #match_arms
                 }
             }
+
         }
 
         impl ::svql_query::traits::Searchable for #struct_name<::svql_query::Search> {
