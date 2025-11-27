@@ -1,8 +1,6 @@
-//! Intermediate Representation for Queries (DAG-Optimized) - WIP/Stubs
+//! Intermediate Representation for Queries (DAG-Optimized)
 
-use std::hash::{Hash, Hasher};
-
-use ahash::{AHashMap, AHasher};
+use ahash::AHashMap;
 use svql_common::Config;
 use svql_driver::{Context, DriverKey};
 use svql_subgraph::cell::CellWrapper;
@@ -19,7 +17,7 @@ pub struct PlanNodeId(pub usize);
 pub enum LogicalPlanNode {
     Scan {
         key: DriverKey,
-        config_hash: u64, // Stub for Eq/Hash
+        config: Config,
         schema: Schema,
     },
     Join {
@@ -49,7 +47,9 @@ impl QueryDag {
     }
 }
 
-#[derive(Clone, Debug)]
+// Added Hash and Eq here.
+// Requirement: Config and DriverKey must implement Hash and Eq.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlan {
     Scan {
         key: DriverKey,
@@ -75,73 +75,79 @@ pub enum JoinConstraint {
 }
 
 pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
-    let mut node_map: AHashMap<NodeHash, PlanNodeId> = AHashMap::new();
+    // We now map the actual LogicalPlan structure to an ID.
+    // This enables structural deduplication (Common Subexpression Elimination).
+    let mut node_map: AHashMap<LogicalPlan, PlanNodeId> = AHashMap::new();
     let mut nodes = Vec::new();
 
-    let _root_id = canonicalize_rec(&root_plan, &mut node_map, &mut nodes);
+    let root_id = canonicalize_rec(root_plan, &mut node_map, &mut nodes);
     QueryDag {
         nodes,
-        root: PlanNodeId(0),
-    } // Stub root
+        root: root_id,
+    }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-struct NodeHash(u64);
-
-fn node_hash(plan: &LogicalPlan) -> NodeHash {
-    let mut hasher = AHasher::default();
-    std::mem::discriminant(plan).hash(&mut hasher);
-    NodeHash(hasher.finish())
-}
 fn canonicalize_rec(
-    plan: &LogicalPlan,
-    node_map: &mut AHashMap<NodeHash, PlanNodeId>,
+    plan: LogicalPlan,
+    node_map: &mut AHashMap<LogicalPlan, PlanNodeId>,
     nodes: &mut Vec<LogicalPlanNode>,
 ) -> PlanNodeId {
-    let hash = node_hash(plan);
-    if let Some(&id) = node_map.get(&hash) {
+    // If this exact structure has been seen before, return its existing ID.
+    if let Some(&id) = node_map.get(&plan) {
         return id;
     }
 
-    // Recurse children first
-    let input_ids = match plan {
+    // We must process children first to get their IDs.
+    // We clone the plan here to keep ownership for the map key later,
+    // while we destructure a copy to process children.
+    // (Optimization: In a production system, we might use Cow or references to avoid this clone)
+    let plan_key = plan.clone();
+
+    let node = match plan {
         LogicalPlan::Scan {
             key,
-            config: _,
+            config,
+            schema,
+        } => LogicalPlanNode::Scan {
+            key,
+            config,
+            schema,
+        },
+        LogicalPlan::Join {
+            inputs,
+            constraints,
             schema,
         } => {
-            let config_hash = {
-                let mut h = AHasher::default();
-                // Stub: Hash discriminant or fields
-                42u64.hash(&mut h);
-                h.finish()
-            };
-            let node = LogicalPlanNode::Scan {
-                key: key.clone(),
-                config_hash,
-                schema: schema.clone(),
-            };
-            let id = PlanNodeId(nodes.len());
-            nodes.push(node);
-            node_map.insert(hash, id);
-            return id;
+            let input_ids = inputs
+                .into_iter()
+                .map(|child| canonicalize_rec(*child, node_map, nodes))
+                .collect();
+            LogicalPlanNode::Join {
+                input_ids,
+                constraints,
+                schema,
+            }
         }
-        LogicalPlan::Join { inputs, .. } | LogicalPlan::Union { inputs, .. } => inputs
-            .iter()
-            .map(|child| canonicalize_rec(child, node_map, nodes))
-            .collect(),
-    };
-
-    // Build node (stub)
-    let node = LogicalPlanNode::Union {
-        input_ids,
-        schema: Schema { columns: vec![] },
-        tag_results: false,
+        LogicalPlan::Union {
+            inputs,
+            schema,
+            tag_results,
+        } => {
+            let input_ids = inputs
+                .into_iter()
+                .map(|child| canonicalize_rec(*child, node_map, nodes))
+                .collect();
+            LogicalPlanNode::Union {
+                input_ids,
+                schema,
+                tag_results,
+            }
+        }
     };
 
     let id = PlanNodeId(nodes.len());
     nodes.push(node);
-    node_map.insert(hash, id);
+    node_map.insert(plan_key, id);
     id
 }
 
@@ -186,15 +192,188 @@ impl<'a> ResultCursor<'a> {
 }
 
 pub trait Executor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_>;
+    fn execute_dag<'a>(
+        &self,
+        dag: &QueryDag,
+        ctx: &'a Context,
+        haystack_key: &DriverKey,
+        config: &Config,
+    ) -> ExecutionResult<'a>;
 }
 
 #[derive(Debug)]
 pub struct NaiveExecutor;
 
 impl Executor for NaiveExecutor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_> {
-        todo!("Executor DAG execution")
+    fn execute_dag<'a>(
+        &self,
+        dag: &QueryDag,
+        ctx: &'a Context,
+        haystack_key: &DriverKey,
+        config: &Config,
+    ) -> ExecutionResult<'a> {
+        let root_result = self.execute_node(dag.root, dag, ctx, haystack_key, config);
+        let schema = match dag.root_node() {
+            LogicalPlanNode::Scan { schema, .. } => schema.clone(),
+            LogicalPlanNode::Join { schema, .. } => schema.clone(),
+            LogicalPlanNode::Union { schema, .. } => schema.clone(),
+        };
+        ExecutionResult {
+            schema,
+            rows: root_result,
+        }
+    }
+}
+
+impl NaiveExecutor {
+    /// Recursively executes a single node in the DAG.
+    fn execute_node<'a>(
+        &self,
+        node_id: PlanNodeId,
+        dag: &QueryDag,
+        ctx: &'a Context,
+        haystack_key: &DriverKey,
+        config: &Config,
+    ) -> Vec<FlatResult<'a>> {
+        match dag.node(node_id) {
+            LogicalPlanNode::Scan {
+                key,
+                config: node_config,
+                schema,
+            } => {
+                // Retrieve needle and haystack designs from context.
+                let needle_container = ctx.get(key).unwrap();
+                let haystack_container = ctx.get(haystack_key).unwrap();
+                let needle = needle_container.design();
+                let haystack = haystack_container.design();
+                let needle_index = needle_container.index();
+                let haystack_index = haystack_container.index();
+
+                // Perform subgraph isomorphism matching.
+                let embeddings = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+                    needle,
+                    haystack,
+                    needle_index,
+                    haystack_index,
+                    node_config,
+                );
+
+                // Build FlatResult for each embedding by resolving cells for schema columns.
+                embeddings
+                    .items
+                    .iter()
+                    .map(|embedding| {
+                        let cells = schema
+                            .columns
+                            .iter()
+                            .filter_map(|wire_name| {
+                                ::svql_query::traits::netlist::resolve_wire(
+                                    embedding,
+                                    &embeddings,
+                                    needle,
+                                    wire_name,
+                                )
+                            })
+                            .collect();
+                        FlatResult {
+                            cells,
+                            variant_choices: vec![],
+                        }
+                    })
+                    .collect()
+            }
+            LogicalPlanNode::Join {
+                input_ids,
+                constraints,
+                ..
+            } => {
+                // Execute all input nodes.
+                let input_results: Vec<Vec<FlatResult<'a>>> = input_ids
+                    .iter()
+                    .map(|&id| self.execute_node(id, dag, ctx, haystack_key, config))
+                    .collect();
+
+                if input_results.is_empty() {
+                    return vec![];
+                }
+
+                // Compute Cartesian product of input results.
+                let combos = Self::cartesian_product(&input_results);
+
+                // Filter combinations based on join constraints.
+                combos
+                    .into_iter()
+                    .filter_map(|combo| {
+                        let satisfied = constraints.iter().all(|constraint| match constraint {
+                            JoinConstraint::Eq((i1, c1), (i2, c2)) => {
+                                combo[*i1].cells[*c1] == combo[*i2].cells[*c2]
+                            }
+                            JoinConstraint::Or(pairs) => {
+                                pairs.iter().any(|&((i1, c1), (i2, c2))| {
+                                    combo[i1].cells[c1] == combo[i2].cells[c2]
+                                })
+                            }
+                        });
+
+                        if satisfied {
+                            let cells = combo.iter().flat_map(|row| row.cells.clone()).collect();
+                            let variant_choices = combo
+                                .iter()
+                                .flat_map(|row| row.variant_choices.clone())
+                                .collect();
+                            Some(FlatResult {
+                                cells,
+                                variant_choices,
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            }
+            LogicalPlanNode::Union {
+                input_ids,
+                tag_results,
+                ..
+            } => {
+                // Execute all input nodes and union results.
+                input_ids
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, &id)| {
+                        let mut results = self.execute_node(id, dag, ctx, haystack_key, config);
+                        if *tag_results {
+                            results
+                                .iter_mut()
+                                .for_each(|row| row.variant_choices.push(i));
+                        }
+                        results
+                    })
+                    .collect()
+            }
+        }
+    }
+
+    /// Helper to compute the Cartesian product of vectors of FlatResult.
+    /// Returns a vector of vectors, where each inner vector is a combination of one FlatResult from each input vector.
+    fn cartesian_product<'a>(results: &[Vec<FlatResult<'a>>]) -> Vec<Vec<FlatResult<'a>>> {
+        if results.is_empty() {
+            return vec![vec![]];
+        }
+
+        let (first, rest) = results.split_first().unwrap();
+        let rest_product = Self::cartesian_product(rest);
+
+        first
+            .iter()
+            .flat_map(|item| {
+                rest_product.iter().map(move |combo| {
+                    let mut new_combo = vec![item.clone()];
+                    new_combo.extend(combo.clone());
+                    new_combo
+                })
+            })
+            .collect()
     }
 }
 

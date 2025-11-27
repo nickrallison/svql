@@ -4,7 +4,7 @@ use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::ir::NaiveExecutor;
 use svql_query::security::cwe1234::Cwe1234;
-use svql_query::traits::{PlannedQuery, Searchable};
+use svql_query::traits::{PlannedQuery, Query, Searchable};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,13 +43,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Executing query...");
     let executor = NaiveExecutor;
-    let results = query.query_planned(&executor, &context, &haystack_key, &config);
-    // let results = query.query(&driver, &context, &haystack_key, &config);
+    let planned_query_results = query.query_planned(&executor, &context, &haystack_key, &config);
+    let query_results = query.query(&driver, &context, &haystack_key, &config);
 
-    info!("Found {} matches", results.len());
+    info!("Found {} matches for old query", query_results.len());
 
-    for (i, _match) in results.iter().enumerate() {
+    for (i, _match) in query_results.iter().enumerate() {
         info!("Match #{}", i);
+        // Inspect match details if needed
+    }
+
+    info!(
+        "Found {} matches for planned query",
+        planned_query_results.len()
+    );
+    for (i, _match) in planned_query_results.iter().enumerate() {
+        info!("Planned Match #{}", i);
         // Inspect match details if needed
     }
 

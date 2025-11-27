@@ -79,14 +79,14 @@ pub trait PlannedQuery: Query {
         &self,
         executor: &'b T,
         ctx: &'a Context,
-        _key: &DriverKey,
+        key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Matched<'a>>
     where
         'b: 'a,
     {
         let dag = self.dag_ir(config);
-        let exec_res = executor.execute_dag(&dag, ctx);
+        let exec_res = executor.execute_dag(&dag, ctx, key, config);
         let expected = self.expected_schema();
         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
 
