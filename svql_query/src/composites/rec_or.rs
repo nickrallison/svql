@@ -181,7 +181,114 @@ impl Query for RecOr<Search> {
 }
 
 impl PlannedQuery for RecOr<Search> {
-    // Default implementation (todo!) is sufficient for compilation
+    fn to_ir(&self, config: &::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+        if let Some(ref child) = self.child {
+            let inputs = vec![
+                Box::new(self.or.to_ir(config)),
+                Box::new(child.to_ir(config)),
+            ];
+
+            let mut builder = ::svql_query::traits::ConnectionBuilder {
+                constraints: Vec::new(),
+            };
+            self.define_connections(&mut builder);
+
+            let mut join_constraints = Vec::new();
+
+            let map_wire =
+                |wire: &::svql_query::Wire<::svql_query::Search>| -> Option<(usize, usize)> {
+                    let wire_path = wire.path();
+                    if wire_path.starts_with(self.or.path()) {
+                        let rel = wire_path.relative(self.or.path());
+                        if let Some(col) = self.or.get_column_index(rel) {
+                            return Some((0, col));
+                        }
+                    }
+                    if wire_path.starts_with(child.path()) {
+                        let rel = wire_path.relative(child.path());
+                        if let Some(col) = child.get_column_index(rel) {
+                            return Some((1, col));
+                        }
+                    }
+                    None
+                };
+
+            for group in builder.constraints {
+                let mut or_group = Vec::new();
+                for (from_opt, to_opt) in group {
+                    if let (Some(from), Some(to)) = (from_opt, to_opt) {
+                        if let (Some(src), Some(dst)) = (map_wire(from), map_wire(to)) {
+                            or_group.push((src, dst));
+                        }
+                    }
+                }
+                if !or_group.is_empty() {
+                    if or_group.len() == 1 {
+                        join_constraints.push(::svql_query::ir::JoinConstraint::Eq(
+                            or_group[0].0,
+                            or_group[0].1,
+                        ));
+                    } else {
+                        join_constraints.push(::svql_query::ir::JoinConstraint::Or(or_group));
+                    }
+                }
+            }
+
+            ::svql_query::ir::LogicalPlan::Join {
+                inputs,
+                constraints: join_constraints,
+                schema: self.expected_schema(),
+            }
+        } else {
+            self.or.to_ir(config)
+        }
+    }
+
+    fn expected_schema(&self) -> ::svql_query::ir::Schema {
+        let mut schema = ::svql_query::ir::Schema {
+            columns: Vec::new(),
+        };
+        schema.columns.extend(self.or.expected_schema().columns);
+        if let Some(ref child) = self.child {
+            schema.columns.extend(child.expected_schema().columns);
+        }
+        schema
+    }
+
+    fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
+        let next = match rel_path.first() {
+            Some(arc_str) => arc_str.as_ref(),
+            None => return None,
+        };
+        let tail = &rel_path[1..];
+        match next {
+            "or" => {
+                let sub_idx = self.or.get_column_index(tail)?;
+                Some(0 + sub_idx)
+            }
+            "child" => {
+                if let Some(ref child) = self.child {
+                    let sub_idx = child.get_column_index(tail)?;
+                    let offset = self.or.expected_schema().columns.len();
+                    Some(offset + sub_idx)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn reconstruct<'a>(
+        &self,
+        cursor: &mut ::svql_query::ir::ResultCursor<'a>,
+    ) -> Self::Matched<'a> {
+        RecOr {
+            path: self.path.clone(),
+            or: self.or.reconstruct(cursor),
+            child: self.child.as_ref().map(|c| Box::new(c.reconstruct(cursor))),
+        }
+    }
 }
 
 impl<'ctx> RecOr<Match<'ctx>> {
