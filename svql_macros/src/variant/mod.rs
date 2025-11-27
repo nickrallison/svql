@@ -179,6 +179,78 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 		        }
 		    });
 
+    // 1. Port cell idents (clk_cell, d_cell, ...)
+    let port_cell_idents: Vec<syn::Ident> = common_ports
+        .iter()
+        .map(|port| format_ident!("{}_cell", port.to_string()))
+        .collect();
+
+    // 2. Port cell bindings: let clk_cell = cursor.next_cell(); ...
+    let port_cell_binds: Vec<proc_macro2::TokenStream> = common_ports
+        .iter()
+        .zip(&port_cell_idents)
+        .map(|(port, cell_ident)| {
+            quote! {
+                let #cell_ident: ::svql_subgraph::cell::CellWrapper<'a> = cursor.next_cell();
+            }
+        })
+        .collect();
+
+    // 3. get_column_arms (unchanged)
+    let get_column_arms: Vec<proc_macro2::TokenStream> = common_ports
+        .iter()
+        .enumerate()
+        .map(|(idx, port)| {
+            let port_lit = quote! { stringify!(#port) };
+            quote! { #port_lit => Some(#idx) }
+        })
+        .collect();
+
+    // 4. schema_columns (unchanged)
+    let schema_columns: Vec<proc_macro2::TokenStream> = common_ports
+        .iter()
+        .map(|port| quote! { stringify!(#port).to_string() })
+        .collect();
+
+    // 5. union_inputs: Box::new(sub_q.to_ir(config))
+    let union_inputs: Vec<proc_macro2::TokenStream> = variant_types
+        .iter()
+        .map(|vtype| {
+            let search_type = common::replace_generic_with_search(vtype);
+            quote! {
+                {
+                    let sub_q: #search_type = <#search_type>::instantiate(dummy_path.clone());
+                    Box::new(sub_q.to_ir(config))
+                }
+            }
+        })
+        .collect();
+
+    // 6. reconstruct_arms: per-variant dispatch w/ port_cell → field mapping
+    //    MVP: Assumes common_ports order/names == field order/names (identity map)
+    let reconstruct_arms: Vec<proc_macro2::TokenStream> = variant_names
+        .iter()
+        .zip(&variant_types)
+        .enumerate()
+        .map(|(idx, (vname, vtype))| {
+            let field_inits: Vec<proc_macro2::TokenStream> = common_ports
+                .iter()
+                .zip(&port_cell_idents)
+                .map(|(port, cell_ident)| {
+                    quote! {
+                        #port: ::svql_query::Wire::new(
+                            self.path().child(stringify!(#vname)).child(stringify!(#port)),
+                            #cell_ident.clone()
+                        )
+                    }
+                })
+                .collect();
+            quote! {
+                #idx => Self::#vname( #vtype { #(#field_inits),* } )
+            }
+        })
+        .collect();
+
     let expanded = quote! {
         #expanded_enum
 
@@ -255,6 +327,42 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 all_results
             }
         }
+
+        impl ::svql_query::traits::PlannedQuery for #enum_name<::svql_query::Search> {
+            fn to_ir(&self, config: &::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
+                use ::svql_query::ir::LogicalPlan;
+                let dummy_path = ::svql_query::instance::Instance::root("dummy".to_string());
+                LogicalPlan::Union {
+                    inputs: vec![ #(#union_inputs),* ],
+                    schema: Self::expected_schema(),
+                    tag_results: true,
+                }
+            }
+
+            fn expected_schema(&self) -> ::svql_query::ir::Schema {
+                ::svql_query::ir::Schema {
+                    columns: vec![ #(#schema_columns),* ],
+                }
+            }
+
+            fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
+                let port_name = rel_path.first()?.as_ref();
+                match port_name {
+                    #(#get_column_arms),*
+                    _ => None,
+                }
+            }
+
+            fn reconstruct<'a>(&self, mut cursor: ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
+                let variant_idx = cursor.next_variant();
+                #(#port_cell_binds)*
+                match variant_idx {
+                    #(#reconstruct_arms),*
+                    _ => panic!("Invalid variant_idx {} for {}", variant_idx, stringify!(#enum_name)),
+                }
+            }
+        }
+
     };
 
     TokenStream::from(expanded)
