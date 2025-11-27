@@ -3,14 +3,16 @@ pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
+
 use svql_common::Config;
 use svql_driver::{Context, DriverKey};
+use svql_subgraph::GraphIndex;
 
-use crate::ir::{
-    Executor, LogicalPlan, QueryDag, ResultCursor, Schema, canonicalize_to_dag,
-    compute_schema_mapping,
+use crate::{
+    Match, Search, State, Wire,
+    instance::Instance,
+    ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
 };
-use crate::{Instance, Match, Search, State, Wire};
 
 /// Base trait for all query components (Netlists, Composites, Variants, Wires).
 pub trait Component<S: State> {
@@ -23,14 +25,16 @@ pub trait Component<S: State> {
 }
 
 /// Trait for components that can be instantiated in the Search state.
-pub trait Searchable: Sized {
+pub trait Searchable: Sized + Component<Search> {
     fn instantiate(base_path: Instance) -> Self;
 }
 
-/// Legacy Query trait (planner WIP: new methods to be added later).
-pub trait Query: Component<Search> {
+/// Legacy Query trait: Compatible with existing macros/manual impls.
+/// Use for `query(driver, ...)`.
+pub trait Query: Component<Search> + Searchable {
     type Matched<'a>: Component<Match<'a>>;
 
+    /// Legacy query dispatcher (current implementation).
     fn query<'a>(
         &self,
         driver: &::svql_driver::Driver,
@@ -42,31 +46,25 @@ pub trait Query: Component<Search> {
 
 /// PlannedQuery supertrait: Enables optimized planner execution.
 /// Implement alongside `Query` for caching/DAG benefits.
-/// Defaults use legacy `Query::query` as fallback.
-pub trait PlannedQuery<'q>: Query {
+/// Defaults use legacy `Query::query` as fallback (TODO: bridge).
+pub trait PlannedQuery: Query {
     /// Generate LogicalPlan tree for this query.
-    fn to_ir(&self, config: &Config) -> LogicalPlan {
-        // Default: Panic → encourage impl for planner users.
-        // FUTURE: Auto-gen from structure via macros/reflection.
-        panic!(
-            "PlannedQuery::to_ir must be implemented for planner execution (or use legacy Query::query)"
-        )
+    fn to_ir(&self, _config: &Config) -> LogicalPlan {
+        todo!("PlannedQuery::to_ir: Generate plan tree (e.g., Scan/Join from structure)")
     }
 
     /// Canonical DAG (shared subplans).
     fn dag_ir(&self, config: &Config) -> QueryDag {
-        canonicalize_to_dag(self.to_ir(config))
+        crate::ir::canonicalize_to_dag(self.to_ir(config))
     }
 
     /// Reconstruct Matched from flat execution result cursor.
-    fn reconstruct<'a>(&self, cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
-        panic!("PlannedQuery::reconstruct must be implemented")
+    fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
+        todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
     }
 
     /// Map relative path (e.g., ["logic", "y"]) to schema column index.
-    fn get_column_index(&self, rel_path: &[Arc<str>]) -> Option<usize> {
-        // Default: Walk structure recursively.
-        // Stub: Requires schema knowledge.
+    fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
         None
     }
 
@@ -76,41 +74,40 @@ pub trait PlannedQuery<'q>: Query {
     }
 
     /// Planner-optimized query: Uses DAG + Executor (caching/indexes).
+    /// WIP: Falls back to legacy for now.
     fn query_planned<'a, T: Executor>(
         &self,
         executor: &'a T,
         ctx: &'a Context,
-        key: &DriverKey,
-        config: &Config,
+        _key: &DriverKey,
+        _config: &Config,
     ) -> Vec<Self::Matched<'a>> {
-        let dag = self.dag_ir(config);
+        let dag = self.dag_ir(_config);
         let exec_res = executor.execute_dag(&dag, ctx);
         let expected = self.expected_schema();
         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
-        exec_res
-            .rows
-            .into_iter()
-            .map(move |row| {
-                let mut cursor = ResultCursor::new(&row, &mapping);
-                self.reconstruct(&mut cursor)
-            })
-            .collect()
+        let mut rows = exec_res.rows;
+        let mut results = Vec::new();
+        while let Some(row) = rows.next() {
+            let mut cursor = ResultCursor::new(&row, &mapping);
+            results.push(self.reconstruct(&mut cursor));
+        }
+        results
     }
 }
 
-// --- Topology & Connections ---
-pub use crate::traits::composite::ConnectionBuilder;
-pub use crate::traits::composite::Topology;
+// Re-export for convenience
+pub use composite::{ConnectionBuilder, Topology};
+pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
 
-/// Validate if `from` drives `to` in haystack.
+/// Validate connection in haystack (used by legacy/composite validation).
 pub fn validate_connection<'ctx>(
     from: &Wire<Match<'ctx>>,
     to: &Wire<Match<'ctx>>,
-    haystack_index: &svql_subgraph::GraphIndex<'ctx>,
+    haystack_index: &GraphIndex<'ctx>,
 ) -> bool {
     let from_cell = &from.inner;
     let to_cell = &to.inner;
-
     haystack_index
         .fanout_set(from_cell)
         .map_or(false, |set| set.contains(to_cell))

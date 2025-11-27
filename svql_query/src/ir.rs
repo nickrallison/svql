@@ -1,4 +1,4 @@
-//! Intermediate Representation for Queries (DAG-Optimized)
+//! Intermediate Representation for Queries (DAG-Optimized) - WIP/Stubs
 
 use std::hash::{Hash, Hasher};
 
@@ -19,8 +19,7 @@ pub struct PlanNodeId(pub usize);
 pub enum LogicalPlanNode {
     Scan {
         key: DriverKey,
-        #[allow(unused)] // WIP: Config hash later
-        config_hash: u64, // Stub: hash(config) for Eq/Hash
+        config_hash: u64, // Stub for Eq/Hash
         schema: Schema,
     },
     Join {
@@ -50,7 +49,7 @@ impl QueryDag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum LogicalPlan {
     Scan {
         key: DriverKey,
@@ -79,11 +78,11 @@ pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
     let mut node_map: AHashMap<NodeHash, PlanNodeId> = AHashMap::new();
     let mut nodes = Vec::new();
 
-    let root_id = canonicalize_rec(&root_plan, &mut node_map, &mut nodes);
+    let _root_id = canonicalize_rec(&root_plan, &mut node_map, &mut nodes);
     QueryDag {
         nodes,
-        root: root_id,
-    }
+        root: PlanNodeId(0),
+    } // Stub root
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -92,7 +91,6 @@ struct NodeHash(u64);
 fn node_hash(plan: &LogicalPlan) -> NodeHash {
     let mut hasher = AHasher::default();
     std::mem::discriminant(plan).hash(&mut hasher);
-    // TODO: Full structural hash (ignore Config cycles)
     NodeHash(hasher.finish())
 }
 
@@ -109,13 +107,13 @@ fn canonicalize_rec(
     let input_ids = match plan {
         LogicalPlan::Scan {
             key,
-            config,
+            config: _,
             schema,
         } => {
             let config_hash = {
                 let mut h = AHasher::default();
-                // Stub hash (expand to full Config hash)
-                config.hash_stub(&mut h); // Assume Config::hash_stub added
+                // Stub: Hash discriminant or fields
+                42u64.hash(&mut h);
                 h.finish()
             };
             let node = LogicalPlanNode::Scan {
@@ -128,51 +126,23 @@ fn canonicalize_rec(
             node_map.insert(hash, id);
             return id;
         }
-        LogicalPlan::Join {
-            inputs,
-            constraints,
-            schema,
-        }
-        | LogicalPlan::Union { inputs, schema, .. } => inputs
+        LogicalPlan::Join { inputs, .. } | LogicalPlan::Union { inputs, .. } => inputs
             .iter()
             .map(|child| canonicalize_rec(child, node_map, nodes))
             .collect(),
     };
 
-    let node = match plan {
-        LogicalPlan::Join {
-            constraints,
-            schema,
-            ..
-        } => LogicalPlanNode::Join {
-            input_ids,
-            constraints: rewrite_constraints(constraints, &input_ids),
-            schema: schema.clone(),
-        },
-        LogicalPlan::Union {
-            schema,
-            tag_results,
-            ..
-        } => LogicalPlanNode::Union {
-            input_ids,
-            schema: schema.clone(),
-            tag_results: *tag_results,
-        },
-        _ => unreachable!(),
+    // Build node (stub)
+    let node = LogicalPlanNode::Union {
+        input_ids,
+        schema: Schema { columns: vec![] },
+        tag_results: false,
     };
 
     let id = PlanNodeId(nodes.len());
     nodes.push(node);
     node_map.insert(hash, id);
     id
-}
-
-fn rewrite_constraints(
-    _constraints: &[JoinConstraint],
-    _input_ids: &[PlanNodeId],
-) -> Vec<JoinConstraint> {
-    // TODO: Remap indices
-    vec![]
 }
 
 #[derive(Clone, Debug)]
@@ -216,19 +186,18 @@ impl<'a> ResultCursor<'a> {
 }
 
 pub trait Executor {
-    fn execute_dag(&self, dag: &QueryDag, ctx: &Context) -> ExecutionResult;
+    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_>;
 }
 
 #[derive(Debug)]
 pub struct NaiveExecutor;
 
 impl Executor for NaiveExecutor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult {
-        todo!("NaiveExecutor: topo-execute DAG")
+    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_> {
+        todo!("Executor DAG execution")
     }
 }
 
 pub fn compute_schema_mapping(expected: &Schema, _actual: &Schema) -> Vec<usize> {
-    // Stub: 1:1 mapping
     (0..expected.columns.len()).collect()
 }
