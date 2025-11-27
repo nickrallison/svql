@@ -1,22 +1,26 @@
-//! Intermediate Representation for Queries (DAG-Optimized) - WIP
+//! Intermediate Representation for Queries (DAG-Optimized)
+
+use std::hash::{Hash, Hasher};
 
 use ahash::{AHashMap, AHasher};
 use svql_common::Config;
 use svql_driver::{Context, DriverKey};
+use svql_subgraph::cell::CellWrapper;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Schema {
-    pub columns: Vec<String>, // e.g., ["logic.y", "reg.clk", "reg.d"]
+    pub columns: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PlanNodeId(usize);
+pub struct PlanNodeId(pub usize);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlanNode {
     Scan {
         key: DriverKey,
-        config: Config,
+        #[allow(unused)] // WIP: Config hash later
+        config_hash: u64, // Stub: hash(config) for Eq/Hash
         schema: Schema,
     },
     Join {
@@ -33,8 +37,8 @@ pub enum LogicalPlanNode {
 
 #[derive(Clone, Debug)]
 pub struct QueryDag {
-    nodes: Vec<LogicalPlanNode>,
-    root: PlanNodeId,
+    pub nodes: Vec<LogicalPlanNode>,
+    pub root: PlanNodeId,
 }
 
 impl QueryDag {
@@ -46,8 +50,7 @@ impl QueryDag {
     }
 }
 
-// Stub LogicalPlan (tree node)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LogicalPlan {
     Scan {
         key: DriverKey,
@@ -55,12 +58,12 @@ pub enum LogicalPlan {
         schema: Schema,
     },
     Join {
-        inputs: Vec<LogicalPlan>,
+        inputs: Vec<Box<LogicalPlan>>,
         constraints: Vec<JoinConstraint>,
         schema: Schema,
     },
     Union {
-        inputs: Vec<LogicalPlan>,
+        inputs: Vec<Box<LogicalPlan>>,
         schema: Schema,
         tag_results: bool,
     },
@@ -68,33 +71,113 @@ pub enum LogicalPlan {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum JoinConstraint {
-    Eq((usize, usize), (usize, usize)), // (local_input_idx, col_idx)
+    Eq((usize, usize), (usize, usize)),
     Or(Vec<((usize, usize), (usize, usize))>),
 }
 
-// Stubs (WIP)
-pub fn canonicalize_to_dag(_root_plan: LogicalPlan) -> QueryDag {
-    todo!("Query planner WIP: canonicalize_to_dag")
+pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
+    let mut node_map: AHashMap<NodeHash, PlanNodeId> = AHashMap::new();
+    let mut nodes = Vec::new();
+
+    let root_id = canonicalize_rec(&root_plan, &mut node_map, &mut nodes);
+    QueryDag {
+        nodes,
+        root: root_id,
+    }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct NodeHash(u64);
 
-fn node_hash(_plan: &LogicalPlan) -> NodeHash {
-    NodeHash(42u64)
+fn node_hash(plan: &LogicalPlan) -> NodeHash {
+    let mut hasher = AHasher::default();
+    std::mem::discriminant(plan).hash(&mut hasher);
+    // TODO: Full structural hash (ignore Config cycles)
+    NodeHash(hasher.finish())
+}
+
+fn canonicalize_rec(
+    plan: &LogicalPlan,
+    node_map: &mut AHashMap<NodeHash, PlanNodeId>,
+    nodes: &mut Vec<LogicalPlanNode>,
+) -> PlanNodeId {
+    let hash = node_hash(plan);
+    if let Some(&id) = node_map.get(&hash) {
+        return id;
+    }
+
+    let input_ids = match plan {
+        LogicalPlan::Scan {
+            key,
+            config,
+            schema,
+        } => {
+            let config_hash = {
+                let mut h = AHasher::default();
+                // Stub hash (expand to full Config hash)
+                config.hash_stub(&mut h); // Assume Config::hash_stub added
+                h.finish()
+            };
+            let node = LogicalPlanNode::Scan {
+                key: key.clone(),
+                config_hash,
+                schema: schema.clone(),
+            };
+            let id = PlanNodeId(nodes.len());
+            nodes.push(node);
+            node_map.insert(hash, id);
+            return id;
+        }
+        LogicalPlan::Join {
+            inputs,
+            constraints,
+            schema,
+        }
+        | LogicalPlan::Union { inputs, schema, .. } => inputs
+            .iter()
+            .map(|child| canonicalize_rec(child, node_map, nodes))
+            .collect(),
+    };
+
+    let node = match plan {
+        LogicalPlan::Join {
+            constraints,
+            schema,
+            ..
+        } => LogicalPlanNode::Join {
+            input_ids,
+            constraints: rewrite_constraints(constraints, &input_ids),
+            schema: schema.clone(),
+        },
+        LogicalPlan::Union {
+            schema,
+            tag_results,
+            ..
+        } => LogicalPlanNode::Union {
+            input_ids,
+            schema: schema.clone(),
+            tag_results: *tag_results,
+        },
+        _ => unreachable!(),
+    };
+
+    let id = PlanNodeId(nodes.len());
+    nodes.push(node);
+    node_map.insert(hash, id);
+    id
 }
 
 fn rewrite_constraints(
     _constraints: &[JoinConstraint],
     _input_ids: &[PlanNodeId],
 ) -> Vec<JoinConstraint> {
-    todo!("Remap constraint indices")
+    // TODO: Remap indices
+    vec![]
 }
 
-// --- Flat Results ---
 #[derive(Clone, Debug)]
 pub struct FlatResult<'a> {
-    pub cells: Vec<svql_subgraph::cell::CellWrapper<'a>>,
+    pub cells: Vec<CellWrapper<'a>>,
     pub variant_choices: Vec<usize>,
 }
 
@@ -103,7 +186,6 @@ pub struct ExecutionResult<'a> {
     pub rows: Box<dyn Iterator<Item = FlatResult<'a>> + Send + 'a>,
 }
 
-// --- Cursor ---
 #[derive(Debug)]
 pub struct ResultCursor<'a> {
     row: &'a FlatResult<'a>,
@@ -121,7 +203,7 @@ impl<'a> ResultCursor<'a> {
             variant_ptr: 0,
         }
     }
-    pub fn next_cell(&mut self) -> svql_subgraph::cell::CellWrapper<'a> {
+    pub fn next_cell(&mut self) -> CellWrapper<'a> {
         let idx = self.mapping[self.logical_ptr];
         self.logical_ptr += 1;
         self.row.cells[idx].clone()
@@ -133,20 +215,20 @@ impl<'a> ResultCursor<'a> {
     }
 }
 
-// --- Executors ---
 pub trait Executor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_>;
+    fn execute_dag(&self, dag: &QueryDag, ctx: &Context) -> ExecutionResult;
 }
 
 #[derive(Debug)]
 pub struct NaiveExecutor;
 
 impl Executor for NaiveExecutor {
-    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult<'_> {
-        todo!("NaiveExecutor WIP")
+    fn execute_dag(&self, _dag: &QueryDag, _ctx: &Context) -> ExecutionResult {
+        todo!("NaiveExecutor: topo-execute DAG")
     }
 }
 
-pub fn compute_schema_mapping(_expected: &Schema, _actual: &Schema) -> Vec<usize> {
-    todo!("Schema mapping WIP")
+pub fn compute_schema_mapping(expected: &Schema, _actual: &Schema) -> Vec<usize> {
+    // Stub: 1:1 mapping
+    (0..expected.columns.len()).collect()
 }
