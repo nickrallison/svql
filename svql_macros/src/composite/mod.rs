@@ -176,7 +176,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 };
                 let tail = &rel_path[1..];
                 match next {
-                    #match_arms
+                    #(#find_port_arms),*
+                    _ => None,
                 }
             }
 
@@ -283,5 +284,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    println!("Expanded composite macro:\n{}", expanded);
     TokenStream::from(expanded)
 }
