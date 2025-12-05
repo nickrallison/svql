@@ -32,7 +32,7 @@ impl Needle {
     }
 }
 
-/// Represents a target design to search in (the "haystack").
+/// Represents a target design to search
 #[derive(Debug, Clone)]
 pub struct Haystack {
     pub yosys_module: YosysModule,

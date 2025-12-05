@@ -192,7 +192,7 @@ fn test_cwe1234_variants() {
     println!("\nAll {} CWE-1234 variant tests passed!", total);
 }
 
-/// Helper: Run a single test case and perform assertions
+/// Run a single test case and perform assertions
 fn run_single_case(
     driver: &Driver,
     config: &Config,

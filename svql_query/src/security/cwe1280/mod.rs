@@ -30,10 +30,7 @@ impl<S: State> Topology<S> for DelayedGrantAccess<S> {
     }
 }
 
-/// Complete CWE-1280 pattern: Access Control with Weakness (Stale Data)
-///
-/// Detects when a grant signal is stored in a register (DelayedGrantAccess)
-/// and that stored (potentially stale) signal is used to enable a sensitive operation (LockedRegister).
+/// Complete CWE-1280 pattern: Access Control with Stale Access Check
 #[composite]
 pub struct Cwe1280<S: State> {
     #[path]

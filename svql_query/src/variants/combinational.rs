@@ -31,7 +31,7 @@ pub enum Combinational<S: State> {
 }
 
 impl<S: State> Combinational<S> {
-    /// Returns a descriptive name for the matched gate type.
+    /// Returns name for the matched gate type.
     pub fn gate_type(&self) -> &'static str {
         match self {
             Combinational::AndGate(_) => "AND Gate",

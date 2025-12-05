@@ -32,8 +32,6 @@ pub fn has_attribute(attrs: &[Attribute], attr_name: &str) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident(attr_name))
 }
 
-/// Extracts the value of a specific key from a comma-separated list of key-value pairs in attributes.
-/// e.g. #[netlist(file = "foo.v", name = "bar")] -> get_arg(..., "file") returns Some("foo.v")
 pub fn parse_args_map(args: proc_macro::TokenStream) -> std::collections::HashMap<String, String> {
     let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
     let parsed_args = parser.parse(args).expect("Failed to parse macro arguments");
@@ -54,8 +52,6 @@ pub fn parse_args_map(args: proc_macro::TokenStream) -> std::collections::HashMa
     map
 }
 
-/// Helper to replace generic <S> with <::svql_query::Search> in a type.
-/// This is crucial for instantiating sub-queries in the Search state.
 pub fn replace_generic_with_search(ty: &Type) -> proc_macro2::TokenStream {
     if let Type::Path(type_path) = ty {
         let mut new_path = type_path.path.clone();
