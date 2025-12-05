@@ -14,7 +14,7 @@ use crate::{
     ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
 };
 
-/// Base trait for all query components (Netlists, Composites, Variants, Wires).
+/// Base trait for all query components
 pub trait Component<S: State> {
     fn path(&self) -> &Instance;
     fn type_name(&self) -> &'static str;
@@ -30,7 +30,6 @@ pub trait Searchable: Sized + Component<Search> {
 }
 
 /// Legacy Query trait: Compatible with existing macros/manual impls.
-/// Use for `query(driver, ...)`.
 pub trait Query: Component<Search> + Searchable {
     type Matched<'a>: Component<Match<'a>>;
 
@@ -44,9 +43,7 @@ pub trait Query: Component<Search> + Searchable {
     ) -> Vec<Self::Matched<'a>>;
 }
 
-/// PlannedQuery supertrait: Enables optimized planner execution.
-/// Implement alongside `Query` for caching/DAG benefits.
-/// Defaults use legacy `Query::query` as fallback (TODO: bridge).
+/// PlannedQuery trait: Enables optimized planner execution.
 pub trait PlannedQuery: Query {
     /// Generate LogicalPlan tree for this query.
     fn to_ir(&self, _config: &Config) -> LogicalPlan {
@@ -59,8 +56,6 @@ pub trait PlannedQuery: Query {
     }
 
     /// Reconstruct Matched from flat execution result cursor.
-    ///
-    /// Takes &mut cursor so sub-components can consume cells sequentially.
     fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
         todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
     }
@@ -99,11 +94,10 @@ pub trait PlannedQuery: Query {
     }
 }
 
-// Re-export for convenience
 pub use composite::{ConnectionBuilder, Topology};
 pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
 
-/// Validate connection in haystack (used by legacy/composite validation).
+/// Validate connection in haystack
 pub fn validate_connection<'ctx>(
     from: &Wire<Match<'ctx>>,
     to: &Wire<Match<'ctx>>,

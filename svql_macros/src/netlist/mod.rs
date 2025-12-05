@@ -16,23 +16,15 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         .clone();
 
     let struct_name = &item_struct.ident;
-    let generics = &item_struct.generics; // Capture full generics with bounds
+    let generics = &item_struct.generics;
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
 
     // 1. Inject 'path' field if not present
     if let Fields::Named(ref mut fields) = item_struct.fields {
-        // Check if path exists
         let has_path = fields
             .named
             .iter()
             .any(|f| f.ident.as_ref().map(|i| i == "path").unwrap_or(false));
-        if !has_path {
-            // We can't easily inject into syn::Fields without parsing,
-            // so we'll handle the struct definition generation manually below
-            // by appending the field in the quote! block if needed.
-            // However, modifying item_struct directly is cleaner for the output.
-            // For simplicity here, we assume we append it in the output quote.
-        }
     }
 
     // 2. Analyze Fields
@@ -44,7 +36,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut find_port_arms = Vec::new();
     let mut field_defs = Vec::new();
 
-    // For PlannedQuery
     let mut schema_cols = Vec::new();
     let mut col_indices = Vec::new();
     let mut reconstruct_fields = Vec::new();
@@ -56,7 +47,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             let ty = &field.ty;
             let vis = &field.vis;
 
-            // Check for rename attribute
             let mut wire_name = name_str.clone();
             let mut attrs_to_remove = Vec::new();
 
@@ -78,19 +68,15 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             field_names.push(ident);
             field_strs.push(wire_name.clone());
 
-            // Reconstruct field definition for the struct output
             field_defs.push(quote! {
                 #vis #ident: #ty
             });
 
-            // For instantiate()
             field_inits.push(quote! {
                 #ident: ::svql_query::Wire::new(base_path.child(#wire_name), ())
             });
 
             // For query() reconstruction
-            // Uses helper to resolve wire name to cell via needle design
-            // FIXED: Pass &embeddings to resolve_wire
             field_matches.push(quote! {
                 #ident: ::svql_query::Wire::new(
                     self.#ident.path().clone(),
@@ -103,15 +89,12 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 )
             });
 
-            // For children()
             child_refs.push(quote! { &self.#ident });
 
-            // For find_port_inner()
             find_port_arms.push(quote! {
                 #wire_name => self.#ident.find_port_inner(tail)
             });
 
-            // For PlannedQuery
             schema_cols.push(wire_name.clone());
             col_indices.push(quote! {
                 #wire_name => Some(#idx)
@@ -128,7 +111,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     // 3. Generate Code
     let expanded = quote! {
         #[derive(Clone, Debug)]
-        // FIXED: Use #generics instead of #ty_generics to include bounds (S: State)
         pub struct #struct_name #generics #where_clause {
             pub path: ::svql_query::instance::Instance,
             #(#field_defs),*
@@ -230,7 +212,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     config,
                 );
 
-                // FIXED: Use iter() to avoid moving embeddings, so we can pass &embeddings to resolve_wire
                 embeddings.items.iter().map(|embedding| {
                     #struct_name {
                         path: self.path.clone(),

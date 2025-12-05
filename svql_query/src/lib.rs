@@ -1,5 +1,4 @@
 //! Core query definitions and structures for SVQL.
-
 extern crate self as svql_query;
 
 use std::sync::Arc;
@@ -16,15 +15,12 @@ pub mod variants;
 
 pub use instance::Instance;
 
-// Re-export dependencies used by macros
 pub use itertools;
 pub use svql_common;
 pub use svql_driver;
 pub use svql_subgraph;
 
 use crate::traits::Component;
-
-// --- State Markers ---
 
 pub trait State: Clone + std::fmt::Debug + PartialEq {
     type WireInner: Clone + std::fmt::Debug + PartialEq;
@@ -45,8 +41,6 @@ pub struct Match<'ctx> {
 impl<'ctx> State for Match<'ctx> {
     type WireInner = CellWrapper<'ctx>;
 }
-
-// --- Wire ---
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wire<S: State>
@@ -101,7 +95,6 @@ impl<S: State> Component<S> for Wire<S> {
     }
 }
 
-// --- Legacy / Helper Exports ---
 #[derive(Debug, Clone, PartialEq)]
 pub struct Connection<S>
 where

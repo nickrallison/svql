@@ -26,8 +26,6 @@ pub struct DelayedGrantAccess<S: State> {
 
 impl<S: State> Topology<S> for DelayedGrantAccess<S> {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        // Grant logic output must feed intermediate DFF's data input
-        // DffAny is a variant, so we use the accessor method .d()
         ctx.connect(Some(&self.grant_access.grant), self.reg_any.d());
     }
 }
@@ -50,8 +48,6 @@ pub struct Cwe1280<S: State> {
 
 impl<S: State> Topology<S> for Cwe1280<S> {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        // The delayed grant signal (Q output of the intermediate register)
-        // must connect to the write enable of the locked register.
         ctx.connect(
             self.delayed_grant_access.reg_any.q(),
             self.locked_reg.write_en(),

@@ -12,7 +12,6 @@ module many_locked_regs (
     input  wire        clk,
     input  wire        rst_n,
 
-    // --- async_en -------------------------------------------------
     input  wire [15:0] async_en_data_in_0,
     input  wire        async_en_write_en_0,
     output wire [15:0] async_en_data_out_0,
@@ -21,7 +20,6 @@ module many_locked_regs (
     input  wire        async_en_write_en_1,
     output wire [15:0] async_en_data_out_1,
 
-    // --- async_mux ------------------------------------------------
     input  wire [15:0] async_mux_data_in_0,
     input  wire        async_mux_write_en_0,
     output wire [15:0] async_mux_data_out_0,
@@ -30,7 +28,6 @@ module many_locked_regs (
     input  wire        async_mux_write_en_1,
     output wire [15:0] async_mux_data_out_1,
 
-    // --- sync_en --------------------------------------------------
     input  wire [15:0] sync_en_data_in_0,
     input  wire        sync_en_write_en_0,
     output wire [15:0] sync_en_data_out_0,
@@ -39,7 +36,6 @@ module many_locked_regs (
     input  wire        sync_en_write_en_1,
     output wire [15:0] sync_en_data_out_1,
 
-    // --- sync_mux -------------------------------------------------
     input  wire [15:0] sync_mux_data_in_0,
     input  wire        sync_mux_write_en_0,
     output wire [15:0] sync_mux_data_out_0,
@@ -48,9 +44,6 @@ module many_locked_regs (
     input  wire        sync_mux_write_en_1,
     output wire [15:0] sync_mux_data_out_1
 );
-    // ----------------------------------------------------------------
-    // 2 × async_en
-    // ----------------------------------------------------------------
     async_en u_async_en_0 (
         .clk      (clk),
         .resetn   (rst_n),
@@ -67,9 +60,6 @@ module many_locked_regs (
         .data_out (async_en_data_out_1)
     );
 
-    // ----------------------------------------------------------------
-    // 2 × async_mux
-    // ----------------------------------------------------------------
     async_mux u_async_mux_0 (
         .clk      (clk),
         .resetn   (rst_n),
@@ -86,9 +76,6 @@ module many_locked_regs (
         .data_out (async_mux_data_out_1)
     );
 
-    // ----------------------------------------------------------------
-    // 2 × sync_en
-    // ----------------------------------------------------------------
     sync_en u_sync_en_0 (
         .clk      (clk),
         .resetn   (rst_n),
@@ -105,9 +92,6 @@ module many_locked_regs (
         .data_out (sync_en_data_out_1)
     );
 
-    // ----------------------------------------------------------------
-    // 2 × sync_mux
-    // ----------------------------------------------------------------
     sync_mux u_sync_mux_0 (
         .clk      (clk),
         .resetn   (rst_n),

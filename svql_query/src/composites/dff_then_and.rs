@@ -19,9 +19,7 @@ pub struct SdffeThenAnd<S: State> {
 
 impl<S: State> Topology<S> for SdffeThenAnd<S> {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        // Connect Q to A
         ctx.connect(Some(&self.sdffe.q), Some(&self.and_gate.a));
-        // Connect Q to B
         ctx.connect(Some(&self.sdffe.q), Some(&self.and_gate.b));
     }
 }

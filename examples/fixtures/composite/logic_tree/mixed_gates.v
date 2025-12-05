@@ -1,8 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/mixed_gates.v
-// Mixed gate types at same level
-// Structure: y = (a & b) | (c ^ d) | (~e)
-// Tests OR with different child gate types
-
 module mixed_gates
 (
     input a, b, c, d, e,

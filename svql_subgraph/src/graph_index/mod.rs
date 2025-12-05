@@ -57,7 +57,6 @@ impl<'a> GraphIndex<'a> {
             .collect()
     }
 
-    // Delegate to cell registry
     pub fn cells_of_type_iter(
         &self,
         node_type: CellKind,
@@ -69,12 +68,10 @@ impl<'a> GraphIndex<'a> {
         self.cell_registry.cells_topo()
     }
 
-    // Helper to get cell index
     fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
         self.cell_registry.get_cell_index(cell)
     }
 
-    // Optimized methods that work with indices internally
     pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanout_indices_set(idx);
@@ -135,7 +132,6 @@ impl<'a> GraphIndex<'a> {
             .collect()
     }
 
-    // Delegate to I/O mapping
     pub fn get_input_fanout_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_input_fanout_by_name(&self.cell_registry)

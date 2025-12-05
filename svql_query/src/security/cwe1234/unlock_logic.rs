@@ -23,9 +23,9 @@ where
     S: State,
 {
     pub path: Instance,
-    pub top_and: AndGate<S>,  // Write enable gate
-    pub rec_or: RecOr<S>,     // Recursive OR tree of bypass conditions
-    pub not_gate: NotGate<S>, // Negated lock signal
+    pub top_and: AndGate<S>,
+    pub rec_or: RecOr<S>,
+    pub not_gate: NotGate<S>,
 }
 
 impl<S> Component<S> for UnlockLogic<S>
@@ -64,7 +64,6 @@ where
     S: State,
 {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        // The OR tree output must connect to one of the AND inputs
         ctx.connect_any(&[
             (Some(self.rec_or.output()), Some(&self.top_and.a)),
             (Some(self.rec_or.output()), Some(&self.top_and.b)),
@@ -92,7 +91,6 @@ impl UnlockLogic<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Need contexts for all three components
         let and_ctx = AndGate::<Search>::context(driver, config)?;
         let or_ctx = RecOr::<Search>::context(driver, config)?;
         let not_ctx = NotGate::<Search>::context(driver, config)?;
@@ -115,7 +113,6 @@ impl Query for UnlockLogic<Search> {
 
         let haystack_index = context.get(key).unwrap().index();
 
-        // Query all components
         let and_gates = self.top_and.query(driver, context, key, config);
         let rec_ors = self.rec_or.query(driver, context, key, config);
         let not_gates = self.not_gate.query(driver, context, key, config);
@@ -127,11 +124,9 @@ impl Query for UnlockLogic<Search> {
             not_gates.len()
         );
 
-        // Step 1: Filter RecOr -> AND connections
-        // We use the Search instance (self) to define the connection pattern
         let or_to_and_conn = Connection {
             from: self.rec_or.output().clone(),
-            to: self.top_and.a.clone(), // Just a placeholder for the path
+            to: self.top_and.a.clone(),
         };
 
         #[cfg(feature = "parallel")]
@@ -161,7 +156,6 @@ impl Query for UnlockLogic<Search> {
                     let pairs: Vec<_> = and_gates
                         .iter()
                         .filter_map(|and_gate| {
-                            // Check both AND inputs (a and b)
                             let connected = [&and_gate.a, &and_gate.b].iter().any(|to_wire| {
                                 let to_cell = &to_wire.inner;
                                 fanout.contains(to_cell)
@@ -219,7 +213,6 @@ impl Query for UnlockLogic<Search> {
                                 not_gate: not_gate.clone(),
                             };
 
-                            // Validate connections using Topology trait
                             let mut builder = ConnectionBuilder {
                                 constraints: Vec::new(),
                             };
@@ -275,21 +268,18 @@ impl PlannedQuery for UnlockLogic<Search> {
 
         let map_wire = |wire: &::svql_query::Wire<::svql_query::Search>| -> Option<(usize, usize)> {
             let wire_path = wire.path();
-            // Child 0: top_and
             if wire_path.starts_with(self.top_and.path()) {
                 let rel = wire_path.relative(self.top_and.path());
                 if let Some(col) = self.top_and.get_column_index(rel) {
                     return Some((0, col));
                 }
             }
-            // Child 1: rec_or
             if wire_path.starts_with(self.rec_or.path()) {
                 let rel = wire_path.relative(self.rec_or.path());
                 if let Some(col) = self.rec_or.get_column_index(rel) {
                     return Some((1, col));
                 }
             }
-            // Child 2: not_gate
             if wire_path.starts_with(self.not_gate.path()) {
                 let rel = wire_path.relative(self.not_gate.path());
                 if let Some(col) = self.not_gate.get_column_index(rel) {

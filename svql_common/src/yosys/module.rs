@@ -59,7 +59,6 @@ impl YosysModule {
     ) -> Vec<String> {
         let mut args = Vec::new();
 
-        // Read command
         args.push("-p".to_string());
         if !config.verific {
             args.push(format!(
@@ -71,11 +70,9 @@ impl YosysModule {
             args.push(format!("verific -sv {}", self.path().display()));
         }
 
-        // Hierarchy
         args.push("-p".to_string());
         args.push(format!("hierarchy -top {}", self.module_name()));
 
-        // Parameters
         for (param, value) in &config.params {
             args.push("-p".to_string());
             args.push(format!(
@@ -86,39 +83,32 @@ impl YosysModule {
             ));
         }
 
-        // Process
         args.push("-p".to_string());
         args.push("proc".to_string());
 
-        // Memory
         args.push("-p".to_string());
         args.push("memory".to_string());
 
-        // Flatten
         if config.flatten {
             args.push("-p".to_string());
             args.push("flatten".to_string());
         }
-        
-        // Optimize and clean
+
         if config.opt {
             args.push("-p".to_string());
             args.push("opt".to_string());
         }
 
-        // Optimize and clean
         if config.opt_clean {
             args.push("-p".to_string());
             args.push("opt_clean".to_string());
         }
 
-        // Other steps
         for step in &config.other_steps {
             args.push("-p".to_string());
             args.push(step.clone());
         }
 
-        // Write output
         args.push("-p".to_string());
         let write_cmd = match output_format {
             OutputFormat::Json => format!("write_json {}", output_path.display()),
@@ -126,11 +116,7 @@ impl YosysModule {
         };
         args.push(write_cmd);
 
-        tracing::trace!(
-            "Yosys args for {}: {:?}",
-            self.path().display(),
-            args
-        );
+        tracing::trace!("Yosys args for {}: {:?}", self.path().display(), args);
 
         args
     }
@@ -140,8 +126,6 @@ impl YosysModule {
         args: Vec<String>,
         yosys: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
-
         let mut cmd = Command::new(yosys);
         cmd.args(args)
             .stdin(Stdio::null())

@@ -1,8 +1,3 @@
-// examples/fixtures/basic/and/verilog/and_nor_tree.v
-// 8-input AND implemented entirely with and_nor submodules.
-// Structure: 4 pairwise -> 2 -> 1 (total 7 and_nor instances)
-
-
 
 module and_nor_tree
 (
@@ -20,7 +15,6 @@ module and_nor_tree
     wire s0, s1, s2, s3;
     wire t0, t1;
 
-    // Stage 1
     and_nor u_and_nor_0 (
         .a(a),
         .b(b),
@@ -45,7 +39,6 @@ module and_nor_tree
         .y(s3)
     );
 
-    // Stage 2
     and_nor u_and_nor_4 (
         .a(s0),
         .b(s1),
@@ -58,7 +51,6 @@ module and_nor_tree
         .y(t1)
     );
 
-    // Stage 3
     and_nor u_and_nor_6 (
         .a(t0),
         .b(t1),

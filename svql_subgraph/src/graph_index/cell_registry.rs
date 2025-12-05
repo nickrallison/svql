@@ -91,7 +91,6 @@ impl<'a> CellRegistry<'a> {
         self.cell_id_map.get(&cell.debug_index()).copied()
     }
 
-    // Helper method to convert indices to cells
     pub fn indices_to_cells(&self, indices: &[CellIndex]) -> Vec<CellWrapper<'a>> {
         indices
             .iter()
@@ -99,7 +98,6 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
-    // Helper method to convert indices with ports to cells with ports
     pub fn indices_with_ports_to_cells(
         &self,
         indices_with_ports: &[(CellIndex, usize)],

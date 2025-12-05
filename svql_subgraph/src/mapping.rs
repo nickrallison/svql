@@ -42,7 +42,6 @@ impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
         None
     }
 
-    // debug ensure that needle & haystack mappings are consistent
     pub fn get_haystack_cell(
         &self,
         needle: CellWrapper<'needle>,
@@ -50,7 +49,6 @@ impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
         self.needle_to_haystack.get(&needle).cloned()
     }
 
-    // debug ensure that needle & haystack mappings are consistent
     pub fn get_needle_cell(
         &self,
         haystack: CellWrapper<'haystack>,

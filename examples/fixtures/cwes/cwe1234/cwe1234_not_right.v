@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_not_right.v
-// NOT gate consistently on the right side of OR gates
-// Tests both left and right input matching
 
 module cwe1234_not_right (
     input [15:0] Data_in_1,
@@ -38,8 +35,6 @@ else begin
     if (Lock_3) lock_status_3 <= 1'b1;
 end
 
-// Pattern 1: OR(bypass, NOT(lock))
-// NOT on right input of root OR
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out_1 <= 16'h0000;
@@ -51,8 +46,6 @@ else begin
     Data_out_1 <= Data_out_1;
 end
 
-// Pattern 2: OR(bypass_a, OR(bypass_b, NOT(lock)))
-// NOT on right input of nested OR
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out_2 <= 16'h0000;
@@ -64,8 +57,6 @@ else begin
     Data_out_2 <= Data_out_2;
 end
 
-// Pattern 3: OR(OR(bypass_a, bypass_b), OR(bypass_c, NOT(lock)))
-// NOT on right side of right subtree
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out_3 <= 16'h0000;

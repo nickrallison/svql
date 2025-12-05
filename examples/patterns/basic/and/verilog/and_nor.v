@@ -1,4 +1,3 @@
-// examples/patterns/basic/and/and_nor.v
 module and_nor
 (
     input  a,

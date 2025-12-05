@@ -112,7 +112,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         needle_input_mapping_queue: VecDeque<CellWrapper<'needle>>,
         recursion_depth: usize,
     ) -> Vec<Embedding<'needle, 'haystack>> {
-        // Base Case
         let Some(needle_current) = needle_internal_mapping_queue.pop_front() else {
             return self.recurse_input_cells(
                 cell_mapping,
@@ -156,7 +155,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         mut needle_input_queue: VecDeque<CellWrapper<'needle>>,
         recursion_depth: usize,
     ) -> Vec<Embedding<'needle, 'haystack>> {
-        // Base Case
         let Some(needle_current) = needle_input_queue.pop_front() else {
             return vec![Embedding {
                 assignment: cell_mapping,
@@ -194,8 +192,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         );
         flat_results
     }
-
-    // ##########################
 
     fn build_needle_work_queues(
         &self,
@@ -244,8 +240,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let unfiltered_candidates: Vec<CellWrapper<'haystack>> = if mapped_haystack_fanin.is_empty()
         {
-            // if no fanin mapped, return all cells of the correct type
-            // This happens for the first cells mapped and is not avoidable
             self.haystack_index
                 .cells_of_type_iter(current_kind)
                 .map(|iter| iter.cloned().collect())
@@ -263,12 +257,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let candidates: Vec<CellWrapper<'haystack>> = unfiltered_candidates
             .into_iter()
-            // .filter(|haystack_cell| {
-            //     self.check_fanin_constraints(
-            //         needle_current.clone(),
-            //         haystack_cell.clone(),
-            //         cell_mapping,
-            //     )
             .filter(|haystack_cell| {
                 if !self.check_fanin_constraints(
                     needle_current.clone(),
@@ -278,7 +266,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     return false;
                 }
 
-                // Handle backedges
                 let needle_fanout = self.needle_index.fanout_set(&needle_current);
 
                 let has_mapped_successor = needle_fanout.as_ref().map_or(false, |sets| {
@@ -360,10 +347,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     }
                 })
             })
-            // Allows Inputs to collide with existing gates.
-            // This is necessary for Cycle detection where an Input 'd'
-            // essentially maps to an existing gate in the loop.
-            // .filter(|haystack_cell| cell_mapping.haystack_mapping().get(haystack_cell).is_none())
             .collect();
 
         candidates

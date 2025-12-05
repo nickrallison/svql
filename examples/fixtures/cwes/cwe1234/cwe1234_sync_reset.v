@@ -1,6 +1,3 @@
-// examples/fixtures/cwes/cwe1234/cwe1234_sync_reset.v
-// Uses synchronous reset DFFs (reset inside always block)
-// Pattern: write & (~lock | debug)
 
 module cwe1234_sync_reset (
     input [15:0] Data_in,
@@ -14,7 +11,6 @@ module cwe1234_sync_reset (
 
 reg lock_status;
 
-// Synchronous reset style
 always @(posedge Clk) begin
     if (~resetn) begin
         lock_status <= 1'b0;
@@ -25,7 +21,6 @@ always @(posedge Clk) begin
     end
 end
 
-// VULNERABILITY: debug_unlocked bypass (synchronous reset)
 always @(posedge Clk) begin
     if (~resetn) begin
         Data_out <= 16'h0000;

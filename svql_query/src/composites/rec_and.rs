@@ -69,12 +69,10 @@ where
     }
 
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        // First, check if the path is for our AND gate
         if let Some(port) = self.and.find_port(p) {
             return Some(port);
         }
 
-        // Otherwise, check if it's for our child
         if let Some(ref child) = self.child {
             if let Some(port) = child.find_port(p) {
                 return Some(port);
@@ -95,7 +93,6 @@ where
 {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
         if let Some(ref child) = self.child {
-            // Connection from child's output to this and's input (either a or b)
             ctx.connect_any(&[
                 (Some(&child.and.y), Some(&self.and.a)),
                 (Some(&child.and.y), Some(&self.and.b)),
@@ -123,7 +120,6 @@ impl RecAnd<Search> {
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        // Only need context for AND gates
         AndGate::<Search>::context(driver, config)
     }
 }
@@ -145,8 +141,6 @@ impl Query for RecAnd<Search> {
 
         let haystack_index = context.get(key).unwrap().index();
 
-        // Query all AND gates once (reuse for all layers)
-        // We instantiate a temporary AndGate to run the query
         let and_query = AndGate::<Search>::instantiate(self.path.child("and"));
         let all_and_gates = and_query.query(driver, context, key, config);
 
@@ -156,7 +150,6 @@ impl Query for RecAnd<Search> {
             all_and_gates.len()
         );
 
-        // Layer 1: Just AND gates (base case - no child)
         let mut current_layer: Vec<RecAnd<Match<'a>>> = all_and_gates
             .iter()
             .map(|and_gate| RecAnd {
@@ -175,7 +168,6 @@ impl Query for RecAnd<Search> {
         let mut all_results = current_layer.clone();
         let mut layer_num = 2;
 
-        // Keep building layers until we can't find any more matches
         loop {
             let next_layer =
                 build_next_layer(&self.path, &all_and_gates, &current_layer, haystack_index);
@@ -223,9 +215,7 @@ impl Query for RecAnd<Search> {
     }
 }
 
-impl PlannedQuery for RecAnd<Search> {
-    // Default implementation (todo!) is sufficient for compilation
-}
+impl PlannedQuery for RecAnd<Search> {}
 
 fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {
     let mut cells = Vec::new();
@@ -266,7 +256,6 @@ fn build_next_layer<'ctx>(
 
             candidates_checked += 1;
 
-            // Update child's path to be under "child"
             let mut child = prev.clone();
             update_rec_and_path(&mut child, path.child("child"));
 
@@ -276,7 +265,6 @@ fn build_next_layer<'ctx>(
                 child: Some(Box::new(child)),
             };
 
-            // Validate connections manually since we constructed it manually
             let mut builder = ConnectionBuilder {
                 constraints: Vec::new(),
             };
@@ -326,7 +314,6 @@ fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match<'ctx>>, new_path: Instan
     rec_and.and.b.path = and_path.child("b");
     rec_and.and.y.path = and_path.child("y");
 
-    // Recursively update nested children
     if let Some(ref mut child) = rec_and.child {
         update_rec_and_path(child, new_path.child("child"));
     }

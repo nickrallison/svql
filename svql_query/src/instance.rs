@@ -1,5 +1,4 @@
 //! Hierarchical instance path representation.
-
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -9,7 +8,6 @@ pub struct Instance {
 
 impl Instance {
     pub fn root(name: String) -> Self {
-        // <- FIXED: String, not Option
         Self {
             segments: vec![Arc::from(name)],
         }
@@ -46,7 +44,6 @@ impl Instance {
             .join(".")
     }
 
-    // Helper for legacy code that might use height/get_item
     pub fn height(&self) -> usize {
         self.segments.len()
     }

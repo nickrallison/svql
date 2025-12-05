@@ -1,5 +1,3 @@
-// svql_query/tests/cwe/cwe1271.rs
-
 use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
@@ -65,7 +63,6 @@ fn run_single_case(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let haystack_module = YosysModule::new(case.fixture_path, case.module_name)?;
 
-    // Load haystack design
     let (haystack_key, haystack_design) = driver.get_or_load_design(
         &haystack_module.path().display().to_string(),
         haystack_module.module_name(),
@@ -82,7 +79,6 @@ fn run_single_case(
         config,
     );
 
-    // Essential assertion: Match count
     assert_eq!(
         results.len(),
         case.expected_matches,
@@ -92,7 +88,6 @@ fn run_single_case(
         results.len()
     );
 
-    // Logging
     println!(
         "  Results: {} matches (types: {:?})",
         results.len(),
@@ -108,7 +103,6 @@ fn run_single_case(
     Ok(())
 }
 
-// Individual tests for key cases
 #[test]
 fn test_cwe1271_simple() -> Result<(), Box<dyn std::error::Error>> {
     init_test_logger();
@@ -169,7 +163,6 @@ fn test_cwe1271_multi() -> Result<(), Box<dyn std::error::Error>> {
     run_single_case(&driver, &config, case)
 }
 
-// Summary test: Run all cases
 #[test]
 fn test_cwe1271_all_variants() {
     init_test_logger();

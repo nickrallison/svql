@@ -64,7 +64,6 @@ impl ConnectivityGraph {
         (fanin_map, fanout_map)
     }
 
-    // Work with indices for better performance
     pub fn fanout_indices(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
         self.fanout_map.get(&cell_idx).map(|v| v.as_slice())
     }
@@ -73,7 +72,6 @@ impl ConnectivityGraph {
         self.fanin_map.get(&cell_idx).map(|v| v.as_slice())
     }
 
-    // Helper to get clean indices set
     pub fn fanout_indices_set(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
         self.fanout_map
             .get(&cell_idx)
@@ -88,7 +86,6 @@ impl ConnectivityGraph {
             .unwrap_or_default()
     }
 
-    // Optimized intersection using indices
     pub fn get_intersect_fanout_of_fanin_indices(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
         let Some(fanin_indices) = self.fanin_map.get(&cell_idx) else {
             return HashSet::new();

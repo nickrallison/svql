@@ -1,7 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/xor_chain.v
-// Chain of XOR gates (linear tree)
-// Structure: y = ((a ^ b) ^ c) ^ d
-// Tests linear/skewed tree structure
 
 module xor_chain
 (

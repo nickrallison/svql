@@ -1,4 +1,3 @@
-// svql_query/tests/cwe/cwe1234/register.rs
 use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
@@ -16,10 +15,6 @@ fn init_test_logger() {
             .try_init();
     });
 }
-
-// NOTE: Only async_mux pattern currently matches real Yosys synthesis.
-// Other patterns (async_en, sync_en, sync_mux) don't match because Yosys
-// optimizes enable signals into MUX structures rather than DFF enable pins.
 
 #[test]
 fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,7 +47,7 @@ fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Locked Register Simple Test ===");
+    println!("\nLocked Register Simple Test");
     println!("Found {} DFF(s)\n", results.len());
 
     assert_eq!(
@@ -95,11 +90,10 @@ fn test_locked_register_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Locked Register Multiple Registers Test ===");
+    println!("\nLocked Register Multiple Registers Test");
     println!("Module has 3 lock status + 3 data registers = 6 DFFs\n");
     println!("Found {} DFF(s)\n", results.len());
 
-    // NOTE: Pattern may not match all registers due to synthesis variations
     assert!(
         results.len() <= 3,
         "Should find at most 3 data registers (pattern-dependent)"
@@ -139,10 +133,9 @@ fn test_locked_register_deep() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Locked Register Deep Test ===");
+    println!("\nLocked Register Deep Test");
     println!("Found {} DFF(s)\n", results.len());
 
-    // Pattern may not match depending on synthesis
     assert!(
         results.len() <= 1,
         "Should find at most 1 data register (pattern-dependent)"
@@ -182,10 +175,9 @@ fn test_locked_register_fixed() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Locked Register Fixed (Secure) Test ===");
+    println!("\nLocked Register Fixed (Secure) Test");
     println!("Found {} DFF(s)\n", results.len());
 
-    // Fixed version may still have structural matches (just used securely)
     println!("Note: Pattern detection is structural, not semantic");
 
     Ok(())
@@ -222,10 +214,9 @@ fn test_locked_register_sync_reset() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Sync Reset Registers Test ===");
+    println!("\nSync Reset Registers Test");
     println!("Found {} DFF(s)\n", results.len());
 
-    // Pattern may not match sync reset structures
     println!("Note: Sync reset patterns may require additional pattern variants");
 
     Ok(())
@@ -262,10 +253,9 @@ fn test_locked_register_enabled() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Enabled Registers Test ===");
+    println!("\nEnabled Registers Test");
     println!("Found {} DFF(s)\n", results.len());
 
-    // Pattern may not match enable-signal structures
     println!("Note: Enable patterns may optimize to MUX structures");
 
     Ok(())
@@ -302,10 +292,9 @@ fn test_locked_register_wide() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== Wide Register Test ===");
+    println!("\nWide Register Test");
     println!("Found {} DFF(s) (32-bit registers)\n", results.len());
 
-    // Wide registers may not all match pattern
     println!("Note: Not all register widths may match structural pattern");
 
     Ok(())
@@ -342,10 +331,9 @@ fn test_locked_register_mixed_resets() -> Result<(), Box<dyn std::error::Error>>
         &config,
     );
 
-    println!("\n=== Mixed Reset Types Test ===");
+    println!("\nMixed Reset Types Test");
     println!("Found {} DFF(s) (async + sync)\n", results.len());
 
-    // Mixed reset types may have different synthesis
     println!("Note: Different reset types may require additional patterns");
 
     Ok(())
@@ -382,7 +370,7 @@ fn test_locked_register_no_reset() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== No Reset Registers Test ===");
+    println!("\nNo Reset Registers Test");
     println!("Found {} DFF(s)\n", results.len());
 
     println!("Note: No-reset patterns may require additional pattern variants");
@@ -421,7 +409,7 @@ fn test_locked_register_multi_width() -> Result<(), Box<dyn std::error::Error>> 
         &config,
     );
 
-    println!("\n=== Multi-Width Registers Test ===");
+    println!("\nMulti-Width Registers Test");
     println!(
         "Found {} DFF(s) (1-bit, 8-bit, 16-bit, 32-bit)\n",
         results.len()

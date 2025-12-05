@@ -1,5 +1,3 @@
-// svql_query/tests/cwe1234_tests.rs
-
 use std::sync::OnceLock;
 
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
@@ -17,10 +15,6 @@ fn init_test_logger() {
             .try_init();
     });
 }
-
-// ============================================================================
-// Basic Pattern Tests
-// ============================================================================
 
 #[test]
 fn test_cwe1234_simple() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,7 +49,7 @@ fn test_cwe1234_simple() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Simple Pattern Test ===");
+    println!("\nCWE1234 Simple Pattern Test");
     println!("Pattern: write & (~lock | debug)");
     println!("Found {} match(es)\n", results.len());
 
@@ -115,7 +109,7 @@ fn test_cwe1234_deep() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Deep OR Tree Test ===");
+    println!("\nCWE1234 Deep OR Tree Test");
     println!("Pattern: write & (((~lock | scan) | debug) | test_mode)");
     println!("Found {} match(es)\n", results.len());
 
@@ -179,7 +173,7 @@ fn test_cwe1234_swapped() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Swapped Inputs Test ===");
+    println!("\nCWE1234 Swapped Inputs Test");
     println!("Pattern: (scan | ~lock | debug) & write");
     println!("Tests commutative AND matching\n");
     println!("Found {} match(es)\n", results.len());
@@ -235,7 +229,7 @@ fn test_cwe1234_combined() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Combined Logic Test ===");
+    println!("\nCWE1234 Combined Logic Test");
     println!("Pattern: write & ((~lock & mode_a) | debug)");
     println!("Tests complex AND/OR combinations\n");
     println!("Found {} match(es)\n", results.len());
@@ -248,10 +242,6 @@ fn test_cwe1234_combined() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// ============================================================================
-// Multiple Pattern Tests
-// ============================================================================
 
 #[test]
 fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
@@ -286,7 +276,7 @@ fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Multiple Registers Test ===");
+    println!("\nCWE1234 Multiple Registers Test");
     println!("Module has 3 vulnerable registers:");
     println!("  1. write_1 & (~lock_1 | scan)");
     println!("  2. write_2 & (~lock_2 | debug)");
@@ -312,10 +302,6 @@ fn test_cwe1234_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// ============================================================================
-// NOT Position Tests
-// ============================================================================
 
 #[test]
 fn test_cwe1234_not_positions() -> Result<(), Box<dyn std::error::Error>> {
@@ -350,7 +336,7 @@ fn test_cwe1234_not_positions() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 NOT Position Variants Test ===");
+    println!("\nCWE1234 NOT Position Variants Test");
     println!("Tests NOT at different horizontal positions:");
     println!("  1. (~lock | scan | debug)    - NOT leftmost");
     println!("  2. (scan | ~lock | debug)    - NOT middle");
@@ -411,7 +397,7 @@ fn test_cwe1234_not_deep() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 NOT Depth Variants Test ===");
+    println!("\nCWE1234 NOT Depth Variants Test");
     println!("Tests NOT at different vertical depths:");
     println!("  Depth 1: OR(~lock, bypass)");
     println!("  Depth 2: OR(OR(~lock, b1), b2)");
@@ -488,7 +474,7 @@ fn test_cwe1234_not_right() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 NOT on Right Input Test ===");
+    println!("\nCWE1234 NOT on Right Input Test");
     println!("Tests NOT consistently on right side of OR gates:");
     println!("  1. OR(bypass, ~lock)");
     println!("  2. OR(a, OR(b, ~lock))");
@@ -548,7 +534,7 @@ fn test_cwe1234_not_alternating() -> Result<(), Box<dyn std::error::Error>> {
         &config,
     );
 
-    println!("\n=== CWE1234 Alternating Position Test ===");
+    println!("\nCWE1234 Alternating Position Test");
     println!("Tests complex zigzag patterns:");
     println!("  Pattern 1: write & (~lock | (bypass_a | bypass_b))");
     println!("  Pattern 2: ((bypass_a | bypass_b) | ~lock) & write\n");
@@ -572,10 +558,6 @@ fn test_cwe1234_not_alternating() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// ============================================================================
-// Negative Test - Fixed Version (No Vulnerability)
-// ============================================================================
 
 #[test]
 fn test_cwe1234_fixed_no_vulnerability() -> Result<(), Box<dyn std::error::Error>> {
@@ -608,7 +590,7 @@ fn test_cwe1234_fixed_no_vulnerability() -> Result<(), Box<dyn std::error::Error
         &config,
     );
 
-    println!("\n=== CWE1234 Fixed (No Vulnerability) Test ===");
+    println!("\nCWE1234 Fixed (No Vulnerability) Test");
     println!("Pattern: write & ~lock  (NO bypass conditions)");
     println!("Found {} match(es)\n", results.len());
 
@@ -619,121 +601,6 @@ fn test_cwe1234_fixed_no_vulnerability() -> Result<(), Box<dyn std::error::Error
     );
 
     println!("✓ No false positives - correctly identifies secure code");
-
-    Ok(())
-}
-
-// ============================================================================
-// Summary Test - Run All Variants
-// ============================================================================
-
-#[test]
-fn test_cwe1234_all_variants_summary() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    println!("\n");
-    println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║        CWE-1234 Pattern Detection Test Suite              ║");
-    println!("╚════════════════════════════════════════════════════════════╝");
-    println!();
-
-    let variants = vec![
-        ("cwe1234_simple.v", "cwe1234_simple", "Simple pattern", 1),
-        ("cwe1234_deep.v", "cwe1234_deep", "Deep OR tree", 1),
-        ("cwe1234_swapped.v", "cwe1234_swapped", "Swapped inputs", 1),
-        (
-            "cwe1234_combined.v",
-            "cwe1234_combined",
-            "Combined (no match)",
-            0,
-        ),
-        (
-            "cwe1234_multi_reg.v",
-            "cwe1234_multi_reg",
-            "Multiple registers",
-            3,
-        ),
-        (
-            "cwe1234_not_positions.v",
-            "cwe1234_not_positions",
-            "NOT positions",
-            5,
-        ),
-        ("cwe1234_not_deep.v", "cwe1234_not_deep", "NOT depths", 3),
-        (
-            "cwe1234_not_right.v",
-            "cwe1234_not_right",
-            "NOT on right",
-            3,
-        ),
-        (
-            "cwe1234_not_alternating.v",
-            "cwe1234_not_alternating",
-            "Alternating",
-            4,
-        ),
-        ("cwe1234_fixed.v", "cwe1234_fixed", "Fixed (SECURE)", 0),
-    ];
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let driver = Driver::new_workspace()?;
-
-    println!("┌────────────────────────────────┬──────────┬──────────┬────────┐");
-    println!("│ Variant                        │ Expected │ Found    │ Status │");
-    println!("├────────────────────────────────┼──────────┼──────────┼────────┤");
-
-    let mut all_passed = true;
-
-    for (filename, module_name, description, expected) in variants {
-        let path = format!("examples/fixtures/cwes/cwe1234/{}", filename);
-        let haystack_module = YosysModule::new(&path, module_name)?;
-
-        let (haystack_key, haystack_design) = driver.get_or_load_design(
-            &haystack_module.path().display().to_string(),
-            haystack_module.module_name(),
-            &config.haystack_options,
-        )?;
-
-        let context = UnlockLogic::<Search>::context(&driver, &config.needle_options)?;
-        let context = context.with_design(haystack_key.clone(), haystack_design);
-
-        let results = UnlockLogic::<Search>::query(
-            &haystack_key,
-            &context,
-            Instance::root("unlock".to_string()),
-            &config,
-        );
-
-        let found = results.len();
-        let status = if found == expected {
-            "✓ PASS"
-        } else {
-            "✗ FAIL"
-        };
-
-        if found != expected {
-            all_passed = false;
-        }
-
-        println!(
-            "│ {:<30} │ {:>8} │ {:>8} │ {:<6} │",
-            description, expected, found, status
-        );
-    }
-
-    println!("└────────────────────────────────┴──────────┴──────────┴────────┘");
-    println!();
-
-    assert!(
-        all_passed,
-        "Some tests did not find expected exact number of matches"
-    );
-
-    println!("✓ All CWE-1234 variant tests passed!");
 
     Ok(())
 }

@@ -18,7 +18,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         self.cells_match_fan_in(p_cell.get(), d_cell.get(), mapping)
     }
 
-    // ####################################
     fn cells_match_fan_in(
         &self,
         needle_cell: &Cell,
@@ -163,29 +162,16 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             (Memory(_p_memory_cell), Memory(_d_memory_cell)) => {
                 todo!("Make Function to match memory cells")
             }
-            // (IoBuf(pi), IoBuf(di)) => todo!(),
-            // (Target(pt), Target(dt)) => todo!(),
-            // (Other(po), Other(do_)) => todo!(),
+
             (Input(_p_name, _p_width), Input(_d_name, _d_width)) => {
-                // panic!(
-                //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
-                // );
                 return true;
-                // todo!("decide how input cells should be matched for fan in")
             }
             (Input(_p_name, _p_width), _d_cell) => {
-                // panic!(
-                //     "p_name: {p_name}, p_width: {p_width}, d_name: {d_name}, d_width: {d_width}"
-                // );
                 return true;
             }
             (_needle_cell, Cell::Other(_haystack_instance)) => {
                 todo!("decide how other cells should be matched for fan in")
             }
-
-            // (Output(pn, pv), Output(dn, dv)) => todo!(),
-            // (Name(pn, pv), Name(dn, dv)) => todo!(),
-            // (Debug(pn, pv), Debug(dn, dv)) => todo!(),
             _ => false,
         }
     }
@@ -236,70 +222,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 return true;
             }
         }
-
-        // // let needle_value_repr: &ValueRepr = &needle_value.0;
-        // // let haystack_value_repr: &ValueRepr = &haystack_value.0;
-        // match (needle_value_repr, haystack_value_repr) {
-        //     (ValueRepr::None, ValueRepr::None) => true,
-        //     (ValueRepr::Some(p_net), ValueRepr::Some(d_net)) => {
-        //         self.nets_match_fan_in(p_net, d_net, mapping)
-        //     }
-        //     (ValueRepr::Many(p_nets), ValueRepr::Many(d_nets)) => match self.config.match_length {
-        //         svql_common::MatchLength::First => {
-        //             let first_p_net = p_nets.first().unwrap();
-        //             let first_d_net = d_nets.first().unwrap();
-        //             return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
-        //         }
-        //         svql_common::MatchLength::NeedleSubsetHaystack => {
-        //             for p_net in p_nets {
-        //                 let mut found_match = false;
-        //                 for d_net in d_nets {
-        //                     if self.nets_match_fan_in(p_net, d_net, mapping) {
-        //                         found_match = true;
-        //                         break;
-        //                     }
-        //                 }
-        //                 if !found_match {
-        //                     return false;
-        //                 }
-        //             }
-        //             return true;
-        //         }
-        //         svql_common::MatchLength::Exact => {
-        //             if p_nets.len() != d_nets.len() {
-        //                 return false;
-        //             }
-        //             for (p_net, d_net) in p_nets.iter().zip(d_nets.iter()) {
-        //                 if !self.nets_match_fan_in(p_net, d_net, mapping) {
-        //                     return false;
-        //                 }
-        //             }
-        //             return true;
-        //         }
-        //     },
-        //     (ValueRepr::Some(p_net), ValueRepr::Many(d_nets)) => match self.config.match_length {
-        //         svql_common::MatchLength::First => {
-        //             let first_d_net = d_nets.first().unwrap();
-        //             return self.nets_match_fan_in(p_net, first_d_net, mapping);
-        //         }
-        //         svql_common::MatchLength::NeedleSubsetHaystack => {
-        //             for d_net in d_nets {
-        //                 if self.nets_match_fan_in(p_net, d_net, mapping) {
-        //                     return true;
-        //                 }
-        //             }
-        //             return false;
-        //         }
-        //         svql_common::MatchLength::Exact => {
-        //             if d_nets.len() != 1 {
-        //                 return false;
-        //             }
-        //             let first_d_net = d_nets.first().unwrap();
-        //             return self.nets_match_fan_in(p_net, first_d_net, mapping);
-        //         }
-        //     },
-        //     _ => false,
-        // }
     }
 
     fn nets_match_fan_in(
@@ -326,8 +248,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
             (Err(haystack_trit), Err(needle_trit)) => haystack_trit == needle_trit,
             (Err(_haystack_const), Ok((needle_cell_ref, _))) => {
-                // NEW: Haystack is constant, needle is variable
-                // Allow if config permits AND needle is an Input (pattern variable)
                 if self.config.pattern_vars_match_design_consts {
                     let needle_cell: CellWrapper = needle_cell_ref.into();
                     needle_cell.cell_type().is_input()
@@ -335,10 +255,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     false
                 }
             }
-            (Ok(_), Err(_)) => {
-                // Haystack variable, needle constant - never allow
-                false
-            } // (Err(_), Ok(_)) => false,
+            (Ok(_), Err(_)) => false,
         }
     }
 

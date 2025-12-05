@@ -18,7 +18,7 @@ struct CweTestCase {
     module_name: &'static str,
     description: &'static str,
     expected_matches: usize,
-    min_or_depth: Option<usize>, // Optional advanced assertion
+    min_or_depth: Option<usize>,
 }
 
 static CWE1234_CASES: &[CweTestCase] = &[
@@ -162,7 +162,6 @@ fn init_test_logger() {
     });
 }
 
-// Run each test case individually in a loop inside the test function
 #[test]
 fn test_cwe1234_variants() {
     init_test_logger();
@@ -201,7 +200,6 @@ fn run_single_case(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let haystack_module = YosysModule::new(case.fixture_path, case.module_name)?;
 
-    // Load haystack design
     let (haystack_key, haystack_design) = driver.get_or_load_design(
         &haystack_module.path().display().to_string(),
         haystack_module.module_name(),
@@ -220,7 +218,6 @@ fn run_single_case(
         config,
     );
 
-    // Essential assertion: Match count
     assert_eq!(
         results.len(),
         case.expected_matches,
@@ -230,7 +227,6 @@ fn run_single_case(
         results.len()
     );
 
-    // Optional: Min OR tree depth (if specified)
     if let Some(min_depth) = case.min_or_depth {
         let depths: Vec<_> = results.iter().map(|r| r.or_tree_depth()).collect();
         let max_depth = depths.iter().max().copied().unwrap_or(0);
@@ -243,7 +239,6 @@ fn run_single_case(
         );
     }
 
-    // Validate each result (e.g., NOT in OR tree, valid connections)
     for (i, result) in results.iter().enumerate() {
         assert!(
             result.has_not_in_or_tree(haystack_index),
@@ -259,7 +254,6 @@ fn run_single_case(
         );
     }
 
-    // Logging
     if !results.is_empty() {
         let depths: Vec<_> = results.iter().map(|r| r.or_tree_depth()).collect();
         println!(
@@ -271,139 +265,3 @@ fn run_single_case(
 
     Ok(())
 }
-
-// ... (rest of the file remains the same: other test functions like test_cwe1234_simple_complete, etc.)
-// #[test]
-// fn test_cwe1234_simple_complete() -> Result<(), Box<dyn std::error::Error>> {
-//     init_test_logger();
-
-//     let config = Config::builder()
-//         .match_length(MatchLength::NeedleSubsetHaystack)
-//         .dedupe(Dedupe::All)
-//         .build();
-
-//     let haystack_module = YosysModule::new(
-//         "examples/fixtures/cwes/cwe1234/cwe1234_simple.v",
-//         "cwe1234_simple",
-//     )?;
-
-//     let driver = Driver::new_workspace()?;
-//     let (haystack_key, haystack_design) = driver.get_or_load_design(
-//         &haystack_module.path().display().to_string(),
-//         haystack_module.module_name(),
-//         &config.haystack_options,
-//     )?;
-
-//     let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;
-//     let context = context.with_design(haystack_key.clone(), haystack_design);
-
-//     let results = Cwe1234::<Search>::query(
-//         &haystack_key,
-//         &context,
-//         Instance::root("cwe1234".to_string()),
-//         &config,
-//     );
-
-//     println!("\n=== CWE-1234 Complete Pattern Test (Simple) ===");
-//     println!("Found {} complete vulnerability(ies)\n", results.len());
-
-//     assert_eq!(
-//         results.len(),
-//         1,
-//         "Should find NeedleSubsetHaystackly 1 complete CWE-1234 pattern"
-//     );
-
-//     Ok(())
-// }
-
-// #[test]
-// fn test_cwe1234_multi_reg_complete() -> Result<(), Box<dyn std::error::Error>> {
-//     init_test_logger();
-
-//     let config = Config::builder()
-//         .match_length(MatchLength::NeedleSubsetHaystack)
-//         .dedupe(Dedupe::All)
-//         .build();
-
-//     let haystack_module = YosysModule::new(
-//         "examples/fixtures/cwes/cwe1234/cwe1234_multi_reg.v",
-//         "cwe1234_multi_reg",
-//     )?;
-
-//     let driver = Driver::new_workspace()?;
-//     let (haystack_key, haystack_design) = driver.get_or_load_design(
-//         &haystack_module.path().display().to_string(),
-//         haystack_module.module_name(),
-//         &config.haystack_options,
-//     )?;
-
-//     let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;
-//     let context = context.with_design(haystack_key.clone(), haystack_design);
-
-//     let results = Cwe1234::<Search>::query(
-//         &haystack_key,
-//         &context,
-//         Instance::root("cwe1234".to_string()),
-//         &config,
-//     );
-
-//     println!("\n=== CWE-1234 Multiple Registers Complete Test ===");
-//     println!("Module has 3 vulnerable data registers\n");
-//     println!("Found {} complete vulnerability(ies)\n", results.len());
-
-//     assert_eq!(
-//         results.len(),
-//         3,
-//         "Should find NeedleSubsetHaystackly 3 complete CWE-1234 patterns"
-//     );
-
-//     println!("\n✓ All 3 vulnerable data registers identified");
-//     println!("✓ Lock status registers correctly excluded");
-
-//     Ok(())
-// }
-
-// #[test]
-// fn test_cwe1234_fixed_complete() -> Result<(), Box<dyn std::error::Error>> {
-//     init_test_logger();
-
-//     let config = Config::builder()
-//         .match_length(MatchLength::NeedleSubsetHaystack)
-//         .dedupe(Dedupe::All)
-//         .build();
-
-//     let haystack_module = YosysModule::new(
-//         "examples/fixtures/cwes/cwe1234/cwe1234_fixed.v",
-//         "cwe1234_fixed",
-//     )?;
-
-//     let driver = Driver::new_workspace()?;
-//     let (haystack_key, haystack_design) = driver.get_or_load_design(
-//         &haystack_module.path().display().to_string(),
-//         haystack_module.module_name(),
-//         &config.haystack_options,
-//     )?;
-
-//     let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;
-//     let context = context.with_design(haystack_key.clone(), haystack_design);
-
-//     let results = Cwe1234::<Search>::query(
-//         &haystack_key,
-//         &context,
-//         Instance::root("cwe1234".to_string()),
-//         &config,
-//     );
-
-//     println!("\n=== CWE-1234 Fixed (Secure) Complete Test ===");
-//     println!("Found {} vulnerability(ies)\n", results.len());
-
-//     assert_eq!(
-//         results.len(),
-//         0,
-//         "Fixed version should have 0 complete CWE-1234 patterns"
-//     );
-
-//     println!("✓ No false positives - secure implementation validated");
-
-//     Ok(())
-// }

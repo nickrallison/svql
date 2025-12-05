@@ -1,6 +1,3 @@
-// examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v
-// Multiple registers with different widths
-// Tests handling of 1-bit, 8-bit, 16-bit, and 32-bit registers
 
 module cwe1234_multi_width (
     input Data_in_1bit,
@@ -28,7 +25,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// 1-bit register
 always @(posedge Clk or negedge resetn) begin
     if (~resetn) begin
         Data_out_1bit <= 1'b0;
@@ -37,7 +33,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// 8-bit register
 always @(posedge Clk or negedge resetn) begin
     if (~resetn) begin
         Data_out_8bit <= 8'h00;
@@ -46,7 +41,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// 16-bit register
 always @(posedge Clk or negedge resetn) begin
     if (~resetn) begin
         Data_out_16bit <= 16'h0000;
@@ -55,7 +49,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// 32-bit register
 always @(posedge Clk or negedge resetn) begin
     if (~resetn) begin
         Data_out_32bit <= 32'h00000000;

@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_not_alternating.v
-// NOT gate alternates between left and right at each depth
-// Tests thorough input checking at all levels
 
 module cwe1234_not_alternating (
     input [15:0] Data_in_1,
@@ -31,10 +28,6 @@ else begin
     if (Lock_2) lock_status_2 <= 1'b1;
 end
 
-// Pattern 1: Left-Right-Left
-// Depth 0: AND (left=write, right=OR tree)
-// Depth 1: OR (left=NOT(lock), right=OR subtree)
-// Depth 2: OR (left=bypass_a, right=bypass_b)
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out_1 <= 16'h0000;
@@ -46,10 +39,6 @@ else begin
     Data_out_1 <= Data_out_1;
 end
 
-// Pattern 2: Right-Left-Right
-// Depth 0: AND (left=OR tree, right=write)
-// Depth 1: OR (left=OR subtree, right=NOT(lock))
-// Depth 2: OR (left=bypass_a, right=bypass_b)
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out_2 <= 16'h0000;

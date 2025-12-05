@@ -37,7 +37,6 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Create a new configuration.
     pub fn new(
         match_length: MatchLength,
         dedupe: Dedupe,
@@ -49,7 +48,6 @@ impl Config {
         Self {
             match_length,
             dedupe,
-            // bind_inputs,
             needle_options,
             haystack_options,
             pattern_vars_match_design_consts,
@@ -64,7 +62,6 @@ impl Config {
 
 impl Hash for Config {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Stub: Hash key fields (e.g., match_length, dedupe)
         self.match_length.hash(state);
         self.dedupe.hash(state);
         self.needle_options.hash(state);
@@ -153,7 +150,6 @@ impl ConfigBuilder {
         Config {
             match_length: self.match_length,
             dedupe: self.dedupe,
-            // bind_inputs: self.bind_inputs,
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
             pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,

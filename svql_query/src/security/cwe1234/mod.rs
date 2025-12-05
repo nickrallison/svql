@@ -32,8 +32,6 @@ pub struct Cwe1234<S: State> {
 
 impl<S: State> Topology<S> for Cwe1234<S> {
     fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        // Critical connection: unlock logic output → register enable
-        // This is the vulnerability - bypass logic controls when data can be written
         ctx.connect(
             Some(&self.unlock_logic.top_and.y),
             self.locked_register.write_en(),

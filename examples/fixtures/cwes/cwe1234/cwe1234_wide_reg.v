@@ -1,6 +1,3 @@
-// examples/fixtures/cwes/cwe1234/cwe1234_wide_reg.v
-// Uses wider registers (32-bit) to test multi-bit DFF handling
-// Pattern: write & (~lock | scan | debug)
 
 module cwe1234_wide_reg (
     input [31:0] Data_in,
@@ -25,7 +22,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// VULNERABILITY: 32-bit register with multiple bypass paths
 always @(posedge Clk or negedge resetn) begin
     if (~resetn) begin
         Data_out <= 32'h00000000;

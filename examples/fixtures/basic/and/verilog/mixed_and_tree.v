@@ -11,7 +11,6 @@ module mixed_and_tree
     output y
 );
 
-    // Stage 1: pairwise ANDs using a mix of implementations
     wire s0, s1, s2, s3;
 
     and_gate u_and_gate_0 (
@@ -38,7 +37,6 @@ module mixed_and_tree
         .y(s3)
     );
 
-    // Stage 2: combine intermediate results, still mixing implementations
     wire t0, t1;
 
     and_mux u_and_mux_1 (
@@ -53,7 +51,6 @@ module mixed_and_tree
         .y(t1)
     );
 
-    // Stage 3: final AND
     and_gate u_and_gate_2 (
         .a(t0),
         .b(t1),

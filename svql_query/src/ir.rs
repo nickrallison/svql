@@ -47,8 +47,6 @@ impl QueryDag {
     }
 }
 
-// Added Hash and Eq here.
-// Requirement: Config and DriverKey must implement Hash and Eq.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlan {
     Scan {
@@ -75,8 +73,6 @@ pub enum JoinConstraint {
 }
 
 pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
-    // We now map the actual LogicalPlan structure to an ID.
-    // This enables structural deduplication (Common Subexpression Elimination).
     let mut node_map: AHashMap<LogicalPlan, PlanNodeId> = AHashMap::new();
     let mut nodes = Vec::new();
 
@@ -92,15 +88,10 @@ fn canonicalize_rec(
     node_map: &mut AHashMap<LogicalPlan, PlanNodeId>,
     nodes: &mut Vec<LogicalPlanNode>,
 ) -> PlanNodeId {
-    // If this exact structure has been seen before, return its existing ID.
     if let Some(&id) = node_map.get(&plan) {
         return id;
     }
 
-    // We must process children first to get their IDs.
-    // We clone the plan here to keep ownership for the map key later,
-    // while we destructure a copy to process children.
-    // (Optimization: In a production system, we might use Cow or references to avoid this clone)
     let plan_key = plan.clone();
 
     let node = match plan {
@@ -241,7 +232,6 @@ impl NaiveExecutor {
                 config: node_config,
                 schema,
             } => {
-                // Retrieve needle and haystack designs from context.
                 let needle_container = ctx.get(key).unwrap();
                 let haystack_container = ctx.get(haystack_key).unwrap();
                 let needle = needle_container.design();
@@ -249,7 +239,6 @@ impl NaiveExecutor {
                 let needle_index = needle_container.index();
                 let haystack_index = haystack_container.index();
 
-                // Perform subgraph isomorphism matching.
                 let embeddings = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle,
                     haystack,
@@ -258,7 +247,6 @@ impl NaiveExecutor {
                     node_config,
                 );
 
-                // Build FlatResult for each embedding by resolving cells for schema columns.
                 embeddings
                     .items
                     .iter()
@@ -287,7 +275,6 @@ impl NaiveExecutor {
                 constraints,
                 ..
             } => {
-                // Execute all input nodes.
                 let input_results: Vec<Vec<FlatResult<'a>>> = input_ids
                     .iter()
                     .map(|&id| self.execute_node(id, dag, ctx, haystack_key, config))
@@ -297,10 +284,8 @@ impl NaiveExecutor {
                     return vec![];
                 }
 
-                // Compute Cartesian product of input results.
                 let combos = Self::cartesian_product(&input_results);
 
-                // Filter combinations based on join constraints.
                 combos
                     .into_iter()
                     .filter_map(|combo| {
@@ -335,22 +320,19 @@ impl NaiveExecutor {
                 input_ids,
                 tag_results,
                 ..
-            } => {
-                // Execute all input nodes and union results.
-                input_ids
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(i, &id)| {
-                        let mut results = self.execute_node(id, dag, ctx, haystack_key, config);
-                        if *tag_results {
-                            results
-                                .iter_mut()
-                                .for_each(|row| row.variant_choices.push(i));
-                        }
+            } => input_ids
+                .iter()
+                .enumerate()
+                .flat_map(|(i, &id)| {
+                    let mut results = self.execute_node(id, dag, ctx, haystack_key, config);
+                    if *tag_results {
                         results
-                    })
-                    .collect()
-            }
+                            .iter_mut()
+                            .for_each(|row| row.variant_choices.push(i));
+                    }
+                    results
+                })
+                .collect(),
         }
     }
 

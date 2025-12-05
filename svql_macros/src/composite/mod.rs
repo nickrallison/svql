@@ -6,7 +6,7 @@ use syn::{Fields, ItemStruct, parse_macro_input};
 pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut item_struct = parse_macro_input!(input as ItemStruct);
     let struct_name = &item_struct.ident;
-    let generics = &item_struct.generics; // Capture full generics with bounds
+    let generics = &item_struct.generics;
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
 
     let mut path_field = None;
@@ -20,7 +20,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut field_defs = Vec::new();
     let mut context_calls = Vec::new();
 
-    // For PlannedQuery
     let mut plan_inputs = Vec::new();
     let mut reconstruct_calls = Vec::new();
     let mut get_col_arms = Vec::new();
@@ -33,7 +32,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             let ty = &field.ty;
             let vis = &field.vis;
 
-            // Check attributes
             let mut is_path = false;
             let mut is_submodule = false;
             let mut attrs_to_remove = Vec::new();
@@ -64,7 +62,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     #name_str => self.#ident.find_port_inner(tail)
                 });
 
-                // Use helper to get Type<Search>
                 let search_ty = common::replace_generic_with_search(ty);
 
                 instantiate_fields.push(quote! {
@@ -77,13 +74,11 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 query_names.push(ident.clone());
                 construct_fields.push(quote! { #ident: #ident });
 
-                // Generate context call for this submodule
                 context_calls.push(quote! {
                     let sub_ctx = <#search_ty>::context(driver, options)?;
                     ctx = ctx.merge(sub_ctx);
                 });
 
-                // PlannedQuery logic
                 plan_inputs.push(quote! {
                     Box::new(self.#ident.to_ir(config))
                 });
@@ -92,15 +87,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     #ident: self.#ident.reconstruct(cursor)
                 });
 
-                // For get_column_index, we need to offset by previous children's schema size
-                // This is dynamic, so we generate code to calculate it
                 get_col_arms.push(quote! {
                     #name_str => {
                         let sub_idx = self.#ident.get_column_index(tail)?;
-                        // Calculate offset
                         let mut offset = 0;
-                        // Iterate previous fields to sum their schema lengths
-                        // This is a bit inefficient O(N^2) but N is small (number of submodules)
                         #(
                             offset += self.#query_names.expected_schema().columns.len();
                         )*
@@ -128,8 +118,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let iproduct_macro = quote! { ::svql_query::itertools::iproduct! };
     let iter_vars: Vec<_> = query_names.iter().collect();
 
-    // Helper to generate the offset calculation logic for get_column_index
-    // We need to regenerate the arms with the correct offsets
     let mut get_col_arms_final = Vec::new();
     for (i, name) in query_names.iter().enumerate() {
         let name_str = name.to_string();
@@ -216,10 +204,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             ) -> Vec<Self::Matched<'a>> {
                 use ::svql_query::traits::Topology;
 
-                // 1. Run Subqueries
                 #(#query_calls)*
 
-                // 2. Cartesian Product
                 #iproduct_macro( #(#iter_vars),* )
                     .map(|( #(#iter_vars),* )| {
                         #struct_name {
@@ -257,23 +243,17 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
                 use ::svql_query::traits::Topology;
 
-                // 1. Collect sub-plans
                 let inputs = vec![ #(#plan_inputs),* ];
 
-                // 2. Extract constraints using ConnectionBuilder
                 let mut builder = ::svql_query::traits::ConnectionBuilder { constraints: Vec::new() };
                 self.define_connections(&mut builder);
 
                 let mut join_constraints = Vec::new();
 
-                // Helper to map Wire -> (child_idx, col_idx)
-                // We need to find which child the wire belongs to
                 let map_wire = |wire: &::svql_query::Wire<::svql_query::Search>| -> Option<(usize, usize)> {
                     let wire_path = wire.path();
-                    // Unrolled loop to avoid heterogeneous Vec issues
                     let mut child_idx = 0;
                     #(
-                        // Use fully qualified trait call here to avoid "no method named path" errors
                         if wire_path.starts_with(::svql_query::traits::Component::path(&self.#query_names)) {
                             let rel = wire_path.relative(::svql_query::traits::Component::path(&self.#query_names));
                             if let Some(col) = self.#query_names.get_column_index(rel) {

@@ -1,7 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/mux_tree.v
-// Tree with MUX gates
-// Structure: y = sel1 ? (sel2 ? a : b) : (sel3 ? c : d)
-// Tests MUX as tree nodes (3 inputs each)
 
 module mux_tree
 (

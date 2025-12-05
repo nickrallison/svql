@@ -57,7 +57,6 @@ impl ModuleConfig {
 
 impl Hash for ModuleConfig {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Stub: Hash key fields (e.g., match_length, dedupe)
         self.flatten.hash(state);
         self.opt_clean.hash(state);
         self.opt.hash(state);

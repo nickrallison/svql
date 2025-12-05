@@ -25,24 +25,18 @@ pub trait NetlistMeta {
     }
 }
 
-/// Helper to resolve a wire name to a cell wrapper using the embedding and needle design.
-/// Used by the netlist macro.
 pub fn resolve_wire<'a>(
     embedding: &Embedding<'a, 'a>,
     embedding_set: &EmbeddingSet<'a, 'a>,
     _needle: &Design,
     wire_name: &str,
 ) -> Option<CellWrapper<'a>> {
-    // 1. Try as Output (Source)
-    // Maps Output Name -> Needle Cell that drives it (e.g. AND gate)
     if let Some(drivers) = embedding_set.needle_output_fanin_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = drivers.first() {
             return embedding.assignment.get_haystack_cell(needle_cell.clone());
         }
     }
 
-    // 2. Try as Input (Sink)
-    // Maps Input Name -> Needle Cell that is driven by it (e.g. DFF)
     if let Some(sinks) = embedding_set.needle_input_fanout_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = sinks.first() {
             return embedding.assignment.get_haystack_cell(needle_cell.clone());

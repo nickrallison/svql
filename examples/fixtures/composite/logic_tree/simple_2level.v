@@ -1,7 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/simple_2level.v
-// Simple 2-level tree: AND of two ORs
-// Structure: y = (a | b) & (c | d)
-// Depth: 2, Gates: 3, Leaves: 4
 
 module simple_2level
 (

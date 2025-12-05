@@ -1,6 +1,3 @@
-// examples/patterns/security/access_control/locked_reg/verilog/async_en.v
-// Async reset flip-flop with explicit enable signal
-// Synthesizes to $adffe cell
 
 module async_en (
     input  wire        clk,
@@ -16,7 +13,6 @@ always @(posedge clk or negedge resetn) begin
     end else if (write_en) begin
         data_out <= data_in;
     end
-    // Implicit: else data_out <= data_out (hold current value)
 end
 
 endmodule

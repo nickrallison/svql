@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_combined.v
-// More complex bypass logic with AND and OR combinations
-// Pattern: write & ((~lock & mode_a) | debug)
 
 module cwe1234_combined (
     input [15:0] Data_in,
@@ -26,9 +23,6 @@ else begin
     lock_status <= lock_status;
 end
 
-// VULNERABILITY: Combined AND/OR logic
-// Pattern: write & ((~lock_status & mode_a) | debug_unlocked)
-// Still has the core pattern: negated lock can be bypassed
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out <= 16'h0000;

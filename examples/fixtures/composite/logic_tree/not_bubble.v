@@ -1,7 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/not_bubble.v
-// Inverters at multiple levels
-// Structure: y = ~((~a & ~b) | (c & d))
-// Tests NOT gates scattered through tree
 
 module not_bubble
 (

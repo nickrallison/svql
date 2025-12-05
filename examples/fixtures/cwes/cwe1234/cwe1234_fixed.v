@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_fixed.v
-// FIXED version - no bypass vulnerability
-// Lock cannot be overridden once set
 
 module cwe1234_fixed (
     input [15:0] Data_in,
@@ -8,8 +5,8 @@ module cwe1234_fixed (
     input resetn,
     input write,
     input Lock,
-    input scan_mode,        // Present but NOT used to bypass lock
-    input debug_unlocked,   // Present but NOT used to bypass lock
+    input scan_mode,
+    input debug_unlocked,
     output reg [15:0] Data_out
 );
 
@@ -26,13 +23,11 @@ else begin
     lock_status <= lock_status;
 end
 
-// FIXED: No bypass - lock cannot be overridden
-// Only unlock path is through reset
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out <= 16'h0000;
 end
-else if (write & ~lock_status) begin  // NO bypass conditions!
+else if (write & ~lock_status) begin
     Data_out <= Data_in;
 end
 else begin

@@ -1,7 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_deep.v
-// Deep OR tree with 4 bypass conditions
-// Pattern: write & (((~lock | scan) | debug) | test_mode)
-// Tests recursive tree traversal at depth 3
 
 module cwe1234_deep (
     input [15:0] Data_in,
@@ -28,8 +24,6 @@ else begin
     lock_status <= lock_status;
 end
 
-// VULNERABILITY: Deep OR tree with multiple bypass paths
-// Yosys will synthesize this as a tree of OR gates
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out <= 16'h0000;

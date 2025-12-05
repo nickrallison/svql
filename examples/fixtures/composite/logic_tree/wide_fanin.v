@@ -1,7 +1,3 @@
-// examples/fixtures/basic/logic_tree/verilog/wide_fanin.v
-// Wide fan-in at single level
-// Structure: y = (a & b) | (c & d) | (e & f) | (g & h)
-// Tests many children at same depth
 
 module wide_fanin
 (

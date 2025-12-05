@@ -1,5 +1,3 @@
-// examples/patterns/security/access_control/uninit_reg/verilog/uninit_reg_en.v
-// Uninitialized register
 
 module uninit_reg_en (
     input  wire        clk,

@@ -90,7 +90,7 @@ impl Context {
     #[contracts::debug_ensures(ret.len() == 1)]
     pub fn from_single(key: DriverKey, design: Arc<DesignContainer>) -> Self {
         let mut ctx = Self::new();
-        ctx.designs.insert(key, design); // Internal, ok
+        ctx.designs.insert(key, design);
         tracing::event!(tracing::Level::DEBUG, "Single design context created");
         ctx
     }

@@ -10,27 +10,22 @@ use svql_macros::variant;
 
 #[variant(ports(y))]
 pub enum Combinational<S: State> {
-    // AND variants (multi-style implementations)
     #[variant(map(y = "y"))]
     AndGate(AndGate<S>),
 
-    // OR gate
     #[variant(map(y = "y"))]
     Or(OrGate<S>),
 
-    // XOR/XNOR gates
     #[variant(map(y = "y"))]
     Xor(XorGate<S>),
     #[variant(map(y = "y"))]
     Xnor(XnorGate<S>),
 
-    // Single-input gates
     #[variant(map(y = "y"))]
     Not(NotGate<S>),
     #[variant(map(y = "y"))]
     Buf(BufGate<S>),
 
-    // MUX (conditional combinational)
     #[variant(map(y = "y"))]
     Mux2(Mux2Gate<S>),
 }

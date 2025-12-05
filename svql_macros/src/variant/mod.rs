@@ -10,7 +10,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = item_enum.generics.split_for_impl();
     let generics = &item_enum.generics;
 
-    // Parse ports from args
     let mut common_ports = Vec::new();
     let args_parser = Punctuated::<Meta, Token![,]>::parse_terminated;
 
@@ -155,31 +154,26 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! { #p: ::svql_query::Wire::new(base_path.child(#p_str), ()) }
     });
 
-    // Generate context() method that merges sub-contexts
     let context_merges = variant_names
         .iter()
         .zip(variant_types.iter())
         .map(|(_v_name, v_type)| {
             let search_type = common::replace_generic_with_search(v_type);
-            // FIXED: Wrapped #search_type in <...> to avoid "comparison operators cannot be chained"
             quote! {
                 let sub_ctx = <#search_type>::context(driver, options)?;
                 ctx = ctx.merge(sub_ctx);
             }
         });
 
-    // Generate query blocks using Search type
     let query_blocks = variant_names.iter().zip(variant_types.iter()).map(|(v_name, v_type)| {
         let search_type = common::replace_generic_with_search(v_type);
         quote! {
             let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
             let results = sub_query.query(driver, context, key, config);
-            // Use fully qualified enum variant with Match<'a>
             all_results.extend(results.into_iter().map(#enum_name::<::svql_query::Match<'a>>::#v_name));
         }
     });
 
-    // PlannedQuery logic
     let plan_inputs = variant_names.iter().zip(variant_types.iter()).map(|(_v_name, v_type)| {
         let search_type = common::replace_generic_with_search(v_type);
         quote! {
@@ -280,9 +274,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         impl ::svql_query::traits::PlannedQuery for #enum_name<::svql_query::Search> {
             fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
                 let inputs = vec![ #(#plan_inputs),* ];
-                // Note: Schema handling for variants is simplified here.
-                // Ideally we check compatibility or use the first variant's schema.
-                // For now, we assume the first variant defines the schema.
                 let schema = if let Some(first) = inputs.first() {
                     match &**first {
                         ::svql_query::ir::LogicalPlan::Scan { schema, .. } => schema.clone(),

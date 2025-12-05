@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_simple.v
-// Minimal CWE1234 pattern: write & (~lock | debug)
-// Only one bypass condition - simplest vulnerable case
 
 module cwe1234_simple (
     input [15:0] Data_in,
@@ -25,8 +22,6 @@ else begin
     lock_status <= lock_status;
 end
 
-// VULNERABILITY: Single bypass via debug_unlocked
-// Pattern: AND -> OR -> NOT (depth 1)
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out <= 16'h0000;

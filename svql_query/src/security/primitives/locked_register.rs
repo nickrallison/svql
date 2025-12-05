@@ -1,10 +1,6 @@
 use crate::{State, Wire};
 use svql_macros::{netlist, variant};
 
-// ============================================================================
-// Pattern Definitions using netlist! macro
-// ============================================================================
-
 #[netlist(
     file = "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
     name = "async_en"
@@ -93,12 +89,10 @@ pub enum LockedRegister<S: State> {
 }
 
 impl<S: State> LockedRegister<S> {
-    /// Get the enable wire for connection validation
     pub fn enable_wire(&self) -> Option<&Wire<S>> {
         self.write_en()
     }
 
-    /// Get a description of the register type for reporting
     pub fn register_type(&self) -> String {
         match self {
             LockedRegister::AsyncEn(_) => "AsyncDffEnable".to_string(),

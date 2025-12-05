@@ -83,7 +83,6 @@ impl Driver {
             self.root_path.join(design_path)
         };
 
-        // Check if already loaded
         let key = DriverKey::new(&absolute_path, module_name.clone());
         {
             let registry = self.registry.read().unwrap();
@@ -93,7 +92,6 @@ impl Driver {
             }
         }
 
-        // Load the design
         tracing::event!(
             tracing::Level::INFO,
             "Loading design: {} ({})",
@@ -106,7 +104,6 @@ impl Driver {
             .import_design_yosys(module_config, &self.yosys_path)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        // Store in registry
         {
             let mut registry = self.registry.write().unwrap();
             registry.insert(key.clone(), Arc::new(DesignContainer::build(design)));
@@ -137,7 +134,6 @@ impl Driver {
 
         let key = DriverKey::new(&absolute_path, module_name.to_string());
 
-        // Try to get from registry first
         {
             let registry = self.registry.read().unwrap();
             if let Some(design) = registry.get(&key) {
@@ -146,7 +142,6 @@ impl Driver {
             }
         }
 
-        // Load and store
         tracing::event!(
             tracing::Level::INFO,
             "Loading design: {} ({})",
@@ -191,7 +186,6 @@ impl Driver {
 
         let key = DriverKey::new(&absolute_path, module_name.to_string());
 
-        // Try to get from registry first
         {
             let registry = self.registry.read().unwrap();
             if let Some(design) = registry.get(&key) {
@@ -200,7 +194,6 @@ impl Driver {
             }
         }
 
-        // Load and store
         tracing::event!(
             tracing::Level::INFO,
             "Loading design: {} ({})",
@@ -306,5 +299,4 @@ impl Driver {
         );
         registry.clone()
     }
-
 }

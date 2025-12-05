@@ -7,7 +7,6 @@ use syn::{Attribute, Expr, GenericArgument, Lit, Meta, PathArguments, Token, Typ
 pub fn get_attribute_value(attrs: &[Attribute], attr_name: &str, key: &str) -> Option<String> {
     for attr in attrs {
         if attr.path().is_ident(attr_name) {
-            // Parse #[attr_name(key = "value", ...)]
             if let Ok(nested) =
                 attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
             {
@@ -61,7 +60,6 @@ pub fn replace_generic_with_search(ty: &Type) -> proc_macro2::TokenStream {
     if let Type::Path(type_path) = ty {
         let mut new_path = type_path.path.clone();
         if let Some(last_segment) = new_path.segments.last_mut() {
-            // Assume the last segment has the generic <S>
             last_segment.arguments =
                 PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
                     colon2_token: None,
@@ -78,7 +76,6 @@ pub fn replace_generic_with_search(ty: &Type) -> proc_macro2::TokenStream {
         }
         quote! { #new_path }
     } else {
-        // Fallback: just quote the type (might fail if it depends on S)
         quote! { #ty }
     }
 }

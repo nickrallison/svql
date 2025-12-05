@@ -1,6 +1,3 @@
-// examples/fixtures/cwes/cwe1234/cwe1234_enabled.v
-// Uses DFFs with explicit enable signals
-// Pattern: write & (~lock | debug)
 
 module cwe1234_enabled (
     input [15:0] Data_in,
@@ -16,7 +13,6 @@ reg lock_status;
 wire lock_enable;
 wire data_enable;
 
-// Lock register with enable
 assign lock_enable = Lock;
 
 always @(posedge Clk or negedge resetn) begin
@@ -27,8 +23,6 @@ always @(posedge Clk or negedge resetn) begin
     end
 end
 
-// VULNERABILITY: Explicit enable with bypass
-// Enable is the vulnerable part: write & (~lock | debug)
 assign data_enable = write & (~lock_status | debug_unlocked);
 
 always @(posedge Clk or negedge resetn) begin

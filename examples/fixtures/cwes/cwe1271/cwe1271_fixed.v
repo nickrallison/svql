@@ -1,4 +1,3 @@
-// examples/fixtures/cwes/cwe1271/cwe1271_fixed.v
 
 module cwe1271_fixed (
     input  wire        clk,

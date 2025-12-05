@@ -1,6 +1,3 @@
-// examples/fixtures/security/access_control/locked_reg/verilog/cwe1234_swapped.v
-// Tests commutative input handling - bypass conditions in different positions
-// Pattern: (scan | ~lock) & write  (OR first, then AND)
 
 module cwe1234_swapped (
     input [15:0] Data_in,
@@ -26,8 +23,6 @@ else begin
     lock_status <= lock_status;
 end
 
-// VULNERABILITY: Bypass conditions come first (tests commutative AND matching)
-// Pattern: (~lock_status | scan_mode | debug_unlocked) & write
 always @(posedge Clk or negedge resetn)
 if (~resetn) begin
     Data_out <= 16'h0000;

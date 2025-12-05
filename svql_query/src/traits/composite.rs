@@ -6,9 +6,6 @@ pub trait Topology<S: State> {
 }
 
 pub struct ConnectionBuilder<'a, S: State> {
-    // Outer Vec = AND (All groups must be satisfied)
-    // Inner Vec = OR  (At least one pair in the group must connect)
-    // Option::None = The port does not exist on the current variant
     pub constraints: Vec<Vec<(Option<&'a Wire<S>>, Option<&'a Wire<S>>)>>,
 }
 
