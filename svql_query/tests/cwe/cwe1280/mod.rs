@@ -69,7 +69,7 @@ mod tests {
             );
         } else {
             println!(
-                "✓ {}: {} ({} matches)",
+                "Success {}: {} ({} matches)",
                 case.name, case.description, case.expected_matches
             );
         }
