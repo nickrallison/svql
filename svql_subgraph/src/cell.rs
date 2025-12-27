@@ -284,7 +284,16 @@ pub struct SourceLocation {
 impl SourceLocation {
     /// Formats the source location for display in reports.
     pub fn report(&self) -> String {
-        todo!("Implement structured printed of source location")
+        if self.lines.is_empty() {
+            return format!("{}:<unknown>", self.file);
+        }
+        let first = self.lines.first().unwrap().number;
+        let last = self.lines.last().unwrap().number;
+        if first == last {
+            format!("{}:{}", self.file, first)
+        } else {
+            format!("{}:{}-{}", self.file, first, last)
+        }
     }
 }
 
@@ -298,6 +307,13 @@ pub struct SourceLine {
 impl SourceLine {
     /// Returns a summary string of the line and column range.
     pub fn report(&self) -> String {
-        todo!("Implement source line formatting")
+        if self.end_column == 0 {
+            format!("Line {}, Col {}+", self.number, self.start_column)
+        } else {
+            format!(
+                "Line {}, Col {}-{}",
+                self.number, self.start_column, self.end_column
+            )
+        }
     }
 }
