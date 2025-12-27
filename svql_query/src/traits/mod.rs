@@ -18,7 +18,6 @@ use crate::{
 pub trait Component<S: State> {
     fn path(&self) -> &Instance;
     fn type_name(&self) -> &'static str;
-    fn children(&self) -> Vec<&dyn Component<S>>;
 
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>>;
     fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>>;

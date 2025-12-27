@@ -84,10 +84,6 @@ impl<S: State> Component<S> for Wire<S> {
         "Wire"
     }
 
-    fn children(&self) -> Vec<&dyn Component<S>> {
-        vec![]
-    }
-
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
         if path.starts_with(&self.path) {
             Some(self)

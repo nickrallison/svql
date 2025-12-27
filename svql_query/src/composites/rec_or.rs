@@ -50,14 +50,6 @@ where
         "RecOr"
     }
 
-    fn children(&self) -> Vec<&dyn Component<S>> {
-        let mut kids: Vec<&dyn Component<S>> = vec![&self.or];
-        if let Some(c) = &self.child {
-            kids.push(c.as_ref());
-        }
-        kids
-    }
-
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         if let Some(port) = self.or.find_port(p) {
             return Some(port);

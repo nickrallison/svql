@@ -213,13 +213,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 stringify!(#enum_name)
             }
 
-            fn children(&self) -> Vec<&dyn ::svql_query::traits::Component<S>> {
-                match self {
-                    #(#component_arms_children),*,
-                    Self::#abstract_ident { .. } => vec![],
-                }
-            }
-
             fn find_port(&self, path: &::svql_query::instance::Instance) -> Option<&::svql_query::Wire<S>> {
                 match self {
                     #(#component_arms_find_port),*,

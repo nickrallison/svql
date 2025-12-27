@@ -125,10 +125,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 stringify!(#struct_name)
             }
 
-            fn children(&self) -> Vec<&dyn ::svql_query::traits::Component<S>> {
-                vec![ #(#child_refs),* ]
-            }
-
             fn find_port(&self, path: &::svql_query::instance::Instance) -> Option<&::svql_query::Wire<S>> {
                 if !path.starts_with(self.path()) { return None; }
                 let rel_path = path.relative(self.path());

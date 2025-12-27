@@ -40,10 +40,6 @@ where
         "UnlockLogic"
     }
 
-    fn children(&self) -> Vec<&dyn Component<S>> {
-        vec![&self.top_and, &self.rec_or, &self.not_gate]
-    }
-
     fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
         let idx = self.path.height() + 1;
         match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
