@@ -2,7 +2,7 @@
 extern crate self as svql_query;
 
 use std::sync::Arc;
-use svql_subgraph::cell::CellWrapper;
+use svql_subgraph::cell::{CellWrapper, SourceLocation};
 
 pub mod binding;
 pub mod composites;
@@ -36,6 +36,16 @@ impl State for Search {
 pub struct Match<'ctx> {
     pub pat_node_ref: Option<CellWrapper<'ctx>>,
     pub design_node_ref: Option<CellWrapper<'ctx>>,
+}
+
+impl<'ctx> Match<'ctx> {
+    pub fn source(&self) -> Option<SourceLocation> {
+        if let Some(cell) = &self.design_node_ref {
+            cell.get_source()
+        } else {
+            None
+        }
+    }
 }
 
 impl<'ctx> State for Match<'ctx> {

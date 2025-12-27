@@ -21,8 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
     // let design_module = "tile";
 
-    let design_path = "examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v";
-    let design_module = "cwe1234_not_alternating";
+    let design_path =
+        "examples/fixtures/larger_designs/json/hackatdac18/cv32e40p_fp_wrapper_netlist.json";
+    let design_module = "cv32e40p_fp_wrapper";
 
     info!("Loading design...");
     let (haystack_key, haystack_design) =
@@ -42,25 +43,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let query = Cwe1234::<Search>::instantiate(Instance::root("cwe1234".to_string()));
 
     info!("Executing query...");
-    let executor = NaiveExecutor;
-    let planned_query_results = query.query_planned(&executor, &context, &haystack_key, &config);
+    // let executor = NaiveExecutor;
+    // let planned_query_results = query.query_planned(&executor, &context, &haystack_key, &config);
     let query_results = query.query(&driver, &context, &haystack_key, &config);
 
     info!("Found {} matches for old query", query_results.len());
 
-    for (i, _match) in query_results.iter().enumerate() {
-        info!("Match #{}", i);
+    for (i, match_) in query_results.iter().enumerate() {
+        info!("Match #{}: {:#?}", i, match_);
         // Inspect match details if needed
     }
 
-    info!(
-        "Found {} matches for planned query",
-        planned_query_results.len()
-    );
-    for (i, _match) in planned_query_results.iter().enumerate() {
-        info!("Planned Match #{}", i);
-        // Inspect match details if needed
-    }
+    // info!(
+    //     "Found {} matches for planned query",
+    //     planned_query_results.len()
+    // );
+    // for (i, _match) in planned_query_results.iter().enumerate() {
+    //     info!("Planned Match #{}", i);
+    //     // Inspect match details if needed
+    // }
 
     Ok(())
 }

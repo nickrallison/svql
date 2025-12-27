@@ -21,7 +21,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // 1. Inject 'path' field if not present
     if let Fields::Named(ref mut fields) = item_struct.fields {
-        let has_path = fields
+        let _has_path = fields
             .named
             .iter()
             .any(|f| f.ident.as_ref().map(|i| i == "path").unwrap_or(false));

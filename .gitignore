@@ -18,4 +18,4 @@ bin/
 ##
 **/openpiton_*.json
 examples/fixtures/larger_designs/json/hackatdac18/*.json
-
+examples/fixtures/larger_designs/verilog/hackatdac18/*.v

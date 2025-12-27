@@ -2,9 +2,10 @@
 
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::{borrow::Cow, fmt::Debug};
 
-use prjunnamed_netlist::{Cell, CellRef, MetaItemRef};
+use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
 /// Enumeration of supported cell types for matching.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -218,6 +219,50 @@ impl<'a> CellWrapper<'a> {
             _ => None,
         }
     }
+
+    /// Extracts structured source location information from cell metadata.
+    pub fn get_source(&self) -> Option<SourceLocation> {
+        match self.metadata.get() {
+            MetaItem::Source { file, start, end } => {
+                let file_path = file.get();
+                let lines = (start.line..=end.line)
+                    .map(|ln| self.get_source_line(ln, start, end))
+                    .collect();
+
+                Some(SourceLocation {
+                    file: file_path,
+                    lines,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Calculates column bounds for a specific line within a source span.
+    fn get_source_line(
+        &self,
+        line_num: u32,
+        start: SourcePosition,
+        end: SourcePosition,
+    ) -> SourceLine {
+        let start_column = if line_num == start.line {
+            start.column as usize
+        } else {
+            1
+        };
+
+        let end_column = if line_num == end.line {
+            end.column as usize
+        } else {
+            0 // 0 indicates the span continues to the end of the line
+        };
+
+        SourceLine {
+            number: line_num as usize,
+            start_column,
+            end_column,
+        }
+    }
 }
 
 impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
@@ -227,5 +272,30 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
             debug_index: val.debug_index(),
             metadata: val.metadata(),
         }
+    }
+}
+
+pub struct SourceLocation {
+    pub file: Arc<str>,
+    pub lines: Vec<SourceLine>,
+}
+
+impl SourceLocation {
+    /// Formats the source location for display in reports.
+    pub fn report(&self) -> String {
+        todo!("Implement structured printed of source location")
+    }
+}
+
+pub struct SourceLine {
+    pub number: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+}
+
+impl SourceLine {
+    /// Returns a summary string of the line and column range.
+    pub fn report(&self) -> String {
+        todo!("Implement source line formatting")
     }
 }
