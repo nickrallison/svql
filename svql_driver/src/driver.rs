@@ -49,6 +49,11 @@ impl Driver {
         Self::new(workspace)
     }
 
+    pub fn new_workspace_yosys<Y: AsRef<Path>>(yosys: Y) -> Result<Self, DriverError> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        Self::with_yosys(workspace, yosys)
+    }
+
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,

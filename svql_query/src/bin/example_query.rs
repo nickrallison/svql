@@ -17,14 +17,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_recursion_depth(Some(3))
         .build();
 
-    let driver = Driver::new_workspace()?;
+    let mut driver = Driver::new_workspace_yosys("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys")?;
 
     // let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
     // let design_module = "tile";
 
     let design_path =
-        "examples/fixtures/larger_designs/json/hackatdac18/cv32e40p_fp_wrapper_netlist.json";
-    let design_module = "cv32e40p_fp_wrapper";
+        "examples/fixtures/larger_designs/json/hackatdac18/soc_interconnect_wrap_netlist.json";
+    let design_module = "soc_interconnect_wrap";
 
     info!("Loading design...");
     let (haystack_key, haystack_design) =

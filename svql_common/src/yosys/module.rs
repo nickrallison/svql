@@ -87,6 +87,9 @@ impl YosysModule {
         args.push("proc".to_string());
 
         args.push("-p".to_string());
+        args.push("chformal -remove".to_string());
+
+        args.push("-p".to_string());
         args.push("memory".to_string());
 
         if config.flatten {
@@ -108,6 +111,9 @@ impl YosysModule {
             args.push("-p".to_string());
             args.push(step.clone());
         }
+
+        args.push("-p".to_string());
+        args.push("delete t:\\$verific$*".to_string());
 
         args.push("-p".to_string());
         let write_cmd = match output_format {
@@ -135,6 +141,7 @@ impl YosysModule {
         let output = cmd.output()?;
 
         if !output.status.success() {
+            let stdout_str = String::from_utf8_lossy(&output.stdout);
             let stderr_str = String::from_utf8_lossy(&output.stderr);
             tracing::event!(
                 tracing::Level::ERROR,
@@ -142,7 +149,11 @@ impl YosysModule {
                 output.status,
                 stderr_str,
             );
-            return Err(format!("Yosys failed: status={:?}\n{}", output.status, stderr_str).into());
+            return Err(format!(
+                "Yosys failed: status={:?}\nstdout: {}\n stderr: {}",
+                output.status, stdout_str, stderr_str
+            )
+            .into());
         }
 
         Ok(())
