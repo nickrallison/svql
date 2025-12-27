@@ -34,7 +34,7 @@ impl DesignPath {
 
     pub fn read_command(&self) -> &'static str {
         match self {
-            DesignPath::Verilog(_) => "read_verilog",
+            DesignPath::Verilog(_) => "read_verilog -sv",
             DesignPath::Rtlil(_) => "read_rtlil",
             DesignPath::Json(_) => "read_json",
         }

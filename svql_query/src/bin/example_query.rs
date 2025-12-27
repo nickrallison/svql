@@ -32,6 +32,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(2);
 
+    let use_raw_import: bool = args
+        .get(4)
+        .and_then(|s| s.parse::<bool>().ok())
+        .unwrap_or(false);
+
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::None)
@@ -39,14 +44,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     info!("Loading design...");
-    let (haystack_key, haystack_design) =
-        match driver.get_or_load_design_raw(design_path, design_module) {
-            Ok(res) => res,
-            Err(e) => {
-                info!("Could not load design (expected if file missing): {}", e);
-                return Ok(());
-            }
-        };
+    let design_result = match use_raw_import {
+        true => driver.get_or_load_design_raw(design_path, design_module),
+        false => driver.get_or_load_design(design_path, design_module, &config.haystack_options),
+    };
+
+    let (haystack_key, haystack_design) = match design_result {
+        Ok(res) => res,
+        Err(e) => {
+            info!("Could not load design (expected if file missing): {}", e);
+            return Err(e.into());
+        }
+    };
 
     info!("Building context...");
     let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;

@@ -86,7 +86,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             0,
         );
 
-        println!("Found {} raw results", results.len());
+        // println!("Found {} raw results", results.len());
 
         if self.config.dedupe.all() {
             let mut seen: HashSet<Vec<usize>> = HashSet::new();
