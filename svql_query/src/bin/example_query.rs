@@ -17,7 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_recursion_depth(Some(3))
         .build();
 
-    let mut driver = Driver::new_workspace_yosys("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys")?;
+    let mut driver = Driver::new_workspace_yosys(
+        "/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys",
+    )?;
 
     // let design_path = "examples/fixtures/larger_designs/json/openpiton_tile_flat.json";
     // let design_module = "tile";
