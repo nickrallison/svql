@@ -87,6 +87,34 @@ impl Searchable for RecOr<Search> {
     }
 }
 
+impl<'a> crate::traits::Reportable for RecOr<Match<'a>> {
+    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+        let mut children = Vec::new();
+        let mut current = self.child.as_ref();
+        let mut idx = 0;
+
+        while let Some(child) = current {
+            children.push(child.or.to_report(&format!("[{}]", idx)));
+            current = child.child.as_ref();
+            idx += 1;
+        }
+
+        crate::report::ReportNode {
+            name: name.to_string(),
+            type_name: "RecOr".to_string(),
+            path: self.path.clone(),
+            details: Some(format!("Depth: {}", self.depth())),
+            source_loc: self.or.y.inner.get_source().unwrap_or_else(|| {
+                svql_subgraph::cell::SourceLocation {
+                    file: std::sync::Arc::from(""),
+                    lines: Vec::new(),
+                }
+            }),
+            children,
+        }
+    }
+}
+
 impl RecOr<Search> {
     pub fn new(path: Instance) -> Self {
         Self {

@@ -99,6 +99,34 @@ impl Searchable for RecAnd<Search> {
     }
 }
 
+impl<'a> crate::traits::Reportable for RecAnd<Match<'a>> {
+    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+        let mut children = Vec::new();
+        let mut current = self.child.as_ref();
+        let mut idx = 0;
+
+        while let Some(child) = current {
+            children.push(child.and.to_report(&format!("[{}]", idx)));
+            current = child.child.as_ref();
+            idx += 1;
+        }
+
+        crate::report::ReportNode {
+            name: name.to_string(),
+            type_name: "RecAnd".to_string(),
+            path: self.path.clone(),
+            details: Some(format!("Depth: {}", self.depth())),
+            source_loc: self.and.y.inner.get_source().unwrap_or_else(|| {
+                svql_subgraph::cell::SourceLocation {
+                    file: std::sync::Arc::from(""),
+                    lines: Vec::new(),
+                }
+            }),
+            children,
+        }
+    }
+}
+
 impl RecAnd<Search> {
     pub fn new(path: Instance) -> Self {
         Self {

@@ -12,6 +12,7 @@ use crate::{
     Match, Search, State, Wire,
     instance::Instance,
     ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
+    report::ReportNode,
 };
 
 /// Base trait for all query components
@@ -21,6 +22,10 @@ pub trait Component<S: State> {
 
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>>;
     fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>>;
+}
+
+pub trait Reportable {
+    fn to_report(&self, name: &str) -> ReportNode;
 }
 
 /// Trait for components that can be instantiated in the Search state.

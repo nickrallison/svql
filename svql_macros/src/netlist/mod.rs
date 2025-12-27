@@ -153,6 +153,37 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match<'a>> {
+            fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
+                use ::svql_query::svql_subgraph::cell::SourceLocation;
+
+                let mut all_lines = Vec::new();
+                let mut file_path = std::sync::Arc::from("");
+                let mut seen = std::collections::HashSet::new();
+
+                #(
+                    if let Some(loc) = self.#field_names.inner.get_source() {
+                        file_path = loc.file;
+                        for line in loc.lines {
+                            if seen.insert(line.number) {
+                                all_lines.push(line);
+                            }
+                        }
+                    }
+                )*
+                all_lines.sort_by_key(|l| l.number);
+
+                ::svql_query::report::ReportNode {
+                    name: name.to_string(),
+                    type_name: stringify!(#struct_name).to_string(),
+                    path: self.path.clone(),
+                    details: None,
+                    source_loc: SourceLocation { file: file_path, lines: all_lines },
+                    children: Vec::new(),
+                }
+            }
+        }
+
         impl ::svql_query::traits::netlist::NetlistMeta for #struct_name<::svql_query::Search> {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;

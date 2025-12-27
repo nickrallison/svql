@@ -248,6 +248,23 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match<'a>> {
+            fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
+                use ::svql_query::svql_subgraph::cell::SourceLocation;
+
+                match self {
+                    #(
+                        Self::#variant_names(inner) => {
+                            let mut node = inner.to_report(name);
+                            node.details = Some(stringify!(#variant_names).to_string());
+                            node
+                        }
+                    )*,
+                    _ => unreachable!("Abstract variant in report")
+                }
+            }
+        }
+
         impl ::svql_query::traits::Query for #enum_name<::svql_query::Search> {
             type Matched<'a> = #enum_name<::svql_query::Match<'a>>;
 

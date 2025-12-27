@@ -4,6 +4,7 @@ use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::ir::NaiveExecutor;
 use svql_query::security::cwe1234::Cwe1234;
+use svql_query::traits::Reportable;
 use svql_query::traits::{PlannedQuery, Query, Searchable};
 use tracing::{Level, info};
 
@@ -49,9 +50,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Found {} matches for old query", query_results.len());
 
-    for (i, match_) in query_results.iter().enumerate() {
-        info!("Match #{}: {:#?}", i, match_);
-        // Inspect match details if needed
+    for (i, match_inst) in query_results.iter().enumerate() {
+        let report = match_inst.to_report(&format!("[Match #{}]", i + 1));
+        println!("{}", report.render());
     }
 
     // info!(

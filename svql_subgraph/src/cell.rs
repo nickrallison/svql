@@ -275,6 +275,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SourceLocation {
     pub file: Arc<str>,
     pub lines: Vec<SourceLine>,
@@ -287,6 +288,7 @@ impl SourceLocation {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SourceLine {
     pub number: usize,
     pub start_column: usize,

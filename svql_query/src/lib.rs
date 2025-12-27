@@ -9,6 +9,7 @@ pub mod composites;
 pub mod instance;
 pub mod ir;
 pub mod primitives;
+pub mod report;
 pub mod security;
 pub mod traits;
 pub mod variants;
@@ -73,6 +74,24 @@ impl<S: State> Wire<S> {
 impl<'ctx> Wire<Match<'ctx>> {
     pub fn cell(&self) -> &CellWrapper<'ctx> {
         &self.inner
+    }
+}
+
+impl<'ctx> crate::traits::Reportable for Wire<Match<'ctx>> {
+    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+        crate::report::ReportNode {
+            name: name.to_string(),
+            type_name: "Wire".to_string(),
+            path: self.path.clone(),
+            details: None,
+            source_loc: self.inner.get_source().unwrap_or_else(|| {
+                svql_subgraph::cell::SourceLocation {
+                    file: std::sync::Arc::from(""),
+                    lines: Vec::new(),
+                }
+            }),
+            children: Vec::new(),
+        }
     }
 }
 

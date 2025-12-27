@@ -95,6 +95,30 @@ impl UnlockLogic<Search> {
     }
 }
 
+impl<'a> crate::traits::Reportable for UnlockLogic<Match<'a>> {
+    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+        let children = vec![
+            self.top_and.to_report("top_and"),
+            self.not_gate.to_report("not_gate"),
+            self.rec_or.to_report("rec_or"),
+        ];
+
+        crate::report::ReportNode {
+            name: name.to_string(),
+            type_name: "UnlockLogic".to_string(),
+            path: self.path.clone(),
+            details: None,
+            source_loc: self.top_and.y.inner.get_source().unwrap_or_else(|| {
+                svql_subgraph::cell::SourceLocation {
+                    file: std::sync::Arc::from(""),
+                    lines: Vec::new(),
+                }
+            }),
+            children,
+        }
+    }
+}
+
 impl Query for UnlockLogic<Search> {
     type Matched<'a> = UnlockLogic<Match<'a>>;
 

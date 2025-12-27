@@ -177,6 +177,28 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match<'a>> {
+            fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
+                use ::svql_query::svql_subgraph::cell::SourceLocation;
+
+                let children = vec![
+                    #( self.#query_names.to_report(stringify!(#query_names)) ),*
+                ];
+
+                ::svql_query::report::ReportNode {
+                    name: name.to_string(),
+                    type_name: stringify!(#struct_name).to_string(),
+                    path: self.#path_ident.clone(),
+                    details: None,
+                    source_loc: ::svql_query::svql_subgraph::cell::SourceLocation {
+                        file: std::sync::Arc::from(""),
+                        lines: Vec::new()
+                    },
+                    children,
+                }
+            }
+        }
+
         impl #struct_name<::svql_query::Search> {
             pub fn context(
                 driver: &::svql_query::svql_driver::Driver,
