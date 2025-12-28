@@ -2,20 +2,20 @@
 
 
 ## 1. Decompress Verilog netlist files
-gzip -d -k examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v.gz
-gzip -d -k examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v.gz
-gzip -d -k examples/fixtures/larger_designs/verilog/hackatdac18/soc_peripherals_netlist.v.gz
-gzip -d -k examples/fixtures/larger_designs/verilog/hackatdac18/udma_core_netlist.v.gz
-gzip -d -k examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_tile.v.gz
-gzip -d -k examples/fixtures/larger_designs/verilog/hummingbirdv2/e203_soc_netlist.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hackatdac18/soc_peripherals_netlist.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hackatdac18/udma_core_netlist.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_tile.v.gz
+gzip -d -k -f examples/fixtures/larger_designs/verilog/hummingbirdv2/e203_soc_netlist.v.gz
 
 ## 2. Decompress Json Netlist Files
-gzip -d -k examples/fixtures/larger_designs/json/hackatdac18/cv32e40p_fp_wrapper_netlist.json.gz
-gzip -d -k examples/fixtures/larger_designs/json/hackatdac18/soc_interconnect_wrap_netlist.json.gz
-gzip -d -k examples/fixtures/larger_designs/json/hackatdac18/soc_peripherals_netlist.json.gz
-gzip -d -k examples/fixtures/larger_designs/json/hackatdac18/udma_core_netlist.json.gz
-gzip -d -k examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json.gz
-gzip -d -k examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hackatdac18/cv32e40p_fp_wrapper_netlist.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hackatdac18/soc_interconnect_wrap_netlist.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hackatdac18/soc_peripherals_netlist.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hackatdac18/udma_core_netlist.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json.gz
+gzip -d -k -f examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json.gz
 
 # #### OPTIONAL, PREPARE JSON FROM VERILOG (NEED TABBYCAD)
 # ## 3. Convert Verilog netlist files to JSON using Yosys
