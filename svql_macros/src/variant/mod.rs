@@ -275,8 +275,13 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 key: &::svql_query::svql_driver::DriverKey,
                 config: &::svql_query::svql_common::Config
             ) -> Vec<Self::Matched<'a>> {
+                use ::svql_query::traits::Component;
+                ::svql_query::tracing::info!("{} searching variants", self.log_label());
+
                 let mut all_results = Vec::new();
                 #(#query_blocks)*
+
+                ::svql_query::tracing::info!("{} found {} total matches across variants", self.log_label(), all_results.len());
                 all_results
             }
         }

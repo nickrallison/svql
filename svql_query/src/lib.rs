@@ -20,6 +20,7 @@ pub use itertools;
 pub use svql_common;
 pub use svql_driver;
 pub use svql_subgraph;
+pub use tracing;
 
 use crate::traits::Component;
 

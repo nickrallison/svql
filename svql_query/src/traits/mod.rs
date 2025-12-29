@@ -22,6 +22,10 @@ pub trait Component<S: State> {
 
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>>;
     fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>>;
+
+    fn log_label(&self) -> String {
+        format!("[{} @ {}]", self.type_name(), self.path().inst_path())
+    }
 }
 
 pub trait Reportable {

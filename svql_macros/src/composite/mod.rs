@@ -220,11 +220,12 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 key: &::svql_query::svql_driver::DriverKey,
                 config: &::svql_query::svql_common::Config
             ) -> Vec<Self::Matched<'a>> {
-                use ::svql_query::traits::Topology;
+                use ::svql_query::traits::{Component, Topology};
+                ::svql_query::tracing::info!("{} searching composite", self.log_label());
 
                 #(#query_calls)*
 
-                #iproduct_macro( #(#iter_vars),* )
+                let results: Vec<_> = #iproduct_macro( #(#iter_vars),* )
                     .map(|( #(#iter_vars),* )| {
                         #struct_name {
                             #path_ident: self.#path_ident.clone(),
@@ -253,7 +254,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         true
                     })
-                    .collect()
+                    .collect();
+
+                ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
+                results
             }
         }
 

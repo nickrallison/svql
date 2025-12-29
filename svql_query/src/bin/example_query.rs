@@ -18,14 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = std::env::args().collect::<Vec<String>>();
 
-    let design_path: &str = args.get(1).map(|s| s.as_str()).unwrap_or(
-        "examples/fixtures/larger_designs/json/hackatdac18/soc_interconnect_wrap_netlist.json",
-    );
-
-    let design_module: &str = args
-        .get(2)
+    let design_path: &str = args
+        .get(1)
         .map(|s| s.as_str())
-        .unwrap_or("soc_interconnect_wrap");
+        .unwrap_or("examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json");
+
+    let design_module: &str = args.get(2).map(|s| s.as_str()).unwrap_or("e203_soc_top");
 
     let max_recursion_depth: usize = args
         .get(3)

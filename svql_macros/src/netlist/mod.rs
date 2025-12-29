@@ -216,7 +216,8 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 key: &::svql_query::svql_driver::DriverKey,
                 config: &::svql_query::svql_common::Config
             ) -> Vec<Self::Matched<'a>> {
-                use ::svql_query::traits::netlist::NetlistMeta;
+                use ::svql_query::traits::{Component, netlist::NetlistMeta};
+                ::svql_query::tracing::info!("{} searching netlist", self.log_label());
 
                 let needle_key = Self::driver_key();
                 let needle_container = context.get(&needle_key)
@@ -239,12 +240,15 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     config,
                 );
 
-                embeddings.items.iter().map(|embedding| {
+                let results: Vec<_> = embeddings.items.iter().map(|embedding| {
                     #struct_name {
                         path: self.path.clone(),
                         #(#field_matches),*
                     }
-                }).collect()
+                }).collect();
+
+                ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
+                results
             }
         }
 
