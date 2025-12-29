@@ -1,28 +1,5 @@
 # TODO
 
-## Source Printing
-
-[Match #1] CWE-1234: Unlock Logic Bypass
-Path: cwe1234
-+-- unlock_logic (UnlockLogic)
-|   +-- top_and (AndGate): hardware/lib/auth.v:
-|       142 | assign auth_en = bypass_or & key_valid;
-|   +-- not_gate (NotGate): hardware/lib/auth.v:
-|       138 | assign bypass_not = !lock_signal;
-|   +-- rec_or (RecOr, Depth: 3)
-|       +-- [0] (OrGate): hardware/lib/auth.v:
-|           130 | assign bypass_or = stage2_or | bypass_not;
-|       +-- [1] (OrGate): hardware/lib/auth.v:
-|           125 | assign stage2_or = stage1_or | debug_en;
-|       +-- [2] (OrGate): hardware/lib/auth.v:
-|           120 | assign stage1_or = config_bit | force_unlock;
-+-- locked_register (LockedRegister: AsyncEn)
-    +-- reg (AsyncDffEnable): hardware/soc/regs.v:
-        512 | always @(posedge clk or negedge resetn) begin
-        513 |     if (!resetn) data_out <= 0;
-        514 |     else if (write_en) data_out <= data_in;
-        515 | end
-
 ## DSL & Query Expressivity
 
 - [ ] **Lambda / Procedural Queries**
