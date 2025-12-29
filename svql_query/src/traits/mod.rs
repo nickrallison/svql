@@ -1,9 +1,13 @@
+//! Core traits for query components and execution.
+//!
+//! Defines the interfaces that all netlists, composites, and variants must
+//! implement to participate in the SVQL query system.
+
 pub mod composite;
 pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
-
 use svql_common::Config;
 use svql_driver::{Context, DriverKey};
 use svql_subgraph::GraphIndex;
@@ -15,33 +19,44 @@ use crate::{
     report::ReportNode,
 };
 
-/// Base trait for all query components
+/// Base trait for all query components.
 pub trait Component<S: State> {
+    /// Returns the hierarchical path of the component.
     fn path(&self) -> &Instance;
+
+    /// Returns the static type name of the component.
     fn type_name(&self) -> &'static str;
 
+    /// Finds a port wire by its absolute hierarchical path.
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>>;
+
+    /// Finds a port wire by its relative path segments.
     fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>>;
 
+    /// Returns a formatted label for logging.
     fn log_label(&self) -> String {
         format!("[{} @ {}]", self.type_name(), self.path().inst_path())
     }
 }
 
+/// Trait for components that can generate a hierarchical report.
 pub trait Reportable {
+    /// Converts the component match into a report node.
     fn to_report(&self, name: &str) -> ReportNode;
 }
 
 /// Trait for components that can be instantiated in the Search state.
 pub trait Searchable: Sized + Component<Search> {
+    /// Creates a new instance of the component at the given path.
     fn instantiate(base_path: Instance) -> Self;
 }
 
-/// Legacy Query trait: Compatible with existing macros/manual impls.
+/// Interface for executing queries using the legacy backtracking engine.
 pub trait Query: Component<Search> + Searchable {
+    /// The type returned when a match is found.
     type Matched<'a>: Component<Match<'a>>;
 
-    /// Legacy query dispatcher (current implementation).
+    /// Executes the query against a design context.
     fn query<'a>(
         &self,
         driver: &::svql_driver::Driver,
@@ -51,33 +66,34 @@ pub trait Query: Component<Search> + Searchable {
     ) -> Vec<Self::Matched<'a>>;
 }
 
-/// PlannedQuery trait: Enables optimized planner execution.
+/// Interface for executing queries using the optimized IR planner.
 pub trait PlannedQuery: Query {
-    /// Generate LogicalPlan tree for this query.
+    /// Generates the logical plan tree for this query.
     fn to_ir(&self, _config: &Config) -> LogicalPlan {
-        todo!("PlannedQuery::to_ir: Generate plan tree (e.g., Scan/Join from structure)")
+        panic!("PlannedQuery::to_ir not implemented for this component")
     }
 
-    /// Canonical DAG (shared subplans).
+    /// Generates a canonical DAG from the logical plan.
     fn dag_ir(&self, config: &Config) -> QueryDag {
         crate::ir::canonicalize_to_dag(self.to_ir(config))
     }
 
-    /// Reconstruct Matched from flat execution result cursor.
+    /// Reconstructs a structured match from a flat result cursor.
     fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
-        todo!("PlannedQuery::reconstruct: Build Matched from cursor cells/variants")
+        panic!("PlannedQuery::reconstruct not implemented for this component")
     }
 
-    /// Map relative path (e.g., ["logic", "y"]) to schema column index.
+    /// Maps a relative path to a schema column index.
     fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
         None
     }
 
-    /// Expected output schema (column paths).
+    /// Returns the expected output schema for this query.
     fn expected_schema(&self) -> Schema {
         Schema { columns: vec![] }
     }
 
+    /// Executes the query using the provided planner and executor.
     fn query_planned<'a, 'b, T: Executor>(
         &self,
         executor: &'b T,
@@ -105,7 +121,7 @@ pub trait PlannedQuery: Query {
 pub use composite::{ConnectionBuilder, Topology};
 pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
 
-/// Validate connection in haystack
+/// Validates that a physical connection exists between two matched wires in the haystack.
 pub fn validate_connection<'ctx>(
     from: &Wire<Match<'ctx>>,
     to: &Wire<Match<'ctx>>,

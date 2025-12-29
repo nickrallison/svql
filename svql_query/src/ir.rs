@@ -1,30 +1,40 @@
-//! Intermediate Representation for Queries (DAG-Optimized)
+//! Intermediate Representation for Queries.
+//!
+//! Defines the logical plan nodes and execution structures used to optimize
+//! and run complex hardware queries.
 
 use ahash::AHashMap;
 use svql_common::Config;
 use svql_driver::{Context, DriverKey};
 use svql_subgraph::cell::CellWrapper;
 
+/// Defines the column structure of a query result.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Schema {
+    /// List of column names (usually wire paths).
     pub columns: Vec<String>,
 }
 
+/// Unique identifier for a node within a query DAG.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PlanNodeId(pub usize);
 
+/// Logical operations within a query plan.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlanNode {
+    /// Scans a design for a specific netlist pattern.
     Scan {
         key: DriverKey,
         config: Config,
         schema: Schema,
     },
+    /// Joins multiple sub-queries based on connectivity constraints.
     Join {
         input_ids: Vec<PlanNodeId>,
         constraints: Vec<JoinConstraint>,
         schema: Schema,
     },
+    /// Combines results from multiple query variants.
     Union {
         input_ids: Vec<PlanNodeId>,
         schema: Schema,
@@ -32,6 +42,7 @@ pub enum LogicalPlanNode {
     },
 }
 
+/// A directed acyclic graph representing a query execution plan.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct QueryDag {
     pub nodes: Vec<LogicalPlanNode>,
@@ -39,14 +50,18 @@ pub struct QueryDag {
 }
 
 impl QueryDag {
+    /// Retrieves a node by its ID.
     pub fn node(&self, id: PlanNodeId) -> &LogicalPlanNode {
         &self.nodes[id.0]
     }
+
+    /// Returns the root node of the DAG.
     pub fn root_node(&self) -> &LogicalPlanNode {
         self.node(self.root)
     }
 }
 
+/// Recursive tree representation of a logical plan.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalPlan {
     Scan {
@@ -66,12 +81,16 @@ pub enum LogicalPlan {
     },
 }
 
+/// Constraints used to filter join results.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum JoinConstraint {
+    /// Requires two wires to be the same physical cell.
     Eq((usize, usize), (usize, usize)),
+    /// Requires at least one of the provided pairs to be the same physical cell.
     Or(Vec<((usize, usize), (usize, usize))>),
 }
 
+/// Converts a recursive logical plan into a deduplicated DAG.
 pub fn canonicalize_to_dag(root_plan: LogicalPlan) -> QueryDag {
     let mut node_map: AHashMap<LogicalPlan, PlanNodeId> = AHashMap::new();
     let mut nodes = Vec::new();
@@ -142,17 +161,22 @@ fn canonicalize_rec(
     id
 }
 
+/// A single row of a query result in flattened format.
 #[derive(Clone, Debug)]
 pub struct FlatResult<'a> {
+    /// Cells corresponding to the schema columns.
     pub cells: Vec<CellWrapper<'a>>,
+    /// Indices of chosen variants for Union nodes.
     pub variant_choices: Vec<usize>,
 }
 
+/// The complete result set of a query execution.
 pub struct ExecutionResult<'a> {
     pub schema: Schema,
     pub rows: Vec<FlatResult<'a>>,
 }
 
+/// Helper to traverse a flat result row and reconstruct structured objects.
 #[derive(Debug)]
 pub struct ResultCursor<'a> {
     row: FlatResult<'a>,
@@ -162,6 +186,7 @@ pub struct ResultCursor<'a> {
 }
 
 impl<'a> ResultCursor<'a> {
+    /// Creates a new cursor for a result row.
     pub fn new(row: FlatResult<'a>, mapping: Vec<usize>) -> Self {
         Self {
             row,
@@ -170,11 +195,15 @@ impl<'a> ResultCursor<'a> {
             variant_ptr: 0,
         }
     }
+
+    /// Retrieves the next cell from the row based on the schema mapping.
     pub fn next_cell(&mut self) -> CellWrapper<'a> {
         let idx = self.mapping[self.logical_ptr];
         self.logical_ptr += 1;
         self.row.cells[idx].clone()
     }
+
+    /// Retrieves the next variant index from the row.
     pub fn next_variant(&mut self) -> usize {
         let v = self.row.variant_choices[self.variant_ptr];
         self.variant_ptr += 1;
@@ -182,7 +211,9 @@ impl<'a> ResultCursor<'a> {
     }
 }
 
+/// Interface for executing query plans.
 pub trait Executor {
+    /// Executes a query DAG against a design context.
     fn execute_dag<'a>(
         &self,
         dag: &QueryDag,
@@ -192,6 +223,7 @@ pub trait Executor {
     ) -> ExecutionResult<'a>;
 }
 
+/// A simple, non-optimized query executor.
 #[derive(Debug)]
 pub struct NaiveExecutor;
 
@@ -232,18 +264,14 @@ impl NaiveExecutor {
                 config: node_config,
                 schema,
             } => {
-                let needle_container = ctx.get(key).unwrap();
-                let haystack_container = ctx.get(haystack_key).unwrap();
-                let needle = needle_container.design();
-                let haystack = haystack_container.design();
-                let needle_index = needle_container.index();
-                let haystack_index = haystack_container.index();
-
+                let needle_container = ctx.get(key).expect("Pattern design missing from context");
+                let haystack_container = ctx.get(haystack_key).expect("Haystack design missing from context");
+                
                 let embeddings = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
-                    needle,
-                    haystack,
-                    needle_index,
-                    haystack_index,
+                    needle_container.design(),
+                    haystack_container.design(),
+                    needle_container.index(),
+                    haystack_container.index(),
                     node_config,
                 );
 
@@ -258,7 +286,7 @@ impl NaiveExecutor {
                                 ::svql_query::traits::netlist::resolve_wire(
                                     embedding,
                                     &embeddings,
-                                    needle,
+                                    needle_container.design(),
                                     wire_name,
                                 )
                             })
@@ -336,8 +364,7 @@ impl NaiveExecutor {
         }
     }
 
-    /// Helper to compute the Cartesian product of vectors of FlatResult.
-    /// Returns a vector of vectors, where each inner vector is a combination of one FlatResult from each input vector.
+    /// Computes the Cartesian product of multiple result sets.
     fn cartesian_product<'a>(results: &[Vec<FlatResult<'a>>]) -> Vec<Vec<FlatResult<'a>>> {
         if results.is_empty() {
             return vec![vec![]];
@@ -359,6 +386,7 @@ impl NaiveExecutor {
     }
 }
 
+/// Computes the mapping between expected schema columns and actual result indices.
 pub fn compute_schema_mapping(expected: &Schema, _actual: &Schema) -> Vec<usize> {
     (0..expected.columns.len()).collect()
 }

@@ -1,50 +1,67 @@
-//! Helper functions for binding query ports to matches.
+//! Utilities for binding query ports to design matches.
 //!
-//! This module provides functions to bind input and output ports of a query
-//! to the corresponding cells in the matched design.
+//! Provides functions to map named ports and bit indices from a pattern
+//! to the corresponding cells discovered during subgraph isomorphism.
 
 use std::collections::HashMap;
-
 use crate::Match;
 use svql_subgraph::{SingleAssignment, cell::CellWrapper};
 use tracing::debug;
 
-/// Binds a named input port bit to a match.
+/// Binds a named input port bit from a pattern to a design match.
+///
+/// # Arguments
+/// * `assignment` - The mapping between pattern cells and design cells.
+/// * `name` - The name of the input port.
+/// * `bit_index` - The bit index within the port.
+/// * `input_fanout` - Map of port names to their fan-out cell references in the pattern.
 pub fn bind_input<'ctx>(
-    m: &SingleAssignment<'ctx, 'ctx>,
+    assignment: &SingleAssignment<'ctx, 'ctx>,
     name: &str,
-    bit: usize,
-    input_fanout_by_name: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
+    bit_index: usize,
+    input_fanout: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
 ) -> Match<'ctx> {
-    let pat = input_fanout_by_name.get(name).cloned().unwrap();
-    let pat_first = &pat[0].0;
-    let des = m.get_haystack_cell(pat_first.clone()).unwrap();
+    let pattern_cells = input_fanout.get(name).expect("Input port not found in pattern");
+    let pattern_cell = &pattern_cells[bit_index].0;
+    let design_cell = assignment.get_haystack_cell(pattern_cell.clone())
+        .expect("Pattern cell not found in assignment");
+
     debug!(
-        "bind_input {} bit {} to des {:?} pat: {:?}",
-        name, bit, des, pat
+        "Binding input {} bit {} to design cell {:?} (pattern: {:?})",
+        name, bit_index, design_cell, pattern_cell
     );
+
     Match {
-        pat_node_ref: Some(pat_first.clone()),
-        design_node_ref: Some(des),
+        pat_node_ref: Some(pattern_cell.clone()),
+        design_node_ref: Some(design_cell),
     }
 }
 
-/// Binds a named output port bit to a match.
+/// Binds a named output port bit from a pattern to a design match.
+///
+/// # Arguments
+/// * `assignment` - The mapping between pattern cells and design cells.
+/// * `name` - The name of the output port.
+/// * `bit_index` - The bit index within the port.
+/// * `output_fanin` - Map of port names to their fan-in cell references in the pattern.
 pub fn bind_output<'ctx>(
-    m: &SingleAssignment<'ctx, 'ctx>,
+    assignment: &SingleAssignment<'ctx, 'ctx>,
     name: &str,
-    bit: usize,
-    output_fanin_by_name: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
+    bit_index: usize,
+    output_fanin: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
 ) -> Match<'ctx> {
-    let pat = output_fanin_by_name.get(name).cloned().unwrap();
-    let pat_first = &pat[0].0;
-    let des = m.get_haystack_cell(pat_first.clone()).unwrap();
+    let pattern_cells = output_fanin.get(name).expect("Output port not found in pattern");
+    let pattern_cell = &pattern_cells[bit_index].0;
+    let design_cell = assignment.get_haystack_cell(pattern_cell.clone())
+        .expect("Pattern cell not found in assignment");
+
     debug!(
-        "bind_output {} bit {} to des {:?} pat: {:?}",
-        name, bit, des, pat
+        "Binding output {} bit {} to design cell {:?} (pattern: {:?})",
+        name, bit_index, design_cell, pattern_cell
     );
+
     Match {
-        pat_node_ref: Some(pat_first.clone()),
-        design_node_ref: Some(des),
+        pat_node_ref: Some(pattern_cell.clone()),
+        design_node_ref: Some(design_cell),
     }
 }
