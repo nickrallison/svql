@@ -1,7 +1,8 @@
-//! The main driver for SVQL execution.
+//! The driver crate manages the lifetimes of hardware designs and their associated indices.
 //!
-//! This crate manages the execution context, design containers, and the overall
-//! driver logic for processing SVQL queries.
+//! It provides a registry to prevent redundant reloading of netlists,
+//! manages design loading and caching, and the creation
+//! of execution contexts.
 
 pub mod context;
 pub mod design_container;

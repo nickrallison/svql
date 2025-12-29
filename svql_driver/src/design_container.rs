@@ -1,12 +1,10 @@
-//! Container for holding a design and its graph index.
+//! Storage container for designs and their structural indices.
 
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
 use svql_subgraph::graph_index::GraphIndex;
 
-/// A self-referencing struct that holds a `Design` and its corresponding `GraphIndex`.
-///
-/// The `GraphIndex` borrows from the `Design`, so they must be kept together.
+/// A self-referencing container that pairs a netlist with its graph index.
 #[self_referencing]
 pub struct DesignContainer {
     design: Design,
@@ -25,6 +23,7 @@ impl std::fmt::Debug for DesignContainer {
 }
 
 impl DesignContainer {
+    /// Constructs a new container and builds the graph index for the provided design.
     pub fn build(design: Design) -> Self {
         DesignContainerBuilder {
             design,
@@ -33,10 +32,12 @@ impl DesignContainer {
         .build()
     }
 
+    /// Returns a reference to the underlying netlist design.
     pub fn design(&self) -> &Design {
         self.borrow_design()
     }
 
+    /// Returns a reference to the structural graph index.
     pub fn index(&self) -> &GraphIndex<'_> {
         self.borrow_index()
     }
