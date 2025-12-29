@@ -189,6 +189,22 @@ impl YosysModule {
         })
     }
 
+    /// Imports the design without any preprocessing by Yosys.
+    pub fn import_design_raw(
+        &self,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
+
+        designs.remove(self.module_name()).ok_or_else(|| {
+            format!(
+                "Module '{}' not found in Yosys output for {}",
+                self.module_name(),
+                self.path().display()
+            )
+            .into()
+        })
+    }
+
     /// Writes the processed design in RTLIL format to the specified path.
     pub fn write_rtlil_to_path(
         &self,
