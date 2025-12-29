@@ -26,20 +26,20 @@ pub trait NetlistMeta {
 }
 
 pub fn resolve_wire<'a>(
-    embedding: &SingleAssignment<'a, 'a>,
-    embedding_set: &AssignmentSet<'a, 'a>,
+    assignment: &SingleAssignment<'a, 'a>,
+    assignment_set: &AssignmentSet<'a, 'a>,
     _needle: &Design,
     wire_name: &str,
 ) -> Option<CellWrapper<'a>> {
-    if let Some(drivers) = embedding_set.needle_output_fanin_by_name.get(wire_name) {
+    if let Some(drivers) = assignment_set.needle_output_fanin_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = drivers.first() {
-            return embedding.get_haystack_cell(needle_cell.clone());
+            return assignment.get_haystack_cell(needle_cell.clone());
         }
     }
 
-    if let Some(sinks) = embedding_set.needle_input_fanout_by_name.get(wire_name) {
+    if let Some(sinks) = assignment_set.needle_input_fanout_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = sinks.first() {
-            return embedding.get_haystack_cell(needle_cell.clone());
+            return assignment.get_haystack_cell(needle_cell.clone());
         }
     }
 

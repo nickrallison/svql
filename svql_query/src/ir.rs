@@ -269,7 +269,7 @@ impl NaiveExecutor {
                     .get(haystack_key)
                     .expect("Haystack design missing from context");
 
-                let embeddings = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+                let assignments = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle_container.design(),
                     haystack_container.design(),
                     needle_container.index(),
@@ -277,17 +277,17 @@ impl NaiveExecutor {
                     node_config,
                 );
 
-                embeddings
+                assignments
                     .items
                     .iter()
-                    .map(|embedding| {
+                    .map(|assignment| {
                         let cells = schema
                             .columns
                             .iter()
                             .filter_map(|wire_name| {
                                 ::svql_query::traits::netlist::resolve_wire(
-                                    embedding,
-                                    &embeddings,
+                                    assignment,
+                                    &assignments,
                                     needle_container.design(),
                                     wire_name,
                                 )

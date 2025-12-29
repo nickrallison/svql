@@ -66,7 +66,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             config,
         };
 
-        matcher.enumerate_embeddings()
+        matcher.enumerate_assignments()
     }
 
     /// Performs a subgraph isomorphism search using pre-built indices.
@@ -86,13 +86,13 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             haystack_index,
             config,
         };
-        matcher.enumerate_embeddings()
+        matcher.enumerate_assignments()
     }
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
-    /// Executes the subgraph matching process and returns the set of all found embeddings.
-    pub fn enumerate_embeddings(&self) -> AssignmentSet<'needle, 'haystack> {
+    /// Executes the subgraph matching process and returns the set of all found mappings.
+    pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
         let (input_queue, gate_queue) = self.prepare_search_queues();
         let initial_assignment = SingleAssignment::new();
 
@@ -275,7 +275,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             .collect()
     }
 
-    /// Removes duplicate embeddings based on the configured deduplication strategy.
+    /// Removes duplicate assignments based on the configured deduplication strategy.
     fn apply_deduplication(&self, results: &mut Vec<SingleAssignment<'needle, 'haystack>>) {
         if self.config.dedupe.all() {
             let mut seen = HashSet::new();

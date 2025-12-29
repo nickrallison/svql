@@ -81,11 +81,11 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 #ident: ::svql_query::Wire::new(
                     self.#ident.path().clone(),
                     ::svql_query::traits::netlist::resolve_wire(
-                        embedding,
-                        &embeddings,
+                        assignment,
+                        &assignments,
                         needle,
                         #wire_name
-                    ).expect(&format!("Wire {} not found in embedding", #wire_name))
+                    ).expect(&format!("Wire {} not found in assignment", #wire_name))
                 )
             });
 
@@ -232,7 +232,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let needle_index = needle_container.index();
                 let haystack_index = haystack_container.index();
 
-                let embeddings = ::svql_query::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+                let assignments = ::svql_query::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle,
                     haystack,
                     needle_index,
@@ -240,7 +240,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     config,
                 );
 
-                let results: Vec<_> = embeddings.items.iter().map(|embedding| {
+                let results: Vec<_> = assignments.items.iter().map(|assignment| {
                     #struct_name {
                         path: self.path.clone(),
                         #(#field_matches),*

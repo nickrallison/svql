@@ -1,6 +1,6 @@
 //! Subgraph matching and graph algorithms for SVQL.
 //!
-//! This crate implements the core subgraph isomorphism algorithms, embedding logic,
+//! This crate implements the core subgraph isomorphism algorithms, mapping logic,
 //! and graph indexing used to match patterns against designs.
 
 #![allow(dead_code)]
