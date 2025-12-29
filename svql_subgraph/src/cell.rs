@@ -7,7 +7,7 @@ use std::{borrow::Cow, fmt::Debug};
 
 use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
-/// Enumeration of supported cell types for matching.
+/// Categorizes netlist primitives into known types for matching.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CellKind {
     Buf,
@@ -48,6 +48,7 @@ pub enum CellKind {
 }
 
 impl CellKind {
+    /// Returns true if the cell represents a combinational or sequential logic gate.
     pub fn is_logic_gate(&self) -> bool {
         matches!(
             self,
@@ -87,6 +88,7 @@ impl CellKind {
         matches!(self, CellKind::Output)
     }
 
+    /// Returns true if the inputs to this cell can be swapped without changing logic.
     pub fn has_commutative_inputs(&self) -> bool {
         matches!(
             self,
@@ -141,7 +143,7 @@ impl std::fmt::Display for CellKind {
     }
 }
 
-/// A lightweight index wrapper for cells.
+/// A lightweight index wrapper for cells within a GraphIndex.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CellIndex {
     idx: usize,
@@ -158,7 +160,7 @@ impl CellIndex {
     }
 }
 
-/// A wrapper around a cell reference that provides equality and hashing based on debug index.
+/// A wrapper around a netlist cell that provides stable identity and metadata access.
 #[derive(Clone)]
 pub struct CellWrapper<'a> {
     cell: Cow<'a, Cell>,
@@ -194,9 +196,11 @@ impl<'a> CellWrapper<'a> {
     pub fn cell_type(&self) -> CellKind {
         CellKind::from(self.cell.as_ref())
     }
+
     pub fn get(&'a self) -> &'a Cell {
         self.cell.as_ref()
     }
+
     pub fn debug_index(&self) -> usize {
         self.debug_index
     }
@@ -220,17 +224,16 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
-    /// Extracts structured source location information from cell metadata.
+    /// Extracts source location information from cell metadata if available.
     pub fn get_source(&self) -> Option<SourceLocation> {
         match self.metadata.get() {
             MetaItem::Source { file, start, end } => {
-                let file_path = file.get();
                 let lines = (start.line..=end.line)
-                    .map(|ln| self.get_source_line(ln, start, end))
+                    .map(|ln| self.calculate_line_span(ln, start, end))
                     .collect();
 
                 Some(SourceLocation {
-                    file: file_path,
+                    file: file.get(),
                     lines,
                 })
             }
@@ -238,8 +241,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
-    /// Calculates column bounds for a specific line within a source span.
-    fn get_source_line(
+    fn calculate_line_span(
         &self,
         line_num: u32,
         start: SourcePosition,
@@ -254,7 +256,7 @@ impl<'a> CellWrapper<'a> {
         let end_column = if line_num == end.line {
             end.column as usize
         } else {
-            0 // 0 indicates the span continues to the end of the line
+            0
         };
 
         SourceLine {
@@ -275,6 +277,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
     }
 }
 
+/// Represents a physical location in the source code.
 #[derive(Debug, Clone)]
 pub struct SourceLocation {
     pub file: Arc<str>,
@@ -282,21 +285,17 @@ pub struct SourceLocation {
 }
 
 impl SourceLocation {
-    /// Formats the source location for display in reports.
+    /// Formats the source location for pretty-printed reports.
     pub fn report(&self) -> String {
-        if self.lines.is_empty() {
-            return format!("{}:<unknown>", self.file);
-        }
-        let first = self.lines.first().unwrap().number;
-        let last = self.lines.last().unwrap().number;
-        if first == last {
-            format!("{}:{}", self.file, first)
-        } else {
-            format!("{}:{}-{}", self.file, first, last)
+        match self.lines.as_slice() {
+            [] => format!("{}:<unknown>", self.file),
+            [single] => format!("{}:{}", self.file, single.number),
+            [first, .., last] => format!("{}:{}-{}", self.file, first.number, last.number),
         }
     }
 }
 
+/// Represents a specific line and column range within a source file.
 #[derive(Debug, Clone)]
 pub struct SourceLine {
     pub number: usize,
@@ -305,7 +304,6 @@ pub struct SourceLine {
 }
 
 impl SourceLine {
-    /// Returns a summary string of the line and column range.
     pub fn report(&self) -> String {
         if self.end_column == 0 {
             format!("Line {}, Col {}+", self.number, self.start_column)

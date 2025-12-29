@@ -22,6 +22,8 @@ enum OutputFormat {
 }
 
 impl YosysModule {
+    /// Creates a new YosysModule reference.
+    /// Resolves relative paths against the workspace root.
     pub fn new(path: &str, module: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let design_path = Path::new(path);
@@ -51,7 +53,8 @@ impl YosysModule {
         &self.module
     }
 
-    fn build_yosys_args(
+    /// Generates the sequence of Yosys commands required to process the design.
+    fn generate_yosys_args(
         &self,
         output_path: &Path,
         config: &ModuleConfig,
@@ -122,36 +125,28 @@ impl YosysModule {
         };
         args.push(write_cmd);
 
-        tracing::trace!("Yosys args for {}: {:?}", self.path().display(), args);
-
         args
     }
 
-    fn run_yosys_command(
+    /// Executes the Yosys process with the provided arguments.
+    fn execute_yosys(
         &self,
         args: Vec<String>,
-        yosys: &Path,
+        yosys_binary: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::new(yosys);
-        cmd.args(args)
+        let output = Command::new(yosys_binary)
+            .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        let output = cmd.output()?;
+            .stderr(Stdio::piped())
+            .output()?;
 
         if !output.status.success() {
-            let stdout_str = String::from_utf8_lossy(&output.stdout);
-            let stderr_str = String::from_utf8_lossy(&output.stderr);
-            tracing::event!(
-                tracing::Level::ERROR,
-                "Yosys failed: status={:?}\n{}",
-                output.status,
-                stderr_str,
-            );
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(format!(
-                "Yosys failed: status={:?}\nstdout: {}\n stderr: {}",
-                output.status, stdout_str, stderr_str
+                "Yosys execution failed: {}\nSTDOUT: {}\nSTDERR: {}",
+                output.status, stdout, stderr
             )
             .into());
         }
@@ -159,81 +154,65 @@ impl YosysModule {
         Ok(())
     }
 
+    /// Imports the design into the internal netlist format by invoking Yosys.
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,
     ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
-        let yosys = which::which("yosys").map_err(|_| "yosys not found on path")?;
+        let yosys = which::which("yosys").map_err(|_| "yosys binary not found in PATH")?;
         self.import_design_yosys(module_config, &yosys)
     }
 
+    /// Imports the design using a specific Yosys binary path.
     pub fn import_design_yosys(
         &self,
         module_config: &ModuleConfig,
-        yosys: &Path,
+        yosys_binary: &Path,
     ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
-        let json_temp_file = tempfile::Builder::new()
-            .prefix("svql_prjunnamed_")
+        let json_temp = tempfile::Builder::new()
+            .prefix("svql_")
             .suffix(".json")
-            .rand_bytes(4)
             .tempfile()?;
 
-        let args = self.build_yosys_args(json_temp_file.path(), module_config, OutputFormat::Json);
-        self.run_yosys_command(args, yosys)?;
+        let args = self.generate_yosys_args(json_temp.path(), module_config, OutputFormat::Json);
+        self.execute_yosys(args, yosys_binary)?;
 
-        let mut designs =
-            prjunnamed_yosys_json::import(None, &mut File::open(json_temp_file.path())?)?;
+        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp.path())?)?;
 
-        let design = designs.remove(self.module_name()).ok_or_else(|| {
+        designs.remove(self.module_name()).ok_or_else(|| {
             format!(
-                "Design not found in Yosys JSON output: {}",
+                "Module '{}' not found in Yosys output for {}",
+                self.module_name(),
                 self.path().display()
             )
-        })?;
-
-        Ok(design)
+            .into()
+        })
     }
 
-    pub fn import_design_raw(
-        &self,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
-        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
-
-        let design = designs.remove(self.module_name()).ok_or_else(|| {
-            format!(
-                "Design not found in Yosys JSON output: {}",
-                self.path().display()
-            )
-        })?;
-
-        Ok(design)
-    }
-
+    /// Writes the processed design in RTLIL format to the specified path.
     pub fn write_rtlil_to_path(
         &self,
         config: &ModuleConfig,
-        yosys: &Path,
+        yosys_binary: &Path,
         rtlil_out: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let args = self.build_yosys_args(rtlil_out, config, OutputFormat::Rtlil);
-
-        self.run_yosys_command(args, yosys)
+        let args = self.generate_yosys_args(rtlil_out, config, OutputFormat::Rtlil);
+        self.execute_yosys(args, yosys_binary)
     }
 
+    /// Writes the processed design in RTLIL format to standard output.
     pub fn write_rtlil_to_stdout(
         &self,
         config: &ModuleConfig,
-        yosys: &Path,
+        yosys_binary: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let rtlil_temp_file = tempfile::Builder::new()
-            .prefix("svql_rtlil_")
+        let rtlil_temp = tempfile::Builder::new()
+            .prefix("svql_")
             .suffix(".il")
-            .rand_bytes(4)
             .tempfile()?;
 
-        self.write_rtlil_to_path(config, rtlil_temp_file.path(), yosys)?;
-
-        let content = std::fs::read_to_string(rtlil_temp_file.path())?;
+        self.write_rtlil_to_path(config, yosys_binary, rtlil_temp.path())?;
+        let content = std::fs::read_to_string(rtlil_temp.path())?;
         print!("{}", content);
 
         Ok(())
