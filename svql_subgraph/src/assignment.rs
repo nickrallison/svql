@@ -2,18 +2,26 @@
 
 use std::collections::HashMap;
 
-use crate::cell::CellWrapper;
+use crate::cell::{CellKind, CellWrapper};
+
+/// A collection of embeddings found during a search.
+#[derive(Clone, Debug, Default)]
+pub struct AssignmentSet<'needle, 'haystack> {
+    pub items: Vec<SingleAssignment<'needle, 'haystack>>,
+    pub needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+    pub needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+}
 
 /// Maintains the current state of cell assignments during the search.
 #[derive(Clone, Debug, Default)]
-pub struct Assignment<'needle, 'haystack> {
+pub struct SingleAssignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
     needle_to_haystack: HashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
     /// Design to Pattern cell mapping
     haystack_to_needle: HashMap<CellWrapper<'haystack>, CellWrapper<'needle>>,
 }
 
-impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
+impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: HashMap::new(),
@@ -74,6 +82,20 @@ impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
         &self.needle_to_haystack
     }
 
+    pub fn debug_print(&self) {
+        let mapping = self.needle_mapping();
+        for (pat_cell, des_cell) in mapping {
+            println!(
+                "{}: {:?} -> {}: {:?}",
+                pat_cell.debug_index(),
+                pat_cell.get(),
+                des_cell.debug_index(),
+                des_cell.get()
+            );
+        }
+        println!("--------------------------------------------------------")
+    }
+
     pub(super) fn signature(&self) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .needle_to_haystack
@@ -82,6 +104,17 @@ impl<'needle, 'haystack> Assignment<'needle, 'haystack> {
             .collect();
         sig.sort_unstable();
         sig.dedup();
+        sig
+    }
+
+    pub fn internal_signature(&self) -> Vec<usize> {
+        let mut sig: Vec<usize> = self
+            .needle_mapping()
+            .iter()
+            .filter(|(p, _)| !matches!(p.cell_type(), CellKind::Input | CellKind::Output))
+            .map(|(_, d)| d.debug_index())
+            .collect();
+        sig.sort_unstable();
         sig
     }
 }

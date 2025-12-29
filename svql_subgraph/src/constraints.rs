@@ -4,25 +4,27 @@
 //! satisfies the connectivity requirements of the needle cell.
 
 use crate::SubgraphMatcherCore;
+use crate::assignment::SingleAssignment;
 use crate::cell::CellWrapper;
-use crate::mapping::Assignment;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+    /// Validates that the haystack cell's inputs match the mapped inputs of the needle cell.
     pub(crate) fn check_fanin_constraints(
         &self,
-        p_cell: CellWrapper<'needle>,
-        d_cell: CellWrapper<'haystack>,
-        mapping: &Assignment<'needle, 'haystack>,
+        needle_cell: CellWrapper<'needle>,
+        haystack_cell: CellWrapper<'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
-        self.cells_match_fan_in(p_cell.get(), d_cell.get(), mapping)
+        self.cells_match_fan_in(needle_cell.get(), haystack_cell.get(), mapping)
     }
 
+    /// Dispatches fan-in matching based on the specific cell primitive type.
     fn cells_match_fan_in(
         &self,
         needle_cell: &Cell,
         haystack_cell: &Cell,
-        mapping: &Assignment<'needle, 'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         use Cell::*;
         match (needle_cell, haystack_cell) {
@@ -33,7 +35,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value, mapping);
                 let result_normal = a_matches && b_matches;
 
-                // Commutative case
                 let a_swapped = self.values_match_fan_in(p_a_value, d_b_value, mapping);
                 let b_swapped = self.values_match_fan_in(p_b_value, d_a_value, mapping);
                 let result_swapped = a_swapped && b_swapped;
@@ -45,7 +46,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value, mapping);
                 let result_normal = a_matches && b_matches;
 
-                // Commutative case
                 let a_swapped = self.values_match_fan_in(p_a_value, d_b_value, mapping);
                 let b_swapped = self.values_match_fan_in(p_b_value, d_a_value, mapping);
                 let result_swapped = a_swapped && b_swapped;
@@ -57,7 +57,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 let b_matches = self.values_match_fan_in(p_b_value, d_b_value, mapping);
                 let result_normal = a_matches && b_matches;
 
-                // Commutative case
                 let a_swapped = self.values_match_fan_in(p_a_value, d_b_value, mapping);
                 let b_swapped = self.values_match_fan_in(p_b_value, d_a_value, mapping);
                 let result_swapped = a_swapped && b_swapped;
@@ -151,16 +150,16 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     && self.values_match_fan_in(pb_value, db_value, mapping)
             }
             (Match(_p_match_cell), Match(_d_match_cell)) => {
-                todo!("Make Function to match match cells")
+                todo!("Implement match cell comparison")
             }
             (Assign(_p_assign_cell), Assign(_d_assign_cell)) => {
-                todo!("Make Function to match assign cells")
+                todo!("Implement assign cell comparison")
             }
             (Dff(p_dff_cell), Dff(d_dff_cell)) => {
                 self.dffs_match_fan_in(p_dff_cell, d_dff_cell, mapping)
             }
             (Memory(_p_memory_cell), Memory(_d_memory_cell)) => {
-                todo!("Make Function to match memory cells")
+                todo!("Implement memory cell comparison")
             }
 
             (Input(_p_name, _p_width), Input(_d_name, _d_width)) => {
@@ -170,17 +169,18 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 return true;
             }
             (_needle_cell, Cell::Other(_haystack_instance)) => {
-                todo!("decide how other cells should be matched for fan in")
+                todo!("Implement other cell fan-in matching")
             }
             _ => false,
         }
     }
 
+    /// Compares two multi-bit values (vectors of nets) for fan-in compatibility.
     fn values_match_fan_in(
         &self,
         needle_value: &Value,
         haystack_value: &Value,
-        mapping: &Assignment<'needle, 'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         let needle_nets_vec = needle_value.iter().collect::<Vec<Net>>();
         let haystack_nets_vec = haystack_value.iter().collect::<Vec<Net>>();
@@ -224,11 +224,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
     }
 
+    /// Checks if a specific net in the haystack matches the source of a net in the needle.
     fn nets_match_fan_in(
         &self,
         needle_net: &prjunnamed_netlist::Net,
         haystack_net: &prjunnamed_netlist::Net,
-        mapping: &Assignment<'needle, 'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         let actual_fan_in_haystack_cell = self.haystack.find_cell(*haystack_net);
         let fan_in_needle_cell = self.needle.find_cell(*needle_net);
@@ -259,11 +260,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
     }
 
+    /// Compares single-bit control nets (e.g., clock, reset) for fan-in compatibility.
     fn control_net_match_fan_in(
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNet,
         haystack_c_net: &prjunnamed_netlist::ControlNet,
-        mapping: &Assignment<'needle, 'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         match (needle_c_net, haystack_c_net) {
             (
@@ -278,11 +280,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
     }
 
+    /// Compares multi-bit control nets for fan-in compatibility.
     fn control_nets_match_fan_in(
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNets,
         haystack_c_net: &prjunnamed_netlist::ControlNets,
-        mapping: &Assignment<'needle, 'haystack>,
+        mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         match (needle_c_net, haystack_c_net) {
             (
@@ -303,11 +306,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
     }
 
+    /// Compares hardcoded constants for equality.
     fn const_match_fan_in(
         &self,
         needle_const: &prjunnamed_netlist::Const,
         haystack_const: &prjunnamed_netlist::Const,
-        _mapping: &Assignment<'needle, 'haystack>,
+        _mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
         let mut needle_const_iter = needle_const.clone().into_iter();
         let mut haystack_const_iter = haystack_const.clone().into_iter();
@@ -320,11 +324,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         true
     }
 
+    /// Validates all ports of a Flip-Flop (data, clock, enable, reset, etc.) for fan-in compatibility.
     fn dffs_match_fan_in(
         &self,
         needle_dff: &FlipFlop,
         haystack_dff: &FlipFlop,
-        mapping: &Assignment,
+        mapping: &SingleAssignment,
     ) -> bool {
         let data_matches = self.values_match_fan_in(&needle_dff.data, &haystack_dff.data, mapping);
         let clock_matches =

@@ -7,6 +7,7 @@ use std::{
 
 use crate::ModuleConfig;
 
+/// Configuration parameters for the subgraph matching engine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
     /// The length of the match to find.
@@ -37,6 +38,7 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Creates a new configuration instance.
     pub fn new(
         match_length: MatchLength,
         dedupe: Dedupe,
@@ -55,6 +57,7 @@ impl Config {
         }
     }
 
+    /// Returns a builder for configuration.
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
@@ -70,6 +73,7 @@ impl Hash for Config {
     }
 }
 
+/// A builder pattern implementation for the `Config` struct.
 #[derive(Clone, Debug, Default)]
 pub struct ConfigBuilder {
     match_length: MatchLength,
@@ -81,27 +85,32 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    /// Sets the match length requirement.
     pub fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
         self
     }
 
+    /// Sets the deduplication strategy.
     pub fn dedupe(mut self, value: Dedupe) -> Self {
         self.dedupe = value;
         self
     }
 
+    /// Sets the Yosys configuration for the needle.
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
         self
     }
 
+    /// Adds a custom Yosys command to the needle processing pipeline.
     pub fn needle_cmd(mut self, cmd: &str) -> Self {
         self.needle_options.other_steps.push(cmd.to_string());
         self
     }
 
+    /// Sets a parameter for the needle module.
     pub fn needle_param(mut self, param: &str, value: &str) -> Self {
         self.needle_options
             .params
@@ -109,16 +118,19 @@ impl ConfigBuilder {
         self
     }
 
+    /// Sets the Yosys configuration for the haystack.
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
         self
     }
 
+    /// Adds a custom Yosys command to the haystack processing pipeline.
     pub fn haystack_cmd(mut self, cmd: &str) -> Self {
         self.haystack_options.other_steps.push(cmd.to_string());
         self
     }
 
+    /// Sets a parameter for the haystack module.
     pub fn haystack_param(mut self, param: &str, value: &str) -> Self {
         self.haystack_options
             .params
@@ -126,26 +138,31 @@ impl ConfigBuilder {
         self
     }
 
+    /// Enables or disables the `opt_clean` pass for the haystack.
     pub fn haystack_opt_clean(mut self, opt_clean: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt_clean(opt_clean);
         self
     }
 
+    /// Enables or disables the `opt` pass for the haystack.
     pub fn haystack_opt(mut self, opt: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt(opt);
         self
     }
 
+    /// Configures whether pattern variables can match design constants.
     pub fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
     }
 
+    /// Sets the maximum recursion depth for the search algorithm.
     pub fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
         self.max_recursion_depth = depth;
         self
     }
 
+    /// Finalizes the builder into a `Config` instance.
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
@@ -164,9 +181,9 @@ pub enum MatchLength {
     /// Stop after the first match.
     #[default]
     First,
-    /// The needle must be a subgraph of the haystack.
+    /// The needle wire must be shorter than the haystack.
     NeedleSubsetHaystack,
-    /// The needle must exactly match the haystack.
+    /// The needle and haystack wires must be the same length.
     Exact,
 }
 
@@ -195,15 +212,15 @@ impl FromStr for MatchLength {
     }
 }
 
-/// Defines the deduplication strategy for matches.
+/// Defines how to handle duplicate results in the search output.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Dedupe {
-    /// No deduplication.
+    /// No deduplication is performed.
     None,
-    /// Deduplicate based on inner matches.
+    /// Deduplicate based on the internal logic gates (ignoring I/O ports).
     #[default]
     Inner,
-    /// Deduplicate all matches.
+    /// Deduplicate based on the entire set of assigned cells (including I/O ports).
     All,
 }
 

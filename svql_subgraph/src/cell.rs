@@ -80,10 +80,12 @@ impl CellKind {
         )
     }
 
+    /// Returns true if the cell is an input port.
     pub fn is_input(&self) -> bool {
         matches!(self, CellKind::Input)
     }
 
+    /// Returns true if the cell is an output port.
     pub fn is_output(&self) -> bool {
         matches!(self, CellKind::Output)
     }
@@ -150,10 +152,12 @@ pub struct CellIndex {
 }
 
 impl CellIndex {
+    /// Creates a new CellIndex from a raw usize.
     pub fn new(idx: usize) -> Self {
         CellIndex { idx }
     }
 
+    /// Returns the raw index value.
     #[inline]
     pub fn index(&self) -> usize {
         self.idx
@@ -193,22 +197,27 @@ impl<'a> Hash for CellWrapper<'a> {
 }
 
 impl<'a> CellWrapper<'a> {
+    /// Returns the categorized type of the underlying cell.
     pub fn cell_type(&self) -> CellKind {
         CellKind::from(self.cell.as_ref())
     }
 
+    /// Returns a reference to the underlying netlist cell.
     pub fn get(&'a self) -> &'a Cell {
         self.cell.as_ref()
     }
 
+    /// Returns the unique debug index assigned by the netlist parser.
     pub fn debug_index(&self) -> usize {
         self.debug_index
     }
 
+    /// Returns the metadata associated with this cell.
     pub fn debug_info(&self) -> MetaItemRef<'a> {
         self.metadata
     }
 
+    /// Returns the name of the input port if this cell is an Input.
     pub fn input_name(&self) -> Option<&str> {
         match &self.cell {
             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
@@ -217,6 +226,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
+    /// Returns the name of the output port if this cell is an Output.
     pub fn output_name(&self) -> Option<&'a str> {
         match &self.cell {
             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
@@ -241,6 +251,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
+    /// Calculates the column span for a specific line within a source range.
     fn calculate_line_span(
         &self,
         line_num: u32,
@@ -304,6 +315,7 @@ pub struct SourceLine {
 }
 
 impl SourceLine {
+    /// Formats the line and column range for reporting.
     pub fn report(&self) -> String {
         if self.end_column == 0 {
             format!("Line {}, Col {}+", self.number, self.start_column)

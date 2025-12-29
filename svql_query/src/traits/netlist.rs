@@ -1,6 +1,6 @@
 use prjunnamed_netlist::Design;
 use svql_driver::DriverKey;
-use svql_subgraph::{Embedding, EmbeddingSet, cell::CellWrapper};
+use svql_subgraph::{AssignmentSet, SingleAssignment, cell::CellWrapper};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PortDir {
@@ -26,20 +26,20 @@ pub trait NetlistMeta {
 }
 
 pub fn resolve_wire<'a>(
-    embedding: &Embedding<'a, 'a>,
-    embedding_set: &EmbeddingSet<'a, 'a>,
+    embedding: &SingleAssignment<'a, 'a>,
+    embedding_set: &AssignmentSet<'a, 'a>,
     _needle: &Design,
     wire_name: &str,
 ) -> Option<CellWrapper<'a>> {
     if let Some(drivers) = embedding_set.needle_output_fanin_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = drivers.first() {
-            return embedding.assignment.get_haystack_cell(needle_cell.clone());
+            return embedding.get_haystack_cell(needle_cell.clone());
         }
     }
 
     if let Some(sinks) = embedding_set.needle_input_fanout_by_name.get(wire_name) {
         if let Some((needle_cell, _)) = sinks.first() {
-            return embedding.assignment.get_haystack_cell(needle_cell.clone());
+            return embedding.get_haystack_cell(needle_cell.clone());
         }
     }
 
