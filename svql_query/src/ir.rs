@@ -265,8 +265,10 @@ impl NaiveExecutor {
                 schema,
             } => {
                 let needle_container = ctx.get(key).expect("Pattern design missing from context");
-                let haystack_container = ctx.get(haystack_key).expect("Haystack design missing from context");
-                
+                let haystack_container = ctx
+                    .get(haystack_key)
+                    .expect("Haystack design missing from context");
+
                 let embeddings = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle_container.design(),
                     haystack_container.design(),

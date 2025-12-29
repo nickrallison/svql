@@ -58,7 +58,9 @@ pub struct Match<'ctx> {
 impl<'ctx> Match<'ctx> {
     /// Retrieves the source code location of the matched design element.
     pub fn source(&self) -> Option<SourceLocation> {
-        self.design_node_ref.as_ref().and_then(|cell| cell.get_source())
+        self.design_node_ref
+            .as_ref()
+            .and_then(|cell| cell.get_source())
     }
 }
 

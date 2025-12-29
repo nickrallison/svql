@@ -3,8 +3,8 @@
 //! Provides functions to map named ports and bit indices from a pattern
 //! to the corresponding cells discovered during subgraph isomorphism.
 
-use std::collections::HashMap;
 use crate::Match;
+use std::collections::HashMap;
 use svql_subgraph::{SingleAssignment, cell::CellWrapper};
 use tracing::debug;
 
@@ -21,9 +21,12 @@ pub fn bind_input<'ctx>(
     bit_index: usize,
     input_fanout: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
 ) -> Match<'ctx> {
-    let pattern_cells = input_fanout.get(name).expect("Input port not found in pattern");
+    let pattern_cells = input_fanout
+        .get(name)
+        .expect("Input port not found in pattern");
     let pattern_cell = &pattern_cells[bit_index].0;
-    let design_cell = assignment.get_haystack_cell(pattern_cell.clone())
+    let design_cell = assignment
+        .get_haystack_cell(pattern_cell.clone())
         .expect("Pattern cell not found in assignment");
 
     debug!(
@@ -50,9 +53,12 @@ pub fn bind_output<'ctx>(
     bit_index: usize,
     output_fanin: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
 ) -> Match<'ctx> {
-    let pattern_cells = output_fanin.get(name).expect("Output port not found in pattern");
+    let pattern_cells = output_fanin
+        .get(name)
+        .expect("Output port not found in pattern");
     let pattern_cell = &pattern_cells[bit_index].0;
-    let design_cell = assignment.get_haystack_cell(pattern_cell.clone())
+    let design_cell = assignment
+        .get_haystack_cell(pattern_cell.clone())
         .expect("Pattern cell not found in assignment");
 
     debug!(
