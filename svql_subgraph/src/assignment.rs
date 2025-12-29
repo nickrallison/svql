@@ -1,10 +1,10 @@
-//! Bi-directional mapping between needle and haystack cells.
+//! Mapping between needle and haystack cells.
 
 use std::collections::HashMap;
 
 use crate::cell::{CellKind, CellWrapper};
 
-/// A collection of embeddings found during a search.
+/// A collection of mappings found during a search.
 #[derive(Clone, Debug, Default)]
 pub struct AssignmentSet<'needle, 'haystack> {
     pub items: Vec<SingleAssignment<'needle, 'haystack>>,
@@ -12,7 +12,29 @@ pub struct AssignmentSet<'needle, 'haystack> {
     pub needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
 }
 
-/// Maintains the current state of cell assignments during the search.
+impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
+    pub fn new(
+        items: Vec<SingleAssignment<'needle, 'haystack>>,
+        needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+        needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+    ) -> Self {
+        Self {
+            items,
+            needle_input_fanout_by_name,
+            needle_output_fanin_by_name,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+}
+
+/// A partial mapping of cell assignments during the search.
 #[derive(Clone, Debug, Default)]
 pub struct SingleAssignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
@@ -80,20 +102,6 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
 
     pub fn needle_mapping(&self) -> &HashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
         &self.needle_to_haystack
-    }
-
-    pub fn debug_print(&self) {
-        let mapping = self.needle_mapping();
-        for (pat_cell, des_cell) in mapping {
-            println!(
-                "{}: {:?} -> {}: {:?}",
-                pat_cell.debug_index(),
-                pat_cell.get(),
-                des_cell.debug_index(),
-                des_cell.get()
-            );
-        }
-        println!("--------------------------------------------------------")
     }
 
     pub(super) fn signature(&self) -> Vec<usize> {
