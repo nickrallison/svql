@@ -5,8 +5,10 @@ mod tests {
     use svql_common::{Config, Dedupe, MatchLength, YosysModule};
     use svql_driver::Driver;
     use svql_query::{
-        Search, instance::Instance, security::cwe1280::Cwe1280,
-        traits::composite::SearchableComposite,
+        Search,
+        instance::Instance,
+        security::cwe1280::Cwe1280,
+        traits::{Query, Searchable},
     };
 
     fn init_test_logger() {
@@ -81,9 +83,7 @@ mod tests {
         config: &Config,
         case: &Cwe1280TestCase,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let fixture_path = case.fixture_path;
-
-        let haystack_module = YosysModule::new(fixture_path, case.module_name)?;
+        let haystack_module = YosysModule::new(case.fixture_path, case.module_name)?;
 
         let (haystack_key, haystack_design) = driver.get_or_load_design(
             &haystack_module.path().display().to_string(),
@@ -91,30 +91,18 @@ mod tests {
             &config.haystack_options,
         )?;
 
-        for cell in haystack_design.index().cells_topo() {
-            tracing::trace!(
-                "Id: {}, Haystack cell: \n{:#?}",
-                cell.debug_index(),
-                cell.get()
-            );
-        }
-
-        let context = Cwe1280::<Search>::context(&driver, &config.needle_options)?;
+        let context = Cwe1280::<Search>::context(driver, &config.needle_options)?;
         let context = context.with_design(haystack_key.clone(), haystack_design);
 
-        let results = Cwe1280::<Search>::query(
-            &haystack_key,
-            &context,
-            Instance::root("cwe1280".to_string()),
-            &config,
-        );
+        let query = Cwe1280::<Search>::instantiate(Instance::root("cwe1280".to_string()));
+        let results = query.query(driver, &context, &haystack_key, config);
 
         assert_eq!(
             results.len(),
             case.expected_matches,
-            "Expected {} matches for {}, got {}",
-            case.expected_matches,
+            "Case {}: expected {} matches, got {}",
             case.name,
+            case.expected_matches,
             results.len()
         );
 

@@ -4,6 +4,7 @@ use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::traits::variant::SearchableVariant;
+use svql_query::traits::{Query, Searchable};
 use svql_query::{Search, instance::Instance};
 
 #[derive(Debug, Clone)]
@@ -72,32 +73,16 @@ fn run_single_case(
     let context = Cwe1271::<Search>::context(driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results: Vec<_> = Cwe1271::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("cwe1271".to_string()),
-        config,
-    );
+    let query = Cwe1271::<Search>::instantiate(Instance::root("cwe1271".to_string()));
+    let results = query.query(driver, &context, &haystack_key, config);
 
     assert_eq!(
         results.len(),
         case.expected_matches,
-        "Expected {} matches for {}, got {}",
-        case.expected_matches,
+        "Case {}: expected {} matches, got {}",
         case.name,
+        case.expected_matches,
         results.len()
-    );
-
-    println!(
-        "  Results: {} matches (types: {:?})",
-        results.len(),
-        results
-            .iter()
-            .map(|r| match r {
-                Cwe1271::UninitRegEn(_) => "UninitRegEn",
-                Cwe1271::UninitReg(_) => "UninitReg",
-            })
-            .collect::<Vec<_>>()
     );
 
     Ok(())

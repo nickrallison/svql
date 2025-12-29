@@ -1,10 +1,90 @@
 use std::sync::OnceLock;
-
 use svql_common::{Config, Dedupe, MatchLength, YosysModule};
 use svql_driver::Driver;
 use svql_query::security::primitives::locked_register::LockedRegister;
-use svql_query::traits::variant::SearchableVariant;
+use svql_query::traits::{Query, Searchable};
 use svql_query::{Search, instance::Instance};
+
+struct LockedRegisterTestCase {
+    name: &'static str,
+    fixture_path: &'static str,
+    module_name: &'static str,
+    expected_matches: usize,
+    match_length: MatchLength,
+}
+
+static LOCKED_REGISTER_CASES: &[LockedRegisterTestCase] = &[
+    LockedRegisterTestCase {
+        name: "simple",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_simple.v",
+        module_name: "cwe1234_simple",
+        expected_matches: 1,
+        match_length: MatchLength::NeedleSubsetHaystack,
+    },
+    LockedRegisterTestCase {
+        name: "multi_reg",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_multi_reg.v",
+        module_name: "cwe1234_multi_reg",
+        expected_matches: 3,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "deep",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_deep.v",
+        module_name: "cwe1234_deep",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "fixed",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_fixed.v",
+        module_name: "cwe1234_fixed",
+        expected_matches: 0,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "sync_reset",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_sync_reset.v",
+        module_name: "cwe1234_sync_reset",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "enabled",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_enabled.v",
+        module_name: "cwe1234_enabled",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "wide",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_wide_reg.v",
+        module_name: "cwe1234_wide_reg",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "mixed_resets",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_mixed_resets.v",
+        module_name: "cwe1234_mixed_resets",
+        expected_matches: 2,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "no_reset",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_no_reset.v",
+        module_name: "cwe1234_no_reset",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+    LockedRegisterTestCase {
+        name: "multi_width",
+        fixture_path: "examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v",
+        module_name: "cwe1234_multi_width",
+        expected_matches: 1,
+        match_length: MatchLength::Exact,
+    },
+];
 
 fn init_test_logger() {
     static INIT: OnceLock<()> = OnceLock::new();
@@ -16,410 +96,49 @@ fn init_test_logger() {
     });
 }
 
-#[test]
-fn test_locked_register_simple() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
+fn run_locked_reg_case(
+    driver: &Driver,
+    case: &LockedRegisterTestCase,
+) -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::builder()
-        .match_length(MatchLength::NeedleSubsetHaystack)
+        .match_length(case.match_length.clone())
         .dedupe(Dedupe::All)
         .build();
 
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_simple.v",
-        "cwe1234_simple",
-    )?;
+    let haystack_module = YosysModule::new(case.fixture_path, case.module_name)?;
 
-    let driver = Driver::new_workspace()?;
     let (haystack_key, haystack_design) = driver.get_or_load_design(
         &haystack_module.path().display().to_string(),
         haystack_module.module_name(),
         &config.haystack_options,
     )?;
 
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
+    let context = LockedRegister::<Search>::context(driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nLocked Register Simple Test");
-    println!("Found {} DFF(s)\n", results.len());
+    let query = LockedRegister::<Search>::instantiate(Instance::root("locked_reg".to_string()));
+    let results = query.query(driver, &context, &haystack_key, &config);
 
     assert_eq!(
         results.len(),
-        1,
-        "Should find 1 async_mux pattern (Data_out register; lock_status doesn't match pattern)"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_multi_reg() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_multi_reg.v",
-        "cwe1234_multi_reg",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nLocked Register Multiple Registers Test");
-    println!("Module has 3 lock status + 3 data registers = 6 DFFs\n");
-    println!("Found {} DFF(s)\n", results.len());
-
-    assert!(
-        results.len() <= 3,
-        "Should find at most 3 data registers (pattern-dependent)"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_deep() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_deep.v",
-        "cwe1234_deep",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nLocked Register Deep Test");
-    println!("Found {} DFF(s)\n", results.len());
-
-    assert!(
-        results.len() <= 1,
-        "Should find at most 1 data register (pattern-dependent)"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_fixed() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_fixed.v",
-        "cwe1234_fixed",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nLocked Register Fixed (Secure) Test");
-    println!("Found {} DFF(s)\n", results.len());
-
-    println!("Note: Pattern detection is structural, not semantic");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_sync_reset() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_sync_reset.v",
-        "cwe1234_sync_reset",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nSync Reset Registers Test");
-    println!("Found {} DFF(s)\n", results.len());
-
-    println!("Note: Sync reset patterns may require additional pattern variants");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_enabled() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_enabled.v",
-        "cwe1234_enabled",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nEnabled Registers Test");
-    println!("Found {} DFF(s)\n", results.len());
-
-    println!("Note: Enable patterns may optimize to MUX structures");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_wide() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_wide_reg.v",
-        "cwe1234_wide_reg",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nWide Register Test");
-    println!("Found {} DFF(s) (32-bit registers)\n", results.len());
-
-    println!("Note: Not all register widths may match structural pattern");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_mixed_resets() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_mixed_resets.v",
-        "cwe1234_mixed_resets",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nMixed Reset Types Test");
-    println!("Found {} DFF(s) (async + sync)\n", results.len());
-
-    println!("Note: Different reset types may require additional patterns");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_no_reset() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_no_reset.v",
-        "cwe1234_no_reset",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nNo Reset Registers Test");
-    println!("Found {} DFF(s)\n", results.len());
-
-    println!("Note: No-reset patterns may require additional pattern variants");
-
-    Ok(())
-}
-
-#[test]
-fn test_locked_register_multi_width() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let haystack_module = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v",
-        "cwe1234_multi_width",
-    )?;
-
-    let driver = Driver::new_workspace()?;
-    let (haystack_key, haystack_design) = driver.get_or_load_design(
-        &haystack_module.path().display().to_string(),
-        haystack_module.module_name(),
-        &config.haystack_options,
-    )?;
-
-    let context = LockedRegister::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    let results = LockedRegister::<Search>::query(
-        &haystack_key,
-        &context,
-        Instance::root("locked_reg".to_string()),
-        &config,
-    );
-
-    println!("\nMulti-Width Registers Test");
-    println!(
-        "Found {} DFF(s) (1-bit, 8-bit, 16-bit, 32-bit)\n",
+        case.expected_matches,
+        "Case {}: expected {} matches, got {}",
+        case.name,
+        case.expected_matches,
         results.len()
     );
 
-    assert_eq!(
-        results.len(),
-        1,
-        "Should find 1 DFF matching async_mux pattern (1-bit register)"
-    );
+    Ok(())
+}
+
+#[test]
+fn test_locked_register_primitives() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_logger();
+    let driver = Driver::new_workspace()?;
+
+    for case in LOCKED_REGISTER_CASES {
+        run_locked_reg_case(&driver, case)?;
+    }
 
     Ok(())
 }

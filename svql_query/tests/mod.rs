@@ -1,3 +1,2 @@
-// mod composite;
-// mod cwe;
-// mod primitives;
+mod cwe;
+mod primitives;
