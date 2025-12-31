@@ -238,14 +238,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #enum_name<::svql_query::Search> {
-            pub fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::svql_driver::Context::new();
-                #(#context_merges)*
-                Ok(ctx)
-            }
+
         }
 
         impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match<'a>> {
@@ -283,6 +276,15 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 ::svql_query::tracing::info!("{} found {} total matches across variants", self.log_label(), all_results.len());
                 all_results
+            }
+
+            fn context(
+                driver: &::svql_query::svql_driver::Driver,
+                options: &::svql_query::svql_common::ModuleConfig
+            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
+                let mut ctx = ::svql_query::svql_driver::Context::new();
+                #(#context_merges)*
+                Ok(ctx)
             }
         }
 

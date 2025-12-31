@@ -123,13 +123,6 @@ impl RecOr<Search> {
             child: None,
         }
     }
-
-    pub fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        OrGate::<Search>::context(driver, config)
-    }
 }
 
 impl Query for RecOr<Search> {
@@ -197,6 +190,13 @@ impl Query for RecOr<Search> {
         }
 
         all_results
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        OrGate::<Search>::context(driver, config)
     }
 }
 

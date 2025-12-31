@@ -200,14 +200,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #struct_name<::svql_query::Search> {
-            pub fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::svql_driver::Context::new();
-                #(#context_calls)*
-                Ok(ctx)
-            }
+
         }
 
         impl ::svql_query::traits::Query for #struct_name<::svql_query::Search> {
@@ -258,6 +251,15 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
                 ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
                 results
+            }
+
+            fn context(
+                driver: &::svql_query::svql_driver::Driver,
+                options: &::svql_query::svql_common::ModuleConfig
+            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
+                let mut ctx = ::svql_query::svql_driver::Context::new();
+                #(#context_calls)*
+                Ok(ctx)
             }
         }
 

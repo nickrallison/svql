@@ -910,6 +910,7 @@ name = "svql_query"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "argparse",
  "contracts",
  "itertools",
  "lazy_static",

@@ -82,17 +82,6 @@ impl UnlockLogic<Search> {
             not_gate: NotGate::new(path.child("not_gate")),
         }
     }
-
-    pub fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        let and_ctx = AndGate::<Search>::context(driver, config)?;
-        let or_ctx = RecOr::<Search>::context(driver, config)?;
-        let not_ctx = NotGate::<Search>::context(driver, config)?;
-
-        Ok(and_ctx.merge(or_ctx).merge(not_ctx))
-    }
 }
 
 impl<'a> crate::traits::Reportable for UnlockLogic<Match<'a>> {
@@ -268,6 +257,17 @@ impl Query for UnlockLogic<Search> {
             results.len()
         );
         results
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        let and_ctx = AndGate::<Search>::context(driver, config)?;
+        let or_ctx = RecOr::<Search>::context(driver, config)?;
+        let not_ctx = NotGate::<Search>::context(driver, config)?;
+
+        Ok(and_ctx.merge(or_ctx).merge(not_ctx))
     }
 }
 

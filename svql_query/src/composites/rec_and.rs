@@ -135,13 +135,6 @@ impl RecAnd<Search> {
             child: None,
         }
     }
-
-    pub fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        AndGate::<Search>::context(driver, config)
-    }
 }
 
 impl Query for RecAnd<Search> {
@@ -232,6 +225,13 @@ impl Query for RecAnd<Search> {
         );
 
         all_results
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        AndGate::<Search>::context(driver, config)
     }
 }
 

@@ -191,16 +191,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #struct_name<::svql_query::Search> {
-            pub fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
-                use ::svql_query::traits::netlist::NetlistMeta;
-                let key = Self::driver_key();
-                let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
-                Ok(::svql_query::svql_driver::Context::from_single(key.clone(), design))
-            }
-
             pub fn new(path: ::svql_query::instance::Instance) -> Self {
                 <Self as ::svql_query::traits::Searchable>::instantiate(path)
             }
@@ -249,6 +239,16 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
                 results
+            }
+
+            fn context(
+                driver: &::svql_query::svql_driver::Driver,
+                options: &::svql_query::svql_common::ModuleConfig
+            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
+                use ::svql_query::traits::netlist::NetlistMeta;
+                let key = Self::driver_key();
+                let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
+                Ok(::svql_query::svql_driver::Context::from_single(key.clone(), design))
             }
         }
 

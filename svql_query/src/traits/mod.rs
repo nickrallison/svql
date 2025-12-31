@@ -8,8 +8,8 @@ pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
-use svql_common::Config;
-use svql_driver::{Context, DriverKey};
+use svql_common::{Config, ModuleConfig};
+use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::GraphIndex;
 
 use crate::{
@@ -64,6 +64,11 @@ pub trait Query: Component<Search> + Searchable {
         key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Matched<'a>>;
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>>;
 }
 
 /// Interface for executing queries using the optimized IR planner.
