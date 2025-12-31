@@ -93,12 +93,26 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     /// Executes the subgraph matching process and returns the set of all found mappings.
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
+        tracing::info!(
+            "starting subgraph search: needle cells: {}, haystack cells: {}",
+            self.needle_index.num_cells(),
+            self.haystack_index.num_cells()
+        );
+
         let (input_queue, gate_queue) = self.prepare_search_queues();
         let initial_assignment = SingleAssignment::new();
 
         let mut results = self.match_gate_cells(initial_assignment, gate_queue, input_queue);
 
+        let total_found = results.len();
+
         self.apply_deduplication(&mut results);
+
+        tracing::info!(
+            "search complete: found {} raw matches, {} after deduplication",
+            total_found,
+            results.len()
+        );
 
         AssignmentSet {
             items: results,
@@ -119,6 +133,22 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         };
 
         let candidates = self.find_candidates_for_cell(current_needle.clone(), &assignment);
+
+        if candidates.is_empty() {
+            tracing::trace!(
+                "backtracking: no candidates for needle cell {} ({:?})",
+                current_needle.debug_index(),
+                current_needle.cell_type()
+            );
+            return vec![];
+        }
+
+        tracing::debug!(
+            "needle cell {} ({:?}): found {} candidates",
+            current_needle.debug_index(),
+            current_needle.cell_type(),
+            candidates.len()
+        );
 
         #[cfg(feature = "rayon")]
         let iter = candidates.into_par_iter();

@@ -25,6 +25,8 @@ pub struct GraphIndex<'a> {
 
 impl<'a> GraphIndex<'a> {
     pub fn build(design: &'a Design) -> Self {
+        let start = std::time::Instant::now();
+
         let cell_refs_topo = Self::build_cell_refs_topo(design);
         let cell_registry = CellRegistry::build(&cell_refs_topo);
         let connectivity =
@@ -33,6 +35,12 @@ impl<'a> GraphIndex<'a> {
             cell_registry.cells_topo(),
             connectivity.fanin_map(),
             connectivity.fanout_map(),
+        );
+
+        tracing::debug!(
+            "graph index built in {:?} for {} cells",
+            start.elapsed(),
+            cell_registry.len()
         );
 
         GraphIndex {

@@ -10,7 +10,7 @@ use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::traits::{Query, Reportable, Searchable};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
