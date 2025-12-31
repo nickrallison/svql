@@ -6,18 +6,14 @@ It provides a domain-specific language (DSL) to define hierarchical queries
 in terms of composition of hardware and executes them against flattened netlists 
 using a specialized subgraph isomorphism engine.
 
-### Testing
-SVQL has been tested on Hack@DAC18, HACK@DAC21, and HummingbordV2. 
-These modules were chosen to have both a set of modules with and without pre-existing bugs.
-
-### Queries
+## Query Library
+SVQL provides a library of structural patterns targeting a small set of Common Weakness Enumerations (CWEs). 
 Thus far, queries have been written for CWE-1234, CWE-1271, and CWE-1280. 
-All of these bugs were chosen for the ability to express these bugs as structural patterns with a hierarchy. 
-Which is to say they should have a grammar that can recognize them.
+These were chosen for the ability to express them as structural patterns with a hierarchy. 
 
-#### CWE-1234: Hardware Internal or Debug Modes Allow Override of Locks
-This query is the most flushed out thus far. It was chosen because it is quite simple to see 
-the structure that underlies this bug is a set of faulty unlock logic feeding into a locked register.
+### CWE-1234: Internal or Debug Modes Allow Override of Locks
+This query was chosen because it is quite simple to express the structure that underlies
+this bug as a set of faulty unlock logic feeding into a locked register.
 
 ```rust
 #[composite]
@@ -40,11 +36,11 @@ impl<S: State> Topology<S> for Cwe1234<S> {
 }
 ```
 
-#### CWE-1271: Uninitialized Value on Reset for Registers Holding Security Settings
-This query is less able to detect instances of the bug than CWE-1234. 
+### CWE-1271: Uninitialized Value on Reset for Security Registers
+This query is more challenging to express as just a structural pattern.
 Part of the bug is an uninitialized register which can be detected by any synthesis tool,
-but another part is detecting the value it holds is used for security sensitive tasks which is more challenging to do & 
-will have to be implemented in a future version, perhaps by letting humans tag which cells match for a specific query. 
+but another part is detecting the value it holds is used for security sensitive tasks which is more challenging to do.
+The plan is to implement it in a future version by letting humans tag which cells match for a specific query. 
 That way humans could define which registers are security specific and those could be added into this query.
 
 ```rust
@@ -57,9 +53,10 @@ pub enum Cwe1271<S: State> {
 }
 ```
 
-#### CWE-1280: Access Control Check Implemented After Asset is Accessed
-This bug was chosen because it is quite amenable to structural analysis, it can be done by looking for a locked register
-which is enabled by an access checking structure but has another register inbetween causing a signal delay.
+### CWE-1280: Access Control Check Implemented After Asset Access
+This bug was chosen because also it is quite amenable to structural analysis.
+This pattern identifies a locked register enabled by an access checking structure 
+where an intermediate register causes a signal delay, leading to stale access checks.
 
 ```rust
 #[composite]
@@ -81,6 +78,14 @@ impl<S: State> Topology<S> for Cwe1280<S> {
     }
 }
 ```
+
+## Validation Data
+
+The framework is validated against open-source hardware designs and security competition benchmark. This was done to ensure the tool performs well, in addition to finding true positive & false positive instances of the bugs.
+
+- **Hack@DAC18 & Hack@DAC21**: These modules contain a large set of manually inserted bugs, providing a ground truth for query testing.
+- **HummingbirdV2**: A real-world RISC-V core used to test performance on complex, non-buggy designs.
+
 
 ## System Architecture
 The workspace is organized into functional layers that separate query definition from the underlying graph algorithms.
@@ -109,7 +114,7 @@ The workspace is organized into functional layers that separate query definition
 
 ## Requirements
 - Requires `yosys` in the system `PATH`
-- Certain designs (e.g., Hack@DAC21) will require TabbyCAD for verific support.
+- Certain designs (e.g., Hack@DAC21) will require TabbyCAD for verific support if you want to compile them from scratch. A compressed json netlist has been included for them in the repo so this is not required by default.
 
 ## Usage Example
 ```rust
