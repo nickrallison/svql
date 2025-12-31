@@ -6,6 +6,7 @@
 //! and fan-in/fan-out constraints.
 
 use std::collections::{HashSet, VecDeque};
+use std::sync::atomic::{AtomicUsize, Ordering}; // New imports
 
 use prjunnamed_netlist::Design;
 use svql_common::Config;
@@ -52,6 +53,12 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) needle_name: String,
     /// Name of Haystack Design for logging purposes.
     pub(crate) haystack_name: String,
+    /// Progress tracking
+    pub(crate) branches_explored: AtomicUsize,
+    pub(crate) active_branches: AtomicUsize,
+    pub(crate) matches_found: AtomicUsize,
+    pub(crate) initial_candidates_total: AtomicUsize,
+    pub(crate) initial_candidates_done: AtomicUsize,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
@@ -76,6 +83,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             config,
             needle_name,
             haystack_name,
+            branches_explored: AtomicUsize::new(0),
+            active_branches: AtomicUsize::new(0),
+            matches_found: AtomicUsize::new(0),
+            initial_candidates_total: AtomicUsize::new(0),
+            initial_candidates_done: AtomicUsize::new(0),
         };
 
         matcher.enumerate_assignments()
@@ -98,9 +110,14 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             haystack,
             needle_index,
             haystack_index,
+            config,
             needle_name,
             haystack_name,
-            config,
+            branches_explored: AtomicUsize::new(0),
+            active_branches: AtomicUsize::new(0),
+            matches_found: AtomicUsize::new(0),
+            initial_candidates_total: AtomicUsize::new(0),
+            initial_candidates_done: AtomicUsize::new(0),
         };
         matcher.enumerate_assignments()
     }
@@ -148,6 +165,27 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         mut gate_queue: VecDeque<CellWrapper<'needle>>,
         input_queue: VecDeque<CellWrapper<'needle>>,
     ) -> Vec<SingleAssignment<'needle, 'haystack>> {
+        let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
+        let is_root = assignment.is_empty();
+
+        if total % 1000 == 0 && total > 0 {
+            let active = self.active_branches.load(Ordering::Relaxed);
+            let found = self.matches_found.load(Ordering::Relaxed);
+            let top_done = self.initial_candidates_done.load(Ordering::Relaxed);
+            let top_total = self.initial_candidates_total.load(Ordering::Relaxed);
+
+            tracing::info!(
+                "[{:^10} -> {:^10}] {:>8} branches | {:>3} active | {:>4} matches | Top: {}/{}",
+                self.needle_name,
+                self.haystack_name,
+                total,
+                active,
+                found,
+                top_done,
+                top_total
+            );
+        }
+
         let Some(current_needle) = gate_queue.pop_front() else {
             return self.match_input_cells(assignment, input_queue);
         };
@@ -155,37 +193,41 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let candidates = self.find_candidates_for_cell(current_needle.clone(), &assignment);
 
         if candidates.is_empty() {
-            tracing::trace!(
-                "[{} -> {}] backtracking: no candidates for needle cell {} ({:?})",
-                self.needle_name,
-                self.haystack_name,
-                current_needle.debug_index(),
-                current_needle.cell_type()
-            );
+            if is_root {
+                tracing::warn!("[{}] no candidates found for root cell", self.needle_name);
+            }
             return vec![];
         }
 
-        tracing::debug!(
-            "[{} -> {}] needle cell {} ({:?}): found {} candidates",
-            self.needle_name,
-            self.haystack_name,
-            current_needle.debug_index(),
-            current_needle.cell_type(),
-            candidates.len()
-        );
+        if is_root {
+            self.initial_candidates_total
+                .store(candidates.len(), Ordering::SeqCst);
+        }
+
+        self.active_branches.fetch_add(1, Ordering::SeqCst);
 
         #[cfg(feature = "rayon")]
         let iter = candidates.into_par_iter();
         #[cfg(not(feature = "rayon"))]
         let iter = candidates.into_iter();
 
-        iter.flat_map(|candidate| {
-            let mut next_assignment = assignment.clone();
-            next_assignment.assign(current_needle.clone(), candidate);
+        let results: Vec<_> = iter
+            .flat_map(|candidate| {
+                let mut next_assignment = assignment.clone();
+                next_assignment.assign(current_needle.clone(), candidate);
 
-            self.match_gate_cells(next_assignment, gate_queue.clone(), input_queue.clone())
-        })
-        .collect()
+                let res =
+                    self.match_gate_cells(next_assignment, gate_queue.clone(), input_queue.clone());
+
+                if is_root {
+                    self.initial_candidates_done.fetch_add(1, Ordering::SeqCst);
+                }
+                res
+            })
+            .collect();
+
+        self.active_branches.fetch_sub(1, Ordering::SeqCst);
+        results
     }
 
     /// Recursively matches input cells from the needle to candidates in the haystack.
@@ -195,6 +237,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         mut input_queue: VecDeque<CellWrapper<'needle>>,
     ) -> Vec<SingleAssignment<'needle, 'haystack>> {
         let Some(current_needle) = input_queue.pop_front() else {
+            self.matches_found.fetch_add(1, Ordering::Relaxed);
             return vec![assignment];
         };
 
