@@ -1,7 +1,86 @@
-# SVQL (Structural Verilog Query Language)
+# SVQL (SystemVerilog Query Language)
 
 ## Overview
-SVQL is a framework for structural pattern matching in hardware netlists. It provides a domain-specific language (DSL) to define hierarchical queries in terms of composition of hardware and executes them against flattened netlists using a specialized subgraph isomorphism engine.
+SVQL is a framework for structural pattern matching in hardware netlists. 
+It provides a domain-specific language (DSL) to define hierarchical queries 
+in terms of composition of hardware and executes them against flattened netlists 
+using a specialized subgraph isomorphism engine.
+
+### Testing
+SVQL has been tested on Hack@DAC18, HACK@DAC21, and HummingbordV2. 
+These modules were chosen to have both a set of modules with and without pre-existing bugs.
+
+### Queries
+Thus far, queries have been written for CWE-1234, CWE-1271, and CWE-1280. 
+All of these bugs were chosen for the ability to express these bugs as structural patterns with a hierarchy. 
+Which is to say they should have a grammar that can recognize them.
+
+#### CWE-1234: Hardware Internal or Debug Modes Allow Override of Locks
+This query is the most flushed out thus far. It was chosen because it is quite simple to see 
+the structure that underlies this bug is a set of faulty unlock logic feeding into a locked register.
+
+```rust
+#[composite]
+pub struct Cwe1234<S: State> {
+    #[path]
+    pub path: Instance,
+    #[submodule]
+    pub unlock_logic: UnlockLogic<S>,
+    #[submodule]
+    pub locked_register: LockedRegister<S>,
+}
+
+impl<S: State> Topology<S> for Cwe1234<S> {
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
+        ctx.connect(
+            Some(&self.unlock_logic.top_and.y),
+            self.locked_register.write_en(),
+        );
+    }
+}
+```
+
+#### CWE-1271: Uninitialized Value on Reset for Registers Holding Security Settings
+This query is less able to detect instances of the bug than CWE-1234. 
+Part of the bug is an uninitialized register which can be detected by any synthesis tool,
+but another part is detecting the value it holds is used for security sensitive tasks which is more challenging to do & 
+will have to be implemented in a future version, perhaps by letting humans tag which cells match for a specific query. 
+That way humans could define which registers are security specific and those could be added into this query.
+
+```rust
+#[variant(ports(clk, data_in, data_out))]
+pub enum Cwe1271<S: State> {
+    #[variant(map(clk = "clk", data_in = "data_in", data_out = "data_out"))]
+    WithEnable(UninitRegEn<S>),
+    #[variant(map(clk = "clk", data_in = "data_in", data_out = "data_out"))]
+    Basic(UninitReg<S>),
+}
+```
+
+#### CWE-1280: Access Control Check Implemented After Asset is Accessed
+This bug was chosen because it is quite amenable to structural analysis, it can be done by looking for a locked register
+which is enabled by an access checking structure but has another register inbetween causing a signal delay.
+
+```rust
+#[composite]
+pub struct Cwe1280<S: State> {
+    #[path]
+    pub path: Instance,
+    #[submodule]
+    pub delayed_grant_access: DelayedGrantAccess<S>,
+    #[submodule]
+    pub locked_reg: LockedRegister<S>,
+}
+
+impl<S: State> Topology<S> for Cwe1280<S> {
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
+        ctx.connect(
+            self.delayed_grant_access.reg_any.q(),
+            self.locked_reg.write_en(),
+        );
+    }
+}
+```
 
 ## System Architecture
 The workspace is organized into functional layers that separate query definition from the underlying graph algorithms.
@@ -30,7 +109,7 @@ The workspace is organized into functional layers that separate query definition
 
 ## Requirements
 - Requires `yosys` in the system `PATH`
-- Certain designs (e.g., Hack@DAC21) will require TabbyCAD forverific support.
+- Certain designs (e.g., Hack@DAC21) will require TabbyCAD for verific support.
 
 ## Usage Example
 ```rust
