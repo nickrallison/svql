@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
-use std::sync::Arc;
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::{Driver, DriverKey};
 use svql_query::Search;
@@ -11,6 +10,7 @@ use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::traits::{Query, Reportable, Searchable};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResultFormat {
@@ -49,6 +49,11 @@ struct Location {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use argparse::{ArgumentParser, Store};
 
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     let mut config_path = String::new();
     let mut format_str = String::from("json");
 
@@ -71,62 +76,99 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => ResultFormat::Json,
     };
 
-    let file = File::open(config_path)?;
+    info!("loading collection configuration from: {}", config_path);
+    let file = File::open(&config_path).map_err(|e| {
+        error!("failed to open config file: {}", e);
+        e
+    })?;
+
     let config: CollectionConfig = serde_json::from_reader(file)?;
     let driver = Driver::new_workspace()?;
     let mut all_summaries = Vec::new();
 
-    for task in config.designs {
+    info!(
+        "starting collection for {} design tasks",
+        config.designs.len()
+    );
+
+    for (idx, task) in config.designs.iter().enumerate() {
+        info!(
+            "[{}/{}] processing design: {} ({})",
+            idx + 1,
+            config.designs.len(),
+            task.module,
+            task.path
+        );
+
         let search_config = Config::builder()
             .match_length(MatchLength::NeedleSubsetHaystack)
             .dedupe(Dedupe::Inner)
             .max_recursion_depth(Some(task.max_depth))
             .build();
 
-        let (key, design) = match task.is_raw {
-            true => driver.get_or_load_design_raw(&task.path, &task.module)?,
-            false => driver.get_or_load_design(
-                &task.path,
-                &task.module,
-                &search_config.haystack_options,
-            )?,
+        let design_result = match task.is_raw {
+            true => {
+                debug!("performing raw import for {}", task.module);
+                driver.get_or_load_design_raw(&task.path, &task.module)
+            }
+            false => {
+                debug!("performing yosys import for {}", task.module);
+                driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
+            }
+        };
+
+        let (key, design) = match design_result {
+            Ok(res) => res,
+            Err(e) => {
+                error!("failed to load design {}: {}", task.module, e);
+                continue;
+            }
         };
 
         // Execute query suite
-        all_summaries.extend(run_suite::<Cwe1234<Search>>(
-            &driver,
-            &key,
-            &search_config,
-            &task,
-            format,
-        )?);
-        all_summaries.extend(run_suite::<Cwe1271<Search>>(
-            &driver,
-            &key,
-            &search_config,
-            &task,
-            format,
-        )?);
-        all_summaries.extend(run_suite::<Cwe1280<Search>>(
-            &driver,
-            &key,
-            &search_config,
-            &task,
-            format,
-        )?);
+        match run_suite_all(&driver, &key, &search_config, task, format) {
+            Ok(summaries) => all_summaries.extend(summaries),
+            Err(e) => error!("query suite failed for {}: {}", task.module, e),
+        }
     }
 
-    // Final structured output dispatch
+    info!(
+        "collection complete. total matches found: {}",
+        all_summaries.len()
+    );
+
     match format {
         ResultFormat::Json => println!("{}", serde_json::to_string_pretty(&all_summaries)?),
         ResultFormat::Csv => report_csv(&all_summaries),
-        ResultFormat::Pretty => (), // Already printed during run_suite
+        ResultFormat::Pretty => (),
     }
 
     Ok(())
 }
 
-/// Executes a specific query type and collects results
+/// Helper to run all registered queries
+fn run_suite_all(
+    driver: &Driver,
+    key: &DriverKey,
+    config: &Config,
+    task: &DesignTask,
+    format: ResultFormat,
+) -> Result<Vec<MatchSummary>, Box<dyn std::error::Error>> {
+    let mut summaries = Vec::new();
+
+    summaries.extend(run_suite::<Cwe1234<Search>>(
+        driver, key, config, task, format,
+    )?);
+    summaries.extend(run_suite::<Cwe1271<Search>>(
+        driver, key, config, task, format,
+    )?);
+    summaries.extend(run_suite::<Cwe1280<Search>>(
+        driver, key, config, task, format,
+    )?);
+
+    Ok(summaries)
+}
+
 fn run_suite<Q>(
     driver: &Driver,
     key: &DriverKey,
@@ -142,11 +184,31 @@ where
         .split("::")
         .last()
         .unwrap_or("Unknown");
-    let context = Q::context(driver, &config.needle_options)?
-        .with_design(key.clone(), driver.get_design(key).unwrap());
+    debug!("preparing context for query: {}", query_name);
 
+    let design_container = driver.get_design(key).ok_or_else(|| {
+        let err = format!("design key not found in driver registry: {:?}", key);
+        error!("{}", err);
+        err
+    })?;
+
+    let context =
+        Q::context(driver, &config.needle_options)?.with_design(key.clone(), design_container);
+
+    info!("executing query: {} on {}", query_name, task.module);
     let query_inst = Q::instantiate(Instance::root(query_name.to_lowercase()));
     let matches = query_inst.query(driver, &context, key, config);
+
+    if matches.is_empty() {
+        debug!("no matches found for {} on {}", query_name, task.module);
+    } else {
+        info!(
+            "found {} matches for {} on {}",
+            matches.len(),
+            query_name,
+            task.module
+        );
+    }
 
     let mut summaries = Vec::new();
     for (i, m) in matches.iter().enumerate() {
@@ -164,7 +226,6 @@ where
     Ok(summaries)
 }
 
-/// Flattens a ReportNode into a structured summary without source text
 fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary {
     let mut locations = HashSet::new();
     collect_locations(&node, &mut locations);

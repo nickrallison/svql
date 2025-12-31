@@ -1,6 +1,7 @@
 use prjunnamed_netlist::Design;
 use svql_driver::DriverKey;
 use svql_subgraph::{AssignmentSet, SingleAssignment, cell::CellWrapper};
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PortDir {
@@ -20,7 +21,11 @@ pub trait NetlistMeta {
     const PORTS: &'static [PortSpec];
 
     fn driver_key() -> DriverKey {
-        tracing::event!(tracing::Level::DEBUG, "Creating driver key for netlist");
+        debug!(
+            "Creating driver key for netlist: {}, file: {}",
+            Self::MODULE_NAME,
+            Self::FILE_PATH
+        );
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 }
