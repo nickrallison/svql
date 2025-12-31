@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::None)
+        .dedupe(Dedupe::All)
         .max_recursion_depth(Some(max_recursion_depth))
         .build();
 
