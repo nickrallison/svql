@@ -1,5 +1,5 @@
 use prjunnamed_netlist::{Cell, ControlNet};
-use std::{borrow::Cow, path::PathBuf};
+use std::borrow::Cow;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

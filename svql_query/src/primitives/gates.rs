@@ -13,6 +13,15 @@ macro_rules! define_primitive_gate {
             $(pub $port: Wire<S>),*
         }
 
+        impl<S: State> $name<S> {
+            $(
+                pub fn $port(&self) -> Option<&Wire<S>> {
+                    Some(&self.$port)
+                }
+            )*
+        }
+
+
         impl<S: State> Component<S> for $name<S> {
             fn path(&self) -> &Instance {
                 &self.path

@@ -1,5 +1,6 @@
 use svql_common::{Config, ModuleConfig};
 use svql_driver::Driver;
+use svql_query::primitives::dff::DffAny;
 use svql_query::primitives::gates::*;
 use svql_query::traits::Query;
 use svql_query::traits::Searchable;
@@ -45,13 +46,13 @@ fn test_and_gate_scan() {
 #[test]
 fn test_dff_gate_scan() {
     let driver = setup_driver();
-    let (key, context) = get_context::<DffGate<Search>>(
+    let (key, context) = get_context::<DffAny<Search>>(
         &driver,
         "examples/fixtures/basic/ff/verilog/seq_double_sdffe.v",
         "seq_double_sdffe",
     );
 
-    let query = DffGate::<Search>::instantiate(Instance::root("q".to_string()));
+    let query = DffAny::<Search>::instantiate(Instance::root("q".to_string()));
     let matches = query.query(&driver, &context, &key, &Config::default());
 
     // seq_double_sdffe has two always @(posedge clk) blocks

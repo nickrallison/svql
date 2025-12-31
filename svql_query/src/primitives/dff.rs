@@ -1,6 +1,6 @@
 use crate::svql_common::{Config, ModuleConfig};
 use crate::svql_driver::{Context, Driver, DriverKey};
-use crate::svql_subgraph::cell::{CellKind, CellWrapper};
+use crate::svql_subgraph::cell::CellKind;
 use crate::traits::{Component, PlannedQuery, Query, Reportable, Searchable};
 use crate::{Instance, Match, Search, State, Wire};
 use prjunnamed_netlist::{Cell, ControlNet};
@@ -24,6 +24,15 @@ macro_rules! impl_dff_primitive {
             pub path: Instance,
             $(pub $port: Wire<S>),*
         }
+
+        impl<S: State> $name<S> {
+            $(
+                pub fn $port(&self) -> Option<&Wire<S>> {
+                    Some(&self.$port)
+                }
+            )*
+        }
+
 
         impl<S: State> Component<S> for $name<S> {
             fn path(&self) -> &Instance { &self.path }
