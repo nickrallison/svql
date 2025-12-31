@@ -206,7 +206,7 @@ fn run_single_case(
     let context = UnlockLogic::<Search>::context(driver, &config.needle_options)?;
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
-    let haystack_index = context.get(&haystack_key).unwrap().index();
+    // let haystack_index = context.get(&haystack_key).unwrap().index();
 
     // Instantiate the query object first
     let query = UnlockLogic::<Search>::instantiate(Instance::root("unlock".to_string()));

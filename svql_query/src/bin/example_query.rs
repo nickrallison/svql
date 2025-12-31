@@ -2,10 +2,9 @@ use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::Driver;
 use svql_query::Search;
 use svql_query::instance::Instance;
-use svql_query::ir::NaiveExecutor;
 use svql_query::security::cwe1234::Cwe1234;
 use svql_query::traits::Reportable;
-use svql_query::traits::{PlannedQuery, Query, Searchable};
+use svql_query::traits::{Query, Searchable};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

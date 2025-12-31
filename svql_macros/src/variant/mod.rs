@@ -136,7 +136,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         .iter()
         .map(|v| quote! { Self::#v(inner) => inner.path() })
         .collect();
-    let component_arms_children: Vec<_> = variant_names
+    let _component_arms_children: Vec<_> = variant_names
         .iter()
         .map(|v| quote! { Self::#v(inner) => inner.children() })
         .collect();
