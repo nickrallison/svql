@@ -1,20 +1,15 @@
-
-module adffe
-(
-input clk,
-input d,
-input reset_n,
-input en,
-output q
+module adffe (
+    input clk,
+    input reset_n,
+    input en,
+    input d,
+    output reg q
 );
-
-reg q1;
-
-always @(posedge clk or negedge reset_n) begin
-    if (!reset_n) q1 <= 1'b0;
-    else if (en) q1 <= d;
-end
-
-assign q = q1;
-
+    always @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            q <= 1'b0;
+        end else if (en) begin
+            q <= d;
+        end
+    end
 endmodule

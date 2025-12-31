@@ -5,6 +5,7 @@ use crate::traits::{Component, PlannedQuery, Query, Reportable, Searchable};
 use crate::{Instance, Match, Search, State, Wire};
 use prjunnamed_netlist::{Cell, ControlNet};
 use std::sync::Arc;
+use tracing::debug;
 
 /// Helper to determine if a DFF control port is actually being used.
 fn is_active(net: &ControlNet) -> bool {
@@ -90,7 +91,7 @@ macro_rules! impl_dff_primitive {
                 let haystack = context.get(key).expect("Haystack missing");
                 let index = haystack.index();
 
-                index.cells_of_type_iter(CellKind::Dff)
+                let real = index.cells_of_type_iter(CellKind::Dff)
                     .into_iter()
                     .flatten()
                     .filter(|cell_wrapper| {
@@ -107,7 +108,38 @@ macro_rules! impl_dff_primitive {
                             $($port: Wire::new(self.$port.path.clone(), cell.clone())),*
                         }
                     })
-                    .collect()
+                    .collect();
+
+                // debugging
+                let cells_of_type: Vec<_> = index.cells_of_type_iter(CellKind::Dff)
+                    .into_iter()
+                    .flatten()
+                    .collect();
+
+                debug!("Total Dff cells found: {}", cells_of_type.len());
+
+                let filtered: Vec<_> = cells_of_type.iter()
+                    .filter(|cell_wrapper| {
+                        if let Cell::Dff(ff) = cell_wrapper.get() {
+                            let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
+                            check(ff)
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
+                debug!("Filtered Dff cells found: {}", filtered.len());
+
+                let mapped: Vec<_> = filtered.iter()
+                    .map(|cell| {
+                        Self::Matched {
+                            path: self.path.clone(),
+                            $($port: Wire::new(self.$port.path.clone(), cell.clone().clone().clone())),*
+                        }
+                    }).collect();
+                debug!("Mapped Dff cells found: {}", mapped.len());
+
+                return real;
             }
             fn context(_d: &Driver, _o: &ModuleConfig) -> Result<Context, Box<dyn std::error::Error>> {
                 Ok(Context::new())
@@ -134,30 +166,68 @@ macro_rules! impl_dff_primitive {
     };
 }
 
-// Any Dff
-impl_dff_primitive!(DffAny, [clk, d, en, q], |_| { true });
+// Any Dff: No filtering
+impl_dff_primitive!(DffAny, [clk, d, en, q], |_| true);
 
-// Sdffe: Sync Reset AND Enable
-impl_dff_primitive!(Sdffe, [clk, d, reset, en, q], |ff| {
-    is_active(&ff.reset) && is_active(&ff.enable)
-});
+fn sdffe_filter(ff: &prjunnamed_netlist::FlipFlop) -> bool {
+    // ff.has_reset() && ff.has_enable()
+    let has_rst = ff.has_reset();
+    let has_en = ff.has_enable();
+    debug!(
+        "Checking Sdffe: {:#?} filter: has_reset={} has_enable={}",
+        ff, has_rst, has_en,
+    );
+    has_rst && has_en
+}
 
-// Adffe: Async Reset AND Enable
+// Sdffe: Synchronous Reset AND Enable
+impl_dff_primitive!(Sdffe, [clk, d, reset, en, q], sdffe_filter);
+
+// Adffe: Asynchronous Reset (Clear) AND Enable
 impl_dff_primitive!(Adffe, [clk, d, reset_n, en, q], |ff| {
-    is_active(&ff.reset) && is_active(&ff.enable)
+    // ff.has_clear() && ff.has_enable()
+    let has_clr = ff.has_clear();
+    let has_en = ff.has_enable();
+    debug!(
+        "Checking Adffe: {:#?} filter: has_clear={} has_enable={}",
+        ff, has_clr, has_en,
+    );
+    has_clr && has_en
 });
 
-// Sdff: Sync Reset, NO Enable
+// Sdff: Synchronous Reset, NO Enable
 impl_dff_primitive!(Sdff, [clk, d, reset, q], |ff| {
-    is_active(&ff.reset) && !is_active(&ff.enable)
+    // ff.has_reset() && !ff.has_enable()
+    let has_rst = ff.has_reset();
+    let has_en = ff.has_enable();
+    debug!(
+        "Checking Sdff: {:#?} filter: has_reset={} has_enable={}",
+        ff, has_rst, has_en,
+    );
+    has_rst && !has_en
 });
 
-// Adff: Async Reset, NO Enable
+// Adff: Asynchronous Reset (Clear), NO Enable
 impl_dff_primitive!(Adff, [clk, d, reset_n, q], |ff| {
-    is_active(&ff.reset) && !is_active(&ff.enable)
+    // ff.has_clear() && !ff.has_enable()
+    let has_clr = ff.has_clear();
+    let has_en = ff.has_enable();
+    debug!(
+        "Checking Adff: {:#?} filter: has_clear={} has_enable={}",
+        ff, has_clr, has_en,
+    );
+    has_clr && !has_en
 });
 
-// Dffe: Enable, NO Reset
+// Dffe: Enable, NO Reset (Sync or Async)
 impl_dff_primitive!(Dffe, [clk, d, en, q], |ff| {
-    !is_active(&ff.reset) && is_active(&ff.enable)
+    // !ff.has_reset() && !ff.has_clear() && ff.has_enable()
+    let has_rst = ff.has_reset();
+    let has_clr = ff.has_clear();
+    let has_en = ff.has_enable();
+    debug!(
+        "Checking Dffe: {:#?} filter: has_reset={} has_clear={} has_enable={}",
+        ff, has_rst, has_clr, has_en,
+    );
+    !has_rst && !has_clr && has_en
 });
