@@ -10,7 +10,10 @@ use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::traits::{Query, Reportable, Searchable};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResultFormat {
@@ -46,10 +49,14 @@ struct Location {
     lines: Vec<usize>,
 }
 
+struct TaskResult {
+    summaries: Vec<MatchSummary>,
+    pretty_output: Vec<String>,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use argparse::{ArgumentParser, Store};
 
-    // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -76,66 +83,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => ResultFormat::Json,
     };
 
-    info!("loading collection configuration from: {}", config_path);
-    let file = File::open(&config_path).map_err(|e| {
-        error!("failed to open config file: {}", e);
-        e
-    })?;
-
+    let file = File::open(&config_path)?;
     let config: CollectionConfig = serde_json::from_reader(file)?;
     let driver = Driver::new_workspace()?;
-    let mut all_summaries = Vec::new();
 
+    #[cfg(feature = "parallel")]
     info!(
-        "starting collection for {} design tasks",
+        "starting parallel collection for {} designs",
+        config.designs.len()
+    );
+    #[cfg(not(feature = "parallel"))]
+    info!(
+        "starting sequential collection for {} designs",
         config.designs.len()
     );
 
-    for (idx, task) in config.designs.iter().enumerate() {
-        info!(
-            "[{}/{}] processing design: {} ({})",
-            idx + 1,
-            config.designs.len(),
-            task.module,
-            task.path
-        );
+    // Feature gated parallel iteration across designs
+    #[cfg(feature = "parallel")]
+    let results: Vec<TaskResult> = config
+        .designs
+        .par_iter()
+        .map(|task| process_design_task(&driver, task, format))
+        .collect();
 
-        let search_config = Config::builder()
-            .match_length(MatchLength::NeedleSubsetHaystack)
-            .dedupe(Dedupe::Inner)
-            .max_recursion_depth(Some(task.max_depth))
-            .build();
+    #[cfg(not(feature = "parallel"))]
+    let results: Vec<TaskResult> = config
+        .designs
+        .iter()
+        .map(|task| process_design_task(&driver, task, format))
+        .collect();
 
-        let design_result = match task.is_raw {
-            true => {
-                debug!("performing raw import for {}", task.module);
-                driver.get_or_load_design_raw(&task.path, &task.module)
-            }
-            false => {
-                debug!("performing yosys import for {}", task.module);
-                driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
-            }
-        };
-
-        let (key, design) = match design_result {
-            Ok(res) => res,
-            Err(e) => {
-                error!("failed to load design {}: {}", task.module, e);
-                continue;
-            }
-        };
-
-        // Execute query suite
-        match run_suite_all(&driver, &key, &search_config, task, format) {
-            Ok(summaries) => all_summaries.extend(summaries),
-            Err(e) => error!("query suite failed for {}: {}", task.module, e),
+    let mut all_summaries = Vec::new();
+    for res in results {
+        all_summaries.extend(res.summaries);
+        for output in res.pretty_output {
+            println!("{}", output);
         }
     }
-
-    info!(
-        "collection complete. total matches found: {}",
-        all_summaries.len()
-    );
 
     match format {
         ResultFormat::Json => println!("{}", serde_json::to_string_pretty(&all_summaries)?),
@@ -146,27 +130,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Helper to run all registered queries
-fn run_suite_all(
-    driver: &Driver,
-    key: &DriverKey,
-    config: &Config,
-    task: &DesignTask,
-    format: ResultFormat,
-) -> Result<Vec<MatchSummary>, Box<dyn std::error::Error>> {
+fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat) -> TaskResult {
+    info!("processing design: {} ({})", task.module, task.path);
+
+    let search_config = Config::builder()
+        .match_length(MatchLength::NeedleSubsetHaystack)
+        .dedupe(Dedupe::Inner)
+        .max_recursion_depth(Some(task.max_depth))
+        .build();
+
+    let design_result = match task.is_raw {
+        true => driver.get_or_load_design_raw(&task.path, &task.module),
+        false => {
+            driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
+        }
+    };
+
+    let (key, _) = match design_result {
+        Ok(res) => res,
+        Err(e) => {
+            error!("failed to load design {}: {}", task.module, e);
+            return TaskResult {
+                summaries: vec![],
+                pretty_output: vec![],
+            };
+        }
+    };
+
+    // Feature gated parallel query execution
+    #[cfg(feature = "parallel")]
+    let (r1, (r2, r3)) = rayon::join(
+        || run_suite::<Cwe1234<Search>>(driver, &key, &search_config, task, format),
+        || {
+            rayon::join(
+                || run_suite::<Cwe1271<Search>>(driver, &key, &search_config, task, format),
+                || run_suite::<Cwe1280<Search>>(driver, &key, &search_config, task, format),
+            )
+        },
+    );
+
+    #[cfg(not(feature = "parallel"))]
+    let (r1, r2, r3) = (
+        run_suite::<Cwe1234<Search>>(driver, &key, &search_config, task, format),
+        run_suite::<Cwe1271<Search>>(driver, &key, &search_config, task, format),
+        run_suite::<Cwe1280<Search>>(driver, &key, &search_config, task, format),
+    );
+
     let mut summaries = Vec::new();
+    let mut pretty_output = Vec::new();
 
-    summaries.extend(run_suite::<Cwe1234<Search>>(
-        driver, key, config, task, format,
-    )?);
-    summaries.extend(run_suite::<Cwe1271<Search>>(
-        driver, key, config, task, format,
-    )?);
-    summaries.extend(run_suite::<Cwe1280<Search>>(
-        driver, key, config, task, format,
-    )?);
+    for res in [r1, r2, r3] {
+        match res {
+            Ok((s, p)) => {
+                summaries.extend(s);
+                pretty_output.extend(p);
+            }
+            Err(e) => error!("query failed for {}: {}", task.module, e),
+        }
+    }
 
-    Ok(summaries)
+    TaskResult {
+        summaries,
+        pretty_output,
+    }
 }
 
 fn run_suite<Q>(
@@ -175,55 +201,49 @@ fn run_suite<Q>(
     config: &Config,
     task: &DesignTask,
     format: ResultFormat,
-) -> Result<Vec<MatchSummary>, Box<dyn std::error::Error>>
+) -> Result<(Vec<MatchSummary>, Vec<String>), Box<dyn std::error::Error + Send + Sync>>
 where
-    Q: Query + Searchable,
-    for<'a> Q::Matched<'a>: Reportable,
+    Q: Query + Searchable + Send + Sync,
+    for<'a> Q::Matched<'a>: Reportable + Send,
 {
     let query_name = std::any::type_name::<Q>()
         .split("::")
         .last()
         .unwrap_or("Unknown");
-    debug!("preparing context for query: {}", query_name);
 
     let design_container = driver.get_design(key).ok_or_else(|| {
-        let err = format!("design key not found in driver registry: {:?}", key);
-        error!("{}", err);
-        err
+        error!("design key not found: {:?}", key);
+        "design missing"
     })?;
 
-    let context =
-        Q::context(driver, &config.needle_options)?.with_design(key.clone(), design_container);
+    let context = Q::context(driver, &config.needle_options)
+        .map_err(|e| {
+            error!("context error: {}", e);
+            "context error"
+        })?
+        .with_design(key.clone(), design_container);
 
     info!("executing query: {} on {}", query_name, task.module);
     let query_inst = Q::instantiate(Instance::root(query_name.to_lowercase()));
     let matches = query_inst.query(driver, &context, key, config);
 
-    if matches.is_empty() {
-        debug!("no matches found for {} on {}", query_name, task.module);
-    } else {
-        info!(
-            "found {} matches for {} on {}",
-            matches.len(),
-            query_name,
-            task.module
-        );
-    }
-
     let mut summaries = Vec::new();
+    let mut pretty_strings = Vec::new();
+
     for (i, m) in matches.iter().enumerate() {
         let report = m.to_report(&format!("Match #{}", i));
 
         match format {
             ResultFormat::Pretty => {
-                println!("--- Design: {} | Query: {} ---", task.module, query_name);
-                println!("{}", report.render());
+                let mut out = format!("--- Design: {} | Query: {} ---\n", task.module, query_name);
+                out.push_str(&report.render());
+                pretty_strings.push(out);
             }
             _ => summaries.push(extract_summary(query_name, &task.module, report)),
         }
     }
 
-    Ok(summaries)
+    Ok((summaries, pretty_strings))
 }
 
 fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary {
