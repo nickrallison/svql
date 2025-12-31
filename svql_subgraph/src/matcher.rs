@@ -168,7 +168,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
         let is_root = assignment.is_empty();
 
-        if total % 1000 == 0 && total > 0 {
+        if total % 512 == 0 && total > 0 {
             let active = self.active_branches.load(Ordering::Relaxed);
             let found = self.matches_found.load(Ordering::Relaxed);
             let top_done = self.initial_candidates_done.load(Ordering::Relaxed);
