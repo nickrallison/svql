@@ -3,20 +3,9 @@ use crate::svql_driver::{Context, Driver, DriverKey};
 use crate::svql_subgraph::cell::CellKind;
 use crate::traits::{Component, PlannedQuery, Query, Reportable, Searchable};
 use crate::{Instance, Match, Search, State, Wire};
-use prjunnamed_netlist::{Cell, ControlNet};
+use prjunnamed_netlist::Cell;
 use std::sync::Arc;
 use tracing::debug;
-
-/// Helper to determine if a DFF control port is actually being used.
-fn is_active(net: &ControlNet) -> bool {
-    match net {
-        // If tied to a constant that never triggers, it is inactive.
-        // Note: This logic assumes standard Yosys mapping where
-        // inactive enables are tied to 1 and inactive resets to 0.
-        ControlNet::Pos(n) => !n.is_const(),
-        ControlNet::Neg(n) => !n.is_const(),
-    }
-}
 
 macro_rules! impl_dff_primitive {
     ($name:ident, [$($port:ident),*], $filter:expr) => {
@@ -169,65 +158,27 @@ macro_rules! impl_dff_primitive {
 // Any Dff: No filtering
 impl_dff_primitive!(DffAny, [clk, d, en, q], |_| true);
 
-fn sdffe_filter(ff: &prjunnamed_netlist::FlipFlop) -> bool {
-    // ff.has_reset() && ff.has_enable()
-    let has_rst = ff.has_reset();
-    let has_en = ff.has_enable();
-    debug!(
-        "Checking Sdffe: {:#?} filter: has_reset={} has_enable={}",
-        ff, has_rst, has_en,
-    );
-    has_rst && has_en
-}
-
 // Sdffe: Synchronous Reset AND Enable
-impl_dff_primitive!(Sdffe, [clk, d, reset, en, q], sdffe_filter);
+impl_dff_primitive!(Sdffe, [clk, d, reset, en, q], |ff| {
+    ff.has_reset() && ff.has_enable()
+});
 
 // Adffe: Asynchronous Reset (Clear) AND Enable
 impl_dff_primitive!(Adffe, [clk, d, reset_n, en, q], |ff| {
-    // ff.has_clear() && ff.has_enable()
-    let has_clr = ff.has_clear();
-    let has_en = ff.has_enable();
-    debug!(
-        "Checking Adffe: {:#?} filter: has_clear={} has_enable={}",
-        ff, has_clr, has_en,
-    );
-    has_clr && has_en
+    ff.has_clear() && ff.has_enable()
 });
 
 // Sdff: Synchronous Reset, NO Enable
 impl_dff_primitive!(Sdff, [clk, d, reset, q], |ff| {
-    // ff.has_reset() && !ff.has_enable()
-    let has_rst = ff.has_reset();
-    let has_en = ff.has_enable();
-    debug!(
-        "Checking Sdff: {:#?} filter: has_reset={} has_enable={}",
-        ff, has_rst, has_en,
-    );
-    has_rst && !has_en
+    ff.has_reset() && !ff.has_enable()
 });
 
 // Adff: Asynchronous Reset (Clear), NO Enable
 impl_dff_primitive!(Adff, [clk, d, reset_n, q], |ff| {
-    // ff.has_clear() && !ff.has_enable()
-    let has_clr = ff.has_clear();
-    let has_en = ff.has_enable();
-    debug!(
-        "Checking Adff: {:#?} filter: has_clear={} has_enable={}",
-        ff, has_clr, has_en,
-    );
-    has_clr && !has_en
+    ff.has_clear() && !ff.has_enable()
 });
 
 // Dffe: Enable, NO Reset (Sync or Async)
 impl_dff_primitive!(Dffe, [clk, d, en, q], |ff| {
-    // !ff.has_reset() && !ff.has_clear() && ff.has_enable()
-    let has_rst = ff.has_reset();
-    let has_clr = ff.has_clear();
-    let has_en = ff.has_enable();
-    debug!(
-        "Checking Dffe: {:#?} filter: has_reset={} has_clear={} has_enable={}",
-        ff, has_rst, has_clr, has_en,
-    );
-    !has_rst && !has_clr && has_en
+    !ff.has_reset() && !ff.has_clear() && ff.has_enable()
 });
