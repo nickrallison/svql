@@ -252,7 +252,8 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
         }
     };
 
-    let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
+    // let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
+    let queries = query_list![Cwe1271<Search>];
 
     #[cfg(feature = "parallel")]
     let query_results: Vec<_> = queries

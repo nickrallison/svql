@@ -99,34 +99,34 @@ macro_rules! impl_dff_primitive {
                     })
                     .collect();
 
-                // debugging
-                let cells_of_type: Vec<_> = index.cells_of_type_iter(CellKind::Dff)
-                    .into_iter()
-                    .flatten()
-                    .collect();
+                // // debugging
+                // let cells_of_type: Vec<_> = index.cells_of_type_iter(CellKind::Dff)
+                //     .into_iter()
+                //     .flatten()
+                //     .collect();
 
-                debug!("Total Dff cells found: {}", cells_of_type.len());
+                // debug!("Total Dff cells found: {}", cells_of_type.len());
 
-                let filtered: Vec<_> = cells_of_type.iter()
-                    .filter(|cell_wrapper| {
-                        if let Cell::Dff(ff) = cell_wrapper.get() {
-                            let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
-                            check(ff)
-                        } else {
-                            false
-                        }
-                    })
-                    .collect();
-                debug!("Filtered Dff cells found: {}", filtered.len());
+                // let filtered: Vec<_> = cells_of_type.iter()
+                //     .filter(|cell_wrapper| {
+                //         if let Cell::Dff(ff) = cell_wrapper.get() {
+                //             let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
+                //             check(ff)
+                //         } else {
+                //             false
+                //         }
+                //     })
+                //     .collect();
+                // debug!("Filtered Dff cells found: {}", filtered.len());
 
-                let mapped: Vec<_> = filtered.iter()
-                    .map(|cell| {
-                        Self::Matched {
-                            path: self.path.clone(),
-                            $($port: Wire::new(self.$port.path.clone(), cell.clone().clone().clone())),*
-                        }
-                    }).collect();
-                debug!("Mapped Dff cells found: {}", mapped.len());
+                // let mapped: Vec<_> = filtered.iter()
+                //     .map(|cell| {
+                //         Self::Matched {
+                //             path: self.path.clone(),
+                //             $($port: Wire::new(self.$port.path.clone(), cell.clone().clone().clone())),*
+                //         }
+                //     }).collect();
+                // debug!("Mapped Dff cells found: {}", mapped.len());
 
                 return real;
             }
@@ -181,4 +181,9 @@ impl_dff_primitive!(Adff, [clk, d, reset_n, q], |ff| {
 // Dffe: Enable, NO Reset (Sync or Async)
 impl_dff_primitive!(Dffe, [clk, d, en, q], |ff| {
     !ff.has_reset() && !ff.has_clear() && ff.has_enable()
+});
+
+// Dff: No Enable, NO Reset
+impl_dff_primitive!(Dff, [clk, d, q], |ff| {
+    !ff.has_reset() && !ff.has_clear() && !ff.has_enable()
 });
