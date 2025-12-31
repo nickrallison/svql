@@ -14,7 +14,7 @@ flamegraph.svg
 fusesoc.conf
 obj_dir/
 *.vcd
-bin/
+/bin/
 ##
 **/openpiton_*.json
 examples/fixtures/larger_designs/json/*/*.json
