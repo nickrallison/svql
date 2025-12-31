@@ -29,10 +29,7 @@ macro_rules! define_primitive_gate {
             }
 
             fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-                let next = match rel_path.first() {
-                    Some(arc_str) => arc_str.as_ref(),
-                    None => return None,
-                };
+                let next = rel_path.first()?.as_ref();
                 let tail = &rel_path[1..];
                 match next {
                     $(stringify!($port) => self.$port.find_port_inner(tail),)*
@@ -54,7 +51,6 @@ macro_rules! define_primitive_gate {
             fn to_report(&self, name: &str) -> crate::report::ReportNode {
                 use crate::svql_subgraph::cell::SourceLocation;
 
-                // All ports on a primitive gate share the same underlying cell/source
                 let source_loc = [$(self.$port.inner.get_source()),*]
                     .into_iter()
                     .flatten()
@@ -85,10 +81,23 @@ macro_rules! define_primitive_gate {
                 _driver: &Driver,
                 context: &'a Context,
                 key: &DriverKey,
-                _config: &Config
+                config: &Config
             ) -> Vec<Self::Matched<'a>> {
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
+
+                // Stub for deduplication logic
+
+                match config.dedupe {
+                    crate::svql_common::Dedupe::All => { /* All Cells Deduplicated */ }
+                    _ => {
+                        crate::tracing::error!(
+                            "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
+                            self.log_label(),
+                            config.dedupe
+                        );
+                    }
+                }
 
                 index.cells_of_type_iter(CellKind::$kind)
                     .into_iter()
@@ -143,7 +152,6 @@ define_primitive_gate!(OrGate, Or, [a, b, y]);
 define_primitive_gate!(NotGate, Not, [a, y]);
 define_primitive_gate!(BufGate, Buf, [a, y]);
 define_primitive_gate!(XorGate, Xor, [a, b, y]);
-// define_primitive_gate!(XnorGate, Xnor, [a, b, y]);
 define_primitive_gate!(MuxGate, Mux, [a, b, sel, y]);
 
 // Comparison & Arithmetic

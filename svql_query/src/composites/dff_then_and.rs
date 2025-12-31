@@ -1,7 +1,7 @@
 use crate::State;
 use crate::instance::Instance;
-use crate::primitives::and::AndGate;
 use crate::primitives::dff::Sdffe;
+use crate::primitives::gates::AndGate;
 use crate::traits::{ConnectionBuilder, Topology};
 use svql_macros::composite;
 

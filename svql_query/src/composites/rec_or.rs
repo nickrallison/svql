@@ -8,7 +8,7 @@ use svql_subgraph::{GraphIndex, cell::CellWrapper};
 use crate::{
     Match, Search, State, Wire,
     instance::Instance,
-    primitives::or::OrGate,
+    primitives::gates::OrGate,
     traits::{
         Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology,
         validate_connection,
@@ -119,7 +119,7 @@ impl RecOr<Search> {
     pub fn new(path: Instance) -> Self {
         Self {
             path: path.clone(),
-            or: OrGate::new(path.child("or")),
+            or: OrGate::instantiate(path.child("or")),
             child: None,
         }
     }

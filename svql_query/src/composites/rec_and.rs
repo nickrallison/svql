@@ -6,7 +6,7 @@ use svql_subgraph::{GraphIndex, cell::CellWrapper};
 use crate::{
     Match, Search, State, Wire,
     instance::Instance,
-    primitives::and::AndGate,
+    primitives::gates::AndGate,
     traits::{
         Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology,
         validate_connection,
@@ -131,7 +131,7 @@ impl RecAnd<Search> {
     pub fn new(path: Instance) -> Self {
         Self {
             path: path.clone(),
-            and: AndGate::new(path.child("and")),
+            and: AndGate::instantiate(path.child("and")),
             child: None,
         }
     }

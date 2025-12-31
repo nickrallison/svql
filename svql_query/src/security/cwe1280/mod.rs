@@ -3,9 +3,9 @@ pub mod grant_access;
 use crate::{
     State,
     instance::Instance,
+    primitives::dff::DffAny,
     security::primitives::locked_register::LockedRegister,
     traits::{ConnectionBuilder, Topology},
-    variants::dff_any::DffAny,
 };
 use svql_macros::composite;
 

@@ -125,6 +125,9 @@ macro_rules! impl_dff_primitive {
     };
 }
 
+// Any Dff
+impl_dff_primitive!(DffAny, [clk, d, en, q], |_| { true });
+
 // Sdffe: Sync Reset AND Enable
 impl_dff_primitive!(Sdffe, [clk, d, reset, en, q], |ff| {
     is_active(&ff.reset) && is_active(&ff.enable)

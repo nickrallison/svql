@@ -1,7 +1,7 @@
 use crate::composites::rec_or::RecOr;
 use crate::instance::Instance;
-use crate::primitives::and::AndGate;
-use crate::primitives::not::NotGate;
+use crate::primitives::gates::AndGate;
+use crate::primitives::gates::NotGate;
 use crate::traits::{
     Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology, validate_connection,
 };
@@ -77,9 +77,9 @@ impl UnlockLogic<Search> {
     pub fn new(path: Instance) -> Self {
         Self {
             path: path.clone(),
-            top_and: AndGate::new(path.child("top_and")),
+            top_and: AndGate::instantiate(path.child("top_and")),
             rec_or: RecOr::new(path.child("rec_or")),
-            not_gate: NotGate::new(path.child("not_gate")),
+            not_gate: NotGate::instantiate(path.child("not_gate")),
         }
     }
 }
