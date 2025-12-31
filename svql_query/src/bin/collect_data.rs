@@ -7,6 +7,7 @@ use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::report::ReportNode;
 use svql_query::security::cwe1234::Cwe1234;
+use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::traits::{Query, Reportable};
 use tracing::{error, info};
@@ -51,9 +52,15 @@ struct Location {
 struct TaskResult {
     summaries: Vec<MatchSummary>,
     pretty_output: Vec<String>,
+    counts: Vec<QueryCount>,
 }
 
-/// Trait to erase the specific query type so they can be stored in a Vec
+struct QueryCount {
+    query: String,
+    design: String,
+    count: usize,
+}
+
 trait QueryRunner: Send + Sync {
     fn run(
         &self,
@@ -62,10 +69,9 @@ trait QueryRunner: Send + Sync {
         config: &Config,
         task: &DesignTask,
         format: ResultFormat,
-    ) -> Result<(Vec<MatchSummary>, Vec<String>), Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<(Vec<MatchSummary>, Vec<String>, usize), Box<dyn std::error::Error + Send + Sync>>;
 }
 
-/// Marker struct to hold the type parameter for a specific query
 struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
 
 impl<Q> QueryRunner for TypedQueryRunner<Q>
@@ -80,11 +86,13 @@ where
         config: &Config,
         task: &DesignTask,
         format: ResultFormat,
-    ) -> Result<(Vec<MatchSummary>, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
-        let query_name = std::any::type_name::<Q>()
-            .split("::")
-            .last()
-            .unwrap_or("Unknown");
+    ) -> Result<(Vec<MatchSummary>, Vec<String>, usize), Box<dyn std::error::Error + Send + Sync>>
+    {
+        let full_name = std::any::type_name::<Q>();
+
+        // Strip generic brackets before splitting path to avoid "Search>" as name
+        let base_name = full_name.split('<').next().unwrap_or(full_name);
+        let query_name = base_name.split("::").last().unwrap_or("Unknown");
 
         let design_container = driver.get_design(key).ok_or_else(|| {
             error!("design key not found: {:?}", key);
@@ -104,6 +112,7 @@ where
 
         let mut summaries = Vec::new();
         let mut pretty_strings = Vec::new();
+        let count = matches.len();
 
         for (i, m) in matches.iter().enumerate() {
             let report = m.to_report(&format!("Match #{}", i));
@@ -119,11 +128,10 @@ where
             }
         }
 
-        Ok((summaries, pretty_strings))
+        Ok((summaries, pretty_strings, count))
     }
 }
 
-/// Macro to easily create a list of query runners from types
 macro_rules! query_list {
     ($($t:ty),* $(,)?) => {
         vec![
@@ -185,6 +193,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|task| process_design_task(&driver, task, format))
         .collect();
 
+    if format == ResultFormat::Pretty {
+        println!("\n========================================");
+        println!("EXECUTION SUMMARY");
+        println!("========================================");
+        println!("{:<20} | {:<30} | Matches", "Query", "Design");
+        println!("{}", "-".repeat(65));
+        for res in &results {
+            for qc in &res.counts {
+                println!("{:<20} | {:<30} | {}", qc.query, qc.design, qc.count);
+            }
+        }
+        println!("========================================\n");
+    }
+
     let mut all_summaries = Vec::new();
     for res in results {
         all_summaries.extend(res.summaries);
@@ -225,16 +247,12 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
             return TaskResult {
                 summaries: vec![],
                 pretty_output: vec![],
+                counts: vec![],
             };
         }
     };
 
-    // Define the list of queries to run using the macro
-    let queries = query_list![
-        Cwe1234<Search>,
-        // Cwe1271<Search>,
-        Cwe1280<Search>,
-    ];
+    let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
 
     #[cfg(feature = "parallel")]
     let query_results: Vec<_> = queries
@@ -250,12 +268,25 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
 
     let mut summaries = Vec::new();
     let mut pretty_output = Vec::new();
+    let mut counts = Vec::new();
 
-    for res in query_results {
+    for (idx, res) in query_results.into_iter().enumerate() {
         match res {
-            Ok((s, p)) => {
+            Ok((s, p, count)) => {
+                // Re-extract name for the summary count
+                let full_name = match idx {
+                    0 => "Cwe1234",
+                    1 => "Cwe1280",
+                    _ => "Unknown",
+                };
+
                 summaries.extend(s);
                 pretty_output.extend(p);
+                counts.push(QueryCount {
+                    query: full_name.to_string(),
+                    design: task.module.clone(),
+                    count,
+                });
             }
             Err(e) => error!("query failed for {}: {}", task.module, e),
         }
@@ -264,6 +295,7 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
     TaskResult {
         summaries,
         pretty_output,
+        counts,
     }
 }
 

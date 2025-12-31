@@ -1,4 +1,5 @@
-export RUST_LOG=collect_data=info,svql_subgraph=debug,svql_query=debug
+# export RUST_LOG=collect_data=info,svql_subgraph=debug,svql_query=debug
+export RUST_LOG=error
 
 # /bin/time cargo run --bin example_query --release --features svql_subgraph/rayon --features svql_query/parallel -- examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v cv32e40p_fp_wrapper 3 false
 # /bin/time cargo run --bin example_query --release --features svql_subgraph/rayon --features svql_query/parallel -- examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v soc_interconnect_wrap 3 false
@@ -11,12 +12,12 @@ export RUST_LOG=collect_data=info,svql_subgraph=debug,svql_query=debug
 
 
 mkdir -p bin
-# cargo run --bin collect_data --release \
-#     --features svql_subgraph/rayon \
-#     --features svql_query/parallel \
-#     -- --config scripts/collect_data.json --format csv > bin/results.csv
-
 cargo run --bin collect_data --release \
     --features svql_subgraph/rayon \
     --features svql_query/parallel \
-    -- --config scripts/collect_data.json --format csv
+    -- --config scripts/collect_data.json --format pretty > bin/results.txt
+
+# cargo run --bin collect_data --release \
+#     --features svql_subgraph/rayon \
+#     --features svql_query/parallel \
+#     -- --config scripts/collect_data.json --format csv
