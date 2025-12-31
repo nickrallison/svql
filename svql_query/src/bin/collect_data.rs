@@ -51,7 +51,6 @@ struct Location {
 
 struct TaskResult {
     summaries: Vec<MatchSummary>,
-    pretty_output: Vec<String>,
     counts: Vec<QueryCount>,
 }
 
@@ -69,7 +68,10 @@ trait QueryRunner: Send + Sync {
         config: &Config,
         task: &DesignTask,
         format: ResultFormat,
-    ) -> Result<(Vec<MatchSummary>, Vec<String>, usize), Box<dyn std::error::Error + Send + Sync>>;
+        file_cache: &std::sync::Arc<
+            std::sync::Mutex<std::collections::HashMap<std::sync::Arc<str>, Vec<String>>>,
+        >,
+    ) -> Result<(Vec<MatchSummary>, usize), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
@@ -86,49 +88,41 @@ where
         config: &Config,
         task: &DesignTask,
         format: ResultFormat,
-    ) -> Result<(Vec<MatchSummary>, Vec<String>, usize), Box<dyn std::error::Error + Send + Sync>>
-    {
+        file_cache: &std::sync::Arc<
+            std::sync::Mutex<std::collections::HashMap<std::sync::Arc<str>, Vec<String>>>,
+        >,
+    ) -> Result<(Vec<MatchSummary>, usize), Box<dyn std::error::Error + Send + Sync>> {
         let full_name = std::any::type_name::<Q>();
-
-        // Strip generic brackets before splitting path to avoid "Search>" as name
         let base_name = full_name.split('<').next().unwrap_or(full_name);
         let query_name = base_name.split("::").last().unwrap_or("Unknown");
 
-        let design_container = driver.get_design(key).ok_or_else(|| {
-            error!("design key not found: {:?}", key);
-            "design missing"
-        })?;
-
-        let context = Q::context(driver, &config.needle_options)
-            .map_err(|e| {
-                error!("context error: {}", e);
-                "context error"
-            })?
-            .with_design(key.clone(), design_container);
+        let design_container = driver.get_design(key).ok_or("design missing")?;
+        let context =
+            Q::context(driver, &config.needle_options)?.with_design(key.clone(), design_container);
 
         info!("executing query: {} on {}", query_name, task.module);
         let query_inst = Q::instantiate(Instance::root(query_name.to_lowercase()));
         let matches = query_inst.query(driver, &context, key, config);
 
         let mut summaries = Vec::new();
-        let mut pretty_strings = Vec::new();
         let count = matches.len();
 
         for (i, m) in matches.iter().enumerate() {
             let report = m.to_report(&format!("Match #{}", i));
 
-            match format {
-                ResultFormat::Pretty => {
-                    let mut out =
-                        format!("--- Design: {} | Query: {} ---\n", task.module, query_name);
-                    out.push_str(&report.render());
-                    pretty_strings.push(out);
-                }
-                _ => summaries.push(extract_summary(query_name, &task.module, report)),
+            if format == ResultFormat::Pretty {
+                let mut cache = file_cache.lock().unwrap();
+                let rendered = report.render_with_cache(&mut cache);
+                println!(
+                    "--- Design: {} | Query: {} ---\n{}",
+                    task.module, query_name, rendered
+                );
+            } else {
+                summaries.push(extract_summary(query_name, &task.module, report));
             }
         }
 
-        Ok((summaries, pretty_strings, count))
+        Ok((summaries, count))
     }
 }
 
@@ -233,11 +227,10 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
         .max_recursion_depth(Some(task.max_depth))
         .build();
 
-    let design_result = match task.is_raw {
-        true => driver.get_or_load_design_raw(&task.path, &task.module),
-        false => {
-            driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
-        }
+    let design_result = if task.is_raw {
+        driver.get_or_load_design_raw(&task.path, &task.module)
+    } else {
+        driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
     };
 
     let (key, _) = match design_result {
@@ -246,7 +239,6 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
             error!("failed to load design {}: {}", task.module, e);
             return TaskResult {
                 summaries: vec![],
-                pretty_output: vec![],
                 counts: vec![],
             };
         }
@@ -254,6 +246,7 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
 
     // let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
     let queries = query_list![Cwe1271<Search>];
+    let file_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
 
     #[cfg(feature = "parallel")]
     let query_results: Vec<_> = queries
@@ -264,11 +257,10 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
     #[cfg(not(feature = "parallel"))]
     let query_results: Vec<_> = queries
         .iter()
-        .map(|q| q.run(driver, &key, &search_config, task, format))
+        .map(|q| q.run(driver, &key, &search_config, task, format, &file_cache))
         .collect();
 
     let mut summaries = Vec::new();
-    let mut pretty_output = Vec::new();
     let mut counts = Vec::new();
 
     for (idx, res) in query_results.into_iter().enumerate() {
@@ -282,7 +274,6 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
                 };
 
                 summaries.extend(s);
-                pretty_output.extend(p);
                 counts.push(QueryCount {
                     query: full_name.to_string(),
                     design: task.module.clone(),
@@ -293,11 +284,7 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
         }
     }
 
-    TaskResult {
-        summaries,
-        pretty_output,
-        counts,
-    }
+    TaskResult { summaries, counts }
 }
 
 fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary {
