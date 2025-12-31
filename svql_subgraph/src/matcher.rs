@@ -110,7 +110,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     /// Executes the subgraph matching process and returns the set of all found mappings.
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
         tracing::info!(
-            "starting subgraph search: needle cells: {}, haystack cells: {}",
+            "[{} -> {}] starting subgraph search: needle cells: {}, haystack cells: {}",
+            self.needle_name,
+            self.haystack_name,
             self.needle_index.num_cells(),
             self.haystack_index.num_cells()
         );
@@ -125,7 +127,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         self.apply_deduplication(&mut results);
 
         tracing::info!(
-            "search complete: found {} raw matches, {} after deduplication",
+            "[{} -> {}] search complete: found {} raw matches, {} after deduplication",
+            self.needle_name,
+            self.haystack_name,
             total_found,
             results.len()
         );
@@ -152,7 +156,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         if candidates.is_empty() {
             tracing::trace!(
-                "backtracking: no candidates for needle cell {} ({:?})",
+                "[{} -> {}] backtracking: no candidates for needle cell {} ({:?})",
+                self.needle_name,
+                self.haystack_name,
                 current_needle.debug_index(),
                 current_needle.cell_type()
             );
@@ -160,7 +166,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
 
         tracing::debug!(
-            "needle cell {} ({:?}): found {} candidates",
+            "[{} -> {}] needle cell {} ({:?}): found {} candidates",
+            self.needle_name,
+            self.haystack_name,
             current_needle.debug_index(),
             current_needle.cell_type(),
             candidates.len()
