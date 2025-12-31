@@ -227,6 +227,8 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     haystack,
                     needle_index,
                     haystack_index,
+                    needle_key.module_name().to_string(),
+                    key.module_name().to_string(),
                     config,
                 );
 

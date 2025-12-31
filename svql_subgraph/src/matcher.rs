@@ -30,6 +30,10 @@ pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     haystack_index: GraphIndex<'haystack>,
     /// Configuration settings for the matcher.
     pub(crate) config: &'cfg Config,
+    /// Name of Needle Design for logging purposes.
+    needle_name: String,
+    /// Name of Haystack Design for logging purposes.
+    haystack_name: String,
 }
 
 /// Core implementation of the subgraph matching algorithm.
@@ -44,6 +48,10 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) haystack_index: &'cfg GraphIndex<'haystack>,
     /// Configuration settings for the matcher.
     pub(crate) config: &'cfg Config,
+    /// Name of Needle Design for logging purposes.
+    pub(crate) needle_name: String,
+    /// Name of Haystack Design for logging purposes.
+    pub(crate) haystack_name: String,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
@@ -53,6 +61,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     pub fn enumerate_all(
         needle: &'needle Design,
         haystack: &'haystack Design,
+        needle_name: String,
+        haystack_name: String,
         config: &'cfg Config,
     ) -> AssignmentSet<'needle, 'haystack> {
         let needle_index = GraphIndex::build(needle);
@@ -64,6 +74,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             needle_index: &needle_index,
             haystack_index: &haystack_index,
             config,
+            needle_name,
+            haystack_name,
         };
 
         matcher.enumerate_assignments()
@@ -77,6 +89,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         haystack: &'haystack Design,
         needle_index: &'cfg GraphIndex<'needle>,
         haystack_index: &'cfg GraphIndex<'haystack>,
+        needle_name: String,
+        haystack_name: String,
         config: &'cfg Config,
     ) -> AssignmentSet<'needle, 'haystack> {
         let matcher = SubgraphMatcherCore {
@@ -84,6 +98,8 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             haystack,
             needle_index,
             haystack_index,
+            needle_name,
+            haystack_name,
             config,
         };
         matcher.enumerate_assignments()

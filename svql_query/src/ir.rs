@@ -274,6 +274,8 @@ impl NaiveExecutor {
                     haystack_container.design(),
                     needle_container.index(),
                     haystack_container.index(),
+                    key.module_name().to_string(),
+                    haystack_key.module_name().to_string(),
                     node_config,
                 );
 

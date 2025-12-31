@@ -17,7 +17,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = svql_common::Config {
         ..Default::default()
     };
-    let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(&needle, &design, &config);
+    let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(
+        &needle,
+        &design,
+        needle_module.module_name().to_string(),
+        design_module.module_name().to_string(),
+        &config,
+    );
 
     for (match_idx, assignment) in assignment_set.items.iter().enumerate() {
         if match_idx % 1000 != 0 {
