@@ -251,12 +251,19 @@ impl Collector {
             match res {
                 Ok(raw_matches) => {
                     let merged = Deduplicator::merge(raw_matches);
+
+                    // Filter out findings that have no source location information
+                    let filtered_findings: Vec<_> = merged
+                        .into_iter()
+                        .filter(|f| !f.summary.locations.is_empty())
+                        .collect();
+
                     final_counts.push(QueryCount {
                         query: runner.name(),
                         design: task.module.clone(),
-                        count: merged.len(),
+                        count: filtered_findings.len(),
                     });
-                    final_findings.extend(merged);
+                    final_findings.extend(filtered_findings);
                 }
                 Err(e) => error!("query {} failed: {}", runner.name(), e),
             }
