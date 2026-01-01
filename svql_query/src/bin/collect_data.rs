@@ -382,20 +382,34 @@ impl Reporter {
 
                 let mut cache = self.file_cache.lock().unwrap();
 
-                for (file_path, mut locs) in by_file {
+                for (file_path, locs) in by_file {
                     println!("Source File: {}", file_path);
 
                     let file_lines = cache
                         .entry(std::sync::Arc::from(file_path.as_str()))
                         .or_insert_with(|| read_file_lines(&file_path).unwrap_or_default());
 
-                    locs.sort_by_key(|l| &l.subquery);
-
+                    // Group sub-components that share the exact same line numbers
+                    let mut line_groups: HashMap<Vec<usize>, Vec<String>> = HashMap::new();
                     for loc in locs {
-                        let ranges = format_line_ranges(&loc.lines);
-                        println!("  [Sub-component: {}] Lines: {}", loc.subquery, ranges);
+                        line_groups
+                            .entry(loc.lines.clone())
+                            .or_default()
+                            .push(loc.subquery.clone());
+                    }
 
-                        for &line_num in &loc.lines {
+                    // Sort groups by the first line number to maintain logical order
+                    let mut sorted_groups: Vec<_> = line_groups.into_iter().collect();
+                    sorted_groups.sort_by_key(|(lines, _)| lines.first().cloned().unwrap_or(0));
+
+                    for (lines, mut subqueries) in sorted_groups {
+                        subqueries.sort();
+                        let sub_names = subqueries.join(", ");
+                        let ranges = format_line_ranges(&lines);
+
+                        println!("  [Sub-components: {}] Lines: {}", sub_names, ranges);
+
+                        for &line_num in &lines {
                             if line_num > 0 && line_num <= file_lines.len() {
                                 let content = &file_lines[line_num - 1];
                                 println!("    {:>4} | {}", line_num, content.trim_end());
