@@ -229,11 +229,8 @@ impl Collector {
             }
         };
 
-        let runners: Vec<Box<dyn QueryRunner>> = query_list![
-            Cwe1234<Search>,
-            // Cwe1271<Search>,
-            Cwe1280<Search>
-        ];
+        let runners: Vec<Box<dyn QueryRunner>> =
+            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
 
         #[cfg(feature = "parallel")]
         let query_results: Vec<_> = runners
