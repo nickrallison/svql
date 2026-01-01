@@ -118,7 +118,7 @@ macro_rules! define_primitive_gate {
                     }
                     _ => {
                         if config.dedupe != crate::svql_common::Dedupe::None {
-                            crate::tracing::error!(
+                            crate::tracing::warn!(
                                 "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
                                 self.log_label(),
                                 config.dedupe

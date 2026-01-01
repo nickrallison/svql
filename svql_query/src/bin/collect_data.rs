@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
+use std::sync::Mutex;
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::{Driver, DriverKey};
 use svql_query::Search;
@@ -14,6 +15,9 @@ use tracing::{error, info};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+
+/// Global lock to prevent interleaved console output
+static PRINT_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResultFormat {
@@ -62,6 +66,8 @@ struct QueryCount {
 }
 
 trait QueryRunner: Send + Sync {
+    fn name(&self) -> String;
+
     fn run(
         &self,
         driver: &Driver,
@@ -82,6 +88,17 @@ where
     Q: Query + Send + Sync,
     for<'a> Q::Matched<'a>: Reportable + Send,
 {
+    fn name(&self) -> String {
+        let full_name = std::any::type_name::<Q>();
+        // Extract "Cwe1234" from "path::to::Cwe1234<Search>"
+        let base_name = full_name.split('<').next().unwrap_or(full_name);
+        base_name
+            .split("::")
+            .last()
+            .unwrap_or("Unknown")
+            .to_string()
+    }
+
     fn run(
         &self,
         driver: &Driver,
@@ -99,7 +116,6 @@ where
 
         let design_container = driver.get_design(key).ok_or("design missing")?;
 
-        // Map the error to a Send + Sync compatible Box
         let context = Q::context(driver, &config.needle_options)
             .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?
             .with_design(key.clone(), design_container);
@@ -117,6 +133,8 @@ where
             if format == ResultFormat::Pretty {
                 let mut cache = file_cache.lock().unwrap();
                 let rendered = report.render_with_cache(&mut cache);
+
+                let _lock = PRINT_LOCK.lock().unwrap();
                 println!(
                     "--- Design: {} | Query: {} ---\n{}",
                     task.module, query_name, rendered
@@ -192,6 +210,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     if format == ResultFormat::Pretty {
+        let _lock = PRINT_LOCK.lock().unwrap();
         println!("\n========================================");
         println!("EXECUTION SUMMARY");
         println!("========================================");
@@ -211,7 +230,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match format {
-        ResultFormat::Json => println!("{}", serde_json::to_string_pretty(&all_summaries)?),
+        ResultFormat::Json => {
+            let _lock = PRINT_LOCK.lock().unwrap();
+            println!("{}", serde_json::to_string_pretty(&all_summaries)?);
+        }
         ResultFormat::Csv => report_csv(&all_summaries),
         ResultFormat::Pretty => (),
     }
@@ -263,24 +285,18 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
     let mut summaries = Vec::new();
     let mut counts = Vec::new();
 
-    for (idx, res) in query_results.into_iter().enumerate() {
+    for (query_runner, res) in queries.iter().zip(query_results) {
+        let query_name = query_runner.name();
         match res {
             Ok((s, count)) => {
-                let full_name = match idx {
-                    0 => "Cwe1234",
-                    1 => "Cwe1271",
-                    2 => "Cwe1280",
-                    _ => "Unknown",
-                };
-
                 summaries.extend(s);
                 counts.push(QueryCount {
-                    query: full_name.to_string(),
+                    query: query_name,
                     design: task.module.clone(),
                     count,
                 });
             }
-            Err(e) => error!("query failed for {}: {}", task.module, e),
+            Err(e) => error!("query {} failed for {}: {}", query_name, task.module, e),
         }
     }
 
@@ -313,9 +329,9 @@ fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
 }
 
 fn report_csv(results: &[MatchSummary]) {
+    let _lock = PRINT_LOCK.lock().unwrap();
     println!("query,design,instance_path,locations");
     results.iter().for_each(|r| {
-        // Convert to Vec and sort by subquery name
         let mut sorted_locations: Vec<_> = r.locations.iter().collect();
         sorted_locations.sort_by(|a, b| a.subquery.cmp(&b.subquery));
 
