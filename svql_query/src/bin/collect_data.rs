@@ -97,8 +97,11 @@ where
         let query_name = base_name.split("::").last().unwrap_or("Unknown");
 
         let design_container = driver.get_design(key).ok_or("design missing")?;
-        let context =
-            Q::context(driver, &config.needle_options)?.with_design(key.clone(), design_container);
+
+        // Map the error to a Send + Sync compatible Box
+        let context = Q::context(driver, &config.needle_options)
+            .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?
+            .with_design(key.clone(), design_container);
 
         info!("executing query: {} on {}", query_name, task.module);
         let query_inst = Q::instantiate(Instance::root(query_name.to_lowercase()));
@@ -204,9 +207,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut all_summaries = Vec::new();
     for res in results {
         all_summaries.extend(res.summaries);
-        for output in res.pretty_output {
-            println!("{}", output);
-        }
     }
 
     match format {
@@ -244,14 +244,13 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
         }
     };
 
-    // let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
-    let queries = query_list![Cwe1271<Search>];
+    let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
     let file_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
 
     #[cfg(feature = "parallel")]
     let query_results: Vec<_> = queries
         .par_iter()
-        .map(|q| q.run(driver, &key, &search_config, task, format))
+        .map(|q| q.run(driver, &key, &search_config, task, format, &file_cache))
         .collect();
 
     #[cfg(not(feature = "parallel"))]
@@ -265,11 +264,11 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
 
     for (idx, res) in query_results.into_iter().enumerate() {
         match res {
-            Ok((s, p, count)) => {
-                // Re-extract name for the summary count
+            Ok((s, count)) => {
                 let full_name = match idx {
                     0 => "Cwe1234",
-                    1 => "Cwe1280",
+                    1 => "Cwe1271",
+                    2 => "Cwe1280",
                     _ => "Unknown",
                 };
 
