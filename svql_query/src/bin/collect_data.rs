@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::sync::Mutex;
 use svql_common::{Config, Dedupe, MatchLength};
@@ -156,6 +156,84 @@ macro_rules! query_list {
     }
 }
 
+fn find_root(i: usize, parent: &mut [usize]) -> usize {
+    if parent[i] == i {
+        i
+    } else {
+        parent[i] = find_root(parent[i], parent);
+        parent[i]
+    }
+}
+
+fn union_sets(i: usize, j: usize, parent: &mut [usize]) {
+    let root_i = find_root(i, parent);
+    let root_j = find_root(j, parent);
+    if root_i != root_j {
+        parent[root_i] = root_j;
+    }
+}
+
+fn deduplicate_summaries(summaries: Vec<MatchSummary>) -> Vec<MatchSummary> {
+    if summaries.is_empty() {
+        return vec![];
+    }
+
+    let n = summaries.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut point_to_matches: HashMap<(String, usize), Vec<usize>> = HashMap::new();
+
+    // Map every specific file:line point to the matches that contain it
+    for (idx, summary) in summaries.iter().enumerate() {
+        for loc in &summary.locations {
+            for &line in &loc.lines {
+                let point = (loc.file.clone(), line);
+                point_to_matches.entry(point).or_default().push(idx);
+            }
+        }
+    }
+
+    // Union matches that share at least one point
+    for matches in point_to_matches.values() {
+        let first = matches[0];
+        for &other in &matches[1..] {
+            union_sets(first, other, &mut parent);
+        }
+    }
+
+    // Group summaries by their DSU root
+    let mut groups: HashMap<usize, Vec<MatchSummary>> = HashMap::new();
+    for (idx, summary) in summaries.into_iter().enumerate() {
+        let root = find_root(idx, &mut parent);
+        groups.entry(root).or_default().push(summary);
+    }
+
+    // Merge each group into a single MatchSummary
+    groups
+        .into_values()
+        .map(|mut group_members| {
+            let mut base = group_members.remove(0);
+
+            for other in group_members {
+                for other_loc in other.locations {
+                    // Find if we already have a location entry for this subquery + file
+                    if let Some(existing_loc) = base
+                        .locations
+                        .iter_mut()
+                        .find(|l| l.subquery == other_loc.subquery && l.file == other_loc.file)
+                    {
+                        existing_loc.lines.extend(other_loc.lines);
+                        existing_loc.lines.sort();
+                        existing_loc.lines.dedup();
+                    } else {
+                        base.locations.push(other_loc);
+                    }
+                }
+            }
+            base
+        })
+        .collect()
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use argparse::{ArgumentParser, Store};
 
@@ -282,25 +360,41 @@ fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat)
         .map(|q| q.run(driver, &key, &search_config, task, format, &file_cache))
         .collect();
 
-    let mut summaries = Vec::new();
-    let mut counts = Vec::new();
-
-    for (query_runner, res) in queries.iter().zip(query_results) {
-        let query_name = query_runner.name();
+    let mut all_raw_summaries = Vec::new();
+    for res in query_results {
         match res {
-            Ok((s, count)) => {
-                summaries.extend(s);
-                counts.push(QueryCount {
-                    query: query_name,
-                    design: task.module.clone(),
-                    count,
-                });
-            }
-            Err(e) => error!("query {} failed for {}: {}", query_name, task.module, e),
+            Ok((s, _)) => all_raw_summaries.extend(s),
+            Err(e) => error!("query execution failed: {}", e),
         }
     }
 
-    TaskResult { summaries, counts }
+    // Group by query type before deduplicating to ensure we don't merge
+    // different CWEs that happen to share a wire/gate
+    let mut summaries_by_query: HashMap<String, Vec<MatchSummary>> = HashMap::new();
+    for s in all_raw_summaries {
+        summaries_by_query
+            .entry(s.query.clone())
+            .or_default()
+            .push(s);
+    }
+
+    let mut final_summaries = Vec::new();
+    let mut final_counts = Vec::new();
+
+    for (query_name, summaries) in summaries_by_query {
+        let merged = deduplicate_summaries(summaries);
+        final_counts.push(QueryCount {
+            query: query_name,
+            design: task.module.clone(),
+            count: merged.len(),
+        });
+        final_summaries.extend(merged);
+    }
+
+    TaskResult {
+        summaries: final_summaries,
+        counts: final_counts,
+    }
 }
 
 fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary {
@@ -328,6 +422,35 @@ fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
     }
 }
 
+fn format_line_ranges(lines: &[usize]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+
+    let mut ranges = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let start = lines[i];
+        let mut end = start;
+
+        // Advance while lines are contiguous
+        while i + 1 < lines.len() && lines[i + 1] == end + 1 {
+            i += 1;
+            end = lines[i];
+        }
+
+        if start == end {
+            ranges.push(start.to_string());
+        } else {
+            ranges.push(format!("{}-{}", start, end));
+        }
+        i += 1;
+    }
+
+    ranges.join(",")
+}
+
 fn report_csv(results: &[MatchSummary]) {
     let _lock = PRINT_LOCK.lock().unwrap();
     println!("query,design,instance_path,locations");
@@ -338,13 +461,9 @@ fn report_csv(results: &[MatchSummary]) {
         let flattened_locations = sorted_locations
             .iter()
             .map(|loc| {
-                let lines = loc
-                    .lines
-                    .iter()
-                    .map(|l| l.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                format!("{}@{}:[{}]", loc.subquery, loc.file, lines)
+                // Use the range formatter instead of joining all lines
+                let lines_str = format_line_ranges(&loc.lines);
+                format!("{}@{}:[{}]", loc.subquery, loc.file, lines_str)
             })
             .collect::<Vec<_>>()
             .join(" | ");
