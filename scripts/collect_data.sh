@@ -15,9 +15,22 @@ mkdir -p bin
 cargo run --bin collect_data --release \
     --features svql_subgraph/rayon \
     --features svql_query/parallel \
-    -- --config scripts/collect_data.json --format pretty > bin/results.txt
+    -- --config scripts/collect_data.json --format csv > bin/results.txt
 
-RUST_LOG=debug cargo run --bin collect_data --release \
+cargo run --bin collect_data --release \
     --features svql_subgraph/rayon \
     --features svql_query/parallel \
-    -- --config scripts/collect_data.json --format pretty
+    -- --config scripts/collect_data.json --format pretty >> bin/results.txt
+
+# cargo run --bin collect_data --release \
+#     --features svql_subgraph/rayon \
+#     --features svql_query/parallel \
+#     -- --config scripts/collect_data.json --format csv > bin/results.csv
+
+
+
+# RUST_LOG=debug cargo run --bin collect_data --release \
+#     --features svql_subgraph/rayon \
+#     --features svql_query/parallel \
+#     -- --config scripts/collect_data.json --format pretty
+

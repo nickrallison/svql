@@ -20,8 +20,6 @@ use rayon::prelude::*;
 
 static PRINT_LOCK: Mutex<()> = Mutex::new(());
 
-// --- Types & Data Structures ---
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResultFormat {
     Json,
@@ -71,8 +69,6 @@ struct QueryCount {
     design: String,
     count: usize,
 }
-
-// --- Query Runner Abstraction ---
 
 trait QueryRunner: Send + Sync {
     fn name(&self) -> String;
@@ -138,8 +134,6 @@ macro_rules! query_list {
     }
 }
 
-// --- CLI & Config Management ---
-
 struct AppArgs {
     config_path: String,
     format: ResultFormat,
@@ -175,8 +169,6 @@ impl AppArgs {
         }
     }
 }
-
-// --- Execution Engine ---
 
 struct Collector {
     driver: Driver,
@@ -237,8 +229,11 @@ impl Collector {
             }
         };
 
-        let runners: Vec<Box<dyn QueryRunner>> =
-            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
+        let runners: Vec<Box<dyn QueryRunner>> = query_list![
+            Cwe1234<Search>,
+            // Cwe1271<Search>,
+            Cwe1280<Search>
+        ];
 
         #[cfg(feature = "parallel")]
         let query_results: Vec<_> = runners
@@ -276,8 +271,6 @@ impl Collector {
         }
     }
 }
-
-// --- Deduplication Logic ---
 
 struct Deduplicator;
 
@@ -345,8 +338,6 @@ impl Deduplicator {
     }
 }
 
-// --- Reporting & Output ---
-
 struct Reporter {
     format: ResultFormat,
     file_cache: Arc<Mutex<HashMap<Arc<str>, Vec<String>>>>,
@@ -378,7 +369,6 @@ impl Reporter {
                 );
                 println!("Instance Path: {}", finding.summary.instance_path);
 
-                // Group locations by file to avoid reopening files repeatedly
                 let mut by_file: std::collections::HashMap<String, Vec<&Location>> =
                     std::collections::HashMap::new();
 
@@ -395,14 +385,12 @@ impl Reporter {
                         .entry(std::sync::Arc::from(file_path.as_str()))
                         .or_insert_with(|| read_file_lines(&file_path).unwrap_or_default());
 
-                    // Sort subqueries for deterministic output
                     locs.sort_by_key(|l| &l.subquery);
 
                     for loc in locs {
                         let ranges = format_line_ranges(&loc.lines);
                         println!("  [Sub-component: {}] Lines: {}", loc.subquery, ranges);
 
-                        // Print the actual source code for the merged lines
                         for &line_num in &loc.lines {
                             if line_num > 0 && line_num <= file_lines.len() {
                                 let content = &file_lines[line_num - 1];
@@ -476,8 +464,6 @@ impl Reporter {
     }
 }
 
-// --- Helper Functions ---
-
 fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -547,8 +533,6 @@ fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
         .iter()
         .for_each(|child| collect_locations(child, set));
 }
-
-// --- Main ---
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
