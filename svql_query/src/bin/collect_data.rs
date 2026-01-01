@@ -188,14 +188,12 @@ impl AppArgs {
 }
 
 struct Collector {
-    driver: Driver,
     sys: Mutex<System>,
 }
 
 impl Collector {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            driver: Driver::new_workspace()?,
             sys: Mutex::new(System::new_all()),
         })
     }
@@ -203,7 +201,6 @@ impl Collector {
     fn get_rss_kb(&self) -> u64 {
         let mut sys = self.sys.lock().unwrap();
         let pid = sysinfo::get_current_pid().expect("Failed to get PID");
-
         let refresh_kind = ProcessRefreshKind::nothing().with_memory();
 
         sys.refresh_processes_specifics(
@@ -237,6 +234,24 @@ impl Collector {
     }
 
     fn process_design(&self, task: &DesignTask) -> TaskResult {
+        info!("Pass 1 (Timing): {}", task.module);
+        let (findings, counts, mut metrics) = self.run_time_pass(task);
+
+        info!("Pass 2 (Memory): {}", task.module);
+        metrics.peak_rss_kb = self.run_memory_pass(task);
+
+        TaskResult {
+            findings,
+            counts,
+            metrics,
+        }
+    }
+
+    fn run_time_pass(
+        &self,
+        task: &DesignTask,
+    ) -> (Vec<MergedFinding>, Vec<QueryCount>, PerformanceMetrics) {
+        let driver = Driver::new_workspace().expect("Failed to create driver");
         let start_load = Instant::now();
         let search_config = Config::builder()
             .match_length(MatchLength::NeedleSubsetHaystack)
@@ -245,48 +260,34 @@ impl Collector {
             .build();
 
         let design_result = match task.is_raw {
-            true => self.driver.get_or_load_design_raw(&task.path, &task.module),
-            false => self.driver.get_or_load_design(
-                &task.path,
-                &task.module,
-                &search_config.haystack_options,
-            ),
+            true => driver.get_or_load_design_raw(&task.path, &task.module),
+            false => {
+                driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
+            }
         };
 
         let (key, design_container) = match design_result {
             Ok(res) => res,
             Err(e) => {
-                error!("failed to load design {}: {}", task.module, e);
-                return TaskResult {
-                    findings: vec![],
-                    counts: vec![],
-                    metrics: PerformanceMetrics {
-                        design_name: task.module.clone(),
-                        gate_count: 0,
-                        load_time_ms: 0,
-                        query_times_ms: HashMap::new(),
-                        peak_rss_kb: 0,
-                    },
-                };
+                panic!("failed to load design {}: {}", task.module, e);
             }
         };
 
         let load_time = start_load.elapsed().as_millis();
         let gate_count = design_container.index().cells_topo().len();
-
         let runners: Vec<Box<dyn QueryRunner>> =
             query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
 
         #[cfg(feature = "parallel")]
         let query_results: Vec<_> = runners
             .par_iter()
-            .map(|q: &Box<dyn QueryRunner>| q.run(&self.driver, &key, &search_config, task))
+            .map(|q| q.run(&driver, &key, &search_config, task))
             .collect();
 
         #[cfg(not(feature = "parallel"))]
         let query_results: Vec<_> = runners
             .iter()
-            .map(|q: &Box<dyn QueryRunner>| q.run(&self.driver, &key, &search_config, task))
+            .map(|q| q.run(&driver, &key, &search_config, task))
             .collect();
 
         let mut final_findings = Vec::new();
@@ -315,17 +316,40 @@ impl Collector {
             }
         }
 
-        TaskResult {
-            findings: final_findings,
-            counts: final_counts,
-            metrics: PerformanceMetrics {
-                design_name: task.module.clone(),
-                gate_count,
-                load_time_ms: load_time,
-                query_times_ms: query_times,
-                peak_rss_kb: self.get_rss_kb(),
-            },
+        let metrics = PerformanceMetrics {
+            design_name: task.module.clone(),
+            gate_count,
+            load_time_ms: load_time,
+            query_times_ms: query_times,
+            peak_rss_kb: 0,
+        };
+
+        (final_findings, final_counts, metrics)
+    }
+
+    fn run_memory_pass(&self, task: &DesignTask) -> u64 {
+        let driver = Driver::new_workspace().expect("Failed to create driver");
+        let search_config = Config::builder()
+            .match_length(MatchLength::NeedleSubsetHaystack)
+            .dedupe(Dedupe::Inner)
+            .max_recursion_depth(Some(task.max_depth))
+            .build();
+
+        let (key, _) = driver
+            .get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
+            .expect("Failed to load design");
+
+        let runners: Vec<Box<dyn QueryRunner>> =
+            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
+
+        let mut peak = self.get_rss_kb();
+
+        for runner in runners {
+            let _ = runner.run(&driver, &key, &search_config, task);
+            peak = peak.max(self.get_rss_kb());
         }
+
+        peak
     }
 }
 
@@ -418,7 +442,6 @@ impl Reporter {
 
     fn render_pretty(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
         let _lock = PRINT_LOCK.lock().unwrap();
-
         for res in results {
             for finding in &res.findings {
                 println!(
@@ -505,7 +528,6 @@ impl Reporter {
 
     fn render_csv(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
         let _lock = PRINT_LOCK.lock().unwrap();
-
         println!("query,design,instance_path,locations");
         for res in results {
             for f in &res.findings {
