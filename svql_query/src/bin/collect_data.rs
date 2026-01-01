@@ -45,6 +45,7 @@ struct MatchSummary {
 
 #[derive(Serialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct Location {
+    subquery: String,
     file: String,
     lines: Vec<usize>,
 }
@@ -301,6 +302,7 @@ fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary 
 fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
     if !node.source_loc.lines.is_empty() {
         set.insert(Location {
+            subquery: node.name.clone(),
             file: node.source_loc.file.to_string(),
             lines: node.source_loc.lines.iter().map(|l| l.number).collect(),
         });
@@ -311,19 +313,29 @@ fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
 }
 
 fn report_csv(results: &[MatchSummary]) {
-    println!("query,design,instance_path,file,lines");
-    for r in results {
-        for loc in &r.locations {
-            let lines = loc
-                .lines
-                .iter()
-                .map(|l| l.to_string())
-                .collect::<Vec<_>>()
-                .join(";");
-            println!(
-                "{},{},{},{},\"{}\"",
-                r.query, r.design, r.instance_path, loc.file, lines
-            );
-        }
-    }
+    println!("query,design,instance_path,locations");
+    results.iter().for_each(|r| {
+        // Convert to Vec and sort by subquery name
+        let mut sorted_locations: Vec<_> = r.locations.iter().collect();
+        sorted_locations.sort_by(|a, b| a.subquery.cmp(&b.subquery));
+
+        let flattened_locations = sorted_locations
+            .iter()
+            .map(|loc| {
+                let lines = loc
+                    .lines
+                    .iter()
+                    .map(|l| l.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("{}@{}:[{}]", loc.subquery, loc.file, lines)
+            })
+            .collect::<Vec<_>>()
+            .join(" | ");
+
+        println!(
+            "{},{},{},\"{}\"",
+            r.query, r.design, r.instance_path, flattened_locations
+        );
+    });
 }
