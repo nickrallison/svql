@@ -1,7 +1,8 @@
+use argparse::{ArgumentParser, Store};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::{Driver, DriverKey};
 use svql_query::Search;
@@ -16,8 +17,9 @@ use tracing::{error, info};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-/// Global lock to prevent interleaved console output
 static PRINT_LOCK: Mutex<()> = Mutex::new(());
+
+// --- Types & Data Structures ---
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResultFormat {
@@ -54,8 +56,13 @@ struct Location {
     lines: Vec<usize>,
 }
 
+struct MergedFinding {
+    summary: MatchSummary,
+    reports: Vec<ReportNode>,
+}
+
 struct TaskResult {
-    summaries: Vec<MatchSummary>,
+    findings: Vec<MergedFinding>,
     counts: Vec<QueryCount>,
 }
 
@@ -65,20 +72,17 @@ struct QueryCount {
     count: usize,
 }
 
+// --- Query Runner Abstraction ---
+
 trait QueryRunner: Send + Sync {
     fn name(&self) -> String;
-
     fn run(
         &self,
         driver: &Driver,
         key: &DriverKey,
         config: &Config,
         task: &DesignTask,
-        format: ResultFormat,
-        file_cache: &std::sync::Arc<
-            std::sync::Mutex<std::collections::HashMap<std::sync::Arc<str>, Vec<String>>>,
-        >,
-    ) -> Result<(Vec<MatchSummary>, usize), Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<Vec<(MatchSummary, ReportNode)>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
@@ -90,7 +94,6 @@ where
 {
     fn name(&self) -> String {
         let full_name = std::any::type_name::<Q>();
-        // Extract "Cwe1234" from "path::to::Cwe1234<Search>"
         let base_name = full_name.split('<').next().unwrap_or(full_name);
         base_name
             .split("::")
@@ -105,56 +108,377 @@ where
         key: &DriverKey,
         config: &Config,
         task: &DesignTask,
-        format: ResultFormat,
-        file_cache: &std::sync::Arc<
-            std::sync::Mutex<std::collections::HashMap<std::sync::Arc<str>, Vec<String>>>,
-        >,
-    ) -> Result<(Vec<MatchSummary>, usize), Box<dyn std::error::Error + Send + Sync>> {
-        let full_name = std::any::type_name::<Q>();
-        let base_name = full_name.split('<').next().unwrap_or(full_name);
-        let query_name = base_name.split("::").last().unwrap_or("Unknown");
-
+    ) -> Result<Vec<(MatchSummary, ReportNode)>, Box<dyn std::error::Error + Send + Sync>> {
+        let query_name = self.name();
         let design_container = driver.get_design(key).ok_or("design missing")?;
-
         let context = Q::context(driver, &config.needle_options)
             .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?
             .with_design(key.clone(), design_container);
 
-        info!("executing query: {} on {}", query_name, task.module);
-        let query_inst = Q::instantiate(Instance::root(query_name.to_lowercase()));
-        let matches = query_inst.query(driver, &context, key, config);
+        let matches = Q::instantiate(Instance::root(query_name.to_lowercase()))
+            .query(driver, &context, key, config);
 
-        let mut summaries = Vec::new();
-        let count = matches.len();
-
-        for (i, m) in matches.iter().enumerate() {
-            let report = m.to_report(&format!("Match #{}", i));
-
-            if format == ResultFormat::Pretty {
-                let mut cache = file_cache.lock().unwrap();
-                let rendered = report.render_with_cache(&mut cache);
-
-                let _lock = PRINT_LOCK.lock().unwrap();
-                println!(
-                    "--- Design: {} | Query: {} ---\n{}",
-                    task.module, query_name, rendered
-                );
-            } else {
-                summaries.push(extract_summary(query_name, &task.module, report));
-            }
-        }
-
-        Ok((summaries, count))
+        Ok(matches
+            .into_iter()
+            .enumerate()
+            .map(|(i, m)| {
+                let report = m.to_report(&format!("Match #{}", i));
+                (
+                    extract_summary(&query_name, &task.module, report.clone()),
+                    report,
+                )
+            })
+            .collect())
     }
 }
 
 macro_rules! query_list {
     ($($t:ty),* $(,)?) => {
-        vec![
-            $( Box::new(TypedQueryRunner::<$t>(std::marker::PhantomData)) as Box<dyn QueryRunner> ),*
-        ]
+        vec![ $( Box::new(TypedQueryRunner::<$t>(std::marker::PhantomData)) as Box<dyn QueryRunner> ),* ]
     }
 }
+
+// --- CLI & Config Management ---
+
+struct AppArgs {
+    config_path: String,
+    format: ResultFormat,
+}
+
+impl AppArgs {
+    fn parse() -> Self {
+        let mut config_path = String::new();
+        let mut format_str = String::from("json");
+
+        {
+            let mut ap = ArgumentParser::new();
+            ap.refer(&mut config_path)
+                .add_option(&["-c", "--config"], Store, "Path to input JSON config")
+                .required();
+            ap.refer(&mut format_str).add_option(
+                &["-f", "--format"],
+                Store,
+                "Output format (json, csv, pretty)",
+            );
+            ap.parse_args_or_exit();
+        }
+
+        let format = match format_str.to_lowercase().as_str() {
+            "csv" => ResultFormat::Csv,
+            "pretty" => ResultFormat::Pretty,
+            _ => ResultFormat::Json,
+        };
+
+        Self {
+            config_path,
+            format,
+        }
+    }
+}
+
+// --- Execution Engine ---
+
+struct Collector {
+    driver: Driver,
+}
+
+impl Collector {
+    fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self {
+            driver: Driver::new_workspace()?,
+        })
+    }
+
+    fn run_tasks(&self, tasks: &[DesignTask]) -> Vec<TaskResult> {
+        info!(
+            "starting collection for {} designs (parallel: {})",
+            tasks.len(),
+            cfg!(feature = "parallel")
+        );
+
+        #[cfg(feature = "parallel")]
+        {
+            tasks
+                .par_iter()
+                .map(|task| self.process_design(task))
+                .collect()
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            tasks.iter().map(|task| self.process_design(task)).collect()
+        }
+    }
+
+    fn process_design(&self, task: &DesignTask) -> TaskResult {
+        let search_config = Config::builder()
+            .match_length(MatchLength::NeedleSubsetHaystack)
+            .dedupe(Dedupe::Inner)
+            .max_recursion_depth(Some(task.max_depth))
+            .build();
+
+        let design_result = match task.is_raw {
+            true => self.driver.get_or_load_design_raw(&task.path, &task.module),
+            false => self.driver.get_or_load_design(
+                &task.path,
+                &task.module,
+                &search_config.haystack_options,
+            ),
+        };
+
+        let (key, _) = match design_result {
+            Ok(res) => res,
+            Err(e) => {
+                error!("failed to load design {}: {}", task.module, e);
+                return TaskResult {
+                    findings: vec![],
+                    counts: vec![],
+                };
+            }
+        };
+
+        let runners: Vec<Box<dyn QueryRunner>> =
+            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
+
+        #[cfg(feature = "parallel")]
+        let query_results: Vec<_> = runners
+            .par_iter()
+            .map(|q: &Box<dyn QueryRunner>| q.run(&self.driver, &key, &search_config, task))
+            .collect();
+
+        #[cfg(not(feature = "parallel"))]
+        let query_results: Vec<_> = runners
+            .iter()
+            .map(|q: &Box<dyn QueryRunner>| q.run(&self.driver, &key, &search_config, task))
+            .collect();
+
+        let mut final_findings = Vec::new();
+        let mut final_counts = Vec::new();
+
+        for (runner, res) in runners.iter().zip(query_results) {
+            match res {
+                Ok(raw_matches) => {
+                    let merged = Deduplicator::merge(raw_matches);
+                    final_counts.push(QueryCount {
+                        query: runner.name(),
+                        design: task.module.clone(),
+                        count: merged.len(),
+                    });
+                    final_findings.extend(merged);
+                }
+                Err(e) => error!("query {} failed: {}", runner.name(), e),
+            }
+        }
+
+        TaskResult {
+            findings: final_findings,
+            counts: final_counts,
+        }
+    }
+}
+
+// --- Deduplication Logic ---
+
+struct Deduplicator;
+
+impl Deduplicator {
+    fn merge(raw_matches: Vec<(MatchSummary, ReportNode)>) -> Vec<MergedFinding> {
+        if raw_matches.is_empty() {
+            return vec![];
+        }
+
+        let n = raw_matches.len();
+        let mut parent: Vec<usize> = (0..n).collect();
+        let mut point_to_matches: HashMap<(String, usize), Vec<usize>> = HashMap::new();
+
+        for (idx, (summary, _)) in raw_matches.iter().enumerate() {
+            for loc in &summary.locations {
+                for &line in &loc.lines {
+                    point_to_matches
+                        .entry((loc.file.clone(), line))
+                        .or_default()
+                        .push(idx);
+                }
+            }
+        }
+
+        for matches in point_to_matches.values() {
+            let first = matches[0];
+            matches
+                .iter()
+                .skip(1)
+                .for_each(|&other| union_sets(first, other, &mut parent));
+        }
+
+        let mut groups: HashMap<usize, Vec<(MatchSummary, ReportNode)>> = HashMap::new();
+        raw_matches.into_iter().enumerate().for_each(|(idx, pair)| {
+            groups
+                .entry(find_root(idx, &mut parent))
+                .or_default()
+                .push(pair);
+        });
+
+        groups.into_values().map(Self::merge_group).collect()
+    }
+
+    fn merge_group(mut members: Vec<(MatchSummary, ReportNode)>) -> MergedFinding {
+        let (mut base_summary, first_report) = members.remove(0);
+        let mut reports = vec![first_report];
+
+        for (other_summary, other_report) in members {
+            reports.push(other_report);
+            for other_loc in other_summary.locations {
+                if let Some(existing) = base_summary
+                    .locations
+                    .iter_mut()
+                    .find(|l| l.subquery == other_loc.subquery && l.file == other_loc.file)
+                {
+                    existing.lines.extend(other_loc.lines);
+                    existing.lines.sort();
+                    existing.lines.dedup();
+                } else {
+                    base_summary.locations.push(other_loc);
+                }
+            }
+        }
+        MergedFinding {
+            summary: base_summary,
+            reports,
+        }
+    }
+}
+
+// --- Reporting & Output ---
+
+struct Reporter {
+    format: ResultFormat,
+    file_cache: Arc<Mutex<HashMap<Arc<str>, Vec<String>>>>,
+}
+
+impl Reporter {
+    fn new(format: ResultFormat) -> Self {
+        Self {
+            format,
+            file_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn render(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
+        match self.format {
+            ResultFormat::Pretty => self.render_pretty(results),
+            ResultFormat::Json => self.render_json(results),
+            ResultFormat::Csv => self.render_csv(results),
+        }
+    }
+
+    fn render_pretty(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
+        let _lock = PRINT_LOCK.lock().unwrap();
+        for res in results {
+            for finding in &res.findings {
+                // 1. Generate the summarized location string (CSV style)
+                let mut locs: Vec<_> = finding.summary.locations.iter().collect();
+                locs.sort_by_key(|l| &l.subquery);
+
+                let flat_locs = locs
+                    .iter()
+                    .map(|l| {
+                        format!(
+                            "{}@{}:[{}]",
+                            l.subquery,
+                            l.file,
+                            format_line_ranges(&l.lines)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" | ");
+
+                // 2. Print the summary line
+                println!("\nquery,design,instance_path,locations");
+                println!(
+                    "{},{},{},\"{}\"",
+                    finding.summary.query,
+                    finding.summary.design,
+                    finding.summary.instance_path,
+                    flat_locs
+                );
+
+                // 3. Print the detailed hierarchical matches
+                println!(
+                    "\n=== Merged Finding: {} | {} ===",
+                    finding.summary.query, finding.summary.design
+                );
+                let mut cache = self.file_cache.lock().unwrap();
+                for (i, report) in finding.reports.iter().enumerate() {
+                    println!(
+                        "--- Sub-match #{} ---\n{}",
+                        i,
+                        report.render_with_cache(&mut cache)
+                    );
+                }
+            }
+        }
+
+        println!(
+            "\n========================================\nEXECUTION SUMMARY\n========================================"
+        );
+        println!(
+            "{:<20} | {:<30} | Matches\n{}",
+            "Query",
+            "Design",
+            "-".repeat(65)
+        );
+        for res in results {
+            for qc in &res.counts {
+                println!("{:<20} | {:<30} | {}", qc.query, qc.design, qc.count);
+            }
+        }
+        Ok(())
+    }
+
+    fn render_json(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
+        let summaries: Vec<_> = results
+            .iter()
+            .flat_map(|r| r.findings.iter().map(|f| &f.summary))
+            .collect();
+        let _lock = PRINT_LOCK.lock().unwrap();
+        println!("{}", serde_json::to_string_pretty(&summaries)?);
+        Ok(())
+    }
+
+    fn render_csv(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
+        let summaries: Vec<_> = results
+            .iter()
+            .flat_map(|r| r.findings.iter().map(|f| &f.summary))
+            .collect();
+        let _lock = PRINT_LOCK.lock().unwrap();
+        println!("query,design,instance_path,locations");
+        for r in summaries {
+            let mut locs: Vec<_> = r.locations.iter().collect();
+            locs.sort_by_key(|l| &l.subquery);
+
+            let flat_locs = locs
+                .iter()
+                .map(|l| {
+                    format!(
+                        "{}@{}:[{}]",
+                        l.subquery,
+                        l.file,
+                        format_line_ranges(&l.lines)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" | ");
+
+            println!(
+                "{},{},{},\"{}\"",
+                r.query, r.design, r.instance_path, flat_locs
+            );
+        }
+        Ok(())
+    }
+}
+
+// --- Helper Functions ---
 
 fn find_root(i: usize, parent: &mut [usize]) -> usize {
     if parent[i] == i {
@@ -173,234 +497,32 @@ fn union_sets(i: usize, j: usize, parent: &mut [usize]) {
     }
 }
 
-fn deduplicate_summaries(summaries: Vec<MatchSummary>) -> Vec<MatchSummary> {
-    if summaries.is_empty() {
-        return vec![];
+fn format_line_ranges(lines: &[usize]) -> String {
+    if lines.is_empty() {
+        return String::new();
     }
-
-    let n = summaries.len();
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut point_to_matches: HashMap<(String, usize), Vec<usize>> = HashMap::new();
-
-    // Map every specific file:line point to the matches that contain it
-    for (idx, summary) in summaries.iter().enumerate() {
-        for loc in &summary.locations {
-            for &line in &loc.lines {
-                let point = (loc.file.clone(), line);
-                point_to_matches.entry(point).or_default().push(idx);
-            }
+    let mut ranges = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let start = lines[i];
+        let mut end = start;
+        while i + 1 < lines.len() && lines[i + 1] == end + 1 {
+            i += 1;
+            end = lines[i];
         }
-    }
-
-    // Union matches that share at least one point
-    for matches in point_to_matches.values() {
-        let first = matches[0];
-        for &other in &matches[1..] {
-            union_sets(first, other, &mut parent);
+        if start == end {
+            ranges.push(start.to_string());
+        } else {
+            ranges.push(format!("{}-{}", start, end));
         }
+        i += 1;
     }
-
-    // Group summaries by their DSU root
-    let mut groups: HashMap<usize, Vec<MatchSummary>> = HashMap::new();
-    for (idx, summary) in summaries.into_iter().enumerate() {
-        let root = find_root(idx, &mut parent);
-        groups.entry(root).or_default().push(summary);
-    }
-
-    // Merge each group into a single MatchSummary
-    groups
-        .into_values()
-        .map(|mut group_members| {
-            let mut base = group_members.remove(0);
-
-            for other in group_members {
-                for other_loc in other.locations {
-                    // Find if we already have a location entry for this subquery + file
-                    if let Some(existing_loc) = base
-                        .locations
-                        .iter_mut()
-                        .find(|l| l.subquery == other_loc.subquery && l.file == other_loc.file)
-                    {
-                        existing_loc.lines.extend(other_loc.lines);
-                        existing_loc.lines.sort();
-                        existing_loc.lines.dedup();
-                    } else {
-                        base.locations.push(other_loc);
-                    }
-                }
-            }
-            base
-        })
-        .collect()
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use argparse::{ArgumentParser, Store};
-
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
-    let mut config_path = String::new();
-    let mut format_str = String::from("json");
-
-    {
-        let mut ap = ArgumentParser::new();
-        ap.refer(&mut config_path)
-            .add_option(&["-c", "--config"], Store, "Path to input JSON config")
-            .required();
-        ap.refer(&mut format_str).add_option(
-            &["-f", "--format"],
-            Store,
-            "Output format (json, csv, pretty)",
-        );
-        ap.parse_args_or_exit();
-    }
-
-    let format = match format_str.to_lowercase().as_str() {
-        "csv" => ResultFormat::Csv,
-        "pretty" => ResultFormat::Pretty,
-        _ => ResultFormat::Json,
-    };
-
-    let file = File::open(&config_path)?;
-    let config: CollectionConfig = serde_json::from_reader(file)?;
-    let driver = Driver::new_workspace()?;
-
-    info!(
-        "starting collection for {} designs (parallel: {})",
-        config.designs.len(),
-        cfg!(feature = "parallel")
-    );
-
-    #[cfg(feature = "parallel")]
-    let results: Vec<TaskResult> = config
-        .designs
-        .par_iter()
-        .map(|task| process_design_task(&driver, task, format))
-        .collect();
-
-    #[cfg(not(feature = "parallel"))]
-    let results: Vec<TaskResult> = config
-        .designs
-        .iter()
-        .map(|task| process_design_task(&driver, task, format))
-        .collect();
-
-    if format == ResultFormat::Pretty {
-        let _lock = PRINT_LOCK.lock().unwrap();
-        println!("\n========================================");
-        println!("EXECUTION SUMMARY");
-        println!("========================================");
-        println!("{:<20} | {:<30} | Matches", "Query", "Design");
-        println!("{}", "-".repeat(65));
-        for res in &results {
-            for qc in &res.counts {
-                println!("{:<20} | {:<30} | {}", qc.query, qc.design, qc.count);
-            }
-        }
-        println!("========================================\n");
-    }
-
-    let mut all_summaries = Vec::new();
-    for res in results {
-        all_summaries.extend(res.summaries);
-    }
-
-    match format {
-        ResultFormat::Json => {
-            let _lock = PRINT_LOCK.lock().unwrap();
-            println!("{}", serde_json::to_string_pretty(&all_summaries)?);
-        }
-        ResultFormat::Csv => report_csv(&all_summaries),
-        ResultFormat::Pretty => (),
-    }
-
-    Ok(())
-}
-
-fn process_design_task(driver: &Driver, task: &DesignTask, format: ResultFormat) -> TaskResult {
-    info!("processing design: {} ({})", task.module, task.path);
-
-    let search_config = Config::builder()
-        .match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::Inner)
-        .max_recursion_depth(Some(task.max_depth))
-        .build();
-
-    let design_result = if task.is_raw {
-        driver.get_or_load_design_raw(&task.path, &task.module)
-    } else {
-        driver.get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
-    };
-
-    let (key, _) = match design_result {
-        Ok(res) => res,
-        Err(e) => {
-            error!("failed to load design {}: {}", task.module, e);
-            return TaskResult {
-                summaries: vec![],
-                counts: vec![],
-            };
-        }
-    };
-
-    let queries = query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>,];
-    let file_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
-
-    #[cfg(feature = "parallel")]
-    let query_results: Vec<_> = queries
-        .par_iter()
-        .map(|q| q.run(driver, &key, &search_config, task, format, &file_cache))
-        .collect();
-
-    #[cfg(not(feature = "parallel"))]
-    let query_results: Vec<_> = queries
-        .iter()
-        .map(|q| q.run(driver, &key, &search_config, task, format, &file_cache))
-        .collect();
-
-    let mut all_raw_summaries = Vec::new();
-    for res in query_results {
-        match res {
-            Ok((s, _)) => all_raw_summaries.extend(s),
-            Err(e) => error!("query execution failed: {}", e),
-        }
-    }
-
-    // Group by query type before deduplicating to ensure we don't merge
-    // different CWEs that happen to share a wire/gate
-    let mut summaries_by_query: HashMap<String, Vec<MatchSummary>> = HashMap::new();
-    for s in all_raw_summaries {
-        summaries_by_query
-            .entry(s.query.clone())
-            .or_default()
-            .push(s);
-    }
-
-    let mut final_summaries = Vec::new();
-    let mut final_counts = Vec::new();
-
-    for (query_name, summaries) in summaries_by_query {
-        let merged = deduplicate_summaries(summaries);
-        final_counts.push(QueryCount {
-            query: query_name,
-            design: task.module.clone(),
-            count: merged.len(),
-        });
-        final_summaries.extend(merged);
-    }
-
-    TaskResult {
-        summaries: final_summaries,
-        counts: final_counts,
-    }
+    ranges.join(",")
 }
 
 fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary {
     let mut locations = HashSet::new();
     collect_locations(&node, &mut locations);
-
     MatchSummary {
         query: query.to_string(),
         design: design.to_string(),
@@ -417,60 +539,26 @@ fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
             lines: node.source_loc.lines.iter().map(|l| l.number).collect(),
         });
     }
-    for child in &node.children {
-        collect_locations(child, set);
-    }
+    node.children
+        .iter()
+        .for_each(|child| collect_locations(child, set));
 }
 
-fn format_line_ranges(lines: &[usize]) -> String {
-    if lines.is_empty() {
-        return String::new();
-    }
+// --- Main ---
 
-    let mut ranges = Vec::new();
-    let mut i = 0;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
-    while i < lines.len() {
-        let start = lines[i];
-        let mut end = start;
+    let args = AppArgs::parse();
+    let config: CollectionConfig = serde_json::from_reader(File::open(&args.config_path)?)?;
 
-        // Advance while lines are contiguous
-        while i + 1 < lines.len() && lines[i + 1] == end + 1 {
-            i += 1;
-            end = lines[i];
-        }
+    let collector = Collector::new()?;
+    let results = collector.run_tasks(&config.designs);
 
-        if start == end {
-            ranges.push(start.to_string());
-        } else {
-            ranges.push(format!("{}-{}", start, end));
-        }
-        i += 1;
-    }
+    let reporter = Reporter::new(args.format);
+    reporter.render(&results)?;
 
-    ranges.join(",")
-}
-
-fn report_csv(results: &[MatchSummary]) {
-    let _lock = PRINT_LOCK.lock().unwrap();
-    println!("query,design,instance_path,locations");
-    results.iter().for_each(|r| {
-        let mut sorted_locations: Vec<_> = r.locations.iter().collect();
-        sorted_locations.sort_by(|a, b| a.subquery.cmp(&b.subquery));
-
-        let flattened_locations = sorted_locations
-            .iter()
-            .map(|loc| {
-                // Use the range formatter instead of joining all lines
-                let lines_str = format_line_ranges(&loc.lines);
-                format!("{}@{}:[{}]", loc.subquery, loc.file, lines_str)
-            })
-            .collect::<Vec<_>>()
-            .join(" | ");
-
-        println!(
-            "{},{},{},\"{}\"",
-            r.query, r.design, r.instance_path, flattened_locations
-        );
-    });
+    Ok(())
 }
