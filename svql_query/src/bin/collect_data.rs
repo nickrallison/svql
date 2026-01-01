@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::{Driver, DriverKey};
 use svql_query::Search;
@@ -13,6 +14,7 @@ use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::traits::{Query, Reportable};
+use sysinfo::{ProcessRefreshKind, System};
 use tracing::{error, info};
 
 #[cfg(feature = "parallel")]
@@ -40,6 +42,15 @@ struct CollectionConfig {
     designs: Vec<DesignTask>,
 }
 
+#[derive(Serialize, Debug, Clone)]
+struct PerformanceMetrics {
+    design_name: String,
+    gate_count: usize,
+    load_time_ms: u128,
+    query_times_ms: HashMap<String, u128>,
+    peak_rss_kb: u64,
+}
+
 #[derive(Serialize, Debug)]
 struct MatchSummary {
     query: String,
@@ -62,6 +73,7 @@ struct MergedFinding {
 struct TaskResult {
     findings: Vec<MergedFinding>,
     counts: Vec<QueryCount>,
+    metrics: PerformanceMetrics,
 }
 
 struct QueryCount {
@@ -78,7 +90,7 @@ trait QueryRunner: Send + Sync {
         key: &DriverKey,
         config: &Config,
         task: &DesignTask,
-    ) -> Result<Vec<(MatchSummary, ReportNode)>, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<(Vec<(MatchSummary, ReportNode)>, u128), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
@@ -104,17 +116,20 @@ where
         key: &DriverKey,
         config: &Config,
         task: &DesignTask,
-    ) -> Result<Vec<(MatchSummary, ReportNode)>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(Vec<(MatchSummary, ReportNode)>, u128), Box<dyn std::error::Error + Send + Sync>>
+    {
         let query_name = self.name();
         let design_container = driver.get_design(key).ok_or("design missing")?;
         let context = Q::context(driver, &config.needle_options)
             .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?
             .with_design(key.clone(), design_container);
 
+        let start = Instant::now();
         let matches = Q::instantiate(Instance::root(query_name.to_lowercase()))
             .query(driver, &context, key, config);
+        let duration = start.elapsed().as_millis();
 
-        Ok(matches
+        let results = matches
             .into_iter()
             .enumerate()
             .map(|(i, m)| {
@@ -124,7 +139,9 @@ where
                     report,
                 )
             })
-            .collect())
+            .collect();
+
+        Ok((results, duration))
     }
 }
 
@@ -172,13 +189,30 @@ impl AppArgs {
 
 struct Collector {
     driver: Driver,
+    sys: Mutex<System>,
 }
 
 impl Collector {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             driver: Driver::new_workspace()?,
+            sys: Mutex::new(System::new_all()),
         })
+    }
+
+    fn get_rss_kb(&self) -> u64 {
+        let mut sys = self.sys.lock().unwrap();
+        let pid = sysinfo::get_current_pid().expect("Failed to get PID");
+
+        let refresh_kind = ProcessRefreshKind::nothing().with_memory();
+
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::Some(&[pid]),
+            true,
+            refresh_kind,
+        );
+
+        sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0)
     }
 
     fn run_tasks(&self, tasks: &[DesignTask]) -> Vec<TaskResult> {
@@ -203,6 +237,7 @@ impl Collector {
     }
 
     fn process_design(&self, task: &DesignTask) -> TaskResult {
+        let start_load = Instant::now();
         let search_config = Config::builder()
             .match_length(MatchLength::NeedleSubsetHaystack)
             .dedupe(Dedupe::Inner)
@@ -218,16 +253,26 @@ impl Collector {
             ),
         };
 
-        let (key, _) = match design_result {
+        let (key, design_container) = match design_result {
             Ok(res) => res,
             Err(e) => {
                 error!("failed to load design {}: {}", task.module, e);
                 return TaskResult {
                     findings: vec![],
                     counts: vec![],
+                    metrics: PerformanceMetrics {
+                        design_name: task.module.clone(),
+                        gate_count: 0,
+                        load_time_ms: 0,
+                        query_times_ms: HashMap::new(),
+                        peak_rss_kb: 0,
+                    },
                 };
             }
         };
+
+        let load_time = start_load.elapsed().as_millis();
+        let gate_count = design_container.index().cells_topo().len();
 
         let runners: Vec<Box<dyn QueryRunner>> =
             query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
@@ -246,13 +291,14 @@ impl Collector {
 
         let mut final_findings = Vec::new();
         let mut final_counts = Vec::new();
+        let mut query_times = HashMap::new();
 
         for (runner, res) in runners.iter().zip(query_results) {
             match res {
-                Ok(raw_matches) => {
+                Ok((raw_matches, duration)) => {
+                    query_times.insert(runner.name(), duration);
                     let merged = Deduplicator::merge(raw_matches);
 
-                    // Filter out findings that have no source location information
                     let filtered_findings: Vec<_> = merged
                         .into_iter()
                         .filter(|f| !f.summary.locations.is_empty())
@@ -272,6 +318,13 @@ impl Collector {
         TaskResult {
             findings: final_findings,
             counts: final_counts,
+            metrics: PerformanceMetrics {
+                design_name: task.module.clone(),
+                gate_count,
+                load_time_ms: load_time,
+                query_times_ms: query_times,
+                peak_rss_kb: self.get_rss_kb(),
+            },
         }
     }
 }
@@ -365,56 +418,37 @@ impl Reporter {
 
     fn render_pretty(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
         let _lock = PRINT_LOCK.lock().unwrap();
+
         for res in results {
             for finding in &res.findings {
                 println!(
-                    "\n=== Merged Finding: {} | {} ===",
+                    "\n=== Finding: {} | {} ===",
                     finding.summary.query, finding.summary.design
                 );
                 println!("Instance Path: {}", finding.summary.instance_path);
 
-                let mut by_file: std::collections::HashMap<String, Vec<&Location>> =
-                    std::collections::HashMap::new();
-
+                let mut by_file: HashMap<String, Vec<&Location>> = HashMap::new();
                 for loc in &finding.summary.locations {
                     by_file.entry(loc.file.clone()).or_default().push(loc);
                 }
 
                 let mut cache = self.file_cache.lock().unwrap();
-
                 for (file_path, locs) in by_file {
                     println!("Source File: {}", file_path);
-
                     let file_lines = cache
-                        .entry(std::sync::Arc::from(file_path.as_str()))
+                        .entry(Arc::from(file_path.as_str()))
                         .or_insert_with(|| read_file_lines(&file_path).unwrap_or_default());
 
-                    // Group sub-components that share the exact same line numbers
-                    let mut line_groups: HashMap<Vec<usize>, Vec<String>> = HashMap::new();
                     for loc in locs {
-                        line_groups
-                            .entry(loc.lines.clone())
-                            .or_default()
-                            .push(loc.subquery.clone());
-                    }
-
-                    // Sort groups by the first line number to maintain logical order
-                    let mut sorted_groups: Vec<_> = line_groups.into_iter().collect();
-                    sorted_groups.sort_by_key(|(lines, _)| lines.first().cloned().unwrap_or(0));
-
-                    for (lines, mut subqueries) in sorted_groups {
-                        subqueries.sort();
-                        let sub_names = subqueries.join(", ");
-                        let ranges = format_line_ranges(&lines);
-
-                        println!("  [Sub-components: {}] Lines: {}", sub_names, ranges);
-
-                        for &line_num in &lines {
+                        let ranges = format_line_ranges(&loc.lines);
+                        println!("  [Sub-component: {}] Lines: {}", loc.subquery, ranges);
+                        for &line_num in &loc.lines {
                             if line_num > 0 && line_num <= file_lines.len() {
-                                let content = &file_lines[line_num - 1];
-                                println!("    {:>4} | {}", line_num, content.trim_end());
-                            } else {
-                                println!("    {:>4} | <line not found>", line_num);
+                                println!(
+                                    "    {:>4} | {}",
+                                    line_num,
+                                    file_lines[line_num - 1].trim_end()
+                                );
                             }
                         }
                     }
@@ -423,7 +457,22 @@ impl Reporter {
         }
 
         println!(
-            "\n========================================\nEXECUTION SUMMARY\n========================================"
+            "\n========================================\nPERFORMANCE SUMMARY\n========================================"
+        );
+        for res in results {
+            let m = &res.metrics;
+            println!("\nDesign: {}", m.design_name);
+            println!("  Gates:        {}", m.gate_count);
+            println!("  Load Time:    {}ms", m.load_time_ms);
+            println!("  Peak RSS:     {:.2}MB", m.peak_rss_kb as f64 / 1024.0);
+            println!("  Query Times:");
+            for (name, time) in &m.query_times_ms {
+                println!("    {:<15} {}ms", name, time);
+            }
+        }
+
+        println!(
+            "\n========================================\nMATCH SUMMARY\n========================================"
         );
         println!(
             "{:<20} | {:<30} | Matches\n{}",
@@ -440,43 +489,67 @@ impl Reporter {
     }
 
     fn render_json(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
-        let summaries: Vec<_> = results
+        let output: Vec<_> = results
             .iter()
-            .flat_map(|r| r.findings.iter().map(|f| &f.summary))
+            .map(|r| {
+                serde_json::json!({
+                    "metrics": r.metrics,
+                    "findings": r.findings.iter().map(|f| &f.summary).collect::<Vec<_>>()
+                })
+            })
             .collect();
         let _lock = PRINT_LOCK.lock().unwrap();
-        println!("{}", serde_json::to_string_pretty(&summaries)?);
+        println!("{}", serde_json::to_string_pretty(&output)?);
         Ok(())
     }
 
     fn render_csv(&self, results: &[TaskResult]) -> Result<(), Box<dyn std::error::Error>> {
-        let summaries: Vec<_> = results
-            .iter()
-            .flat_map(|r| r.findings.iter().map(|f| &f.summary))
-            .collect();
         let _lock = PRINT_LOCK.lock().unwrap();
+
         println!("query,design,instance_path,locations");
-        for r in summaries {
-            let mut locs: Vec<_> = r.locations.iter().collect();
-            locs.sort_by_key(|l| &l.subquery);
+        for res in results {
+            for f in &res.findings {
+                let r = &f.summary;
+                let mut locs: Vec<_> = r.locations.iter().collect();
+                locs.sort_by_key(|l| &l.subquery);
 
-            let flat_locs = locs
-                .iter()
-                .map(|l| {
-                    format!(
-                        "{}@{}:[{}]",
-                        l.subquery,
-                        l.file,
-                        format_line_ranges(&l.lines)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(" | ");
+                let flat_locs = locs
+                    .iter()
+                    .map(|l| {
+                        format!(
+                            "{}@{}:[{}]",
+                            l.subquery,
+                            l.file,
+                            format_line_ranges(&l.lines)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" | ");
 
-            println!(
-                "{},{},{},\"{}\"",
-                r.query, r.design, r.instance_path, flat_locs
-            );
+                println!(
+                    "{},{},{},\"{}\"",
+                    r.query, r.design, r.instance_path, flat_locs
+                );
+            }
+        }
+
+        println!("\n# PERFORMANCE METRICS");
+        println!("design,gates,load_ms,peak_rss_kb,query,query_ms,matches");
+        for res in results {
+            let m = &res.metrics;
+            for qc in &res.counts {
+                let q_time = m.query_times_ms.get(&qc.query).unwrap_or(&0);
+                println!(
+                    "{},{},{},{},{},{},{}",
+                    m.design_name,
+                    m.gate_count,
+                    m.load_time_ms,
+                    m.peak_rss_kb,
+                    qc.query,
+                    q_time,
+                    qc.count
+                );
+            }
         }
         Ok(())
     }
