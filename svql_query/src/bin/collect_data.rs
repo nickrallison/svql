@@ -2,6 +2,7 @@ use argparse::{ArgumentParser, Store};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
 use svql_common::{Config, Dedupe, MatchLength};
 use svql_driver::{Driver, DriverKey};
@@ -58,7 +59,6 @@ struct Location {
 
 struct MergedFinding {
     summary: MatchSummary,
-    reports: Vec<ReportNode>,
 }
 
 struct TaskResult {
@@ -322,11 +322,9 @@ impl Deduplicator {
     }
 
     fn merge_group(mut members: Vec<(MatchSummary, ReportNode)>) -> MergedFinding {
-        let (mut base_summary, first_report) = members.remove(0);
-        let mut reports = vec![first_report];
+        let (mut base_summary, _) = members.remove(0);
 
-        for (other_summary, other_report) in members {
-            reports.push(other_report);
+        for (other_summary, _) in members {
             for other_loc in other_summary.locations {
                 if let Some(existing) = base_summary
                     .locations
@@ -343,7 +341,6 @@ impl Deduplicator {
         }
         MergedFinding {
             summary: base_summary,
-            reports,
         }
     }
 }
@@ -375,45 +372,46 @@ impl Reporter {
         let _lock = PRINT_LOCK.lock().unwrap();
         for res in results {
             for finding in &res.findings {
-                // 1. Generate the summarized location string (CSV style)
-                let mut locs: Vec<_> = finding.summary.locations.iter().collect();
-                locs.sort_by_key(|l| &l.subquery);
-
-                let flat_locs = locs
-                    .iter()
-                    .map(|l| {
-                        format!(
-                            "{}@{}:[{}]",
-                            l.subquery,
-                            l.file,
-                            format_line_ranges(&l.lines)
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" | ");
-
-                // 2. Print the summary line
-                println!("\nquery,design,instance_path,locations");
-                println!(
-                    "{},{},{},\"{}\"",
-                    finding.summary.query,
-                    finding.summary.design,
-                    finding.summary.instance_path,
-                    flat_locs
-                );
-
-                // 3. Print the detailed hierarchical matches
                 println!(
                     "\n=== Merged Finding: {} | {} ===",
                     finding.summary.query, finding.summary.design
                 );
+                println!("Instance Path: {}", finding.summary.instance_path);
+
+                // Group locations by file to avoid reopening files repeatedly
+                let mut by_file: std::collections::HashMap<String, Vec<&Location>> =
+                    std::collections::HashMap::new();
+
+                for loc in &finding.summary.locations {
+                    by_file.entry(loc.file.clone()).or_default().push(loc);
+                }
+
                 let mut cache = self.file_cache.lock().unwrap();
-                for (i, report) in finding.reports.iter().enumerate() {
-                    println!(
-                        "--- Sub-match #{} ---\n{}",
-                        i,
-                        report.render_with_cache(&mut cache)
-                    );
+
+                for (file_path, mut locs) in by_file {
+                    println!("Source File: {}", file_path);
+
+                    let file_lines = cache
+                        .entry(std::sync::Arc::from(file_path.as_str()))
+                        .or_insert_with(|| read_file_lines(&file_path).unwrap_or_default());
+
+                    // Sort subqueries for deterministic output
+                    locs.sort_by_key(|l| &l.subquery);
+
+                    for loc in locs {
+                        let ranges = format_line_ranges(&loc.lines);
+                        println!("  [Sub-component: {}] Lines: {}", loc.subquery, ranges);
+
+                        // Print the actual source code for the merged lines
+                        for &line_num in &loc.lines {
+                            if line_num > 0 && line_num <= file_lines.len() {
+                                let content = &file_lines[line_num - 1];
+                                println!("    {:>4} | {}", line_num, content.trim_end());
+                            } else {
+                                println!("    {:>4} | <line not found>", line_num);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -479,6 +477,12 @@ impl Reporter {
 }
 
 // --- Helper Functions ---
+
+fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    reader.lines().collect()
+}
 
 fn find_root(i: usize, parent: &mut [usize]) -> usize {
     if parent[i] == i {
