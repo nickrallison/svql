@@ -84,7 +84,7 @@ impl<S: State> Topology<S> for Cwe1280<S> {
 The framework is validated against open-source hardware designs and security competition benchmark. This was done to ensure the tool performs well, in addition to finding true positive & false positive instances of the bugs.
 
 - **Hack@DAC18 & Hack@DAC21**: These modules contain a large set of manually inserted bugs, providing a ground truth for query testing.
-- **HummingbirdV2**: A real-world RISC-V core used to test performance on complex, non-buggy designs.
+- **HummingbirdV2**: A RISC-V core used to test performance on complex, non-buggy designs.
 
 
 ## System Architecture
