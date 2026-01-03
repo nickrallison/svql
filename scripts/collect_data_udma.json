@@ -1,0 +1,10 @@
+{
+    "designs": [
+        {
+            "path": "examples/fixtures/larger_designs/json/hackatdac18/udma_core_netlist.json",
+            "module": "udma_core",
+            "max_depth": 2,
+            "is_raw": true
+        }
+    ]
+}

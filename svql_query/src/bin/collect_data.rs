@@ -46,7 +46,6 @@ struct CollectionConfig {
 struct PerformanceMetrics {
     design_name: String,
     gate_count: usize,
-    load_time_ms: u128,
     query_times_ms: HashMap<String, u128>,
     peak_rss_kb: u64,
 }
@@ -154,17 +153,22 @@ macro_rules! query_list {
 struct AppArgs {
     config_path: String,
     format: ResultFormat,
+    query_name: String,
 }
 
 impl AppArgs {
     fn parse() -> Self {
         let mut config_path = String::new();
         let mut format_str = String::from("json");
+        let mut query_name = String::new();
 
         {
             let mut ap = ArgumentParser::new();
             ap.refer(&mut config_path)
                 .add_option(&["-c", "--config"], Store, "Path to input JSON config")
+                .required();
+            ap.refer(&mut query_name)
+                .add_option(&["-q", "--query"], Store, "Specific query to run")
                 .required();
             ap.refer(&mut format_str).add_option(
                 &["-f", "--format"],
@@ -183,6 +187,7 @@ impl AppArgs {
         Self {
             config_path,
             format,
+            query_name,
         }
     }
 }
@@ -212,33 +217,33 @@ impl Collector {
         sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0)
     }
 
-    fn run_tasks(&self, tasks: &[DesignTask]) -> Vec<TaskResult> {
+    fn run_tasks(&self, tasks: &[DesignTask], query_filter: &str) -> Vec<TaskResult> {
         info!(
-            "starting collection for {} designs (parallel: {})",
+            "starting collection for {} designs (query: {})",
             tasks.len(),
-            cfg!(feature = "parallel")
+            query_filter
         );
 
         #[cfg(feature = "parallel")]
         {
             tasks
                 .par_iter()
-                .map(|task| self.process_design(task))
+                .map(|task| self.process_design(task, query_filter))
                 .collect()
         }
 
         #[cfg(not(feature = "parallel"))]
         {
-            tasks.iter().map(|task| self.process_design(task)).collect()
+            tasks
+                .iter()
+                .map(|task| self.process_design(task, query_filter))
+                .collect()
         }
     }
 
-    fn process_design(&self, task: &DesignTask) -> TaskResult {
-        info!("Pass 1 (Timing): {}", task.module);
-        let (findings, counts, mut metrics) = self.run_time_pass(task);
-
-        info!("Pass 2 (Memory): {}", task.module);
-        metrics.peak_rss_kb = self.run_memory_pass(task);
+    fn process_design(&self, task: &DesignTask, query_filter: &str) -> TaskResult {
+        let (findings, counts, mut metrics) = self.run_time_pass(task, query_filter);
+        metrics.peak_rss_kb = self.run_memory_pass(task, query_filter);
 
         TaskResult {
             findings,
@@ -247,12 +252,22 @@ impl Collector {
         }
     }
 
+    fn get_filtered_runners(&self, filter: &str) -> Vec<Box<dyn QueryRunner>> {
+        let all_runners: Vec<Box<dyn QueryRunner>> =
+            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
+
+        all_runners
+            .into_iter()
+            .filter(|r| r.name().to_lowercase() == filter.to_lowercase())
+            .collect()
+    }
+
     fn run_time_pass(
         &self,
         task: &DesignTask,
+        query_filter: &str,
     ) -> (Vec<MergedFinding>, Vec<QueryCount>, PerformanceMetrics) {
         let driver = Driver::new_workspace().expect("Failed to create driver");
-        let start_load = Instant::now();
         let search_config = Config::builder()
             .match_length(MatchLength::NeedleSubsetHaystack)
             .dedupe(Dedupe::Inner)
@@ -266,17 +281,13 @@ impl Collector {
             }
         };
 
-        let (key, design_container) = match design_result {
-            Ok(res) => res,
-            Err(e) => {
-                panic!("failed to load design {}: {}", task.module, e);
-            }
-        };
-
-        let load_time = start_load.elapsed().as_millis();
+        let (key, design_container) = design_result.expect("failed to load design");
         let gate_count = design_container.index().cells_topo().len();
-        let runners: Vec<Box<dyn QueryRunner>> =
-            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
+
+        let runners = self.get_filtered_runners(query_filter);
+        if runners.is_empty() {
+            panic!("Query {} not found in registry", query_filter);
+        }
 
         #[cfg(feature = "parallel")]
         let query_results: Vec<_> = runners
@@ -319,7 +330,6 @@ impl Collector {
         let metrics = PerformanceMetrics {
             design_name: task.module.clone(),
             gate_count,
-            load_time_ms: load_time,
             query_times_ms: query_times,
             peak_rss_kb: 0,
         };
@@ -327,7 +337,7 @@ impl Collector {
         (final_findings, final_counts, metrics)
     }
 
-    fn run_memory_pass(&self, task: &DesignTask) -> u64 {
+    fn run_memory_pass(&self, task: &DesignTask, query_filter: &str) -> u64 {
         let driver = Driver::new_workspace().expect("Failed to create driver");
         let search_config = Config::builder()
             .match_length(MatchLength::NeedleSubsetHaystack)
@@ -339,9 +349,7 @@ impl Collector {
             .get_or_load_design(&task.path, &task.module, &search_config.haystack_options)
             .expect("Failed to load design");
 
-        let runners: Vec<Box<dyn QueryRunner>> =
-            query_list![Cwe1234<Search>, Cwe1271<Search>, Cwe1280<Search>];
-
+        let runners = self.get_filtered_runners(query_filter);
         let mut peak = self.get_rss_kb();
 
         for runner in runners {
@@ -486,7 +494,6 @@ impl Reporter {
             let m = &res.metrics;
             println!("\nDesign: {}", m.design_name);
             println!("  Gates:        {}", m.gate_count);
-            println!("  Load Time:    {}ms", m.load_time_ms);
             println!("  Peak RSS:     {:.2}MB", m.peak_rss_kb as f64 / 1024.0);
             println!("  Query Times:");
             for (name, time) in &m.query_times_ms {
@@ -562,14 +569,8 @@ impl Reporter {
             for qc in &res.counts {
                 let q_time = m.query_times_ms.get(&qc.query).unwrap_or(&0);
                 println!(
-                    "{},{},{},{},{},{},{}",
-                    m.design_name,
-                    m.gate_count,
-                    m.load_time_ms,
-                    m.peak_rss_kb,
-                    qc.query,
-                    q_time,
-                    qc.count
+                    "{},{},{},{},{},{}",
+                    m.design_name, m.gate_count, m.peak_rss_kb, qc.query, q_time, qc.count
                 );
             }
         }
@@ -656,7 +657,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: CollectionConfig = serde_json::from_reader(File::open(&args.config_path)?)?;
 
     let collector = Collector::new()?;
-    let results = collector.run_tasks(&config.designs);
+    let results = collector.run_tasks(&config.designs, &args.query_name);
 
     let reporter = Reporter::new(args.format);
     reporter.render(&results)?;

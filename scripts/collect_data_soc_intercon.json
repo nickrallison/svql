@@ -1,0 +1,10 @@
+{
+    "designs": [
+        {
+            "path": "examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v",
+            "module": "soc_interconnect_wrap",
+            "max_depth": 2,
+            "is_raw": false
+        }
+    ]
+}

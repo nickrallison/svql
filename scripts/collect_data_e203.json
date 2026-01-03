@@ -1,0 +1,10 @@
+{
+    "designs": [
+        {
+            "path": "examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json",
+            "module": "e203_soc_top",
+            "max_depth": 2,
+            "is_raw": true
+        }
+    ]
+}

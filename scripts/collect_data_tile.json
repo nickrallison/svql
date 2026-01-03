@@ -1,0 +1,10 @@
+{
+    "designs": [
+        {
+            "path": "examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json",
+            "module": "tile",
+            "max_depth": 2,
+            "is_raw": true
+        }
+    ]
+}
