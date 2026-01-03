@@ -10,6 +10,9 @@ mod constraints;
 mod matcher;
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 pub mod cell;
 pub mod graph_index;
 
