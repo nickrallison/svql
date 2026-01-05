@@ -12,7 +12,7 @@ pub use crate::{
     report::ReportNode,
     traits::validate_connection,
     traits::{
-        Component, Query, Reportable, Searchable,
+        Component, Projected, Query, Reportable, Searchable,
         composite::{ConnectionBuilder, Topology},
     },
 };

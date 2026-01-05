@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         false => driver.get_or_load_design(design_path, design_module, &config.haystack_options),
     };
 
-    let (haystack_key, haystack_design) = match design_result {
+    let (haystack_key, _) = match design_result {
         Ok(res) => res,
         Err(e) => {
             info!("Could not load design (expected if file missing): {}", e);
@@ -48,17 +48,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    info!("Building context...");
-    let context = Cwe1234::<Search>::context(&driver, &config.needle_options)?;
-    let context = context.with_design(haystack_key.clone(), haystack_design);
-
-    info!("Instantiating query...");
-    let query = Cwe1234::<Search>::instantiate(Instance::root("cwe1234".to_string()));
-
     info!("Executing query...");
-    // let executor = NaiveExecutor;
-    // let planned_query_results = query.query_planned(&executor, &context, &haystack_key, &config);
-    let query_results = query.query(&driver, &context, &haystack_key, &config);
+    let query_results = execute_query::<Cwe1234<Search>>(&driver, &haystack_key, &config)?;
 
     info!("Found {} matches for old query", query_results.len());
 

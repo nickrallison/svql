@@ -11,6 +11,15 @@ use std::sync::Arc;
 
 use crate::prelude::*;
 
+/// Links the Search and Match phases of a query component.
+pub trait Projected {
+    /// The Search (Pattern) version of this component.
+    type Pattern: Searchable;
+
+    /// The Match (Result) version of this component.
+    type Result<'a>: Component<Match>;
+}
+
 /// Base trait for all query components.
 pub trait Component<S: State> {
     /// Returns the hierarchical path of the component.
