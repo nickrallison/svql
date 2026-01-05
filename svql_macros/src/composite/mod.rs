@@ -209,7 +209,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 key: &::svql_query::svql_driver::DriverKey,
                 config: &::svql_query::svql_common::Config
             ) -> Vec<Self::Matched<'a>> {
-                use ::svql_query::traits::{Component, Topology};
+                use ::svql_query::prelude::{Component, Topology, ConnectionBuilder};
                 ::svql_query::tracing::info!("{} searching composite", self.log_label());
 
                 #(#query_calls)*
@@ -222,7 +222,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                     })
                     .filter(|candidate| {
-                        let mut builder = ::svql_query::traits::ConnectionBuilder { constraints: Vec::new() };
+                        let mut builder = ConnectionBuilder { constraints: Vec::new() };
                         candidate.define_connections(&mut builder);
 
                         let haystack_index = context.get(key).unwrap().index();

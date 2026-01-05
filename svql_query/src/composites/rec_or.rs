@@ -5,12 +5,7 @@ use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::{GraphIndex, cell::CellWrapper};
 
-use crate::{
-    Match, Search, State, Wire,
-    instance::Instance,
-    primitives::gates::OrGate,
-    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
-};
+use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct RecOr<S>

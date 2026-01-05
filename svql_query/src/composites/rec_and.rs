@@ -3,12 +3,7 @@ use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::{GraphIndex, cell::CellWrapper};
 
-use crate::{
-    Match, Search, State, Wire,
-    instance::Instance,
-    primitives::gates::AndGate,
-    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
-};
+use crate::prelude::*;
 
 // #[recursive_composite]
 // pub struct RecAnd<S: State> {
@@ -113,12 +108,7 @@ impl<'a> crate::traits::Reportable for RecAnd<Match> {
             type_name: "RecAnd".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: self.and.y.inner.get_source().unwrap_or_else(|| {
-                svql_subgraph::cell::SourceLocation {
-                    file: std::sync::Arc::from(""),
-                    lines: Vec::new(),
-                }
-            }),
+            source_loc: self.and.y.inner.as_ref().and_then(|c| c.get_source()),
             children,
         }
     }
@@ -232,16 +222,17 @@ impl Query for RecAnd<Search> {
     }
 }
 
-fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match>) -> Vec<&'a CellWrapper<'ctx>> {
-    let mut cells = Vec::new();
-    let and_cell = &rec_and.and.y.inner;
-    cells.push(and_cell);
-
-    if let Some(ref child) = rec_and.child {
-        cells.extend(rec_and_cells(child));
+fn rec_and_cell_ids(rec_and: &RecAnd<Match>) -> Vec<usize> {
+    let mut ids = Vec::new();
+    if let Some(ref info) = rec_and.and.y.inner {
+        ids.push(info.id);
     }
 
-    cells
+    if let Some(ref child) = rec_and.child {
+        ids.extend(rec_and_cell_ids(child));
+    }
+
+    ids
 }
 
 fn build_next_layer<'ctx>(
@@ -256,16 +247,28 @@ fn build_next_layer<'ctx>(
     let mut validations_passed = 0;
 
     for prev in prev_layer {
-        let top_and_cell = &prev.and.y.inner;
+        let Some(top_info) = &prev.and.y.inner else {
+            continue;
+        };
+        let Some(top_and_wrapper) = haystack_index.get_cell_by_id(top_info.id) else {
+            continue;
+        };
+
         let fanout = haystack_index
-            .fanout_set(top_and_cell)
+            .fanout_set(&top_and_wrapper)
             .expect("Fanout not found for cell");
-        let contained_cells = rec_and_cells(prev);
+
+        let contained_ids = rec_and_cell_ids(prev);
 
         for and_gate in all_and_gates {
-            let cell = &and_gate.y.inner;
+            let Some(gate_info) = &and_gate.y.inner else {
+                continue;
+            };
+            let Some(gate_wrapper) = haystack_index.get_cell_by_id(gate_info.id) else {
+                continue;
+            };
 
-            if !fanout.contains(cell) || contained_cells.contains(&cell) {
+            if !fanout.contains(&gate_wrapper) || contained_ids.contains(&gate_info.id) {
                 continue;
             }
 

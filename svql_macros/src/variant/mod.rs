@@ -174,26 +174,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    let plan_inputs = variant_names.iter().zip(variant_types.iter()).map(|(_v_name, v_type)| {
-        let search_type = common::replace_generic_with_search(v_type);
-        quote! {
-            {
-                let sub = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
-                Box::new(sub.to_ir(config))
-            }
-        }
-    });
-
-    let reconstruct_arms = variant_names.iter().enumerate().zip(variant_types.iter()).map(|((idx, v_name), v_type)| {
-        let search_type = common::replace_generic_with_search(v_type);
-        quote! {
-            #idx => {
-                let sub = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
-                #enum_name::<::svql_query::Match>::#v_name(sub.reconstruct(cursor))
-            }
-        }
-    });
-
     let expanded = quote! {
         #expanded_enum
 

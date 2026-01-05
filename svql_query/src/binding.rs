@@ -35,8 +35,7 @@ pub fn bind_input<'ctx>(
     );
 
     Match {
-        pat_node_ref: Some(pattern_cell.clone()),
-        design_node_ref: Some(design_cell),
+        cell: Some(design_cell.to_info()),
     }
 }
 
@@ -67,7 +66,6 @@ pub fn bind_output<'ctx>(
     );
 
     Match {
-        pat_node_ref: Some(pattern_cell.clone()),
-        design_node_ref: Some(design_cell),
+        cell: Some(design_cell.to_info()),
     }
 }

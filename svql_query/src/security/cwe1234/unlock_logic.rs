@@ -1,11 +1,7 @@
 use crate::composites::rec_or::RecOr;
-use crate::instance::Instance;
-use crate::primitives::gates::AndGate;
-use crate::primitives::gates::NotGate;
-use crate::traits::{
-    Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection,
-};
-use crate::{Connection, Match, Search, State, Wire};
+
+use crate::prelude::*;
+
 use std::sync::Arc;
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};

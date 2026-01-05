@@ -1,8 +1,9 @@
 pub use crate::{
-    Match, Search, State, Wire,
+    Connection, Match, Search, State, Wire,
     instance::Instance,
     primitives::dff::*,
     primitives::gates::*,
+    traits::validate_connection,
     traits::{
         Component, Query, Reportable, Searchable,
         composite::{ConnectionBuilder, Topology},
