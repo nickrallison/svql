@@ -7,7 +7,7 @@
 use crate::svql_common::{Config, ModuleConfig};
 use crate::svql_driver::{Context, Driver, DriverKey};
 use crate::svql_subgraph::cell::CellKind;
-use crate::traits::{Component, PlannedQuery, Query, Reportable, Searchable};
+use crate::traits::{Component, Query, Reportable, Searchable};
 use crate::{Instance, Match, Search, State, Wire};
 use prjunnamed_netlist::Cell;
 use std::sync::Arc;
@@ -134,33 +134,6 @@ macro_rules! impl_dff_primitive {
                 _options: &ModuleConfig
             ) -> Result<Context, Box<dyn std::error::Error>> {
                 Ok(Context::new())
-            }
-        }
-
-        impl PlannedQuery for $name<Search> {
-            fn expected_schema(&self) -> crate::ir::Schema {
-                crate::ir::Schema {
-                    columns: vec![$(stringify!($port).to_string()),*]
-                }
-            }
-
-            fn get_column_index(&self, rel_path: &[Arc<str>]) -> Option<usize> {
-                let next = rel_path.first()?.as_ref();
-                let mut column_idx = 0;
-                $(
-                    if next == stringify!($port) {
-                        return Some(column_idx);
-                    }
-                    column_idx += 1;
-                )*
-                None
-            }
-
-            fn reconstruct<'a>(&self, cursor: &mut crate::ir::ResultCursor<'a>) -> Self::Matched<'a> {
-                $name {
-                    path: self.path.clone(),
-                    $($port: Wire::new(self.$port.path.clone(), cursor.next_cell())),*
-                }
             }
         }
     };

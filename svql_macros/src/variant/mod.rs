@@ -287,35 +287,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 Ok(ctx)
             }
         }
-
-        impl ::svql_query::traits::PlannedQuery for #enum_name<::svql_query::Search> {
-            fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
-                let inputs = vec![ #(#plan_inputs),* ];
-                let schema = if let Some(first) = inputs.first() {
-                    match &**first {
-                        ::svql_query::ir::LogicalPlan::Scan { schema, .. } => schema.clone(),
-                        ::svql_query::ir::LogicalPlan::Join { schema, .. } => schema.clone(),
-                        ::svql_query::ir::LogicalPlan::Union { schema, .. } => schema.clone(),
-                    }
-                } else {
-                    ::svql_query::ir::Schema { columns: vec![] }
-                };
-
-                ::svql_query::ir::LogicalPlan::Union {
-                    inputs,
-                    schema,
-                    tag_results: true,
-                }
-            }
-
-            fn reconstruct<'a>(&self, cursor: &mut ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
-                let variant_idx = cursor.next_variant();
-                match variant_idx {
-                    #(#reconstruct_arms),*,
-                    _ => panic!("Invalid variant index in cursor"),
-                }
-            }
-        }
     };
 
     TokenStream::from(expanded)

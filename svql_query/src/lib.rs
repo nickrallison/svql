@@ -7,12 +7,12 @@
 extern crate self as svql_query;
 
 use std::sync::Arc;
-use svql_subgraph::cell::{CellInfo, CellWrapper, SourceLocation};
+use svql_subgraph::cell::{CellInfo, SourceLocation};
 
 pub mod binding;
 pub mod composites;
 pub mod instance;
-pub mod ir;
+// pub mod ir;
 pub mod primitives;
 pub mod report;
 pub mod security;

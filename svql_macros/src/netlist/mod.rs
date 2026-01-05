@@ -253,41 +253,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 Ok(::svql_query::svql_driver::Context::from_single(key.clone(), design))
             }
         }
-
-        impl ::svql_query::traits::PlannedQuery for #struct_name<::svql_query::Search> {
-            fn to_ir(&self, config: &::svql_query::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
-                use ::svql_query::traits::netlist::NetlistMeta;
-                ::svql_query::ir::LogicalPlan::Scan {
-                    key: Self::driver_key(),
-                    config: config.clone(),
-                    schema: self.expected_schema(),
-                }
-            }
-
-            fn expected_schema(&self) -> ::svql_query::ir::Schema {
-                ::svql_query::ir::Schema {
-                    columns: vec![ #(#schema_cols.to_string()),* ]
-                }
-            }
-
-            fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
-                let next = match rel_path.first() {
-                    Some(arc_str) => arc_str.as_ref(),
-                    None => return None,
-                };
-                match next {
-                    #(#col_indices),*,
-                    _ => None
-                }
-            }
-
-            fn reconstruct<'a>(&self, cursor: &mut ::svql_query::ir::ResultCursor<'a>) -> Self::Matched<'a> {
-                #struct_name {
-                    path: self.path.clone(),
-                    #(#reconstruct_fields),*
-                }
-            }
-        }
     };
 
     TokenStream::from(expanded)

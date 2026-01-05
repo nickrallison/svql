@@ -7,10 +7,7 @@ use crate::{
     Match, Search, State, Wire,
     instance::Instance,
     primitives::gates::AndGate,
-    traits::{
-        Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology,
-        validate_connection,
-    },
+    traits::{Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection},
 };
 
 // #[recursive_composite]
@@ -234,8 +231,6 @@ impl Query for RecAnd<Search> {
         AndGate::<Search>::context(driver, config)
     }
 }
-
-impl PlannedQuery for RecAnd<Search> {}
 
 fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match>) -> Vec<&'a CellWrapper<'ctx>> {
     let mut cells = Vec::new();

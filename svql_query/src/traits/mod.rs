@@ -12,12 +12,7 @@ use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
 use svql_subgraph::GraphIndex;
 
-use crate::{
-    Match, Search, State, Wire,
-    instance::Instance,
-    ir::{Executor, LogicalPlan, QueryDag, ResultCursor, Schema, compute_schema_mapping},
-    report::ReportNode,
-};
+use crate::{Match, Search, State, Wire, instance::Instance, report::ReportNode};
 
 /// Base trait for all query components.
 pub trait Component<S: State> {
@@ -71,57 +66,57 @@ pub trait Query: Component<Search> + Searchable {
     ) -> Result<Context, Box<dyn std::error::Error>>;
 }
 
-/// Interface for executing queries using the optimized IR planner.
-pub trait PlannedQuery: Query {
-    /// Generates the logical plan tree for this query.
-    fn to_ir(&self, _config: &Config) -> LogicalPlan {
-        panic!("PlannedQuery::to_ir not implemented for this component")
-    }
+// /// Interface for executing queries using the optimized IR planner.
+// pub trait PlannedQuery: Query {
+//     /// Generates the logical plan tree for this query.
+//     fn to_ir(&self, _config: &Config) -> LogicalPlan {
+//         panic!("PlannedQuery::to_ir not implemented for this component")
+//     }
 
-    /// Generates a canonical DAG from the logical plan.
-    fn dag_ir(&self, config: &Config) -> QueryDag {
-        crate::ir::canonicalize_to_dag(self.to_ir(config))
-    }
+//     /// Generates a canonical DAG from the logical plan.
+//     fn dag_ir(&self, config: &Config) -> QueryDag {
+//         crate::ir::canonicalize_to_dag(self.to_ir(config))
+//     }
 
-    /// Reconstructs a structured match from a flat result cursor.
-    fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
-        panic!("PlannedQuery::reconstruct not implemented for this component")
-    }
+//     /// Reconstructs a structured match from a flat result cursor.
+//     fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
+//         panic!("PlannedQuery::reconstruct not implemented for this component")
+//     }
 
-    /// Maps a relative path to a schema column index.
-    fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
-        None
-    }
+//     /// Maps a relative path to a schema column index.
+//     fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
+//         None
+//     }
 
-    /// Returns the expected output schema for this query.
-    fn expected_schema(&self) -> Schema {
-        Schema { columns: vec![] }
-    }
+//     /// Returns the expected output schema for this query.
+//     fn expected_schema(&self) -> Schema {
+//         Schema { columns: vec![] }
+//     }
 
-    /// Executes the query using the provided planner and executor.
-    fn query_planned<'a, 'b, T: Executor>(
-        &self,
-        executor: &'b T,
-        ctx: &'a Context,
-        key: &DriverKey,
-        config: &Config,
-    ) -> Vec<Self::Matched<'a>>
-    where
-        'b: 'a,
-    {
-        let dag = self.dag_ir(config);
-        let exec_res = executor.execute_dag(&dag, ctx, key, config);
-        let expected = self.expected_schema();
-        let mapping = compute_schema_mapping(&expected, &exec_res.schema);
+//     /// Executes the query using the provided planner and executor.
+//     fn query_planned<'a, 'b, T: Executor>(
+//         &self,
+//         executor: &'b T,
+//         ctx: &'a Context,
+//         key: &DriverKey,
+//         config: &Config,
+//     ) -> Vec<Self::Matched<'a>>
+//     where
+//         'b: 'a,
+//     {
+//         let dag = self.dag_ir(config);
+//         let exec_res = executor.execute_dag(&dag, ctx, key, config);
+//         let expected = self.expected_schema();
+//         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
 
-        let mut results = Vec::new();
-        for row in exec_res.rows {
-            let mut cursor = ResultCursor::new(row, mapping.clone());
-            results.push(self.reconstruct(&mut cursor));
-        }
-        results
-    }
-}
+//         let mut results = Vec::new();
+//         for row in exec_res.rows {
+//             let mut cursor = ResultCursor::new(row, mapping.clone());
+//             results.push(self.reconstruct(&mut cursor));
+//         }
+//         results
+//     }
+// }
 
 pub use composite::{ConnectionBuilder, Topology};
 pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};

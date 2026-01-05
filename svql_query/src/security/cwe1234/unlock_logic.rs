@@ -3,7 +3,7 @@ use crate::instance::Instance;
 use crate::primitives::gates::AndGate;
 use crate::primitives::gates::NotGate;
 use crate::traits::{
-    Component, ConnectionBuilder, PlannedQuery, Query, Searchable, Topology, validate_connection,
+    Component, ConnectionBuilder, Query, Searchable, Topology, validate_connection,
 };
 use crate::{Connection, Match, Search, State, Wire};
 use std::sync::Arc;
@@ -268,125 +268,6 @@ impl Query for UnlockLogic<Search> {
         let not_ctx = NotGate::<Search>::context(driver, config)?;
 
         Ok(and_ctx.merge(or_ctx).merge(not_ctx))
-    }
-}
-
-impl PlannedQuery for UnlockLogic<Search> {
-    fn to_ir(&self, config: &::svql_common::Config) -> ::svql_query::ir::LogicalPlan {
-        let inputs = vec![
-            Box::new(self.top_and.to_ir(config)),
-            Box::new(self.rec_or.to_ir(config)),
-            Box::new(self.not_gate.to_ir(config)),
-        ];
-
-        let mut builder = ::svql_query::traits::ConnectionBuilder {
-            constraints: Vec::new(),
-        };
-        self.define_connections(&mut builder);
-
-        let mut join_constraints = Vec::new();
-
-        let map_wire = |wire: &::svql_query::Wire<::svql_query::Search>| -> Option<(usize, usize)> {
-            let wire_path = wire.path();
-            if wire_path.starts_with(self.top_and.path()) {
-                let rel = wire_path.relative(self.top_and.path());
-                if let Some(col) = self.top_and.get_column_index(rel) {
-                    return Some((0, col));
-                }
-            }
-            if wire_path.starts_with(self.rec_or.path()) {
-                let rel = wire_path.relative(self.rec_or.path());
-                if let Some(col) = self.rec_or.get_column_index(rel) {
-                    return Some((1, col));
-                }
-            }
-            if wire_path.starts_with(self.not_gate.path()) {
-                let rel = wire_path.relative(self.not_gate.path());
-                if let Some(col) = self.not_gate.get_column_index(rel) {
-                    return Some((2, col));
-                }
-            }
-            None
-        };
-
-        for group in builder.constraints {
-            let mut or_group = Vec::new();
-            for (from_opt, to_opt) in group {
-                if let (Some(from), Some(to)) = (from_opt, to_opt) {
-                    if let (Some(src), Some(dst)) = (map_wire(from), map_wire(to)) {
-                        or_group.push((src, dst));
-                    }
-                }
-            }
-            if !or_group.is_empty() {
-                if or_group.len() == 1 {
-                    join_constraints.push(::svql_query::ir::JoinConstraint::Eq(
-                        or_group[0].0,
-                        or_group[0].1,
-                    ));
-                } else {
-                    join_constraints.push(::svql_query::ir::JoinConstraint::Or(or_group));
-                }
-            }
-        }
-
-        ::svql_query::ir::LogicalPlan::Join {
-            inputs,
-            constraints: join_constraints,
-            schema: self.expected_schema(),
-        }
-    }
-
-    fn expected_schema(&self) -> ::svql_query::ir::Schema {
-        let mut schema = ::svql_query::ir::Schema {
-            columns: Vec::new(),
-        };
-        schema
-            .columns
-            .extend(self.top_and.expected_schema().columns);
-        schema.columns.extend(self.rec_or.expected_schema().columns);
-        schema
-            .columns
-            .extend(self.not_gate.expected_schema().columns);
-        schema
-    }
-
-    fn get_column_index(&self, rel_path: &[std::sync::Arc<str>]) -> Option<usize> {
-        let next = match rel_path.first() {
-            Some(arc_str) => arc_str.as_ref(),
-            None => return None,
-        };
-        let tail = &rel_path[1..];
-        match next {
-            "top_and" => {
-                let sub_idx = self.top_and.get_column_index(tail)?;
-                Some(0 + sub_idx)
-            }
-            "rec_or" => {
-                let sub_idx = self.rec_or.get_column_index(tail)?;
-                let offset = self.top_and.expected_schema().columns.len();
-                Some(offset + sub_idx)
-            }
-            "not_gate" => {
-                let sub_idx = self.not_gate.get_column_index(tail)?;
-                let offset = self.top_and.expected_schema().columns.len()
-                    + self.rec_or.expected_schema().columns.len();
-                Some(offset + sub_idx)
-            }
-            _ => None,
-        }
-    }
-
-    fn reconstruct<'a>(
-        &self,
-        cursor: &mut ::svql_query::ir::ResultCursor<'a>,
-    ) -> Self::Matched<'a> {
-        UnlockLogic {
-            path: self.path.clone(),
-            top_and: self.top_and.reconstruct(cursor),
-            rec_or: self.rec_or.reconstruct(cursor),
-            not_gate: self.not_gate.reconstruct(cursor),
-        }
     }
 }
 
