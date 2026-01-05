@@ -1,4 +1,4 @@
-use crate::{State, Wire};
+use crate::prelude::*;
 
 /// Implemented by Composites to define internal connectivity.
 pub trait Topology<S: State> {
@@ -34,4 +34,24 @@ impl<'a, S: State> ConnectionBuilder<'a, S> {
 
         self.constraints.push(group);
     }
+}
+
+/// Validates a candidate composite match against its topology constraints.
+pub fn validate_composite<'ctx, T>(candidate: &T, haystack_index: &GraphIndex<'ctx>) -> bool
+where
+    T: Topology<Match>,
+{
+    let mut builder = ConnectionBuilder {
+        constraints: Vec::new(),
+    };
+    candidate.define_connections(&mut builder);
+
+    builder.constraints.iter().all(|group| {
+        group
+            .iter()
+            .any(|(from_opt, to_opt)| match (from_opt, to_opt) {
+                (Some(f), Some(t)) => validate_connection(f, t, haystack_index),
+                _ => false,
+            })
+    })
 }

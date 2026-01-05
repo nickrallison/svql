@@ -235,46 +235,29 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
-            fn query<'a>(
+                        fn query<'a>(
                 &self,
                 driver: &::svql_query::driver::Driver,
                 context: &'a ::svql_query::driver::Context,
                 key: &::svql_query::driver::DriverKey,
                 config: &::svql_query::common::Config
             ) -> Vec<Self::Result> {
-                use ::svql_query::prelude::{Component, Topology, ConnectionBuilder};
-                ::svql_query::tracing::info!("{} searching composite", self.log_label());
+                use ::svql_query::traits::composite::validate_composite;
 
                 // 1. Execute sub-queries
                 #(#query_calls)*
 
                 // 2. Cartesian Product & Filtering
-                let results: Vec<_> = ::svql_query::itertools::iproduct!( #(#query_vars),* )
+                let haystack_index = context.get(key).unwrap().index();
+
+                ::svql_query::itertools::iproduct!( #(#query_vars),* )
                     .map(|( #(#query_vars),* )| {
-                        #struct_name {
-                            #(#construct_fields),*
-                        }
+                        #struct_name { #(#construct_fields),* }
                     })
-                        .filter(|candidate| {
-                            let mut builder = ConnectionBuilder { constraints: Vec::new() };
-                            candidate.define_connections(&mut builder);
-
-                            let haystack_index = context.get(key).unwrap().index();
-
-                            builder.constraints.iter().all(|group| {
-                                group.iter().any(|(from_opt, to_opt)| {
-                                    match (from_opt, to_opt) {
-                                        (Some(f), Some(t)) => ::svql_query::traits::validate_connection(f, t, haystack_index),
-                                        _ => false
-                                    }
-                                })
-                            })
-                        })
-                    .collect();
-
-                ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
-                results
+                    .filter(|candidate| validate_composite(candidate, haystack_index))
+                    .collect()
             }
+
 
             fn context(
                 driver: &::svql_query::driver::Driver,

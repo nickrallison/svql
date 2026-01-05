@@ -109,19 +109,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    let report_logic = parsed_fields.iter().map(|f| {
-        let ident = &f.ident;
-        quote! {
-            if let Some(loc) = self.#ident.inner.as_ref().and_then(|c| c.get_source()) {
-                file_path = loc.file;
-                for line in loc.lines {
-                    if seen.insert(line.number) {
-                        all_lines.push(line);
-                    }
-                }
-            }
-        }
-    });
+    let field_idents: Vec<_> = parsed_fields.iter().map(|f| &f.ident).collect();
 
     let expanded = quote! {
         #[derive(Clone, Debug)]
@@ -141,18 +129,12 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
-            fn path(&self) -> &::svql_query::instance::Instance {
-                &self.path
-            }
-
-            fn type_name(&self) -> &'static str {
-                stringify!(#struct_name)
-            }
+            fn path(&self) -> &::svql_query::instance::Instance { &self.path }
+            fn type_name(&self) -> &'static str { stringify!(#struct_name) }
 
             fn find_port(&self, path: &::svql_query::instance::Instance) -> Option<&::svql_query::Wire<S>> {
                 if !path.starts_with(self.path()) { return None; }
-                let rel_path = path.relative(self.path());
-                self.find_port_inner(rel_path)
+                self.find_port_inner(path.relative(self.path()))
             }
 
             fn find_port_inner(&self, rel_path: &[std::sync::Arc<str>]) -> Option<&::svql_query::Wire<S>> {
@@ -179,37 +161,20 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                use ::svql_query::subgraph::cell::SourceLocation;
-
-                let mut all_lines = Vec::new();
-                let mut file_path = std::sync::Arc::from("");
-                let mut seen = std::collections::HashSet::new();
-
-                #(#report_logic)*
-
-                all_lines.sort_by_key(|l| l.number);
-
-                ::svql_query::report::ReportNode {
-                    name: name.to_string(),
-                    type_name: stringify!(#struct_name).to_string(),
-                    path: self.path.clone(),
-                    details: None,
-                    source_loc: if file_path.is_empty() { None } else { Some(SourceLocation { file: file_path, lines: all_lines }) },
-                    children: Vec::new(),
-                }
+                let mut node = ::svql_query::traits::netlist::report_netlist(
+                    &self.path,
+                    stringify!(#struct_name),
+                    &[#(&self.#field_idents),*]
+                );
+                node.name = name.to_string();
+                node
             }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::netlist::NetlistMeta for #search_type #spec_where_clause {
+        impl #spec_impl_generics ::svql_query::traits::netlist::Netlist for #search_type #spec_where_clause {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
-            const PORTS: &'static [::svql_query::traits::netlist::PortSpec] = &[];
-        }
-
-        impl #spec_impl_generics #search_type #spec_where_clause {
-            pub fn new(path: ::svql_query::instance::Instance) -> Self {
-                <Self as ::svql_query::traits::Searchable>::instantiate(path)
-            }
+            // const PORTS: &'static [::svql_query::traits::netlist::PortSpec] = &[];
         }
 
         impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
@@ -220,52 +185,28 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 key: &::svql_query::driver::DriverKey,
                 config: &::svql_query::common::Config
             ) -> Vec<Self::Result> {
-                use ::svql_query::traits::{Component, netlist::NetlistMeta};
+                use ::svql_query::traits::netlist::{Netlist, execute_netlist_query};
                 use ::svql_query::binding::PortResolver;
-                ::svql_query::tracing::info!("{} searching netlist", self.log_label());
 
-                let needle_key = Self::driver_key();
-                let needle_container = context.get(&needle_key)
-                    .expect("Pattern design not found in context")
-                    .as_ref();
-
-                let haystack_container = context.get(key)
-                    .expect("Haystack design not found in context")
-                    .as_ref();
-
-                let assignments = ::svql_query::subgraph::SubgraphMatcher::enumerate_with_indices(
-                    needle_container.design(),
-                    haystack_container.design(),
-                    needle_container.index(),
-                    haystack_container.index(),
-                    needle_key.module_name().to_string(),
-                    key.module_name().to_string(),
-                    config,
-                );
-
-                // Pre-compute port mappings for the needle
+                let assignments = execute_netlist_query(self, context, key, config);
+                let needle_container = context.get(&Self::driver_key()).unwrap();
                 let resolver = PortResolver::new(needle_container.index());
 
-                let results: Vec<_> = assignments.items.iter().map(|assignment| {
+                assignments.items.iter().map(|assignment| {
                     #struct_name {
                         path: self.path.clone(),
                         #(#match_fields),*
                     }
-                }).collect();
-
-                ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
-                results
+                }).collect()
             }
-
 
             fn context(
                 driver: &::svql_query::driver::Driver,
                 options: &::svql_query::common::ModuleConfig
             ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
-                use ::svql_query::traits::netlist::NetlistMeta;
-                let key = Self::driver_key();
+                use ::svql_query::traits::netlist::Netlist;
                 let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
-                Ok(::svql_query::driver::Context::from_single(key.clone(), design))
+                Ok(::svql_query::driver::Context::from_single(Self::driver_key(), design))
             }
         }
     };
