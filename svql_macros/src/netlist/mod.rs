@@ -157,7 +157,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                use ::svql_query::svql_subgraph::cell::SourceLocation;
+                use ::svql_query::subgraph::cell::SourceLocation;
 
                 let mut all_lines = Vec::new();
                 let mut file_path = std::sync::Arc::from("");
@@ -204,10 +204,10 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn query<'a>(
                 &self,
-                driver: &::svql_query::svql_driver::Driver,
-                context: &'a ::svql_query::svql_driver::Context,
-                key: &::svql_query::svql_driver::DriverKey,
-                config: &::svql_query::svql_common::Config
+                driver: &::svql_query::driver::Driver,
+                context: &'a ::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config
             ) -> Vec<Self::Matched<'a>> {
                 use ::svql_query::traits::{Component, netlist::NetlistMeta};
                 ::svql_query::tracing::info!("{} searching netlist", self.log_label());
@@ -225,7 +225,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let needle_index = needle_container.index();
                 let haystack_index = haystack_container.index();
 
-                let assignments = ::svql_query::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+                let assignments = ::svql_query::subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle,
                     haystack,
                     needle_index,
@@ -247,13 +247,13 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
+                driver: &::svql_query::driver::Driver,
+                options: &::svql_query::common::ModuleConfig
+            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
                 use ::svql_query::traits::netlist::NetlistMeta;
                 let key = Self::driver_key();
                 let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
-                Ok(::svql_query::svql_driver::Context::from_single(key.clone(), design))
+                Ok(::svql_query::driver::Context::from_single(key.clone(), design))
             }
         }
     };

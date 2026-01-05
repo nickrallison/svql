@@ -2,14 +2,8 @@
 mod tests {
     use rstest::rstest;
     use std::sync::OnceLock;
-    use common::{Config, Dedupe, MatchLength, YosysModule};
-    use driver::Driver;
-    use svql_query::{
-        Search,
-        instance::Instance,
-        security::cwe1280::Cwe1280,
-        traits::{Query, Searchable},
-    };
+    use svql_query::prelude::*;
+    use svql_query::security::cwe1280::Cwe1280;
 
     fn init_test_logger() {
         static INIT: OnceLock<()> = OnceLock::new();

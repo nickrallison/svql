@@ -1,10 +1,7 @@
 use std::sync::OnceLock;
-use common::{Config, Dedupe, MatchLength, YosysModule};
-use driver::Driver;
-use svql_query::security::primitives::locked_register::LockedRegister;
-use svql_query::traits::{Query, Searchable};
-use svql_query::{Search, instance::Instance};
 
+use svql_query::prelude::*;
+use svql_query::security::primitives::locked_register::LockedRegister;
 struct LockedRegisterTestCase {
     name: &'static str,
     fixture_path: &'static str,

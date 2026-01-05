@@ -1,10 +1,7 @@
 use std::sync::OnceLock;
 
-use common::{Config, Dedupe, MatchLength, YosysModule};
-use driver::Driver;
+use svql_query::prelude::*;
 use svql_query::security::cwe1271::Cwe1271;
-use svql_query::traits::{Query, Searchable};
-use svql_query::{Search, instance::Instance};
 
 #[derive(Debug, Clone)]
 struct Cwe1271TestCase {

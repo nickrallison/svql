@@ -223,7 +223,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                use ::svql_query::svql_subgraph::cell::SourceLocation;
+                use ::svql_query::subgraph::cell::SourceLocation;
 
                 match self {
                     #(
@@ -243,10 +243,10 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn query<'a>(
                 &self,
-                driver: &::svql_query::svql_driver::Driver,
-                context: &'a ::svql_query::svql_driver::Context,
-                key: &::svql_query::svql_driver::DriverKey,
-                config: &::svql_query::svql_common::Config
+                driver: &::svql_query::driver::Driver,
+                context: &'a ::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config
             ) -> Vec<Self::Matched<'a>> {
                 use ::svql_query::traits::Component;
                 ::svql_query::tracing::info!("{} searching variants", self.log_label());
@@ -259,10 +259,10 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::svql_driver::Context::new();
+                driver: &::svql_query::driver::Driver,
+                options: &::svql_query::common::ModuleConfig
+            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
+                let mut ctx = ::svql_query::driver::Context::new();
                 #(#context_merges)*
                 Ok(ctx)
             }

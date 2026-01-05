@@ -5,8 +5,9 @@
 
 use crate::Match;
 use std::collections::HashMap;
-use subgraph::{SingleAssignment, cell::CellWrapper};
 use tracing::debug;
+
+use crate::prelude::*;
 
 /// Binds a named input port bit from a pattern to a design match.
 ///

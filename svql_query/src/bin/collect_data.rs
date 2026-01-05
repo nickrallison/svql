@@ -1,3 +1,5 @@
+use svql_query::prelude::*;
+
 use argparse::{ArgumentParser, Store};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -5,15 +7,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use common::{Config, Dedupe, MatchLength};
-use driver::{Driver, DriverKey};
-use svql_query::Search;
-use svql_query::instance::Instance;
-use svql_query::report::ReportNode;
 use svql_query::security::cwe1234::Cwe1234;
 use svql_query::security::cwe1271::Cwe1271;
 use svql_query::security::cwe1280::Cwe1280;
-use svql_query::traits::{Query, Reportable};
 use sysinfo::{ProcessRefreshKind, System};
 use tracing::{error, info};
 

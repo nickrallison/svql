@@ -1,8 +1,15 @@
+pub use itertools;
+pub use svql_common as common;
+pub use svql_driver as driver;
+pub use svql_subgraph as subgraph;
+pub use tracing;
+
 pub use crate::{
     Connection, Match, Search, State, Wire,
     instance::Instance,
     primitives::dff::*,
     primitives::gates::*,
+    report::ReportNode,
     traits::validate_connection,
     traits::{
         Component, Query, Reportable, Searchable,
@@ -10,11 +17,14 @@ pub use crate::{
     },
 };
 
-pub use itertools;
-pub use common as common;
-pub use driver as driver;
-pub use subgraph as subgraph;
-pub use tracing;
+pub use common::{Config, Dedupe, MatchLength, ModuleConfig, YosysModule};
+
+pub use subgraph::{
+    AssignmentSet, SingleAssignment,
+    cell::{CellInfo, CellWrapper, SourceLocation},
+    graph_index::GraphIndex,
+};
+
+pub use driver::{Driver, DriverKey, context::Context};
 
 pub use svql_macros::{composite, netlist, variant};
-pub use subgraph::cell::{CellInfo, SourceLocation};

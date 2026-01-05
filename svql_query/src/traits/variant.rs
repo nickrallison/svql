@@ -1,7 +1,4 @@
-use common::{Config, ModuleConfig};
-use driver::{DriverKey, context::Context, driver::Driver};
-
-use crate::{Match, Search, State, instance::Instance};
+use crate::prelude::*;
 
 pub trait Variant<S>
 where

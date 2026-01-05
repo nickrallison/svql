@@ -8,11 +8,8 @@ pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
-use common::{Config, ModuleConfig};
-use driver::{Context, Driver, DriverKey};
-use subgraph::GraphIndex;
 
-use crate::{Match, Search, State, Wire, instance::Instance, report::ReportNode};
+use crate::prelude::*;
 
 /// Base trait for all query components.
 pub trait Component<S: State> {
@@ -54,7 +51,7 @@ pub trait Query: Component<Search> + Searchable {
     /// Executes the query against a design context.
     fn query<'a>(
         &self,
-        driver: &::driver::Driver,
+        driver: &Driver,
         context: &'a Context,
         key: &DriverKey,
         config: &Config,

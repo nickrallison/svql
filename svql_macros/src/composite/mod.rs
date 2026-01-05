@@ -178,7 +178,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                use ::svql_query::svql_subgraph::cell::SourceLocation;
+                use ::svql_query::subgraph::cell::SourceLocation;
 
                 let children = vec![
                     #( self.#query_names.to_report(stringify!(#query_names)) ),*
@@ -204,10 +204,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn query<'a>(
                 &self,
-                driver: &::svql_query::svql_driver::Driver,
-                context: &'a ::svql_query::svql_driver::Context,
-                key: &::svql_query::svql_driver::DriverKey,
-                config: &::svql_query::svql_common::Config
+                driver: &::svql_query::driver::Driver,
+                context: &'a ::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config
             ) -> Vec<Self::Matched<'a>> {
                 use ::svql_query::prelude::{Component, Topology, ConnectionBuilder};
                 ::svql_query::tracing::info!("{} searching composite", self.log_label());
@@ -250,10 +250,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn context(
-                driver: &::svql_query::svql_driver::Driver,
-                options: &::svql_query::svql_common::ModuleConfig
-            ) -> Result<::svql_query::svql_driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::svql_driver::Context::new();
+                driver: &::svql_query::driver::Driver,
+                options: &::svql_query::common::ModuleConfig
+            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
+                let mut ctx = ::svql_query::driver::Context::new();
                 #(#context_calls)*
                 Ok(ctx)
             }

@@ -2,11 +2,8 @@ mod unlock_logic;
 
 use std::sync::OnceLock;
 
-use common::{Config, Dedupe, MatchLength, YosysModule};
-use driver::Driver;
+use svql_query::prelude::*;
 use svql_query::security::cwe1234::unlock_logic::UnlockLogic;
-use svql_query::traits::{Query, Searchable};
-use svql_query::{Search, instance::Instance};
 
 #[derive(Debug, Clone)]
 struct CweTestCase {

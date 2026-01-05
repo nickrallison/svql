@@ -1,10 +1,4 @@
-use common::{Config, Dedupe, MatchLength};
-use driver::Driver;
-use svql_query::Search;
-use svql_query::instance::Instance;
-use svql_query::security::cwe1234::Cwe1234;
-use svql_query::traits::Reportable;
-use svql_query::traits::{Query, Searchable};
+use svql_query::{prelude::*, security::cwe1234::Cwe1234};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

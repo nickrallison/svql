@@ -1,20 +1,10 @@
-use common::{Config, ModuleConfig};
-use driver::Driver;
-use svql_query::primitives::dff::DffAny;
-use svql_query::primitives::gates::*;
-use svql_query::traits::Query;
-use svql_query::traits::Searchable;
-use svql_query::{Instance, Search};
+use svql_query::prelude::*;
 
 fn setup_driver() -> Driver {
     Driver::new_workspace().expect("Failed to create driver")
 }
 
-fn get_context<'a, Q: Query>(
-    driver: &Driver,
-    path: &str,
-    module: &str,
-) -> (::driver::DriverKey, ::driver::Context) {
+fn get_context<'a, Q: Query>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
     let config = ModuleConfig::default().with_flatten(true);
     let (key, design) = driver
         .get_or_load_design(path, module, &config)

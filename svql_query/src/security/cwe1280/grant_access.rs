@@ -13,15 +13,11 @@ pub struct GrantAccess<S: State> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Search,
-        instance::Instance,
-        security::cwe1280::grant_access::GrantAccess,
-        traits::{Query, Searchable},
-    };
+    use super::*;
+
+    use crate::prelude::*;
+
     use std::sync::OnceLock;
-    use common::{Config, Dedupe, MatchLength, YosysModule};
-    use driver::Driver;
 
     #[derive(Debug, Clone)]
     struct GrantAccessTestCase {
