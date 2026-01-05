@@ -253,93 +253,71 @@ fn rec_and_cell_ids(rec_and: &RecAnd<Match>) -> Vec<usize> {
     ids
 }
 
+fn validate_rec_candidate<'ctx>(
+    path: &Instance,
+    and_gate: &AndGate<Match>,
+    prev: &RecAnd<Match>,
+    haystack_index: &GraphIndex<'ctx>,
+) -> bool {
+    // We create a temporary candidate to run the topology check
+    let mut child = prev.clone();
+    update_rec_and_path(&mut child, path.child("child"));
+
+    let candidate = RecAnd {
+        path: path.clone(),
+        and: and_gate.clone(),
+        child: Some(Box::new(child)),
+    };
+
+    let mut builder = ConnectionBuilder {
+        constraints: Vec::new(),
+    };
+    candidate.define_connections(&mut builder);
+
+    // Ensure all connection groups have at least one valid physical connection
+    builder.constraints.iter().all(|group| {
+        group.iter().any(|(from, to)| match (from, to) {
+            (Some(f), Some(t)) => validate_connection(f, t, haystack_index),
+            _ => false,
+        })
+    })
+}
+
 fn build_next_layer<'ctx>(
     path: &Instance,
     all_and_gates: &[AndGate<Match>],
     prev_layer: &[RecAnd<Match>],
     haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecAnd<Match>> {
-    let start_time = std::time::Instant::now();
-    let mut next_layer = Vec::new();
-    let mut candidates_checked = 0;
-    let mut validations_passed = 0;
+    prev_layer
+        .iter()
+        .flat_map(|prev| {
+            let top_info = prev.and.y.inner.as_ref()?;
+            let top_wrapper = haystack_index.get_cell_by_id(top_info.id)?;
+            let fanout = haystack_index.fanout_set(&top_wrapper)?;
+            let contained_ids = rec_and_cell_ids(prev);
 
-    for prev in prev_layer {
-        let Some(top_info) = &prev.and.y.inner else {
-            continue;
-        };
-        let Some(top_and_wrapper) = haystack_index.get_cell_by_id(top_info.id) else {
-            continue;
-        };
+            Some(all_and_gates.iter().filter_map(move |and_gate| {
+                let gate_info = and_gate.y.inner.as_ref()?;
+                let gate_wrapper = haystack_index.get_cell_by_id(gate_info.id)?;
 
-        let fanout = haystack_index
-            .fanout_set(&top_and_wrapper)
-            .expect("Fanout not found for cell");
+                let is_valid = fanout.contains(&gate_wrapper)
+                    && !contained_ids.contains(&gate_info.id)
+                    && validate_rec_candidate(path, and_gate, prev, haystack_index);
 
-        let contained_ids = rec_and_cell_ids(prev);
-
-        for and_gate in all_and_gates {
-            let Some(gate_info) = &and_gate.y.inner else {
-                continue;
-            };
-            let Some(gate_wrapper) = haystack_index.get_cell_by_id(gate_info.id) else {
-                continue;
-            };
-
-            if !fanout.contains(&gate_wrapper) || contained_ids.contains(&gate_info.id) {
-                continue;
-            }
-
-            candidates_checked += 1;
-
-            let mut child = prev.clone();
-            update_rec_and_path(&mut child, path.child("child"));
-
-            let candidate = RecAnd {
-                path: path.clone(),
-                and: and_gate.clone(),
-                child: Some(Box::new(child)),
-            };
-
-            let mut builder = ConnectionBuilder {
-                constraints: Vec::new(),
-            };
-            candidate.define_connections(&mut builder);
-
-            let mut valid = true;
-            for group in builder.constraints {
-                let mut group_satisfied = false;
-                for (from, to) in group {
-                    if let (Some(f), Some(t)) = (from, to) {
-                        if validate_connection(f, t, haystack_index) {
-                            group_satisfied = true;
-                            break;
-                        }
+                is_valid.then(|| {
+                    let mut child = prev.clone();
+                    update_rec_and_path(&mut child, path.child("child"));
+                    RecAnd {
+                        path: path.clone(),
+                        and: and_gate.clone(),
+                        child: Some(Box::new(child)),
                     }
-                }
-                if !group_satisfied {
-                    valid = false;
-                    break;
-                }
-            }
-
-            if valid {
-                validations_passed += 1;
-                next_layer.push(candidate);
-            }
-        }
-    }
-
-    let total_duration = start_time.elapsed();
-    tracing::event!(
-        tracing::Level::INFO,
-        "build_next_layer: Completed in {:?}, checked {} candidates, {} passed",
-        total_duration,
-        candidates_checked,
-        validations_passed
-    );
-
-    next_layer
+                })
+            }))
+        })
+        .flatten()
+        .collect()
 }
 
 fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match>, new_path: Instance) {

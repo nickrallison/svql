@@ -255,28 +255,21 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                             #(#construct_fields),*
                         }
                     })
-                    .filter(|candidate| {
-                        let mut builder = ConnectionBuilder { constraints: Vec::new() };
-                        candidate.define_connections(&mut builder);
+                        .filter(|candidate| {
+                            let mut builder = ConnectionBuilder { constraints: Vec::new() };
+                            candidate.define_connections(&mut builder);
 
-                        let haystack_index = context.get(key).unwrap().index();
+                            let haystack_index = context.get(key).unwrap().index();
 
-                        for group in builder.constraints {
-                            let mut group_satisfied = false;
-                            for (from_opt, to_opt) in group {
-                                if let (Some(from), Some(to)) = (from_opt, to_opt) {
-                                    if ::svql_query::traits::validate_connection(from, to, haystack_index) {
-                                        group_satisfied = true;
-                                        break;
+                            builder.constraints.iter().all(|group| {
+                                group.iter().any(|(from_opt, to_opt)| {
+                                    match (from_opt, to_opt) {
+                                        (Some(f), Some(t)) => ::svql_query::traits::validate_connection(f, t, haystack_index),
+                                        _ => false
                                     }
-                                }
-                            }
-                            if !group_satisfied {
-                                return false;
-                            }
-                        }
-                        true
-                    })
+                                })
+                            })
+                        })
                     .collect();
 
                 ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());

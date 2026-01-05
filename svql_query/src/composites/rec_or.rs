@@ -243,6 +243,33 @@ fn rec_or_cell_ids(rec_or: &RecOr<Match>) -> Vec<usize> {
 
     ids
 }
+fn validate_rec_candidate<'ctx>(
+    path: &Instance,
+    or_gate: &OrGate<Match>,
+    prev: &RecOr<Match>,
+    haystack_index: &GraphIndex<'ctx>,
+) -> bool {
+    let mut child = prev.clone();
+    update_rec_or_path(&mut child, path.child("child"));
+
+    let candidate = RecOr {
+        path: path.clone(),
+        or: or_gate.clone(),
+        child: Some(Box::new(child)),
+    };
+
+    let mut builder = ConnectionBuilder {
+        constraints: Vec::new(),
+    };
+    candidate.define_connections(&mut builder);
+
+    builder.constraints.iter().all(|group| {
+        group.iter().any(|(from, to)| match (from, to) {
+            (Some(f), Some(t)) => validate_connection(f, t, haystack_index),
+            _ => false,
+        })
+    })
+}
 
 fn build_next_layer<'ctx>(
     path: &Instance,
@@ -250,70 +277,44 @@ fn build_next_layer<'ctx>(
     prev_layer: &[RecOr<Match>],
     haystack_index: &GraphIndex<'ctx>,
 ) -> Vec<RecOr<Match>> {
-    let mut next_layer = Vec::new();
+    let start_time = std::time::Instant::now();
 
-    for prev in prev_layer {
-        let Some(top_info) = &prev.or.y.inner else {
-            continue;
-        };
-        let Some(top_or_wrapper) = haystack_index.get_cell_by_id(top_info.id) else {
-            continue;
-        };
+    let next_layer: Vec<_> = prev_layer
+        .iter()
+        .flat_map(|prev| {
+            let top_info = prev.or.y.inner.as_ref()?;
+            let top_wrapper = haystack_index.get_cell_by_id(top_info.id)?;
+            let fanout = haystack_index.fanout_set(&top_wrapper)?;
+            let contained_ids = rec_or_cell_ids(prev);
 
-        let fanout = haystack_index
-            .fanout_set(&top_or_wrapper)
-            .expect("Fanout Not found for cell");
+            Some(all_or_gates.iter().filter_map(move |or_gate| {
+                let gate_info = or_gate.y.inner.as_ref()?;
+                let gate_wrapper = haystack_index.get_cell_by_id(gate_info.id)?;
 
-        let contained_ids = rec_or_cell_ids(prev);
+                let is_valid = fanout.contains(&gate_wrapper)
+                    && !contained_ids.contains(&gate_info.id)
+                    && validate_rec_candidate(path, or_gate, prev, haystack_index);
 
-        for or_gate in all_or_gates {
-            let Some(gate_info) = &or_gate.y.inner else {
-                continue;
-            };
-            let Some(gate_wrapper) = haystack_index.get_cell_by_id(gate_info.id) else {
-                continue;
-            };
-
-            if !fanout.contains(&gate_wrapper) || contained_ids.contains(&gate_info.id) {
-                continue;
-            }
-
-            let mut child = prev.clone();
-            update_rec_or_path(&mut child, path.child("child"));
-
-            let candidate = RecOr {
-                path: path.clone(),
-                or: or_gate.clone(),
-                child: Some(Box::new(child)),
-            };
-
-            let mut builder = ConnectionBuilder {
-                constraints: Vec::new(),
-            };
-            candidate.define_connections(&mut builder);
-
-            let mut valid = true;
-            for group in builder.constraints {
-                let mut group_satisfied = false;
-                for (from, to) in group {
-                    if let (Some(f), Some(t)) = (from, to) {
-                        if validate_connection(f, t, haystack_index) {
-                            group_satisfied = true;
-                            break;
-                        }
+                is_valid.then(|| {
+                    let mut child = prev.clone();
+                    update_rec_or_path(&mut child, path.child("child"));
+                    RecOr {
+                        path: path.clone(),
+                        or: or_gate.clone(),
+                        child: Some(Box::new(child)),
                     }
-                }
-                if !group_satisfied {
-                    valid = false;
-                    break;
-                }
-            }
+                })
+            }))
+        })
+        .flatten()
+        .collect();
 
-            if valid {
-                next_layer.push(candidate);
-            }
-        }
-    }
+    tracing::event!(
+        tracing::Level::INFO,
+        "build_next_layer: Completed in {:?}, found {} matches",
+        start_time.elapsed(),
+        next_layer.len()
+    );
 
     next_layer
 }
