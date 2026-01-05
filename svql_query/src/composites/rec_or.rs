@@ -96,12 +96,7 @@ impl<'a> crate::traits::Reportable for RecOr<Match> {
             type_name: "RecOr".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: self.or.y.inner.get_source().unwrap_or_else(|| {
-                svql_subgraph::cell::SourceLocation {
-                    file: std::sync::Arc::from(""),
-                    lines: Vec::new(),
-                }
-            }),
+            source_loc: self.or.y.inner.as_ref().and_then(|c| c.get_source()),
             children,
         }
     }
@@ -195,35 +190,40 @@ impl Query for RecOr<Search> {
 impl<'ctx> RecOr<Match> {
     pub fn fanin_set(&self, haystack_index: &GraphIndex<'ctx>) -> HashSet<CellWrapper<'ctx>> {
         let mut all_cells = HashSet::new();
-        self.collect_cells(&mut all_cells);
+        self.collect_cell_ids(&mut all_cells);
         let mut fanin = HashSet::new();
-        for cell in &all_cells {
-            if let Some(fanin_set) = haystack_index.fanin_set(cell) {
+        for cell_id in &all_cells {
+            let Some(cell) = haystack_index.get_cell_by_id(*cell_id) else {
+                continue;
+            };
+            if let Some(fanin_set) = haystack_index.fanin_set(&cell) {
                 fanin.extend(fanin_set.iter().cloned());
             }
         }
         fanin
     }
 
-    fn collect_cells(&self, cells: &mut HashSet<CellWrapper<'ctx>>) {
-        let or_cell = &self.or.y.inner;
-        cells.insert(or_cell.clone());
+    fn collect_cell_ids(&self, ids: &mut HashSet<usize>) {
+        if let Some(ref info) = self.or.y.inner {
+            ids.insert(info.id);
+        }
         if let Some(ref child) = self.child {
-            child.collect_cells(cells);
+            child.collect_cell_ids(ids);
         }
     }
 }
 
-fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match>) -> Vec<&'a CellWrapper<'ctx>> {
-    let mut cells = Vec::new();
-    let or_cell = &rec_or.or.y.inner;
-    cells.push(or_cell);
-
-    if let Some(ref child) = rec_or.child {
-        cells.extend(rec_or_cells(child));
+fn rec_or_cell_ids(rec_or: &RecOr<Match>) -> Vec<usize> {
+    let mut ids = Vec::new();
+    if let Some(ref info) = rec_or.or.y.inner {
+        ids.push(info.id);
     }
 
-    cells
+    if let Some(ref child) = rec_or.child {
+        ids.extend(rec_or_cell_ids(child));
+    }
+
+    ids
 }
 
 fn build_next_layer<'ctx>(
@@ -235,16 +235,28 @@ fn build_next_layer<'ctx>(
     let mut next_layer = Vec::new();
 
     for prev in prev_layer {
-        let top_or_cell = &prev.or.y.inner;
+        let Some(top_info) = &prev.or.y.inner else {
+            continue;
+        };
+        let Some(top_or_wrapper) = haystack_index.get_cell_by_id(top_info.id) else {
+            continue;
+        };
+
         let fanout = haystack_index
-            .fanout_set(top_or_cell)
+            .fanout_set(&top_or_wrapper)
             .expect("Fanout Not found for cell");
-        let contained_cells = rec_or_cells(prev);
+
+        let contained_ids = rec_or_cell_ids(prev);
 
         for or_gate in all_or_gates {
-            let cell = &or_gate.y.inner;
+            let Some(gate_info) = &or_gate.y.inner else {
+                continue;
+            };
+            let Some(gate_wrapper) = haystack_index.get_cell_by_id(gate_info.id) else {
+                continue;
+            };
 
-            if !fanout.contains(cell) || contained_cells.contains(&cell) {
+            if !fanout.contains(&gate_wrapper) || contained_ids.contains(&gate_info.id) {
                 continue;
             }
 
