@@ -19,7 +19,25 @@ struct CompositeField {
 pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let item_struct = parse_macro_input!(input as ItemStruct);
     let struct_name = &item_struct.ident;
+
+    // Generics for the struct definition and Component impl (includes S: State)
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
+
+    // Specialized generics for Search/Match impls (S removed)
+    let specialized_generics = common::remove_state_generic(&item_struct.generics);
+    let (spec_impl_generics, _, spec_where_clause) = specialized_generics.split_for_impl();
+
+    // Concrete types for Search and Match
+    let search_type = common::make_replaced_type(
+        struct_name,
+        &item_struct.generics,
+        quote!(::svql_query::Search),
+    );
+    let match_type = common::make_replaced_type(
+        struct_name,
+        &item_struct.generics,
+        quote!(::svql_query::Match),
+    );
 
     // --- Parsing Phase ---
     let mut fields_info = Vec::new();
@@ -72,8 +90,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             FieldKind::Path => quote! { #ident: base_path.clone() },
             FieldKind::Submodule => {
                 let ty = &f.ty;
+                // Must replace S with Search in the field type because we are in the Search impl
+                let search_ty = common::replace_state_generic(ty);
                 quote! {
-                    #ident: <<#ty as ::svql_query::traits::Projected>::Pattern as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
+                    #ident: <<#search_ty as ::svql_query::traits::Projected>::Pattern as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
                 }
             },
             FieldKind::Wire => quote! {
@@ -101,8 +121,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 construct_fields.push(quote! { #ident: self.#ident.clone() });
             }
             FieldKind::Wire => {
-                // Wires in composites are usually just placeholders or manual connections
-                // In Match state, they remain empty/unbound unless manually bound later
                 construct_fields.push(quote! {
                     #ident: ::svql_query::Wire::new(self.#ident.path.clone(), None)
                 });
@@ -114,7 +132,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let context_calls = fields_info.iter().filter_map(|f| {
         if let FieldKind::Submodule = f.kind {
             let ty = &f.ty;
-            // Use the robust generic replacement
             let search_ty = common::replace_state_generic(ty);
             Some(quote! {
                 let sub_ctx = <#search_ty>::context(driver, options)?;
@@ -130,7 +147,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let name_str = ident.to_string();
         match f.kind {
-            FieldKind::Path => quote! {}, // Path doesn't have ports
+            FieldKind::Path => quote! {},
             _ => quote! {
                 #name_str => self.#ident.find_port_inner(tail)
             },
@@ -153,14 +170,14 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             #(#struct_fields),*
         }
 
-        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
-            type Pattern = #struct_name<::svql_query::Search>;
-            type Result = #struct_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #search_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
-        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Match> #where_clause {
-            type Pattern = #struct_name<::svql_query::Search>;
-            type Result = #struct_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #match_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
@@ -191,7 +208,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::svql_query::traits::Searchable for #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Searchable for #search_type #spec_where_clause {
             fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
                 Self {
                     #(#instantiate_fields),*
@@ -199,7 +216,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
+        impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 let children = vec![
                     #(#report_children),*
@@ -216,7 +233,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::svql_query::traits::Query for #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
             fn query<'a>(
                 &self,
                 driver: &::svql_query::driver::Driver,
@@ -231,8 +248,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 #(#query_calls)*
 
                 // 2. Cartesian Product & Filtering
-                // Note: We use ::svql_query::itertools::iproduct to ensure the macro works
-                // without the user importing itertools explicitly.
                 let results: Vec<_> = ::svql_query::itertools::iproduct!( #(#query_vars),* )
                     .map(|( #(#query_vars),* )| {
                         #struct_name {

@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, GenericArgument, Lit, Meta, PathArguments, Token, Type};
+use syn::{
+    Attribute, Expr, GenericArgument, GenericParam, Lit, Meta, PathArguments, Token, Type,
+    WherePredicate,
+};
 
 #[allow(dead_code)]
 pub fn get_attribute_value(attrs: &[Attribute], attr_name: &str, key: &str) -> Option<String> {
@@ -34,14 +37,6 @@ pub fn has_attribute(attrs: &[Attribute], attr_name: &str) -> bool {
 }
 
 /// Robustly replaces the generic argument corresponding to `State` with `::svql_query::Search`.
-///
-/// This function assumes the standard SVQL pattern where the `State` parameter is
-/// a Type argument (not a lifetime or const). It replaces the *first* Type argument found.
-///
-/// Examples:
-/// - `MyQuery<S>` -> `MyQuery<::svql_query::Search>`
-/// - `MyQuery<'a, S>` -> `MyQuery<'a, ::svql_query::Search>`
-/// - `MyQuery<S, const N: usize>` -> `MyQuery<::svql_query::Search, const N: usize>`
 pub fn replace_state_generic(ty: &Type) -> TokenStream {
     if let Type::Path(type_path) = ty {
         let mut new_path = type_path.clone();
@@ -56,7 +51,6 @@ pub fn replace_state_generic(ty: &Type) -> TokenStream {
                         *arg = GenericArgument::Type(syn::parse_quote!(::svql_query::Search));
 
                         // We break immediately to avoid replacing subsequent Type arguments
-                        // (if the struct has multiple generic types).
                         break;
                     }
                 }
@@ -64,10 +58,6 @@ pub fn replace_state_generic(ty: &Type) -> TokenStream {
         }
         quote! { #new_path }
     } else {
-        // If the type is not a Path (e.g., it's a reference `&T`, array `[T]`, etc.),
-        // we return it unmodified. The generated code will likely fail to compile
-        // if this type is used as a submodule, which is the intended behavior
-        // (submodules must be named types).
         quote! { #ty }
     }
 }
@@ -90,4 +80,91 @@ pub fn parse_args_map(args: proc_macro::TokenStream) -> std::collections::HashMa
         }
     }
     map
+}
+
+/// Removes the first Type generic parameter (assumed to be State) from the generics list.
+/// This is used to create the `impl` generics for concrete Search/Match implementations.
+pub fn remove_state_generic(generics: &syn::Generics) -> syn::Generics {
+    let mut new_generics = generics.clone();
+    let mut removed_ident = None;
+
+    let mut new_params = Punctuated::new();
+    let mut found = false;
+
+    for param in new_generics.params {
+        if !found {
+            if let GenericParam::Type(type_param) = &param {
+                removed_ident = Some(type_param.ident.clone());
+                found = true;
+                continue;
+            }
+        }
+        new_params.push(param);
+    }
+    new_generics.params = new_params;
+
+    // Clean up where clause if it references the removed generic
+    if let Some(ident) = removed_ident {
+        if let Some(where_clause) = &mut new_generics.where_clause {
+            let mut new_predicates = Punctuated::new();
+            for pred in &where_clause.predicates {
+                let keep = match pred {
+                    WherePredicate::Type(pt) => {
+                        if let Type::Path(tp) = &pt.bounded_ty {
+                            !tp.path.is_ident(&ident)
+                        } else {
+                            true
+                        }
+                    }
+                    _ => true,
+                };
+                if keep {
+                    new_predicates.push(pred.clone());
+                }
+            }
+            where_clause.predicates = new_predicates;
+        }
+    }
+
+    new_generics
+}
+
+/// Constructs the type identifier with the State generic replaced by a concrete type (Search or Match).
+/// e.g., `MyQuery<S, T>` -> `MyQuery<::svql_query::Search, T>`
+pub fn make_replaced_type(
+    ident: &syn::Ident,
+    generics: &syn::Generics,
+    replacement: TokenStream,
+) -> TokenStream {
+    let mut args = Punctuated::<TokenStream, Token![,]>::new();
+    let mut found = false;
+
+    for param in &generics.params {
+        match param {
+            GenericParam::Type(t) => {
+                if !found {
+                    args.push(replacement.clone());
+                    found = true;
+                } else {
+                    let i = &t.ident;
+                    args.push(quote! { #i });
+                }
+            }
+            GenericParam::Const(c) => {
+                let i = &c.ident;
+                args.push(quote! { #i });
+            }
+            GenericParam::Lifetime(l) => {
+                let i = &l.lifetime;
+                args.push(quote! { #i });
+            }
+        }
+    }
+
+    if args.is_empty() {
+        // Should not happen if we are replacing a state generic, but for safety
+        quote! { #ident }
+    } else {
+        quote! { #ident < #args > }
+    }
 }

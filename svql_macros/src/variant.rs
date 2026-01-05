@@ -14,8 +14,20 @@ struct VariantInfo {
 pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let item_enum = parse_macro_input!(input as ItemEnum);
     let enum_name = &item_enum.ident;
+
+    // Generics
     let (impl_generics, ty_generics, where_clause) = item_enum.generics.split_for_impl();
     let generics = &item_enum.generics;
+
+    // Specialized generics (S removed)
+    let specialized_generics = common::remove_state_generic(&item_enum.generics);
+    let (spec_impl_generics, _, spec_where_clause) = specialized_generics.split_for_impl();
+
+    // Concrete types
+    let search_type =
+        common::make_replaced_type(enum_name, &item_enum.generics, quote!(::svql_query::Search));
+    let match_type =
+        common::make_replaced_type(enum_name, &item_enum.generics, quote!(::svql_query::Match));
 
     // --- Parsing Phase ---
 
@@ -44,7 +56,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     for variant in &item_enum.variants {
         let ident = variant.ident.clone();
 
-        // Extract the inner type (e.g., AndGate<S> from Gate(AndGate<S>))
         let ty = if let Fields::Unnamed(ref fields) = variant.fields {
             if let Some(field) = fields.unnamed.first() {
                 field.ty.clone()
@@ -57,7 +68,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         let mut port_map = std::collections::HashMap::new();
 
-        // Non-destructive attribute parsing
         for attr in &variant.attrs {
             if attr.path().is_ident("variant") {
                 if let Ok(list) =
@@ -103,7 +113,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let abstract_ident = format_ident!("__Abstract");
 
     // 1. Enum Definition
-    // We reconstruct the enum variants to strip attributes like #[variant(map...)]
     let variant_defs = variants_info.iter().map(|v| {
         let ident = &v.ident;
         let ty = &v.ty;
@@ -175,18 +184,15 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let query_blocks = variants_info.iter().map(|v| {
         let v_ident = &v.ident;
         let v_ty = &v.ty;
-        // Use the robust generic replacement
         let search_type = common::replace_state_generic(v_ty);
 
         quote! {
             {
-                // Instantiate the specific variant in Search mode
                 let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(
                     ::svql_query::traits::Component::path(self).clone()
                 );
                 let results = sub_query.query(driver, context, key, config);
 
-                // Map results back to the Enum variant
                 all_results.extend(
                     results.into_iter().map(#enum_name::<::svql_query::Match>::#v_ident)
                 );
@@ -222,14 +228,14 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#accessors)*
         }
 
-        impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Search> #where_clause {
-            type Pattern = #enum_name<::svql_query::Search>;
-            type Result = #enum_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #search_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
-        impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Match> #where_clause {
-            type Pattern = #enum_name<::svql_query::Search>;
-            type Result = #enum_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #match_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #enum_name #ty_generics #where_clause {
@@ -259,7 +265,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::svql_query::traits::Searchable for #enum_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Searchable for #search_type #spec_where_clause {
             fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
                 Self::#abstract_ident {
                     path: base_path.clone(),
@@ -268,18 +274,18 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match> {
+        impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 use ::svql_query::subgraph::cell::SourceLocation;
 
                 match self {
                     #(#report_arms),*,
-                    Self::#abstract_ident { .. } => panic!("__Abstract variant found in Match state during reporting. This indicates a bug in the query execution logic."),
+                    Self::#abstract_ident { .. } => panic!("__Abstract variant found in Match state during reporting."),
                 }
             }
         }
 
-        impl ::svql_query::traits::Query for #enum_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
             fn query<'a>(
                 &self,
                 driver: &::svql_query::driver::Driver,

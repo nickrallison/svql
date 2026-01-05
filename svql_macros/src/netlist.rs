@@ -4,7 +4,7 @@ use quote::quote;
 use syn::{Fields, ItemStruct, Lit, parse_macro_input};
 
 pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
-    let item_struct = parse_macro_input!(input as ItemStruct); // Don't make mutable yet
+    let item_struct = parse_macro_input!(input as ItemStruct);
     let args_map = common::parse_args_map(args);
 
     let file_path = args_map
@@ -16,7 +16,25 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         .clone();
 
     let struct_name = &item_struct.ident;
+
+    // Generics
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
+
+    // Specialized generics (S removed)
+    let specialized_generics = common::remove_state_generic(&item_struct.generics);
+    let (spec_impl_generics, _, spec_where_clause) = specialized_generics.split_for_impl();
+
+    // Concrete types
+    let search_type = common::make_replaced_type(
+        struct_name,
+        &item_struct.generics,
+        quote!(::svql_query::Search),
+    );
+    let match_type = common::make_replaced_type(
+        struct_name,
+        &item_struct.generics,
+        quote!(::svql_query::Match),
+    );
 
     // --- Parsing Phase ---
 
@@ -32,15 +50,11 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     if let Fields::Named(ref fields) = item_struct.fields {
         for field in &fields.named {
             let ident = field.ident.clone().unwrap();
-
-            // Skip the 'path' field if it exists in the source
             if ident == "path" {
                 continue;
             }
 
             let mut wire_name = ident.to_string();
-
-            // Non-destructive attribute check
             for attr in &field.attrs {
                 if attr.path().is_ident("rename") {
                     if let Ok(Lit::Str(s)) = attr.parse_args::<Lit>() {
@@ -60,16 +74,13 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // --- Generation Phase ---
 
-    // 1. Struct Definition Fields
     let struct_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let ty = &f.ty;
         let vis = &f.vis;
-        // We strip attributes like #[rename] by simply not including them here
         quote! { #vis #ident: #ty }
     });
 
-    // 2. Search::instantiate Fields
     let init_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let wire_name = &f.wire_name;
@@ -78,8 +89,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 3. Query::query Match Reconstruction
-    // Uses the new helper function to keep this clean and ensure ownership transfer
     let match_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let wire_name = &f.wire_name;
@@ -94,7 +103,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 4. Component::find_port_inner Arms
     let find_port_arms = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let wire_name = &f.wire_name;
@@ -103,7 +111,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 5. Reportable Implementation
     let report_logic = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         quote! {
@@ -125,16 +132,14 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#struct_fields),*
         }
 
-        // ... Trait Implementations ...
-
-        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
-            type Pattern = #struct_name<::svql_query::Search>;
-            type Result = #struct_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #search_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
-        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Match> #where_clause {
-            type Pattern = #struct_name<::svql_query::Search>;
-            type Result = #struct_name<::svql_query::Match>;
+        impl #spec_impl_generics ::svql_query::traits::Projected for #match_type #spec_where_clause {
+            type Pattern = #search_type;
+            type Result = #match_type;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
@@ -165,7 +170,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::svql_query::traits::Searchable for #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Searchable for #search_type #spec_where_clause {
             fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
                 Self {
                     path: base_path.clone(),
@@ -174,7 +179,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
+        impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 use ::svql_query::subgraph::cell::SourceLocation;
 
@@ -197,19 +202,19 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::svql_query::traits::netlist::NetlistMeta for #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::netlist::NetlistMeta for #search_type #spec_where_clause {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
             const PORTS: &'static [::svql_query::traits::netlist::PortSpec] = &[];
         }
 
-        impl #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics #search_type #spec_where_clause {
             pub fn new(path: ::svql_query::instance::Instance) -> Self {
                 <Self as ::svql_query::traits::Searchable>::instantiate(path)
             }
         }
 
-        impl ::svql_query::traits::Query for #struct_name<::svql_query::Search> {
+        impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
             fn query<'a>(
                 &self,
                 driver: &::svql_query::driver::Driver,
