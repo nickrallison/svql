@@ -96,7 +96,12 @@ impl<'a> crate::traits::Reportable for RecOr<Match> {
             type_name: "RecOr".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: self.or.y.inner.as_ref().and_then(|c| c.get_source()),
+            source_loc: Some(self.or.y.inner.as_ref().and_then(|c| c.get_source()).unwrap_or_else(|| {
+                svql_subgraph::cell::SourceLocation {
+                    file: std::sync::Arc::from(""),
+                    lines: Vec::new(),
+                }
+            })),
             children,
         }
     }

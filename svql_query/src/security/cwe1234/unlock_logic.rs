@@ -93,12 +93,17 @@ impl<'a> crate::traits::Reportable for UnlockLogic<Match> {
             type_name: "UnlockLogic".to_string(),
             path: self.path.clone(),
             details: None,
-            source_loc: self.top_and.y.inner.get_source().unwrap_or_else(|| {
-                svql_subgraph::cell::SourceLocation {
-                    file: std::sync::Arc::from(""),
-                    lines: Vec::new(),
-                }
-            }),
+            source_loc: Some(
+                self.top_and
+                    .y
+                    .inner
+                    .as_ref()
+                    .and_then(|c| c.get_source())
+                    .unwrap_or_else(|| svql_subgraph::cell::SourceLocation {
+                        file: std::sync::Arc::from(""),
+                        lines: Vec::new(),
+                    }),
+            ),
             children,
         }
     }
@@ -153,17 +158,30 @@ impl Query for UnlockLogic<Search> {
                     let from_wire = rec_or
                         .find_port(&or_to_and_conn.from.path)
                         .expect("RecOr output port not found");
-                    let from_cell = &from_wire.inner;
+
+                    let Some(from_info) = &from_wire.inner else {
+                        return vec![];
+                    };
+                    let Some(from_wrapper) = haystack_index.get_cell_by_id(from_info.id) else {
+                        return vec![];
+                    };
+
                     let fanout = haystack_index
-                        .fanout_set(from_cell)
+                        .fanout_set(&from_wrapper)
                         .expect("Fanout not found for RecOr cell");
 
                     let pairs: Vec<_> = and_gates
                         .iter()
                         .filter_map(|and_gate| {
                             let connected = [&and_gate.a, &and_gate.b].iter().any(|to_wire| {
-                                let to_cell = &to_wire.inner;
-                                fanout.contains(to_cell)
+                                let Some(to_info) = &to_wire.inner else {
+                                    return false;
+                                };
+                                let Some(to_wrapper) = haystack_index.get_cell_by_id(to_info.id)
+                                else {
+                                    return false;
+                                };
+                                fanout.contains(&to_wrapper)
                             });
 
                             if connected {
@@ -205,9 +223,15 @@ impl Query for UnlockLogic<Search> {
                     let candidates: Vec<_> = not_gates
                         .iter()
                         .filter_map(|not_gate| {
-                            let not_output_cell = &not_gate.y.inner;
+                            let Some(not_info) = &not_gate.y.inner else {
+                                return None;
+                            };
+                            let Some(not_wrapper) = haystack_index.get_cell_by_id(not_info.id)
+                            else {
+                                return None;
+                            };
 
-                            if !rec_or_fanin.contains(not_output_cell) {
+                            if !rec_or_fanin.contains(&not_wrapper) {
                                 return None;
                             }
 

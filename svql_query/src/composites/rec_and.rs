@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use svql_common::{Config, ModuleConfig};
 use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::{GraphIndex, cell::CellWrapper};
+use svql_subgraph::GraphIndex;
 
 use crate::prelude::*;
 
@@ -108,7 +108,17 @@ impl<'a> crate::traits::Reportable for RecAnd<Match> {
             type_name: "RecAnd".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: self.and.y.inner.as_ref().and_then(|c| c.get_source()),
+            source_loc: Some(
+                self.and
+                    .y
+                    .inner
+                    .as_ref()
+                    .and_then(|c| c.get_source())
+                    .unwrap_or_else(|| svql_subgraph::cell::SourceLocation {
+                        file: std::sync::Arc::from(""),
+                        lines: Vec::new(),
+                    }),
+            ),
             children,
         }
     }

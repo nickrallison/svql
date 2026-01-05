@@ -20,8 +20,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut field_defs = Vec::new();
     let mut context_calls = Vec::new();
 
-    let mut plan_inputs = Vec::new();
-    let mut reconstruct_calls = Vec::new();
+    let mut _plan_inputs = Vec::new();
+    let mut _reconstruct_calls = Vec::new();
     let mut get_col_arms = Vec::new();
     let mut schema_calls = Vec::new();
 
@@ -79,11 +79,11 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     ctx = ctx.merge(sub_ctx);
                 });
 
-                plan_inputs.push(quote! {
+                _plan_inputs.push(quote! {
                     Box::new(self.#ident.to_ir(config))
                 });
 
-                reconstruct_calls.push(quote! {
+                _reconstruct_calls.push(quote! {
                     #ident: self.#ident.reconstruct(cursor)
                 });
 
