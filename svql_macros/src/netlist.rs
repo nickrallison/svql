@@ -93,11 +93,9 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let wire_name = &f.wire_name;
         quote! {
-            #ident: ::svql_query::traits::netlist::bind_match_wire(
+            #ident: resolver.bind_wire(
                 self.#ident.path().clone(),
                 assignment,
-                &assignments,
-                needle,
                 #wire_name
             )
         }
@@ -223,19 +221,20 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 config: &::svql_query::common::Config
             ) -> Vec<Self::Result> {
                 use ::svql_query::traits::{Component, netlist::NetlistMeta};
+                use ::svql_query::binding::PortResolver;
                 ::svql_query::tracing::info!("{} searching netlist", self.log_label());
 
                 let needle_key = Self::driver_key();
                 let needle_container = context.get(&needle_key)
                     .expect("Pattern design not found in context")
                     .as_ref();
-                let needle = needle_container.design(); // FIX: Define needle variable
+
                 let haystack_container = context.get(key)
                     .expect("Haystack design not found in context")
                     .as_ref();
 
                 let assignments = ::svql_query::subgraph::SubgraphMatcher::enumerate_with_indices(
-                    needle,
+                    needle_container.design(),
                     haystack_container.design(),
                     needle_container.index(),
                     haystack_container.index(),
@@ -243,6 +242,9 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     key.module_name().to_string(),
                     config,
                 );
+
+                // Pre-compute port mappings for the needle
+                let resolver = PortResolver::new(needle_container.index());
 
                 let results: Vec<_> = assignments.items.iter().map(|assignment| {
                     #struct_name {
@@ -254,6 +256,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 ::svql_query::tracing::info!("{} found {} matches", self.log_label(), results.len());
                 results
             }
+
 
             fn context(
                 driver: &::svql_query::driver::Driver,
