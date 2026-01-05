@@ -84,7 +84,7 @@ impl UnlockLogic<Search> {
     }
 }
 
-impl<'a> crate::traits::Reportable for UnlockLogic<Match<'a>> {
+impl<'a> crate::traits::Reportable for UnlockLogic<Match> {
     fn to_report(&self, name: &str) -> crate::report::ReportNode {
         let children = vec![
             self.top_and.to_report("top_and"),
@@ -109,7 +109,7 @@ impl<'a> crate::traits::Reportable for UnlockLogic<Match<'a>> {
 }
 
 impl Query for UnlockLogic<Search> {
-    type Matched<'a> = UnlockLogic<Match<'a>>;
+    type Matched<'a> = UnlockLogic<Match>;
 
     fn query<'a>(
         &self,
@@ -143,7 +143,7 @@ impl Query for UnlockLogic<Search> {
         #[cfg(not(feature = "parallel"))]
         let or_iter = rec_ors.iter();
 
-        let rec_or_and_pairs: Vec<(RecOr<Match<'a>>, AndGate<Match<'a>>)> = {
+        let rec_or_and_pairs: Vec<(RecOr<Match>, AndGate<Match>)> = {
             or_iter
                 .enumerate()
                 .flat_map(|(rec_or_index, rec_or)| {
@@ -193,7 +193,7 @@ impl Query for UnlockLogic<Search> {
         #[cfg(not(feature = "parallel"))]
         let and_or_iter = rec_or_and_pairs.iter();
 
-        let results: Vec<UnlockLogic<Match<'a>>> = {
+        let results: Vec<UnlockLogic<Match>> = {
             and_or_iter
                 .enumerate()
                 .flat_map(|(rec_or_and_index, (rec_or, top_and))| {
@@ -390,7 +390,7 @@ impl PlannedQuery for UnlockLogic<Search> {
     }
 }
 
-impl<'ctx> UnlockLogic<Match<'ctx>> {
+impl<'ctx> UnlockLogic<Match> {
     pub fn or_tree_depth(&self) -> usize {
         self.rec_or.depth()
     }

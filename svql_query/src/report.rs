@@ -12,7 +12,7 @@ pub struct ReportNode {
     pub type_name: String,
     pub path: Instance,
     pub details: Option<String>,
-    pub source_loc: SourceLocation,
+    pub source_loc: Option<SourceLocation>,
     pub children: Vec<ReportNode>,
 }
 
@@ -50,8 +50,12 @@ impl ReportNode {
             format!("({})", self.type_name)
         };
 
-        let source_header = if !self.source_loc.lines.is_empty() {
-            format!(": {}:", self.source_loc.file)
+        let source_header = if let Some(source_loc) = &self.source_loc {
+            if !source_loc.lines.is_empty() {
+                format!(": {}:", source_loc.file)
+            } else {
+                "".to_string()
+            }
         } else {
             "".to_string()
         };
@@ -70,25 +74,30 @@ impl ReportNode {
         };
 
         // Fetch and print source lines
-        if !self.source_loc.lines.is_empty() {
-            let file_path = &self.source_loc.file;
-            let lines = cache
-                .entry(file_path.clone())
-                .or_insert_with(|| read_file_lines(file_path).unwrap_or_default());
+        if let Some(source_loc) = &self.source_loc {
+            if !source_loc.lines.is_empty() {
+                let file_path = &source_loc.file;
+                let lines = cache
+                    .entry(file_path.clone())
+                    .or_insert_with(|| read_file_lines(file_path).unwrap_or_default());
 
-            for line_meta in &self.source_loc.lines {
-                // SourceLine numbers are 1-indexed
-                let content = if line_meta.number > 0 && line_meta.number <= lines.len() {
-                    lines[line_meta.number - 1].trim_end()
-                } else {
-                    "<line not found in file>"
-                };
+                for line_meta in &source_loc.lines {
+                    // SourceLine numbers are 1-indexed
+                    let content = if line_meta.number > 0 && line_meta.number <= lines.len() {
+                        lines[line_meta.number - 1].trim_end()
+                    } else {
+                        "<line not found in file>"
+                    };
 
-                f.push_str(&format!(
-                    "{}    {:>4} | {}\n",
-                    new_prefix, line_meta.number, content
-                ));
+                    f.push_str(&format!(
+                        "{}    {:>4} | {}\n",
+                        new_prefix, line_meta.number, content
+                    ));
+                }
             }
+        } else {
+            // No source location available
+            f.push_str(&format!("{}    <no source location>\n", new_prefix));
         }
 
         for (i, child) in self.children.iter().enumerate() {

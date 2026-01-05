@@ -25,4 +25,4 @@ pub trait SearchableVariant: Variant<Search> {
     ) -> Vec<Self::Hit<'ctx>>;
 }
 
-pub trait MatchedVariant<'ctx>: Variant<Match<'ctx>> {}
+pub trait MatchedVariant<'ctx>: Variant<Match> {}

@@ -170,7 +170,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
             let results = sub_query.query(driver, context, key, config);
-            all_results.extend(results.into_iter().map(#enum_name::<::svql_query::Match<'a>>::#v_name));
+            all_results.extend(results.into_iter().map(#enum_name::<::svql_query::Match>::#v_name));
         }
     });
 
@@ -189,7 +189,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #idx => {
                 let sub = <#search_type as ::svql_query::traits::Searchable>::instantiate(::svql_query::traits::Component::path(self).clone());
-                #enum_name::<::svql_query::Match<'a>>::#v_name(sub.reconstruct(cursor))
+                #enum_name::<::svql_query::Match>::#v_name(sub.reconstruct(cursor))
             }
         }
     });
@@ -241,7 +241,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         }
 
-        impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match<'a>> {
+        impl<'a> ::svql_query::traits::Reportable for #enum_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 use ::svql_query::svql_subgraph::cell::SourceLocation;
 
@@ -259,7 +259,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl ::svql_query::traits::Query for #enum_name<::svql_query::Search> {
-            type Matched<'a> = #enum_name<::svql_query::Match<'a>>;
+            type Matched<'a> = #enum_name<::svql_query::Match>;
 
             fn query<'a>(
                 &self,

@@ -164,6 +164,23 @@ impl CellIndex {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CellInfo {
+    /// Unique identifier (debug_index) to allow equality checks
+    pub id: usize,
+    /// The type of cell (AND, OR, DFF, etc.)
+    pub kind: CellKind,
+    /// Source code location (Arc<str> is cheap to clone and owned)
+    pub source_loc: Option<SourceLocation>,
+}
+
+impl CellInfo {
+    /// Retrieves the source code location of the cell if available.
+    pub fn get_source(&self) -> Option<SourceLocation> {
+        self.source_loc.clone()
+    }
+}
+
 /// A wrapper around a netlist cell that provides stable identity and metadata access.
 #[derive(Clone)]
 pub struct CellWrapper<'a> {
@@ -276,6 +293,14 @@ impl<'a> CellWrapper<'a> {
             end_column,
         }
     }
+
+    pub fn to_info(&self) -> CellInfo {
+        CellInfo {
+            id: self.debug_index,
+            kind: self.cell_type(),
+            source_loc: self.get_source(),
+        }
+    }
 }
 
 impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
@@ -289,7 +314,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
 }
 
 /// Represents a physical location in the source code.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceLocation {
     pub file: Arc<str>,
     pub lines: Vec<SourceLine>,
@@ -307,7 +332,7 @@ impl SourceLocation {
 }
 
 /// Represents a specific line and column range within a source file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceLine {
     pub number: usize,
     pub start_column: usize,

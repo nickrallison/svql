@@ -54,7 +54,7 @@ pub trait Searchable: Sized + Component<Search> {
 /// Interface for executing queries using the legacy backtracking engine.
 pub trait Query: Component<Search> + Searchable {
     /// The type returned when a match is found.
-    type Matched<'a>: Component<Match<'a>>;
+    type Matched<'a>: Component<Match>;
 
     /// Executes the query against a design context.
     fn query<'a>(
@@ -128,8 +128,8 @@ pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
 
 /// Validates that a physical connection exists between two matched wires in the haystack.
 pub fn validate_connection<'ctx>(
-    from: &Wire<Match<'ctx>>,
-    to: &Wire<Match<'ctx>>,
+    from: &Wire<Match>,
+    to: &Wire<Match>,
     haystack_index: &GraphIndex<'ctx>,
 ) -> bool {
     let from_cell = &from.inner;

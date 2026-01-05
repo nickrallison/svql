@@ -153,7 +153,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match<'a>> {
+        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 use ::svql_query::svql_subgraph::cell::SourceLocation;
 
@@ -197,7 +197,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl ::svql_query::traits::Query for #struct_name<::svql_query::Search> {
-            type Matched<'a> = #struct_name<::svql_query::Match<'a>>;
+            type Matched<'a> = #struct_name<::svql_query::Match>;
 
             fn query<'a>(
                 &self,

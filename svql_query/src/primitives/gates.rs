@@ -72,7 +72,7 @@ macro_rules! define_primitive_gate {
             }
         }
 
-        impl<'a> Reportable for $name<Match<'a>> {
+        impl<'a> Reportable for $name<Match> {
             fn to_report(&self, name: &str) -> crate::report::ReportNode {
                 use crate::svql_subgraph::cell::SourceLocation;
 
@@ -99,7 +99,7 @@ macro_rules! define_primitive_gate {
         }
 
         impl Query for $name<Search> {
-            type Matched<'a> = $name<Match<'a>>;
+            type Matched<'a> = $name<Match>;
 
             /// Scans the design index for all cells matching the primitive type.
             fn query<'a>(

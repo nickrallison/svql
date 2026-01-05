@@ -20,7 +20,7 @@ pub fn bind_input<'ctx>(
     name: &str,
     bit_index: usize,
     input_fanout: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
-) -> Match<'ctx> {
+) -> Match {
     let pattern_cells = input_fanout
         .get(name)
         .expect("Input port not found in pattern");
@@ -52,7 +52,7 @@ pub fn bind_output<'ctx>(
     name: &str,
     bit_index: usize,
     output_fanin: &HashMap<String, Vec<(CellWrapper<'ctx>, usize)>>,
-) -> Match<'ctx> {
+) -> Match {
     let pattern_cells = output_fanin
         .get(name)
         .expect("Output port not found in pattern");

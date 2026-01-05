@@ -87,7 +87,7 @@ impl Searchable for RecOr<Search> {
     }
 }
 
-impl<'a> crate::traits::Reportable for RecOr<Match<'a>> {
+impl<'a> crate::traits::Reportable for RecOr<Match> {
     fn to_report(&self, name: &str) -> crate::report::ReportNode {
         let mut children = Vec::new();
         let mut current = self.child.as_ref();
@@ -126,7 +126,7 @@ impl RecOr<Search> {
 }
 
 impl Query for RecOr<Search> {
-    type Matched<'a> = RecOr<Match<'a>>;
+    type Matched<'a> = RecOr<Match>;
 
     fn query<'a>(
         &self,
@@ -151,7 +151,7 @@ impl Query for RecOr<Search> {
             all_or_gates.len()
         );
 
-        let mut current_layer: Vec<RecOr<Match<'a>>> = all_or_gates
+        let mut current_layer: Vec<RecOr<Match>> = all_or_gates
             .iter()
             .map(|or_gate| RecOr {
                 path: self.path.clone(),
@@ -311,7 +311,7 @@ impl PlannedQuery for RecOr<Search> {
     }
 }
 
-impl<'ctx> RecOr<Match<'ctx>> {
+impl<'ctx> RecOr<Match> {
     pub fn fanin_set(&self, haystack_index: &GraphIndex<'ctx>) -> HashSet<CellWrapper<'ctx>> {
         let mut all_cells = HashSet::new();
         self.collect_cells(&mut all_cells);
@@ -333,7 +333,7 @@ impl<'ctx> RecOr<Match<'ctx>> {
     }
 }
 
-fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {
+fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match>) -> Vec<&'a CellWrapper<'ctx>> {
     let mut cells = Vec::new();
     let or_cell = &rec_or.or.y.inner;
     cells.push(or_cell);
@@ -347,10 +347,10 @@ fn rec_or_cells<'a, 'ctx>(rec_or: &'a RecOr<Match<'ctx>>) -> Vec<&'a CellWrapper
 
 fn build_next_layer<'ctx>(
     path: &Instance,
-    all_or_gates: &[OrGate<Match<'ctx>>],
-    prev_layer: &[RecOr<Match<'ctx>>],
+    all_or_gates: &[OrGate<Match>],
+    prev_layer: &[RecOr<Match>],
     haystack_index: &GraphIndex<'ctx>,
-) -> Vec<RecOr<Match<'ctx>>> {
+) -> Vec<RecOr<Match>> {
     let mut next_layer = Vec::new();
 
     for prev in prev_layer {
@@ -407,7 +407,7 @@ fn build_next_layer<'ctx>(
     next_layer
 }
 
-fn update_rec_or_path<'ctx>(rec_or: &mut RecOr<Match<'ctx>>, new_path: Instance) {
+fn update_rec_or_path<'ctx>(rec_or: &mut RecOr<Match>, new_path: Instance) {
     rec_or.path = new_path.clone();
     let or_path = new_path.child("or");
     rec_or.or.path = or_path.clone();

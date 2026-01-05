@@ -7,7 +7,7 @@
 extern crate self as svql_query;
 
 use std::sync::Arc;
-use svql_subgraph::cell::{CellWrapper, SourceLocation};
+use svql_subgraph::cell::{CellInfo, CellWrapper, SourceLocation};
 
 pub mod binding;
 pub mod composites;
@@ -48,24 +48,20 @@ impl State for Search {
 
 /// Represents a query result bound to specific design elements.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Match<'ctx> {
-    /// Reference to the cell in the pattern/needle design.
-    pub pat_node_ref: Option<CellWrapper<'ctx>>,
-    /// Reference to the cell in the target/haystack design.
-    pub design_node_ref: Option<CellWrapper<'ctx>>,
+pub struct Match {
+    /// Owned metadata about the matched cell in the target design.
+    pub cell: Option<svql_subgraph::cell::CellInfo>,
 }
 
-impl<'ctx> Match<'ctx> {
+impl Match {
     /// Retrieves the source code location of the matched design element.
     pub fn source(&self) -> Option<SourceLocation> {
-        self.design_node_ref
-            .as_ref()
-            .and_then(|cell| cell.get_source())
+        self.cell.as_ref().and_then(|cell| cell.get_source())
     }
 }
 
-impl<'ctx> State for Match<'ctx> {
-    type WireInner = CellWrapper<'ctx>;
+impl State for Match {
+    type WireInner = Option<CellInfo>;
 }
 
 /// A logical connection point within a query component.
@@ -92,14 +88,14 @@ impl<S: State> Wire<S> {
     }
 }
 
-impl<'ctx> Wire<Match<'ctx>> {
+impl<'ctx> Wire<Match> {
     /// Returns the matched cell associated with this wire.
-    pub fn cell(&self) -> &CellWrapper<'ctx> {
-        &self.inner
+    pub fn cell(&self) -> Option<&svql_subgraph::cell::CellInfo> {
+        self.inner.as_ref()
     }
 }
 
-impl<'ctx> crate::traits::Reportable for Wire<Match<'ctx>> {
+impl<'ctx> crate::traits::Reportable for Wire<Match> {
     /// Generates a report node for the wire.
     fn to_report(&self, name: &str) -> crate::report::ReportNode {
         crate::report::ReportNode {
@@ -107,12 +103,7 @@ impl<'ctx> crate::traits::Reportable for Wire<Match<'ctx>> {
             type_name: "Wire".to_string(),
             path: self.path.clone(),
             details: None,
-            source_loc: self.inner.get_source().unwrap_or_else(|| {
-                svql_subgraph::cell::SourceLocation {
-                    file: std::sync::Arc::from(""),
-                    lines: Vec::new(),
-                }
-            }),
+            source_loc: self.inner.as_ref().and_then(|cell| cell.get_source()),
             children: Vec::new(),
         }
     }

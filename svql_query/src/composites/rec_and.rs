@@ -99,7 +99,7 @@ impl Searchable for RecAnd<Search> {
     }
 }
 
-impl<'a> crate::traits::Reportable for RecAnd<Match<'a>> {
+impl<'a> crate::traits::Reportable for RecAnd<Match> {
     fn to_report(&self, name: &str) -> crate::report::ReportNode {
         let mut children = Vec::new();
         let mut current = self.child.as_ref();
@@ -138,7 +138,7 @@ impl RecAnd<Search> {
 }
 
 impl Query for RecAnd<Search> {
-    type Matched<'a> = RecAnd<Match<'a>>;
+    type Matched<'a> = RecAnd<Match>;
 
     fn query<'a>(
         &self,
@@ -163,7 +163,7 @@ impl Query for RecAnd<Search> {
             all_and_gates.len()
         );
 
-        let mut current_layer: Vec<RecAnd<Match<'a>>> = all_and_gates
+        let mut current_layer: Vec<RecAnd<Match>> = all_and_gates
             .iter()
             .map(|and_gate| RecAnd {
                 path: self.path.clone(),
@@ -237,7 +237,7 @@ impl Query for RecAnd<Search> {
 
 impl PlannedQuery for RecAnd<Search> {}
 
-fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match<'ctx>>) -> Vec<&'a CellWrapper<'ctx>> {
+fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match>) -> Vec<&'a CellWrapper<'ctx>> {
     let mut cells = Vec::new();
     let and_cell = &rec_and.and.y.inner;
     cells.push(and_cell);
@@ -251,10 +251,10 @@ fn rec_and_cells<'a, 'ctx>(rec_and: &'a RecAnd<Match<'ctx>>) -> Vec<&'a CellWrap
 
 fn build_next_layer<'ctx>(
     path: &Instance,
-    all_and_gates: &[AndGate<Match<'ctx>>],
-    prev_layer: &[RecAnd<Match<'ctx>>],
+    all_and_gates: &[AndGate<Match>],
+    prev_layer: &[RecAnd<Match>],
     haystack_index: &GraphIndex<'ctx>,
-) -> Vec<RecAnd<Match<'ctx>>> {
+) -> Vec<RecAnd<Match>> {
     let start_time = std::time::Instant::now();
     let mut next_layer = Vec::new();
     let mut candidates_checked = 0;
@@ -326,7 +326,7 @@ fn build_next_layer<'ctx>(
     next_layer
 }
 
-fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match<'ctx>>, new_path: Instance) {
+fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match>, new_path: Instance) {
     rec_and.path = new_path.clone();
     let and_path = new_path.child("and");
     rec_and.and.path = and_path.clone();
