@@ -4,119 +4,128 @@ use quote::quote;
 use syn::{Fields, ItemStruct, Lit, parse_macro_input};
 
 pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut item_struct = parse_macro_input!(input as ItemStruct);
+    let item_struct = parse_macro_input!(input as ItemStruct); // Don't make mutable yet
     let args_map = common::parse_args_map(args);
 
     let file_path = args_map
         .get("file")
-        .expect("netlist attribute requires 'file' argument");
+        .expect("netlist attribute requires 'file'");
     let module_name = args_map
         .get("name")
         .unwrap_or(&item_struct.ident.to_string())
         .clone();
 
     let struct_name = &item_struct.ident;
-    let generics = &item_struct.generics;
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
 
-    // 1. Inject 'path' field if not present
-    if let Fields::Named(ref mut fields) = item_struct.fields {
-        let _has_path = fields
-            .named
-            .iter()
-            .any(|f| f.ident.as_ref().map(|i| i == "path").unwrap_or(false));
+    // --- Parsing Phase ---
+
+    struct FieldInfo {
+        ident: syn::Ident,
+        ty: syn::Type,
+        vis: syn::Visibility,
+        wire_name: String,
     }
 
-    // 2. Analyze Fields
-    let mut field_names = Vec::new();
-    let mut field_strs = Vec::new();
-    let mut field_inits = Vec::new();
-    let mut field_matches = Vec::new();
-    let mut child_refs = Vec::new();
-    let mut find_port_arms = Vec::new();
-    let mut field_defs = Vec::new();
+    let mut parsed_fields = Vec::new();
 
-    let mut schema_cols = Vec::new();
-    let mut col_indices = Vec::new();
-    let mut reconstruct_fields = Vec::new();
+    if let Fields::Named(ref fields) = item_struct.fields {
+        for field in &fields.named {
+            let ident = field.ident.clone().unwrap();
 
-    if let Fields::Named(ref mut fields) = item_struct.fields {
-        for (idx, field) in fields.named.iter_mut().enumerate() {
-            let ident = field.ident.as_ref().unwrap();
-            let name_str = ident.to_string();
-            let ty = &field.ty;
-            let vis = &field.vis;
+            // Skip the 'path' field if it exists in the source
+            if ident == "path" {
+                continue;
+            }
 
-            let mut wire_name = name_str.clone();
-            let mut attrs_to_remove = Vec::new();
+            let mut wire_name = ident.to_string();
 
-            for (i, attr) in field.attrs.iter().enumerate() {
+            // Non-destructive attribute check
+            for attr in &field.attrs {
                 if attr.path().is_ident("rename") {
-                    if let Ok(lit) = attr.parse_args::<Lit>() {
-                        if let Lit::Str(s) = lit {
-                            wire_name = s.value();
-                        }
+                    if let Ok(Lit::Str(s)) = attr.parse_args::<Lit>() {
+                        wire_name = s.value();
                     }
-                    attrs_to_remove.push(i);
                 }
             }
 
-            for i in attrs_to_remove.into_iter().rev() {
-                field.attrs.remove(i);
-            }
-
-            field_names.push(ident);
-            field_strs.push(wire_name.clone());
-
-            field_defs.push(quote! {
-                #vis #ident: #ty
-            });
-
-            field_inits.push(quote! {
-                #ident: ::svql_query::Wire::new(base_path.child(#wire_name), ())
-            });
-
-            // For query() reconstruction: Convert CellWrapper to CellInfo
-            field_matches.push(quote! {
-                #ident: ::svql_query::Wire::new(
-                    self.#ident.path().clone(),
-                    ::svql_query::traits::netlist::resolve_wire(
-                        assignment,
-                        &assignments,
-                        needle,
-                        #wire_name
-                    ).map(|cw| cw.to_info())
-                )
-            });
-
-            child_refs.push(quote! { &self.#ident });
-
-            find_port_arms.push(quote! {
-                #wire_name => self.#ident.find_port_inner(tail)
-            });
-
-            schema_cols.push(wire_name.clone());
-            col_indices.push(quote! {
-                #wire_name => Some(#idx)
-            });
-
-            // For IR reconstruction
-            reconstruct_fields.push(quote! {
-                #ident: ::svql_query::Wire::new(
-                    self.#ident.path().clone(),
-                    Some(cursor.next_cell().to_info())
-                )
+            parsed_fields.push(FieldInfo {
+                ident,
+                ty: field.ty.clone(),
+                vis: field.vis.clone(),
+                wire_name,
             });
         }
     }
 
-    // 3. Generate Code
+    // --- Generation Phase ---
+
+    // 1. Struct Definition Fields
+    let struct_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let ty = &f.ty;
+        let vis = &f.vis;
+        // We strip attributes like #[rename] by simply not including them here
+        quote! { #vis #ident: #ty }
+    });
+
+    // 2. Search::instantiate Fields
+    let init_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let wire_name = &f.wire_name;
+        quote! {
+            #ident: ::svql_query::Wire::new(base_path.child(#wire_name), ())
+        }
+    });
+
+    // 3. Query::query Match Reconstruction
+    // Uses the new helper function to keep this clean and ensure ownership transfer
+    let match_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let wire_name = &f.wire_name;
+        quote! {
+            #ident: ::svql_query::traits::netlist::bind_match_wire(
+                self.#ident.path().clone(),
+                assignment,
+                &assignments,
+                needle,
+                #wire_name
+            )
+        }
+    });
+
+    // 4. Component::find_port_inner Arms
+    let find_port_arms = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let wire_name = &f.wire_name;
+        quote! {
+            #wire_name => self.#ident.find_port_inner(tail)
+        }
+    });
+
+    // 5. Reportable Implementation
+    let report_logic = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        quote! {
+            if let Some(loc) = self.#ident.inner.as_ref().and_then(|c| c.get_source()) {
+                file_path = loc.file;
+                for line in loc.lines {
+                    if seen.insert(line.number) {
+                        all_lines.push(line);
+                    }
+                }
+            }
+        }
+    });
+
     let expanded = quote! {
         #[derive(Clone, Debug)]
-        pub struct #struct_name #generics #where_clause {
+        pub struct #struct_name #impl_generics #where_clause {
             pub path: ::svql_query::instance::Instance,
-            #(#field_defs),*
+            #(#struct_fields),*
         }
+
+        // ... Trait Implementations ...
 
         impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
             type Pattern = #struct_name<::svql_query::Search>;
@@ -160,7 +169,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
                 Self {
                     path: base_path.clone(),
-                    #(#field_inits),*
+                    #(#init_fields),*
                 }
             }
         }
@@ -173,17 +182,8 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let mut file_path = std::sync::Arc::from("");
                 let mut seen = std::collections::HashSet::new();
 
-                #(
-                    // Handle Option<CellInfo>
-                    if let Some(loc) = self.#field_names.inner.as_ref().and_then(|c| c.get_source()) {
-                        file_path = loc.file;
-                        for line in loc.lines {
-                            if seen.insert(line.number) {
-                                all_lines.push(line);
-                            }
-                        }
-                    }
-                )*
+                #(#report_logic)*
+
                 all_lines.sort_by_key(|l| l.number);
 
                 ::svql_query::report::ReportNode {
@@ -228,16 +228,11 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     .expect("Haystack design not found in context")
                     .as_ref();
 
-                let needle = needle_container.design();
-                let haystack = haystack_container.design();
-                let needle_index = needle_container.index();
-                let haystack_index = haystack_container.index();
-
                 let assignments = ::svql_query::subgraph::SubgraphMatcher::enumerate_with_indices(
-                    needle,
-                    haystack,
-                    needle_index,
-                    haystack_index,
+                    needle_container.design(),
+                    haystack_container.design(),
+                    needle_container.index(),
+                    haystack_container.index(),
                     needle_key.module_name().to_string(),
                     key.module_name().to_string(),
                     config,
@@ -246,7 +241,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let results: Vec<_> = assignments.items.iter().map(|assignment| {
                     #struct_name {
                         path: self.path.clone(),
-                        #(#field_matches),*
+                        #(#match_fields),*
                     }
                 }).collect();
 

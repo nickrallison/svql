@@ -1,3 +1,4 @@
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
@@ -32,6 +33,45 @@ pub fn has_attribute(attrs: &[Attribute], attr_name: &str) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident(attr_name))
 }
 
+/// Robustly replaces the generic argument corresponding to `State` with `::svql_query::Search`.
+///
+/// This function assumes the standard SVQL pattern where the `State` parameter is
+/// a Type argument (not a lifetime or const). It replaces the *first* Type argument found.
+///
+/// Examples:
+/// - `MyQuery<S>` -> `MyQuery<::svql_query::Search>`
+/// - `MyQuery<'a, S>` -> `MyQuery<'a, ::svql_query::Search>`
+/// - `MyQuery<S, const N: usize>` -> `MyQuery<::svql_query::Search, const N: usize>`
+pub fn replace_state_generic(ty: &Type) -> TokenStream {
+    if let Type::Path(type_path) = ty {
+        let mut new_path = type_path.clone();
+
+        // We modify the last segment of the path (e.g., `MyQuery` in `crate::module::MyQuery<S>`)
+        if let Some(last_segment) = new_path.path.segments.last_mut() {
+            if let PathArguments::AngleBracketed(args) = &mut last_segment.arguments {
+                // Iterate over the generic arguments (Lifetimes, Types, Consts, Bindings, Constraints)
+                for arg in &mut args.args {
+                    if let GenericArgument::Type(_) = arg {
+                        // Replace the first Type argument we encounter with `Search`
+                        *arg = GenericArgument::Type(syn::parse_quote!(::svql_query::Search));
+
+                        // We break immediately to avoid replacing subsequent Type arguments
+                        // (if the struct has multiple generic types).
+                        break;
+                    }
+                }
+            }
+        }
+        quote! { #new_path }
+    } else {
+        // If the type is not a Path (e.g., it's a reference `&T`, array `[T]`, etc.),
+        // we return it unmodified. The generated code will likely fail to compile
+        // if this type is used as a submodule, which is the intended behavior
+        // (submodules must be named types).
+        quote! { #ty }
+    }
+}
+
 pub fn parse_args_map(args: proc_macro::TokenStream) -> std::collections::HashMap<String, String> {
     let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
     let parsed_args = parser.parse(args).expect("Failed to parse macro arguments");
@@ -50,28 +90,4 @@ pub fn parse_args_map(args: proc_macro::TokenStream) -> std::collections::HashMa
         }
     }
     map
-}
-
-pub fn replace_generic_with_search(ty: &Type) -> proc_macro2::TokenStream {
-    if let Type::Path(type_path) = ty {
-        let mut new_path = type_path.path.clone();
-        if let Some(last_segment) = new_path.segments.last_mut() {
-            last_segment.arguments =
-                PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
-                    colon2_token: None,
-                    lt_token: Default::default(),
-                    args: {
-                        let mut args = Punctuated::new();
-                        args.push(GenericArgument::Type(syn::parse_quote!(
-                            ::svql_query::Search
-                        )));
-                        args
-                    },
-                    gt_token: Default::default(),
-                });
-        }
-        quote! { #new_path }
-    } else {
-        quote! { #ty }
-    }
 }

@@ -51,3 +51,19 @@ pub fn resolve_wire<'a>(
 
     None
 }
+
+/// Helper for macros to construct a Wire in the Match state.
+/// This handles the logic of looking up the cell, converting it to owned info,
+/// and handling the Option wrapping.
+pub fn bind_match_wire(
+    path: Instance,
+    assignment: &SingleAssignment,
+    assignment_set: &AssignmentSet,
+    needle_design: &prjunnamed_netlist::Design,
+    wire_name: &str,
+) -> Wire<Match> {
+    let cell_info =
+        resolve_wire(assignment, assignment_set, needle_design, wire_name).map(|cw| cw.to_info()); // Converts borrowed CellWrapper to owned CellInfo
+
+    Wire::new(path, cell_info)
+}
