@@ -65,8 +65,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 let search_ty = common::replace_generic_with_search(ty);
 
                 instantiate_fields.push(quote! {
-                        #ident: <#search_ty as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
-                    });
+                    #ident: <<#ty as ::svql_query::traits::Projected>::Pattern as ::svql_query::traits::Searchable>::instantiate(...)
+                });
 
                 query_calls.push(quote! {
                     let #ident = self.#ident.query(driver, context, key, config);
@@ -137,6 +137,16 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         #[derive(Clone, Debug)]
         pub struct #struct_name #generics #where_clause {
             #(#field_defs),*
+        }
+
+        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
+            type Pattern = #struct_name<::svql_query::Search>;
+            type Result<'a> = #struct_name<::svql_query::Match>;
+        }
+
+        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Match> #where_clause {
+            type Pattern = #struct_name<::svql_query::Search>;
+            type Result<'a> = #struct_name<::svql_query::Match>;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {

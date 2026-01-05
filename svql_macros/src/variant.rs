@@ -181,6 +181,16 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#accessors)*
         }
 
+        impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Search> #where_clause {
+            type Pattern = #enum_name<::svql_query::Search>;
+            type Result<'a> = #enum_name<::svql_query::Match>;
+        }
+
+        impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Match> #where_clause {
+            type Pattern = #enum_name<::svql_query::Search>;
+            type Result<'a> = #enum_name<::svql_query::Match>;
+        }
+
         impl #impl_generics ::svql_query::traits::Component<S> for #enum_name #ty_generics #where_clause {
             fn path(&self) -> &::svql_query::instance::Instance {
                 match self {

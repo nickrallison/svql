@@ -118,6 +118,16 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#field_defs),*
         }
 
+        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
+            type Pattern = #struct_name<::svql_query::Search>;
+            type Result<'a> = #struct_name<::svql_query::Match>;
+        }
+
+        impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Match> #where_clause {
+            type Pattern = #struct_name<::svql_query::Search>;
+            type Result<'a> = #struct_name<::svql_query::Match>;
+        }
+
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
             fn path(&self) -> &::svql_query::instance::Instance {
                 &self.path
