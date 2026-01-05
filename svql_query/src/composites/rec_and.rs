@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
+use std::sync::Arc;
 use subgraph::GraphIndex;
 
 use crate::prelude::*;
@@ -38,6 +38,16 @@ where
     pub fn output(&self) -> &Wire<S> {
         &self.and.y
     }
+}
+
+impl Projected for RecAnd<Search> {
+    type Pattern = RecAnd<Search>;
+    type Result = RecAnd<Match>;
+}
+
+impl Projected for RecAnd<Match> {
+    type Pattern = RecAnd<Search>;
+    type Result = RecAnd<Match>;
 }
 
 impl<S> Component<S> for RecAnd<S>
@@ -135,15 +145,13 @@ impl RecAnd<Search> {
 }
 
 impl Query for RecAnd<Search> {
-    type Matched<'a> = RecAnd<Match>;
-
-    fn query<'a>(
+    fn query(
         &self,
         driver: &Driver,
-        context: &'a Context,
+        context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Matched<'a>> {
+    ) -> Vec<Self::Result> {
         tracing::event!(
             tracing::Level::INFO,
             "RecAnd::query: starting recursive AND gate search"

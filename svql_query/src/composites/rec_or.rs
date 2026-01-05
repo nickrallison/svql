@@ -30,6 +30,16 @@ where
     }
 }
 
+impl Projected for RecOr<Search> {
+    type Pattern = RecOr<Search>;
+    type Result = RecOr<Match>;
+}
+
+impl Projected for RecOr<Match> {
+    type Pattern = RecOr<Search>;
+    type Result = RecOr<Match>;
+}
+
 impl<S> Component<S> for RecOr<S>
 where
     S: State,
@@ -96,12 +106,17 @@ impl<'a> crate::traits::Reportable for RecOr<Match> {
             type_name: "RecOr".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: Some(self.or.y.inner.as_ref().and_then(|c| c.get_source()).unwrap_or_else(|| {
-                subgraph::cell::SourceLocation {
-                    file: std::sync::Arc::from(""),
-                    lines: Vec::new(),
-                }
-            })),
+            source_loc: Some(
+                self.or
+                    .y
+                    .inner
+                    .as_ref()
+                    .and_then(|c| c.get_source())
+                    .unwrap_or_else(|| subgraph::cell::SourceLocation {
+                        file: std::sync::Arc::from(""),
+                        lines: Vec::new(),
+                    }),
+            ),
             children,
         }
     }
@@ -118,15 +133,13 @@ impl RecOr<Search> {
 }
 
 impl Query for RecOr<Search> {
-    type Matched<'a> = RecOr<Match>;
-
-    fn query<'a>(
+    fn query(
         &self,
         driver: &Driver,
-        context: &'a Context,
+        context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Matched<'a>> {
+    ) -> Vec<Self::Result> {
         tracing::event!(
             tracing::Level::INFO,
             "RecOr::query: starting recursive OR gate search"

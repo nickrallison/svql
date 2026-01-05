@@ -2,9 +2,9 @@ use crate::composites::rec_or::RecOr;
 
 use crate::prelude::*;
 
-use std::sync::Arc;
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
+use std::sync::Arc;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -22,6 +22,16 @@ where
     pub top_and: AndGate<S>,
     pub rec_or: RecOr<S>,
     pub not_gate: NotGate<S>,
+}
+
+impl Projected for UnlockLogic<Search> {
+    type Pattern = UnlockLogic<Search>;
+    type Result = UnlockLogic<Match>;
+}
+
+impl Projected for UnlockLogic<Match> {
+    type Pattern = UnlockLogic<Search>;
+    type Result = UnlockLogic<Match>;
 }
 
 impl<S> Component<S> for UnlockLogic<S>
@@ -110,15 +120,13 @@ impl<'a> crate::traits::Reportable for UnlockLogic<Match> {
 }
 
 impl Query for UnlockLogic<Search> {
-    type Matched<'a> = UnlockLogic<Match>;
-
-    fn query<'a>(
+    fn query(
         &self,
         driver: &Driver,
-        context: &'a Context,
+        context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Matched<'a>> {
+    ) -> Vec<Self::Result> {
         tracing::info!("UnlockLogic::query: starting CWE1234 unlock pattern search");
 
         let haystack_index = context.get(key).unwrap().index();
