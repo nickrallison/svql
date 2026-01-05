@@ -95,14 +95,14 @@ impl<'ctx> Wire<Match> {
     }
 }
 
-impl<'ctx> crate::traits::Reportable for Wire<Match> {
-    /// Generates a report node for the wire.
+impl crate::traits::Reportable for Wire<Match> {
     fn to_report(&self, name: &str) -> crate::report::ReportNode {
         crate::report::ReportNode {
             name: name.to_string(),
             type_name: "Wire".to_string(),
             path: self.path.clone(),
             details: None,
+            // inner is now Option<CellInfo>, so we map through it
             source_loc: self.inner.as_ref().and_then(|cell| cell.get_source()),
             children: Vec::new(),
         }

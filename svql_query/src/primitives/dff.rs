@@ -71,17 +71,10 @@ macro_rules! impl_dff_primitive {
 
         impl<'a> Reportable for $name<Match> {
             fn to_report(&self, name: &str) -> crate::report::ReportNode {
-                use crate::svql_subgraph::cell::SourceLocation;
-                let source_loc = [$(self.$port.inner.get_source()),*]
+                let source_loc = [$(self.$port.inner.as_ref().and_then(|c| c.get_source())),*]
                     .into_iter()
                     .flatten()
-                    .next()
-                    .unwrap_or_else(|| {
-                        SourceLocation {
-                            file: Arc::from(""),
-                            lines: Vec::new()
-                        }
-                    });
+                    .next();
 
                 crate::report::ReportNode {
                     name: name.to_string(),
@@ -93,6 +86,7 @@ macro_rules! impl_dff_primitive {
                 }
             }
         }
+
 
         impl Query for $name<Search> {
             type Matched<'a> = $name<Match>;
@@ -122,9 +116,10 @@ macro_rules! impl_dff_primitive {
                     .map(|cell| {
                         $name {
                             path: self.path.clone(),
-                            $($port: Wire::new(self.$port.path.clone(), cell.clone())),*
+                            $($port: Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
                         }
                     })
+
                     .collect();
                 matches
             }

@@ -76,7 +76,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 #ident: ::svql_query::Wire::new(base_path.child(#wire_name), ())
             });
 
-            // For query() reconstruction
+            // For query() reconstruction: Convert CellWrapper to CellInfo
             field_matches.push(quote! {
                 #ident: ::svql_query::Wire::new(
                     self.#ident.path().clone(),
@@ -85,7 +85,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                         &assignments,
                         needle,
                         #wire_name
-                    ).expect(&format!("Wire {} not found in assignment", #wire_name))
+                    ).map(|cw| cw.to_info())
                 )
             });
 
@@ -99,10 +99,12 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             col_indices.push(quote! {
                 #wire_name => Some(#idx)
             });
+
+            // For IR reconstruction
             reconstruct_fields.push(quote! {
                 #ident: ::svql_query::Wire::new(
                     self.#ident.path().clone(),
-                    cursor.next_cell()
+                    Some(cursor.next_cell().to_info())
                 )
             });
         }
@@ -162,7 +164,8 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let mut seen = std::collections::HashSet::new();
 
                 #(
-                    if let Some(loc) = self.#field_names.inner.get_source() {
+                    // Handle Option<CellInfo>
+                    if let Some(loc) = self.#field_names.inner.as_ref().and_then(|c| c.get_source()) {
                         file_path = loc.file;
                         for line in loc.lines {
                             if seen.insert(line.number) {
@@ -178,7 +181,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     type_name: stringify!(#struct_name).to_string(),
                     path: self.path.clone(),
                     details: None,
-                    source_loc: SourceLocation { file: file_path, lines: all_lines },
+                    source_loc: if file_path.is_empty() { None } else { Some(SourceLocation { file: file_path, lines: all_lines }) },
                     children: Vec::new(),
                 }
             }

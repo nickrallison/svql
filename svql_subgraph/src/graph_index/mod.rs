@@ -149,4 +149,11 @@ impl<'a> GraphIndex<'a> {
         self.io_mapping
             .get_output_fanin_by_name(&self.cell_registry)
     }
+
+    pub fn get_cell_by_id(&self, id: usize) -> Option<CellWrapper<'a>> {
+        self.cell_registry
+            .cell_id_map()
+            .get(&id)
+            .map(|idx| self.cell_registry.get_cell_by_index(*idx).clone())
+    }
 }

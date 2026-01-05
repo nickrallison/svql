@@ -118,18 +118,27 @@ pub trait Query: Component<Search> + Searchable {
 //     }
 // }
 
-pub use composite::{ConnectionBuilder, Topology};
-pub use netlist::{NetlistMeta, PortDir, PortSpec, resolve_wire};
-
 /// Validates that a physical connection exists between two matched wires in the haystack.
 pub fn validate_connection<'ctx>(
     from: &Wire<Match>,
     to: &Wire<Match>,
     haystack_index: &GraphIndex<'ctx>,
 ) -> bool {
-    let from_cell = &from.inner;
-    let to_cell = &to.inner;
-    haystack_index
-        .fanout_set(from_cell)
-        .map_or(false, |set| set.contains(to_cell))
+    validate_connection_inner(from, to, haystack_index).unwrap_or(false)
+}
+
+/// Private helper to resolve CellInfo to CellWrappers and check connectivity.
+fn validate_connection_inner<'ctx>(
+    from: &Wire<Match>,
+    to: &Wire<Match>,
+    haystack_index: &GraphIndex<'ctx>,
+) -> Option<bool> {
+    let from_id = from.inner.as_ref()?.id;
+    let to_id = to.inner.as_ref()?.id;
+
+    let f_wrapper = haystack_index.get_cell_by_id(from_id)?;
+    let t_wrapper = haystack_index.get_cell_by_id(to_id)?;
+
+    let fanout = haystack_index.fanout_set(&f_wrapper)?;
+    Some(fanout.contains(&t_wrapper))
 }
