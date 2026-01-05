@@ -141,12 +141,12 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Search> #where_clause {
             type Pattern = #struct_name<::svql_query::Search>;
-            type Result<'a> = #struct_name<::svql_query::Match>;
+            type Result = #struct_name<::svql_query::Match>;
         }
 
         impl #impl_generics ::svql_query::traits::Projected for #struct_name<::svql_query::Match> #where_clause {
             type Pattern = #struct_name<::svql_query::Search>;
-            type Result<'a> = #struct_name<::svql_query::Match>;
+            type Result = #struct_name<::svql_query::Match>;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
@@ -210,7 +210,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl ::svql_query::traits::Query for #struct_name<::svql_query::Search> {
-            type Matched<'a> = #struct_name<::svql_query::Match>;
 
             fn query<'a>(
                 &self,
@@ -218,7 +217,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 context: &'a ::svql_query::driver::Context,
                 key: &::svql_query::driver::DriverKey,
                 config: &::svql_query::common::Config
-            ) -> Vec<Self::Matched<'a>> {
+            ) -> Vec<Self::Result> {
                 use ::svql_query::prelude::{Component, Topology, ConnectionBuilder};
                 ::svql_query::tracing::info!("{} searching composite", self.log_label());
 

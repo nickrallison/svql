@@ -183,12 +183,12 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Search> #where_clause {
             type Pattern = #enum_name<::svql_query::Search>;
-            type Result<'a> = #enum_name<::svql_query::Match>;
+            type Result = #enum_name<::svql_query::Match>;
         }
 
         impl #impl_generics ::svql_query::traits::Projected for #enum_name<::svql_query::Match> #where_clause {
             type Pattern = #enum_name<::svql_query::Search>;
-            type Result<'a> = #enum_name<::svql_query::Match>;
+            type Result = #enum_name<::svql_query::Match>;
         }
 
         impl #impl_generics ::svql_query::traits::Component<S> for #enum_name #ty_generics #where_clause {
@@ -249,15 +249,13 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl ::svql_query::traits::Query for #enum_name<::svql_query::Search> {
-            type Matched<'a> = #enum_name<::svql_query::Match>;
-
             fn query<'a>(
                 &self,
                 driver: &::svql_query::driver::Driver,
                 context: &'a ::svql_query::driver::Context,
                 key: &::svql_query::driver::DriverKey,
                 config: &::svql_query::common::Config
-            ) -> Vec<Self::Matched<'a>> {
+            ) -> Vec<Self::Result> {
                 use ::svql_query::traits::Component;
                 ::svql_query::tracing::info!("{} searching variants", self.log_label());
 

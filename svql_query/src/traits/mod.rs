@@ -17,7 +17,7 @@ pub trait Projected {
     type Pattern: Searchable;
 
     /// The Match (Result) version of this component.
-    type Result<'a>: Component<Match>;
+    type Result: Component<Match>;
 }
 
 /// Base trait for all query components.
@@ -53,18 +53,15 @@ pub trait Searchable: Sized + Component<Search> {
 }
 
 /// Interface for executing queries using the legacy backtracking engine.
-pub trait Query: Component<Search> + Searchable {
-    /// The type returned when a match is found.
-    type Matched<'a>: Component<Match>;
-
+pub trait Query: Component<Search> + Searchable + Projected {
     /// Executes the query against a design context.
-    fn query<'a>(
+    fn query(
         &self,
         driver: &Driver,
-        context: &'a Context,
+        context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Matched<'a>>;
+    ) -> Vec<Self::Result>;
 
     fn context(
         driver: &Driver,

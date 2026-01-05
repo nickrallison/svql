@@ -92,8 +92,8 @@ struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
 
 impl<Q> QueryRunner for TypedQueryRunner<Q>
 where
-    Q: Query + Send + Sync,
-    for<'a> Q::Matched<'a>: Reportable + Send,
+    Q: Query + Projected<Pattern = Q> + Send + Sync + 'static,
+    for<'a> Q::Result: Reportable + Send,
 {
     fn name(&self) -> String {
         let full_name = std::any::type_name::<Q>();
@@ -114,14 +114,12 @@ where
     ) -> Result<(Vec<(MatchSummary, ReportNode)>, u128), Box<dyn std::error::Error + Send + Sync>>
     {
         let query_name = self.name();
-        let design_container = driver.get_design(key).ok_or("design missing")?;
-        let context = Q::context(driver, &config.needle_options)
-            .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?
-            .with_design(key.clone(), design_container);
 
         let start = Instant::now();
-        let matches = Q::instantiate(Instance::root(query_name.to_lowercase()))
-            .query(driver, &context, key, config);
+
+        let matches = execute_query::<Q>(driver, key, config)
+            .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e.to_string()))?;
+
         let duration = start.elapsed().as_millis();
 
         let results = matches

@@ -27,11 +27,11 @@ use std::sync::Arc;
 /// 2. Building the specific Context for this query.
 /// 3. Instantiating the query root.
 /// 4. Running the search.
-pub fn execute_query<'a, Q>(
+pub fn execute_query<Q>(
     driver: &Driver,
     key: &DriverKey,
     config: &Config,
-) -> Result<Vec<Q::Result<'a>>, Box<dyn std::error::Error>>
+) -> Result<Vec<Q::Result>, Box<dyn std::error::Error>>
 where
     // Q represents the <Search> version (e.g., Cwe1234<Search>)
     Q: Projected + Query + Searchable + 'static,

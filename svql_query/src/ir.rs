@@ -163,7 +163,7 @@ fn canonicalize_rec(
 
 /// A single row of a query result in flattened format.
 #[derive(Clone, Debug)]
-pub struct FlatResult<'a> {
+pub struct FlatResult {
     /// Cells corresponding to the schema columns.
     pub cells: Vec<CellWrapper<'a>>,
     /// Indices of chosen variants for Union nodes.
@@ -171,15 +171,15 @@ pub struct FlatResult<'a> {
 }
 
 /// The complete result set of a query execution.
-pub struct ExecutionResult<'a> {
+pub struct ExecutionResult {
     pub schema: Schema,
-    pub rows: Vec<FlatResult<'a>>,
+    pub rows: Vec<FlatResult>,
 }
 
 /// Helper to traverse a flat result row and reconstruct structured objects.
 #[derive(Debug)]
 pub struct ResultCursor<'a> {
-    row: FlatResult<'a>,
+    row: FlatResult,
     mapping: Vec<usize>,
     logical_ptr: usize,
     variant_ptr: usize,
@@ -187,7 +187,7 @@ pub struct ResultCursor<'a> {
 
 impl<'a> ResultCursor<'a> {
     /// Creates a new cursor for a result row.
-    pub fn new(row: FlatResult<'a>, mapping: Vec<usize>) -> Self {
+    pub fn new(row: FlatResult, mapping: Vec<usize>) -> Self {
         Self {
             row,
             mapping,
@@ -220,7 +220,7 @@ pub trait Executor {
         ctx: &'a Context,
         haystack_key: &DriverKey,
         config: &Config,
-    ) -> ExecutionResult<'a>;
+    ) -> ExecutionResult;
 }
 
 /// A simple, non-optimized query executor.
@@ -234,7 +234,7 @@ impl Executor for NaiveExecutor {
         ctx: &'a Context,
         haystack_key: &DriverKey,
         config: &Config,
-    ) -> ExecutionResult<'a> {
+    ) -> ExecutionResult {
         let root_result = self.execute_node(dag.root, dag, ctx, haystack_key, config);
         let schema = match dag.root_node() {
             LogicalPlanNode::Scan { schema, .. } => schema.clone(),
@@ -257,7 +257,7 @@ impl NaiveExecutor {
         ctx: &'a Context,
         haystack_key: &DriverKey,
         config: &Config,
-    ) -> Vec<FlatResult<'a>> {
+    ) -> Vec<FlatResult> {
         match dag.node(node_id) {
             LogicalPlanNode::Scan {
                 key,
@@ -307,7 +307,7 @@ impl NaiveExecutor {
                 constraints,
                 ..
             } => {
-                let input_results: Vec<Vec<FlatResult<'a>>> = input_ids
+                let input_results: Vec<Vec<FlatResult>> = input_ids
                     .iter()
                     .map(|&id| self.execute_node(id, dag, ctx, haystack_key, config))
                     .collect();
@@ -369,7 +369,7 @@ impl NaiveExecutor {
     }
 
     /// Computes the Cartesian product of multiple result sets.
-    fn cartesian_product<'a>(results: &[Vec<FlatResult<'a>>]) -> Vec<Vec<FlatResult<'a>>> {
+    fn cartesian_product<'a>(results: &[Vec<FlatResult>]) -> Vec<Vec<FlatResult>> {
         if results.is_empty() {
             return vec![vec![]];
         }

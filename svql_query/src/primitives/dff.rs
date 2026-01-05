@@ -34,6 +34,16 @@ macro_rules! impl_dff_primitive {
             )*
         }
 
+        impl ::svql_query::traits::Projected for $name<::svql_query::Search> {
+            type Pattern = $name<::svql_query::Search>;
+            type Result = $name<::svql_query::Match>;
+        }
+
+        impl ::svql_query::traits::Projected for $name<::svql_query::Match> {
+            type Pattern = $name<::svql_query::Search>;
+            type Result = $name<::svql_query::Match>;
+        }
+
         impl<S: State> Component<S> for $name<S> {
             fn path(&self) -> &Instance {
                 &self.path
@@ -89,15 +99,13 @@ macro_rules! impl_dff_primitive {
 
 
         impl Query for $name<Search> {
-            type Matched<'a> = $name<Match>;
-
             fn query<'a>(
                 &self,
                 _driver: &Driver,
                 context: &'a Context,
                 key: &DriverKey,
                 _config: &Config
-            ) -> Vec<Self::Matched<'a>> {
+            ) -> Vec<Self::Result> {
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
 
