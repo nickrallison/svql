@@ -1,12 +1,9 @@
 pub mod grant_access;
 
-use crate::{
-    State, instance::Instance, primitives::dff::DffAny,
-    security::primitives::locked_register::LockedRegister,
-};
-use svql_macros::composite;
+use crate::prelude::*;
 
 use crate::security::cwe1280::grant_access::GrantAccess;
+use crate::security::primitives::locked_register::LockedRegister;
 
 /// Represents the first stage of CWE-1280: Access granted and stored in a register.
 #[composite]

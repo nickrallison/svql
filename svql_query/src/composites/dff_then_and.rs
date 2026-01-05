@@ -1,9 +1,4 @@
-use crate::State;
-use crate::instance::Instance;
-use crate::primitives::dff::Sdffe;
-use crate::primitives::gates::AndGate;
-use crate::traits::{ConnectionBuilder, Topology};
-use svql_macros::composite;
+use crate::prelude::*;
 
 #[composite]
 pub struct SdffeThenAnd<S: State> {

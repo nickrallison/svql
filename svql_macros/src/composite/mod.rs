@@ -115,7 +115,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let path_ident = path_field.expect("Composite struct must have a #[path] field");
 
-    let iproduct_macro = quote! { ::svql_query::itertools::iproduct! };
     let iter_vars: Vec<_> = query_names.iter().collect();
 
     let mut get_col_arms_final = Vec::new();
@@ -177,7 +176,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-                impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
+        impl<'a> ::svql_query::traits::Reportable for #struct_name<::svql_query::Match> {
             fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 use ::svql_query::svql_subgraph::cell::SourceLocation;
 
@@ -215,7 +214,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
                 #(#query_calls)*
 
-                let results: Vec<_> = #iproduct_macro( #(#iter_vars),* )
+                let results: Vec<_> = ::svql_query::itertools::iproduct!( #(#iter_vars),* )
                     .map(|( #(#iter_vars),* )| {
                         #struct_name {
                             #path_ident: self.#path_ident.clone(),
