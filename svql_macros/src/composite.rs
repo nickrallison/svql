@@ -143,14 +143,15 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     // 5. Find Port Logic
-    let find_port_arms = fields_info.iter().map(|f| {
+    // FIX: Use filter_map to avoid generating empty tokens for Path fields
+    let find_port_arms = fields_info.iter().filter_map(|f| {
         let ident = &f.ident;
         let name_str = ident.to_string();
         match f.kind {
-            FieldKind::Path => quote! {},
-            _ => quote! {
+            FieldKind::Path => None,
+            _ => Some(quote! {
                 #name_str => self.#ident.find_port_inner(tail)
-            },
+            }),
         }
     });
 

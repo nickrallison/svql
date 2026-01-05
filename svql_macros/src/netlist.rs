@@ -229,12 +229,13 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let needle_container = context.get(&needle_key)
                     .expect("Pattern design not found in context")
                     .as_ref();
+                let needle = needle_container.design(); // FIX: Define needle variable
                 let haystack_container = context.get(key)
                     .expect("Haystack design not found in context")
                     .as_ref();
 
                 let assignments = ::svql_query::subgraph::SubgraphMatcher::enumerate_with_indices(
-                    needle_container.design(),
+                    needle,
                     haystack_container.design(),
                     needle_container.index(),
                     haystack_container.index(),
