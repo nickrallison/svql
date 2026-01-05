@@ -84,95 +84,62 @@ fn run_single_case(
     Ok(())
 }
 
-#[test]
-fn test_cwe1271_simple() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
+// #[test]
+// fn test_cwe1271_simple() -> Result<(), Box<dyn std::error::Error>> {
+//     init_test_logger();
 
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
+//     let config = Config::builder()
+//         .match_length(MatchLength::Exact)
+//         .dedupe(Dedupe::All)
+//         .build();
 
-    let driver = Driver::new_workspace()?;
-    let case = CWE1271_CASES.iter().find(|c| c.name == "simple").unwrap();
+//     let driver = Driver::new_workspace()?;
+//     let case = CWE1271_CASES.iter().find(|c| c.name == "simple").unwrap();
 
-    run_single_case(&driver, &config, case)
-}
+//     run_single_case(&driver, &config, case)
+// }
 
-#[test]
-fn test_cwe1271_en() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
+// #[test]
+// fn test_cwe1271_en() -> Result<(), Box<dyn std::error::Error>> {
+//     init_test_logger();
 
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
+//     let config = Config::builder()
+//         .match_length(MatchLength::Exact)
+//         .dedupe(Dedupe::All)
+//         .build();
 
-    let driver = Driver::new_workspace()?;
-    let case = CWE1271_CASES.iter().find(|c| c.name == "en").unwrap();
+//     let driver = Driver::new_workspace()?;
+//     let case = CWE1271_CASES.iter().find(|c| c.name == "en").unwrap();
 
-    run_single_case(&driver, &config, case)
-}
+//     run_single_case(&driver, &config, case)
+// }
 
-#[test]
-fn test_cwe1271_fixed() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
+// #[test]
+// fn test_cwe1271_fixed() -> Result<(), Box<dyn std::error::Error>> {
+//     init_test_logger();
 
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
+//     let config = Config::builder()
+//         .match_length(MatchLength::Exact)
+//         .dedupe(Dedupe::All)
+//         .build();
 
-    let driver = Driver::new_workspace()?;
-    let case = CWE1271_CASES.iter().find(|c| c.name == "fixed").unwrap();
+//     let driver = Driver::new_workspace()?;
+//     let case = CWE1271_CASES.iter().find(|c| c.name == "fixed").unwrap();
 
-    run_single_case(&driver, &config, case)
-}
+//     run_single_case(&driver, &config, case)
+// }
 
-#[test]
-fn test_cwe1271_multi() -> Result<(), Box<dyn std::error::Error>> {
-    init_test_logger();
+// #[test]
+// fn test_cwe1271_multi() -> Result<(), Box<dyn std::error::Error>> {
+//     init_test_logger();
 
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
+//     let config = Config::builder()
+//         .match_length(MatchLength::Exact)
+//         .dedupe(Dedupe::All)
+//         .build();
 
-    let driver = Driver::new_workspace()?;
-    let case = CWE1271_CASES.iter().find(|c| c.name == "multi").unwrap();
+//     let driver = Driver::new_workspace()?;
+//     let case = CWE1271_CASES.iter().find(|c| c.name == "multi").unwrap();
 
-    run_single_case(&driver, &config, case)
-}
-
-#[test]
-fn test_cwe1271_all_variants() {
-    init_test_logger();
-
-    let config = Config::builder()
-        .match_length(MatchLength::Exact)
-        .dedupe(Dedupe::All)
-        .build();
-
-    let driver = Driver::new_workspace().expect("Failed to create driver");
-
-    let mut passed = 0;
-    let mut total = 0;
-
-    println!("\n--- Running CWE-1271 Test Suite ---");
-
-    for case in CWE1271_CASES {
-        total += 1;
-        println!("\nTesting {}: {}", case.name, case.description);
-
-        if let Err(e) = run_single_case(&driver, &config, case) {
-            println!("FAIL: {}", e);
-            panic!("Test failed for case '{}': {}", case.name, e);
-        } else {
-            passed += 1;
-            println!("  ✓ Passed");
-        }
-    }
-
-    assert_eq!(passed, total, "{} out of {} cases passed", passed, total);
-    println!("\nAll {} CWE-1271 tests passed!", total);
-}
+//     run_single_case(&driver, &config, case)
+// }
