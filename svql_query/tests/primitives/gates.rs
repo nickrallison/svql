@@ -1,5 +1,5 @@
-use svql_common::{Config, ModuleConfig};
-use svql_driver::Driver;
+use common::{Config, ModuleConfig};
+use driver::Driver;
 use svql_query::primitives::dff::DffAny;
 use svql_query::primitives::gates::*;
 use svql_query::traits::Query;
@@ -14,7 +14,7 @@ fn get_context<'a, Q: Query>(
     driver: &Driver,
     path: &str,
     module: &str,
-) -> (::svql_driver::DriverKey, ::svql_driver::Context) {
+) -> (::driver::DriverKey, ::driver::Context) {
     let config = ModuleConfig::default().with_flatten(true);
     let (key, design) = driver
         .get_or_load_design(path, module, &config)

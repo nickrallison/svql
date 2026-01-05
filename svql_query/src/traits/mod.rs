@@ -8,9 +8,9 @@ pub mod netlist;
 pub mod variant;
 
 use std::sync::Arc;
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::GraphIndex;
+use common::{Config, ModuleConfig};
+use driver::{Context, Driver, DriverKey};
+use subgraph::GraphIndex;
 
 use crate::{Match, Search, State, Wire, instance::Instance, report::ReportNode};
 
@@ -54,7 +54,7 @@ pub trait Query: Component<Search> + Searchable {
     /// Executes the query against a design context.
     fn query<'a>(
         &self,
-        driver: &::svql_driver::Driver,
+        driver: &::driver::Driver,
         context: &'a Context,
         key: &DriverKey,
         config: &Config,

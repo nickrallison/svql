@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
-use svql_subgraph::cell::SourceLocation;
+use subgraph::cell::SourceLocation;
 
 use crate::instance::Instance;
 

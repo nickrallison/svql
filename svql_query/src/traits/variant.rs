@@ -1,5 +1,5 @@
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{DriverKey, context::Context, driver::Driver};
+use common::{Config, ModuleConfig};
+use driver::{DriverKey, context::Context, driver::Driver};
 
 use crate::{Match, Search, State, instance::Instance};
 

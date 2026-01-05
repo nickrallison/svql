@@ -2,8 +2,8 @@
 mod tests {
     use rstest::rstest;
     use std::sync::OnceLock;
-    use svql_common::{Config, Dedupe, MatchLength, YosysModule};
-    use svql_driver::Driver;
+    use common::{Config, Dedupe, MatchLength, YosysModule};
+    use driver::Driver;
     use svql_query::{
         Search,
         instance::Instance,

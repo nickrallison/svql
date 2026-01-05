@@ -1,5 +1,5 @@
-use svql_common::{Config, Dedupe, MatchLength};
-use svql_driver::Driver;
+use common::{Config, Dedupe, MatchLength};
+use driver::Driver;
 use svql_query::Search;
 use svql_query::instance::Instance;
 use svql_query::security::cwe1234::Cwe1234;

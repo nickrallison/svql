@@ -2,8 +2,8 @@ mod unlock_logic;
 
 use std::sync::OnceLock;
 
-use svql_common::{Config, Dedupe, MatchLength, YosysModule};
-use svql_driver::Driver;
+use common::{Config, Dedupe, MatchLength, YosysModule};
+use driver::Driver;
 use svql_query::security::cwe1234::unlock_logic::UnlockLogic;
 use svql_query::traits::{Query, Searchable};
 use svql_query::{Search, instance::Instance};

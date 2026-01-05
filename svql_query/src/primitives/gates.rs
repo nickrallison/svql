@@ -3,9 +3,9 @@
 //! This module provides standard logic and arithmetic gates used as the
 //! atomic building blocks for structural queries.
 
-use crate::svql_common::{Config, ModuleConfig};
-use crate::svql_driver::{Context, Driver, DriverKey};
-use crate::svql_subgraph::cell::CellKind;
+use crate::common::{Config, ModuleConfig};
+use crate::driver::{Context, Driver, DriverKey};
+use crate::subgraph::cell::CellKind;
 use crate::traits::{Component, Query, Reportable, Searchable};
 use crate::{Instance, Match, Search, State, Wire};
 use std::sync::Arc;
@@ -106,11 +106,11 @@ macro_rules! define_primitive_gate {
                 let index = haystack.index();
 
                 match config.dedupe {
-                    crate::svql_common::Dedupe::All => {
+                    crate::common::Dedupe::All => {
                         /* All Cells Deduplicated */
                     }
                     _ => {
-                        if config.dedupe != crate::svql_common::Dedupe::None {
+                        if config.dedupe != crate::common::Dedupe::None {
                             crate::tracing::warn!(
                                 "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
                                 self.log_label(),

@@ -6,7 +6,7 @@ Provides the type system and orchestration logic for queries.
 ## Key Responsibilities
 - **Type-Level State Tracking**: Uses the `State` trait to differentiate between `Search` (unbound pattern definition) and `Match` (results bound to design cells) phases.
 - **Structural Composition**: Implements the logic for `Netlist` (atomic primitives), `Composite` (hierarchical structures), and `Variant` (polymorphic choices) query types.
-- **Execution Orchestration**: Manages the dispatch of queries to the `svql_subgraph` kernel.
+- **Execution Orchestration**: Manages the dispatch of queries to the `subgraph` kernel.
 
 ## Core Abstractions
 | Type / Trait | Description |
@@ -17,14 +17,14 @@ Provides the type system and orchestration logic for queries.
 | `Instance` | A hierarchical path tracker used to identify components within a nested query tree. |
 
 ## Data Flow
-- **Input**: `Search` state query structures, design handles from `svql_driver`, and search `Config`.
+- **Input**: `Search` state query structures, design handles from `driver`, and search `Config`.
 - **Output**: Collections of `Match` state structures and `ReportNode` trees for source-level traceability.
 
 ## Usage Example
 ```rust
 use svql_query::{Search, Instance, traits::*};
-use svql_driver::Driver;
-use svql_common::Config;
+use driver::Driver;
+use common::Config;
 
 fn execute_query<Q>(driver: &Driver, config: &Config, key: &DriverKey) -> Vec<Q::Matched<'_>> 
 where 

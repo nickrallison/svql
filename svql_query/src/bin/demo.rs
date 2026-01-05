@@ -1,10 +1,9 @@
-use svql_common::{Config, Dedupe, MatchLength};
-use svql_driver::Driver;
+use common::{Config, Dedupe, MatchLength};
+use driver::Driver;
 use svql_macros::{composite, netlist, variant};
-use svql_query::{
-    Instance, Search, State, Wire,
-    traits::{ConnectionBuilder, Query, Searchable, Topology},
-};
+
+use svql_query::prelude::*;
+
 use tracing::{Level, info};
 
 // ============================================================================

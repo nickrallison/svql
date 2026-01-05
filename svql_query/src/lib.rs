@@ -42,7 +42,7 @@ impl State for Search {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Match {
     /// Owned metadata about the matched cell in the target design.
-    pub cell: Option<svql_subgraph::cell::CellInfo>,
+    pub cell: Option<subgraph::cell::CellInfo>,
 }
 
 impl Match {
@@ -82,7 +82,7 @@ impl<S: State> Wire<S> {
 
 impl<'ctx> Wire<Match> {
     /// Returns the matched cell associated with this wire.
-    pub fn cell(&self) -> Option<&svql_subgraph::cell::CellInfo> {
+    pub fn cell(&self) -> Option<&subgraph::cell::CellInfo> {
         self.inner.as_ref()
     }
 }

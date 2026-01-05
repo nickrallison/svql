@@ -3,8 +3,8 @@ use crate::composites::rec_or::RecOr;
 use crate::prelude::*;
 
 use std::sync::Arc;
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{Context, Driver, DriverKey};
+use common::{Config, ModuleConfig};
+use driver::{Context, Driver, DriverKey};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -99,7 +99,7 @@ impl<'a> crate::traits::Reportable for UnlockLogic<Match> {
                     .inner
                     .as_ref()
                     .and_then(|c| c.get_source())
-                    .unwrap_or_else(|| svql_subgraph::cell::SourceLocation {
+                    .unwrap_or_else(|| subgraph::cell::SourceLocation {
                         file: std::sync::Arc::from(""),
                         lines: Vec::new(),
                     }),

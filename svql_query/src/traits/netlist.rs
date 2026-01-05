@@ -1,6 +1,6 @@
 use prjunnamed_netlist::Design;
-use svql_driver::DriverKey;
-use svql_subgraph::{AssignmentSet, SingleAssignment, cell::CellWrapper};
+use driver::DriverKey;
+use subgraph::{AssignmentSet, SingleAssignment, cell::CellWrapper};
 use tracing::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

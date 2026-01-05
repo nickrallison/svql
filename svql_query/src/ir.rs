@@ -4,9 +4,9 @@
 //! and run complex hardware queries.
 
 use ahash::AHashMap;
-use svql_common::Config;
-use svql_driver::{Context, DriverKey};
-use svql_subgraph::cell::CellWrapper;
+use common::Config;
+use driver::{Context, DriverKey};
+use subgraph::cell::CellWrapper;
 
 /// Defines the column structure of a query result.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -269,7 +269,7 @@ impl NaiveExecutor {
                     .get(haystack_key)
                     .expect("Haystack design missing from context");
 
-                let assignments = ::svql_subgraph::SubgraphMatcher::enumerate_with_indices(
+                let assignments = ::subgraph::SubgraphMatcher::enumerate_with_indices(
                     needle_container.design(),
                     haystack_container.design(),
                     needle_container.index(),

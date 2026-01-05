@@ -11,10 +11,10 @@ pub use crate::{
 };
 
 pub use itertools;
-pub use svql_common;
-pub use svql_driver;
-pub use svql_subgraph;
+pub use common as common;
+pub use driver as driver;
+pub use subgraph as subgraph;
 pub use tracing;
 
 pub use svql_macros::{composite, netlist, variant};
-pub use svql_subgraph::cell::{CellInfo, SourceLocation};
+pub use subgraph::cell::{CellInfo, SourceLocation};

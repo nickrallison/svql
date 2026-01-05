@@ -20,8 +20,8 @@ mod tests {
         traits::{Query, Searchable},
     };
     use std::sync::OnceLock;
-    use svql_common::{Config, Dedupe, MatchLength, YosysModule};
-    use svql_driver::Driver;
+    use common::{Config, Dedupe, MatchLength, YosysModule};
+    use driver::Driver;
 
     #[derive(Debug, Clone)]
     struct GrantAccessTestCase {

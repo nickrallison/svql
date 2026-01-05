@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use svql_common::{Config, ModuleConfig};
-use svql_driver::{Context, Driver, DriverKey};
-use svql_subgraph::{GraphIndex, cell::CellWrapper};
+use common::{Config, ModuleConfig};
+use driver::{Context, Driver, DriverKey};
+use subgraph::{GraphIndex, cell::CellWrapper};
 
 use crate::prelude::*;
 
@@ -97,7 +97,7 @@ impl<'a> crate::traits::Reportable for RecOr<Match> {
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
             source_loc: Some(self.or.y.inner.as_ref().and_then(|c| c.get_source()).unwrap_or_else(|| {
-                svql_subgraph::cell::SourceLocation {
+                subgraph::cell::SourceLocation {
                     file: std::sync::Arc::from(""),
                     lines: Vec::new(),
                 }
