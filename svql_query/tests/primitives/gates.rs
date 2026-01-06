@@ -4,7 +4,7 @@ fn setup_driver() -> Driver {
     Driver::new_workspace().expect("Failed to create driver")
 }
 
-fn get_context<'a, Q: Query>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
+fn get_context<'a, Q: Pattern>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
     let config = ModuleConfig::default().with_flatten(true);
     let (key, design) = driver
         .get_or_load_design(path, module, &config)
@@ -27,7 +27,7 @@ fn test_and_gate_scan() {
     );
 
     let query = AndGate::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     // small_and_tree has: (a & b) & (c & d) -> 3 AND gates
     assert_eq!(matches.len(), 3, "Should find exactly 3 AND gates");
@@ -43,7 +43,7 @@ fn test_dff_gate_scan() {
     );
 
     let query = DffAny::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     // seq_double_sdffe has two always @(posedge clk) blocks
     assert_eq!(matches.len(), 2, "Should find exactly 2 DFFs");
@@ -57,7 +57,7 @@ fn test_mixed_gates_scan() {
 
     // Test AND
     let (key, ctx) = get_context::<AndGate<Search>>(&driver, path, module);
-    let matches = AndGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches = AndGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx,
         &key,
@@ -67,7 +67,7 @@ fn test_mixed_gates_scan() {
 
     // Test XOR
     let (key, ctx) = get_context::<XorGate<Search>>(&driver, path, module);
-    let matches = XorGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches = XorGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx,
         &key,
@@ -77,7 +77,7 @@ fn test_mixed_gates_scan() {
 
     // Test NOT
     let (key, ctx) = get_context::<NotGate<Search>>(&driver, path, module);
-    let matches = NotGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches = NotGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx,
         &key,
@@ -89,7 +89,7 @@ fn test_mixed_gates_scan() {
     // assign y = and_out | xor_out | not_out;
     // This usually flattens to two 2-input OR gates
     let (key, ctx) = get_context::<OrGate<Search>>(&driver, path, module);
-    let matches = OrGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches = OrGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx,
         &key,
@@ -108,7 +108,7 @@ fn test_mux_gate_scan() {
     );
 
     let query = MuxGate::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     // mux_tree has 3 ternary operators (?)
     assert_eq!(matches.len(), 3, "Should find exactly 3 MUXes");
@@ -124,7 +124,7 @@ fn test_xor_chain_scan() {
     );
 
     let query = XorGate::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     // xor_chain has 3 XOR operations (^)
     assert_eq!(matches.len(), 3, "Should find exactly 3 XOR gates");
@@ -141,7 +141,7 @@ fn test_eq_gate_scan() {
     );
 
     let query = EqGate::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     // Should find exactly 1 equality comparison cell
     assert_eq!(matches.len(), 1, "Should find 1 Eq gate in grant_access");
@@ -157,7 +157,7 @@ fn test_complex_comparison_scan() {
 
     // Check Eq
     let (key_eq, ctx_eq) = get_context::<EqGate<Search>>(&driver, path, module);
-    let matches_eq = EqGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches_eq = EqGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx_eq,
         &key_eq,
@@ -171,7 +171,7 @@ fn test_complex_comparison_scan() {
 
     // Check Mux
     let (key_mux, ctx_mux) = get_context::<MuxGate<Search>>(&driver, path, module);
-    let matches_mux = MuxGate::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches_mux = MuxGate::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &ctx_mux,
         &key_mux,

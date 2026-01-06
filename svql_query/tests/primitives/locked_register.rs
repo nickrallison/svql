@@ -114,7 +114,7 @@ fn run_locked_reg_case(
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
     let query = LockedRegister::<Search>::instantiate(Instance::root("locked_reg".to_string()));
-    let results = query.query(driver, &context, &haystack_key, &config);
+    let results = query.execute(driver, &context, &haystack_key, &config);
 
     assert_eq!(
         results.len(),

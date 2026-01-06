@@ -71,7 +71,7 @@ mod tests {
         let context = GrantAccess::<Search>::context(driver, &config.needle_options)?;
         let context = context.with_design(haystack_key.clone(), haystack_design);
 
-        let results = GrantAccess::<Search>::query(
+        let results = GrantAccess::<Search>::execute(
             &GrantAccess::<Search>::instantiate(Instance::root("grant_access".to_string())),
             driver,
             &context,

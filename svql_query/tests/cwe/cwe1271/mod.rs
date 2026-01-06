@@ -70,7 +70,7 @@ fn run_single_case(
     let context = context.with_design(haystack_key.clone(), haystack_design);
 
     let query = Cwe1271::<Search>::instantiate(Instance::root("cwe1271".to_string()));
-    let results = query.query(driver, &context, &haystack_key, config);
+    let results = query.execute(driver, &context, &haystack_key, config);
 
     assert_eq!(
         results.len(),

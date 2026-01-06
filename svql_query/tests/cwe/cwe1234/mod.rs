@@ -207,7 +207,7 @@ fn run_single_case(
 
     // Instantiate the query object first
     let query = UnlockLogic::<Search>::instantiate(Instance::root("unlock".to_string()));
-    let results = query.query(driver, &context, &haystack_key, config);
+    let results = query.execute(driver, &context, &haystack_key, config);
 
     assert_eq!(
         results.len(),

@@ -1,12 +1,10 @@
 use svql_query::prelude::*;
 
 fn setup_driver() -> Driver {
-    // Driver::new_workspace().expect("Failed to create driver")
-    Driver::new_workspace_yosys("/home/nick/Applications/tabby-linux-x64-latest/tabby/bin/yosys")
-        .expect("Failed to create driver")
+    Driver::new_workspace().expect("Failed to create driver")
 }
 
-fn get_context<'a, Q: Query>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
+fn get_context<'a, Q: Pattern>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
     let config = ModuleConfig::default().with_flatten(true);
     let (key, design) = driver
         .get_or_load_design(path, module, &config)
@@ -27,7 +25,7 @@ fn test_sdffe_primitive() {
 
     let (key, context) = get_context::<Sdffe<Search>>(&driver, path, module);
     let query = Sdffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 Sdffe (Sync Reset + En)");
 }
@@ -40,7 +38,7 @@ fn test_adffe_primitive() {
 
     let (key, context) = get_context::<Adffe<Search>>(&driver, path, module);
     let query = Adffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 Adffe (Async Reset + En)");
 }
@@ -53,12 +51,12 @@ fn test_sdff_primitive() {
 
     let (key, context) = get_context::<Sdff<Search>>(&driver, path, module);
     let query = Sdff::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 Sdff (Sync Reset, No En)");
 
     // Negative test: Sdffe should not match because enable is inactive
-    let matches_sdffe = Sdffe::<Search>::instantiate(Instance::root("q".to_string())).query(
+    let matches_sdffe = Sdffe::<Search>::instantiate(Instance::root("q".to_string())).execute(
         &driver,
         &context,
         &key,
@@ -79,7 +77,7 @@ fn test_adff_primitive() {
 
     let (key, context) = get_context::<Adff<Search>>(&driver, path, module);
     let query = Adff::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 Adff (Async Reset, No En)");
 }
@@ -92,7 +90,7 @@ fn test_dffe_primitive() {
 
     let (key, context) = get_context::<Dffe<Search>>(&driver, path, module);
     let query = Dffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 Dffe (No Reset, En)");
 }
@@ -105,7 +103,7 @@ fn test_dff_any_primitive() {
 
     let (key, context) = get_context::<DffAny<Search>>(&driver, path, module);
     let query = DffAny::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.query(&driver, &context, &key, &Config::default());
+    let matches = query.execute(&driver, &context, &key, &Config::default());
 
     assert_eq!(matches.len(), 1, "Should find 1 DffAny (Basic DFF)");
 }
