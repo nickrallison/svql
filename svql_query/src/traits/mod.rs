@@ -7,119 +7,92 @@ pub mod composite;
 pub mod netlist;
 pub mod variant;
 
-use std::sync::Arc;
-
 use crate::prelude::*;
 
-/// Links the Search and Match phases of a query component.
-pub trait Projected {
-    /// The Search (Pattern) version of this component.
-    type Pattern: Searchable;
+/// The central hardware abstraction.
+/// Replaces Component and Projected.
+pub trait Hardware: std::fmt::Debug {
+    /// The current state (Search or Match).
+    type State: State;
 
-    /// The Match (Result) version of this component.
-    type Result: Component<Match>;
-}
-
-/// Base trait for all query components.
-pub trait Component<S: State> {
-    /// Returns the hierarchical path of the component.
+    /// Hierarchical path (Moved from Component).
     fn path(&self) -> &Instance;
 
-    /// Returns the static type name of the component.
+    /// Static type name (Moved from Component).
     fn type_name(&self) -> &'static str;
 
-    /// Finds a port wire by its absolute hierarchical path.
-    fn find_port(&self, path: &Instance) -> Option<&Wire<S>>;
+    /// Returns a list of immediate child wires/submodules.
+    fn children(&self) -> Vec<&dyn Hardware<State = Self::State>>;
 
-    /// Finds a port wire by its relative path segments.
-    fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>>;
+    /// Generic implementation of port finding based on children.
+    fn find_port(&self, path: &Instance) -> Option<&Wire<Self::State>> {
+        if path == self.path() {
+            // Wires should override this to return Some(self)
+            return None;
+        }
+        for child in self.children() {
+            if path.starts_with(child.path()) {
+                if let Some(port) = child.find_port(path) {
+                    return Some(port);
+                }
+            }
+        }
+        None
+    }
 
-    /// Returns a formatted label for logging.
-    fn log_label(&self) -> String {
-        format!("[{} @ {}]", self.type_name(), self.path().inst_path())
+    /// Source location retrieval.
+    fn source(&self) -> Option<SourceLocation> {
+        self.children().iter().find_map(|c| c.source())
+    }
+
+    /// Reporting.
+    fn report(&self, name: &str) -> ReportNode {
+        let children_reports = self
+            .children()
+            .iter()
+            .map(|c| c.report(c.path().name()))
+            .collect();
+
+        ReportNode {
+            name: name.to_string(),
+            type_name: self.type_name().to_string(),
+            path: self.path().clone(),
+            source_loc: self.source(),
+            children: children_reports,
+            details: None,
+        }
     }
 }
 
-/// Trait for components that can generate a hierarchical report.
-pub trait Reportable {
-    /// Converts the component match into a report node.
-    fn to_report(&self, name: &str) -> ReportNode;
-}
+/// The Pattern trait for Search state.
+/// Replaces Searchable and Query.
+pub trait Pattern: Hardware<State = Search> + Sized + Clone {
+    type Match: Matched<Search = Self>;
 
-/// Trait for components that can be instantiated in the Search state.
-pub trait Searchable: Sized + Component<Search> {
-    /// Creates a new instance of the component at the given path.
+    /// Constructor (Moved from Searchable).
     fn instantiate(base_path: Instance) -> Self;
-}
 
-/// Interface for executing queries using the legacy backtracking engine.
-pub trait Query: Component<Search> + Searchable + Projected {
-    /// Executes the query against a design context.
-    fn query(
+    /// Context setup (Moved from Query).
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>>;
+
+    /// Execution logic (Moved from Query).
+    fn execute(
         &self,
         driver: &Driver,
         context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Result>;
-
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>>;
+    ) -> Vec<Self::Match>;
 }
 
-// /// Interface for executing queries using the optimized IR planner.
-// pub trait PlannedQuery: Query {
-//     /// Generates the logical plan tree for this query.
-//     fn to_ir(&self, _config: &Config) -> LogicalPlan {
-//         panic!("PlannedQuery::to_ir not implemented for this component")
-//     }
-
-//     /// Generates a canonical DAG from the logical plan.
-//     fn dag_ir(&self, config: &Config) -> QueryDag {
-//         crate::ir::canonicalize_to_dag(self.to_ir(config))
-//     }
-
-//     /// Reconstructs a structured match from a flat result cursor.
-//     fn reconstruct<'a>(&self, _cursor: &mut ResultCursor<'a>) -> Self::Matched<'a> {
-//         panic!("PlannedQuery::reconstruct not implemented for this component")
-//     }
-
-//     /// Maps a relative path to a schema column index.
-//     fn get_column_index(&self, _rel_path: &[Arc<str>]) -> Option<usize> {
-//         None
-//     }
-
-//     /// Returns the expected output schema for this query.
-//     fn expected_schema(&self) -> Schema {
-//         Schema { columns: vec![] }
-//     }
-
-//     /// Executes the query using the provided planner and executor.
-//     fn query_planned<'a, 'b, T: Executor>(
-//         &self,
-//         executor: &'b T,
-//         ctx: &'a Context,
-//         key: &DriverKey,
-//         config: &Config,
-//     ) -> Vec<Self::Matched<'a>>
-//     where
-//         'b: 'a,
-//     {
-//         let dag = self.dag_ir(config);
-//         let exec_res = executor.execute_dag(&dag, ctx, key, config);
-//         let expected = self.expected_schema();
-//         let mapping = compute_schema_mapping(&expected, &exec_res.schema);
-
-//         let mut results = Vec::new();
-//         for row in exec_res.rows {
-//             let mut cursor = ResultCursor::new(row, mapping.clone());
-//             results.push(self.reconstruct(&mut cursor));
-//         }
-//         results
-//     }
-// }
+/// The Matched trait for Match state.
+/// Replaces Reportable.
+pub trait Matched: Hardware<State = Match> + Sized + Clone {
+    type Search: Pattern<Match = Self>;
+}
 
 /// Validates that a physical connection exists between two matched wires in the haystack.
 pub fn validate_connection<'ctx>(

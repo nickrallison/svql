@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Found {} matches for old query", query_results.len());
 
     for (i, match_inst) in query_results.iter().enumerate() {
-        let report = match_inst.to_report(&format!("[Match #{}]", i + 1));
+        let report = match_inst.report(&format!("[Match #{}]", i + 1));
         println!("{}", report.render());
     }
 

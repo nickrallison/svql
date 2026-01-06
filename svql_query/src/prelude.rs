@@ -14,8 +14,9 @@ pub use crate::{
     report::ReportNode,
     traits::validate_connection,
     traits::{
-        Component, Projected, Query, Reportable, Searchable,
-        composite::{ConnectionBuilder, Topology},
+        Hardware, Matched, Pattern,
+        composite::{ConnectionBuilder, Topology, validate_composite},
+        netlist::{Netlist, execute_netlist_query},
     },
 };
 

@@ -1,19 +1,8 @@
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
-use std::sync::Arc;
 use subgraph::GraphIndex;
 
 use crate::prelude::*;
-
-// #[recursive_composite]
-// pub struct RecAnd<S: State> {
-//     #[path]
-//     pub path: Instance,
-//     #[submodule]
-//     pub and: AndGate<S>,
-//     #[recursive_submodule]
-//     pub child: Option<Box<Self>>,
-// }
 
 #[derive(Debug, Clone)]
 pub struct RecAnd<S>
@@ -40,20 +29,12 @@ where
     }
 }
 
-impl Projected for RecAnd<Search> {
-    type Pattern = RecAnd<Search>;
-    type Result = RecAnd<Match>;
-}
-
-impl Projected for RecAnd<Match> {
-    type Pattern = RecAnd<Search>;
-    type Result = RecAnd<Match>;
-}
-
-impl<S> Component<S> for RecAnd<S>
+impl<S> Hardware for RecAnd<S>
 where
     S: State,
 {
+    type State = S;
+
     fn path(&self) -> &Instance {
         &self.path
     }
@@ -62,23 +43,140 @@ where
         "RecAnd"
     }
 
-    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        if let Some(port) = self.and.find_port(p) {
-            return Some(port);
+    fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+        let mut children: Vec<&dyn Hardware<State = Self::State>> = vec![&self.and];
+        if let Some(child) = &self.child {
+            children.push(child.as_ref());
+        }
+        children
+    }
+
+    fn report(&self, name: &str) -> ReportNode {
+        let mut children = Vec::new();
+        let mut current = self.child.as_ref();
+        let mut idx = 0;
+
+        while let Some(child) = current {
+            children.push(child.and.report(&format!("[{}]", idx)));
+            current = child.child.as_ref();
+            idx += 1;
         }
 
-        if let Some(ref child) = self.child {
-            if let Some(port) = child.find_port(p) {
-                return Some(port);
+        ReportNode {
+            name: name.to_string(),
+            type_name: "RecAnd".to_string(),
+            path: self.path.clone(),
+            details: Some(format!("Depth: {}", self.depth())),
+            source_loc: self.and.y.source(),
+            children,
+        }
+    }
+}
+
+impl Pattern for RecAnd<Search> {
+    type Match = RecAnd<Match>;
+
+    fn instantiate(base_path: Instance) -> Self {
+        Self::new(base_path)
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        AndGate::<Search>::context(driver, config)
+    }
+
+    fn execute(
+        &self,
+        driver: &Driver,
+        context: &Context,
+        key: &DriverKey,
+        config: &Config,
+    ) -> Vec<Self::Match> {
+        tracing::event!(
+            tracing::Level::INFO,
+            "RecAnd::execute: starting recursive AND gate search"
+        );
+
+        let haystack_index = context.get(key).unwrap().index();
+
+        let and_query = AndGate::<Search>::instantiate(self.path.child("and"));
+        let all_and_gates = and_query.execute(driver, context, key, config);
+
+        tracing::event!(
+            tracing::Level::INFO,
+            "RecAnd::execute: Found {} total AND gates in design",
+            all_and_gates.len()
+        );
+
+        let mut current_layer: Vec<RecAnd<Match>> = all_and_gates
+            .iter()
+            .map(|and_gate| RecAnd {
+                path: self.path.clone(),
+                and: and_gate.clone(),
+                child: None,
+            })
+            .collect();
+
+        tracing::event!(
+            tracing::Level::INFO,
+            "RecAnd::execute: Layer 1 (base case) has {} matches",
+            current_layer.len()
+        );
+
+        let mut all_results = current_layer.clone();
+        let mut layer_num = 2;
+
+        loop {
+            let next_layer =
+                build_next_layer(&self.path, &all_and_gates, &current_layer, haystack_index);
+
+            if next_layer.is_empty() {
+                tracing::event!(
+                    tracing::Level::INFO,
+                    "RecAnd::execute: No more matches at layer {}, stopping",
+                    layer_num
+                );
+                break;
+            }
+
+            tracing::event!(
+                tracing::Level::INFO,
+                "RecAnd::execute: Layer {} has {} matches",
+                layer_num,
+                next_layer.len()
+            );
+
+            all_results.extend(next_layer.iter().cloned());
+            current_layer = next_layer;
+            layer_num += 1;
+
+            if let Some(max) = config.max_recursion_depth {
+                if layer_num > max {
+                    tracing::event!(
+                        tracing::Level::INFO,
+                        "RecAnd::execute: Reached max recursion depth of {}, stopping",
+                        max
+                    );
+                    break;
+                }
             }
         }
 
-        None
-    }
+        tracing::event!(
+            tracing::Level::INFO,
+            "RecAnd::execute: Total {} matches across {} layers",
+            all_results.len(),
+            layer_num - 1
+        );
 
-    fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-        None
+        all_results
     }
+}
+
+impl Matched for RecAnd<Match> {
+    type Search = RecAnd<Search>;
 }
 
 impl<S> Topology<S> for RecAnd<S>
@@ -95,45 +193,6 @@ where
     }
 }
 
-impl Searchable for RecAnd<Search> {
-    fn instantiate(base_path: Instance) -> Self {
-        Self::new(base_path)
-    }
-}
-
-impl<'a> crate::traits::Reportable for RecAnd<Match> {
-    fn to_report(&self, name: &str) -> crate::report::ReportNode {
-        let mut children = Vec::new();
-        let mut current = self.child.as_ref();
-        let mut idx = 0;
-
-        while let Some(child) = current {
-            children.push(child.and.to_report(&format!("[{}]", idx)));
-            current = child.child.as_ref();
-            idx += 1;
-        }
-
-        crate::report::ReportNode {
-            name: name.to_string(),
-            type_name: "RecAnd".to_string(),
-            path: self.path.clone(),
-            details: Some(format!("Depth: {}", self.depth())),
-            source_loc: Some(
-                self.and
-                    .y
-                    .inner
-                    .as_ref()
-                    .and_then(|c| c.get_source())
-                    .unwrap_or_else(|| subgraph::cell::SourceLocation {
-                        file: std::sync::Arc::from(""),
-                        lines: Vec::new(),
-                    }),
-            ),
-            children,
-        }
-    }
-}
-
 impl RecAnd<Search> {
     pub fn new(path: Instance) -> Self {
         Self {
@@ -141,102 +200,6 @@ impl RecAnd<Search> {
             and: AndGate::instantiate(path.child("and")),
             child: None,
         }
-    }
-}
-
-impl Query for RecAnd<Search> {
-    fn query(
-        &self,
-        driver: &Driver,
-        context: &Context,
-        key: &DriverKey,
-        config: &Config,
-    ) -> Vec<Self::Result> {
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecAnd::query: starting recursive AND gate search"
-        );
-
-        let haystack_index = context.get(key).unwrap().index();
-
-        let and_query = AndGate::<Search>::instantiate(self.path.child("and"));
-        let all_and_gates = and_query.query(driver, context, key, config);
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecAnd::query: Found {} total AND gates in design",
-            all_and_gates.len()
-        );
-
-        let mut current_layer: Vec<RecAnd<Match>> = all_and_gates
-            .iter()
-            .map(|and_gate| RecAnd {
-                path: self.path.clone(),
-                and: and_gate.clone(),
-                child: None,
-            })
-            .collect();
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecAnd::query: Layer 1 (base case) has {} matches",
-            current_layer.len()
-        );
-
-        let mut all_results = current_layer.clone();
-        let mut layer_num = 2;
-
-        loop {
-            let next_layer =
-                build_next_layer(&self.path, &all_and_gates, &current_layer, haystack_index);
-
-            if next_layer.is_empty() {
-                tracing::event!(
-                    tracing::Level::INFO,
-                    "RecAnd::query: No more matches at layer {}, stopping",
-                    layer_num
-                );
-                break;
-            }
-
-            tracing::event!(
-                tracing::Level::INFO,
-                "RecAnd::query: Layer {} has {} matches",
-                layer_num,
-                next_layer.len()
-            );
-
-            all_results.extend(next_layer.iter().cloned());
-            current_layer = next_layer;
-            layer_num += 1;
-
-            if let Some(max) = config.max_recursion_depth {
-                if layer_num > max {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "RecAnd::query: Reached max recursion depth of {}, stopping",
-                        max
-                    );
-                    break;
-                }
-            }
-        }
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "RecAnd::query: Total {} matches across {} layers",
-            all_results.len(),
-            layer_num - 1
-        );
-
-        all_results
-    }
-
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        AndGate::<Search>::context(driver, config)
     }
 }
 

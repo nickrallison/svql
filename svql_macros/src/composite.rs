@@ -20,14 +20,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let item_struct = parse_macro_input!(input as ItemStruct);
     let struct_name = &item_struct.ident;
 
-    // Generics for the struct definition and Component impl (includes S: State)
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
-
-    // Specialized generics for Search/Match impls (S removed)
     let specialized_generics = common::remove_state_generic(&item_struct.generics);
     let (spec_impl_generics, _, spec_where_clause) = specialized_generics.split_for_impl();
 
-    // Concrete types for Search and Match
     let search_type = common::make_replaced_type(
         struct_name,
         &item_struct.generics,
@@ -39,7 +35,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         quote!(::svql_query::Match),
     );
 
-    // --- Parsing Phase ---
     let mut fields_info = Vec::new();
     let mut path_ident = None;
 
@@ -47,8 +42,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         for field in &fields.named {
             let ident = field.ident.clone().unwrap();
             let mut kind = FieldKind::Wire; // Default
-
-            // Check attributes non-destructively
             for attr in &field.attrs {
                 if attr.path().is_ident("path") {
                     kind = FieldKind::Path;
@@ -56,11 +49,9 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     kind = FieldKind::Submodule;
                 }
             }
-
             if let FieldKind::Path = kind {
                 path_ident = Some(ident.clone());
             }
-
             fields_info.push(CompositeField {
                 ident,
                 ty: field.ty.clone(),
@@ -74,7 +65,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     // --- Generation Phase ---
 
-    // 1. Struct Definition
     let struct_fields = fields_info.iter().map(|f| {
         let ident = &f.ident;
         let ty = &f.ty;
@@ -82,7 +72,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         quote! { #vis #ident: #ty }
     });
 
-    // 2. Instantiate (Search State)
     let instantiate_fields = fields_info.iter().map(|f| {
         let ident = &f.ident;
         let name_str = ident.to_string();
@@ -90,10 +79,9 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             FieldKind::Path => quote! { #ident: base_path.clone() },
             FieldKind::Submodule => {
                 let ty = &f.ty;
-                // Must replace S with Search in the field type because we are in the Search impl
                 let search_ty = common::replace_state_generic(ty);
                 quote! {
-                    #ident: <<#search_ty as ::svql_query::traits::Projected>::Pattern as ::svql_query::traits::Searchable>::instantiate(base_path.child(#name_str))
+                   #ident: <#search_ty as ::svql_query::traits::Pattern>::instantiate(base_path.child(#name_str))
                 }
             },
             FieldKind::Wire => quote! {
@@ -102,7 +90,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 3. Query Logic
     let mut query_calls = Vec::new();
     let mut query_vars = Vec::new();
     let mut construct_fields = Vec::new();
@@ -112,7 +99,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         match f.kind {
             FieldKind::Submodule => {
                 query_calls.push(quote! {
-                    let #ident = self.#ident.query(driver, context, key, config);
+                    let #ident = self.#ident.execute(driver, context, key, config);
                 });
                 query_vars.push(ident);
                 construct_fields.push(quote! { #ident: #ident });
@@ -128,7 +115,14 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
 
-    // 4. Context Building
+    let children_impl = fields_info
+        .iter()
+        .filter(|f| !matches!(f.kind, FieldKind::Path))
+        .map(|f| {
+            let ident = &f.ident;
+            quote! { &self.#ident }
+        });
+
     let context_calls = fields_info.iter().filter_map(|f| {
         if let FieldKind::Submodule = f.kind {
             let ty = &f.ty;
@@ -142,47 +136,16 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 5. Find Port Logic
-    // FIX: Use filter_map to avoid generating empty tokens for Path fields
-    let find_port_arms = fields_info.iter().filter_map(|f| {
-        let ident = &f.ident;
-        let name_str = ident.to_string();
-        match f.kind {
-            FieldKind::Path => None,
-            _ => Some(quote! {
-                #name_str => self.#ident.find_port_inner(tail)
-            }),
-        }
-    });
-
-    // 6. Reporting
-    let report_children = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Submodule = f.kind {
-            let ident = &f.ident;
-            Some(quote! { self.#ident.to_report(stringify!(#ident)) })
-        } else {
-            None
-        }
-    });
-
     let expanded = quote! {
         #[derive(Clone, Debug)]
         pub struct #struct_name #impl_generics #where_clause {
             #(#struct_fields),*
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Projected for #search_type #spec_where_clause {
-            type Pattern = #search_type;
-            type Result = #match_type;
-        }
+        impl #impl_generics ::svql_query::prelude::Hardware for #struct_name #ty_generics #where_clause {
+            type State = S;
 
-        impl #spec_impl_generics ::svql_query::traits::Projected for #match_type #spec_where_clause {
-            type Pattern = #search_type;
-            type Result = #match_type;
-        }
-
-        impl #impl_generics ::svql_query::traits::Component<S> for #struct_name #ty_generics #where_clause {
-            fn path(&self) -> &::svql_query::instance::Instance {
+            fn path(&self) -> &::svql_query::prelude::Instance {
                 &self.#path_ident
             }
 
@@ -190,59 +153,37 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 stringify!(#struct_name)
             }
 
-            fn find_port(&self, path: &::svql_query::instance::Instance) -> Option<&::svql_query::Wire<S>> {
-                if !path.starts_with(self.path()) { return None; }
-                let rel_path = path.relative(self.path());
-                self.find_port_inner(rel_path)
-            }
-
-            fn find_port_inner(&self, rel_path: &[std::sync::Arc<str>]) -> Option<&::svql_query::Wire<S>> {
-                let next = match rel_path.first() {
-                    Some(arc_str) => arc_str.as_ref(),
-                    None => return None,
-                };
-                let tail = &rel_path[1..];
-                match next {
-                    #(#find_port_arms),*,
-                    _ => None,
-                }
+            fn children(&self) -> Vec<&dyn ::svql_query::prelude::Hardware<State = Self::State>> {
+                vec![ #(#children_impl),* ]
             }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Searchable for #search_type #spec_where_clause {
-            fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
+        impl #spec_impl_generics ::svql_query::prelude::Pattern for #search_type #spec_where_clause {
+            type Match = #match_type;
+
+            fn instantiate(base_path: ::svql_query::prelude::Instance) -> Self {
                 Self {
                     #(#instantiate_fields),*
                 }
             }
-        }
 
-        impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
-            fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                let children = vec![
-                    #(#report_children),*
-                ];
-
-                ::svql_query::report::ReportNode {
-                    name: name.to_string(),
-                    type_name: stringify!(#struct_name).to_string(),
-                    path: self.#path_ident.clone(),
-                    details: None,
-                    source_loc: None,
-                    children,
-                }
+            fn context(
+                driver: &::svql_query::prelude::Driver,
+                options: &::svql_query::prelude::ModuleConfig
+            ) -> Result<::svql_query::prelude::Context, Box<dyn std::error::Error>> {
+                let mut ctx = ::svql_query::prelude::Context::new();
+                #(#context_calls)*
+                Ok(ctx)
             }
-        }
 
-        impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
-                        fn query<'a>(
+            fn execute(
                 &self,
-                driver: &::svql_query::driver::Driver,
-                context: &'a ::svql_query::driver::Context,
-                key: &::svql_query::driver::DriverKey,
-                config: &::svql_query::common::Config
-            ) -> Vec<Self::Result> {
-                use ::svql_query::traits::composite::validate_composite;
+                driver: &::svql_query::prelude::Driver,
+                context: &::svql_query::prelude::Context,
+                key: &::svql_query::prelude::DriverKey,
+                config: &::svql_query::prelude::Config
+            ) -> Vec<Self::Match> {
+                use ::svql_query::prelude::validate_composite;
 
                 // 1. Execute sub-queries
                 #(#query_calls)*
@@ -257,16 +198,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     .filter(|candidate| validate_composite(candidate, haystack_index))
                     .collect()
             }
+        }
 
-
-            fn context(
-                driver: &::svql_query::driver::Driver,
-                options: &::svql_query::common::ModuleConfig
-            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::driver::Context::new();
-                #(#context_calls)*
-                Ok(ctx)
-            }
+        impl #spec_impl_generics ::svql_query::prelude::Matched for #match_type #spec_where_clause {
+            type Search = #search_type;
         }
     };
 

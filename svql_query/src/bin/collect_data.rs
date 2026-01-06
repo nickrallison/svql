@@ -92,8 +92,8 @@ struct TypedQueryRunner<Q>(std::marker::PhantomData<Q>);
 
 impl<Q> QueryRunner for TypedQueryRunner<Q>
 where
-    Q: Query + Projected<Pattern = Q> + Send + Sync + 'static,
-    for<'a> Q::Result: Reportable + Send,
+    Q: Pattern + Send + Sync + 'static,
+    Q::Match: Hardware + Send,
 {
     fn name(&self) -> String {
         let full_name = std::any::type_name::<Q>();
@@ -126,7 +126,7 @@ where
             .into_iter()
             .enumerate()
             .map(|(i, m)| {
-                let report = m.to_report(&format!("Match #{}", i));
+                let report = m.report(&format!("Match #{}", i));
                 (
                     extract_summary(&query_name, &task.module, report.clone()),
                     report,

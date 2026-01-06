@@ -4,7 +4,6 @@ use crate::prelude::*;
 
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
-use std::sync::Arc;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -24,20 +23,12 @@ where
     pub not_gate: NotGate<S>,
 }
 
-impl Projected for UnlockLogic<Search> {
-    type Pattern = UnlockLogic<Search>;
-    type Result = UnlockLogic<Match>;
-}
-
-impl Projected for UnlockLogic<Match> {
-    type Pattern = UnlockLogic<Search>;
-    type Result = UnlockLogic<Match>;
-}
-
-impl<S> Component<S> for UnlockLogic<S>
+impl<S> Hardware for UnlockLogic<S>
 where
     S: State,
 {
+    type State = S;
+
     fn path(&self) -> &Instance {
         &self.path
     }
@@ -46,97 +37,63 @@ where
         "UnlockLogic"
     }
 
-    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        let idx = self.path.height() + 1;
-        match p.get_item(idx).as_ref().map(|s| s.as_ref()) {
-            Some("top_and") => self.top_and.find_port(p),
-            Some("rec_or") => self.rec_or.find_port(p),
-            Some("not_gate") => self.not_gate.find_port(p),
-            _ => None,
-        }
+    fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+        vec![&self.top_and, &self.rec_or, &self.not_gate]
     }
 
-    fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-        None
-    }
-}
-
-impl<S> Topology<S> for UnlockLogic<S>
-where
-    S: State,
-{
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        ctx.connect_any(&[
-            (Some(self.rec_or.output()), Some(&self.top_and.a)),
-            (Some(self.rec_or.output()), Some(&self.top_and.b)),
-        ]);
-    }
-}
-
-impl Searchable for UnlockLogic<Search> {
-    fn instantiate(base_path: Instance) -> Self {
-        Self::new(base_path)
-    }
-}
-
-impl UnlockLogic<Search> {
-    pub fn new(path: Instance) -> Self {
-        Self {
-            path: path.clone(),
-            top_and: AndGate::instantiate(path.child("top_and")),
-            rec_or: RecOr::new(path.child("rec_or")),
-            not_gate: NotGate::instantiate(path.child("not_gate")),
-        }
-    }
-}
-
-impl<'a> crate::traits::Reportable for UnlockLogic<Match> {
-    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+    fn report(&self, name: &str) -> ReportNode {
         let children = vec![
-            self.top_and.to_report("top_and"),
-            self.not_gate.to_report("not_gate"),
-            self.rec_or.to_report("rec_or"),
+            self.top_and.report("top_and"),
+            self.not_gate.report("not_gate"),
+            self.rec_or.report("rec_or"),
         ];
 
-        crate::report::ReportNode {
+        ReportNode {
             name: name.to_string(),
             type_name: "UnlockLogic".to_string(),
             path: self.path.clone(),
             details: None,
-            source_loc: Some(
-                self.top_and
-                    .y
-                    .inner
-                    .as_ref()
-                    .and_then(|c| c.get_source())
-                    .unwrap_or_else(|| subgraph::cell::SourceLocation {
-                        file: std::sync::Arc::from(""),
-                        lines: Vec::new(),
-                    }),
-            ),
+            source_loc: self.top_and.y.source(),
             children,
         }
     }
 }
 
-impl Query for UnlockLogic<Search> {
-    fn query(
+impl Pattern for UnlockLogic<Search> {
+    type Match = UnlockLogic<Match>;
+
+    fn instantiate(base_path: Instance) -> Self {
+        Self::new(base_path)
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        let and_ctx = AndGate::<Search>::context(driver, config)?;
+        let or_ctx = RecOr::<Search>::context(driver, config)?;
+        let not_ctx = NotGate::<Search>::context(driver, config)?;
+
+        Ok(and_ctx.merge(or_ctx).merge(not_ctx))
+    }
+
+    fn execute(
         &self,
         driver: &Driver,
         context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Result> {
-        tracing::info!("UnlockLogic::query: starting CWE1234 unlock pattern search");
+    ) -> Vec<Self::Match> {
+        tracing::info!("UnlockLogic::execute: starting CWE1234 unlock pattern search");
 
         let haystack_index = context.get(key).unwrap().index();
 
-        let and_gates = self.top_and.query(driver, context, key, config);
-        let rec_ors = self.rec_or.query(driver, context, key, config);
-        let not_gates = self.not_gate.query(driver, context, key, config);
+        let and_gates = self.top_and.execute(driver, context, key, config);
+        let rec_ors = self.rec_or.execute(driver, context, key, config);
+        let not_gates = self.not_gate.execute(driver, context, key, config);
 
         tracing::info!(
-            "UnlockLogic::query: Found {} AND gates, {} RecOR trees, {} NOT gates",
+            "UnlockLogic::execute: Found {} AND gates, {} RecOR trees, {} NOT gates",
             and_gates.len(),
             rec_ors.len(),
             not_gates.len()
@@ -158,7 +115,7 @@ impl Query for UnlockLogic<Search> {
                 .flat_map(|(rec_or_index, rec_or)| {
                     if rec_or_index % 50 == 0 {
                         tracing::debug!(
-                            "UnlockLogic::query: Processing RecOr index {}",
+                            "UnlockLogic::execute: Processing RecOr index {}",
                             rec_or_index
                         );
                     }
@@ -206,7 +163,7 @@ impl Query for UnlockLogic<Search> {
         };
 
         tracing::info!(
-            "UnlockLogic::query: Found {} valid (RecOr, AND) pairs",
+            "UnlockLogic::execute: Found {} valid (RecOr, AND) pairs",
             rec_or_and_pairs.len()
         );
 
@@ -221,7 +178,7 @@ impl Query for UnlockLogic<Search> {
                 .flat_map(|(rec_or_and_index, (rec_or, top_and))| {
                     if rec_or_and_index % 50 == 0 {
                         tracing::debug!(
-                            "UnlockLogic::query: Processing pair index {}",
+                            "UnlockLogic::execute: Processing pair index {}",
                             rec_or_and_index
                         );
                     }
@@ -281,21 +238,37 @@ impl Query for UnlockLogic<Search> {
         };
 
         tracing::info!(
-            "UnlockLogic::query: Found {} final valid patterns",
+            "UnlockLogic::execute: Found {} final valid patterns",
             results.len()
         );
         results
     }
+}
 
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        let and_ctx = AndGate::<Search>::context(driver, config)?;
-        let or_ctx = RecOr::<Search>::context(driver, config)?;
-        let not_ctx = NotGate::<Search>::context(driver, config)?;
+impl Matched for UnlockLogic<Match> {
+    type Search = UnlockLogic<Search>;
+}
 
-        Ok(and_ctx.merge(or_ctx).merge(not_ctx))
+impl<S> Topology<S> for UnlockLogic<S>
+where
+    S: State,
+{
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
+        ctx.connect_any(&[
+            (Some(self.rec_or.output()), Some(&self.top_and.a)),
+            (Some(self.rec_or.output()), Some(&self.top_and.b)),
+        ]);
+    }
+}
+
+impl UnlockLogic<Search> {
+    pub fn new(path: Instance) -> Self {
+        Self {
+            path: path.clone(),
+            top_and: AndGate::instantiate(path.child("top_and")),
+            rec_or: RecOr::new(path.child("rec_or")),
+            not_gate: NotGate::instantiate(path.child("not_gate")),
+        }
     }
 }
 

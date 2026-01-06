@@ -7,10 +7,9 @@
 use crate::common::{Config, ModuleConfig};
 use crate::driver::{Context, Driver, DriverKey};
 use crate::subgraph::cell::CellKind;
-use crate::traits::{Component, Query, Reportable, Searchable};
-use crate::{Instance, Match, Search, State, Wire};
+use crate::traits::{Hardware, Matched, Pattern};
+use crate::{Instance, Match, ReportNode, Search, State, Wire};
 use prjunnamed_netlist::Cell;
-use std::sync::Arc;
 
 macro_rules! impl_dff_primitive {
     ($name:ident, [$($port:ident),*], $filter:expr, $description:expr) => {
@@ -34,17 +33,9 @@ macro_rules! impl_dff_primitive {
             )*
         }
 
-        impl ::svql_query::traits::Projected for $name<::svql_query::Search> {
-            type Pattern = $name<::svql_query::Search>;
-            type Result = $name<::svql_query::Match>;
-        }
+        impl<S: State> Hardware for $name<S> {
+            type State = S;
 
-        impl ::svql_query::traits::Projected for $name<::svql_query::Match> {
-            type Pattern = $name<::svql_query::Search>;
-            type Result = $name<::svql_query::Match>;
-        }
-
-        impl<S: State> Component<S> for $name<S> {
             fn path(&self) -> &Instance {
                 &self.path
             }
@@ -53,40 +44,29 @@ macro_rules! impl_dff_primitive {
                 stringify!($name)
             }
 
+            fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+                vec![ $( &self.$port ),* ]
+            }
+
             fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
                 if !path.starts_with(self.path()) {
                     return None;
                 }
-                self.find_port_inner(path.relative(self.path()))
-            }
-
-            fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
+                let rel_path = path.relative(self.path());
                 let next = rel_path.first()?.as_ref();
-                let tail = &rel_path[1..];
                 match next {
-                    $(stringify!($port) => self.$port.find_port_inner(tail),)*
+                    $(stringify!($port) => self.$port.find_port(path),)*
                     _ => None,
                 }
             }
-        }
 
-        impl Searchable for $name<Search> {
-            fn instantiate(base_path: Instance) -> Self {
-                Self {
-                    path: base_path.clone(),
-                    $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
-                }
-            }
-        }
-
-        impl<'a> Reportable for $name<Match> {
-            fn to_report(&self, name: &str) -> crate::report::ReportNode {
-                let source_loc = [$(self.$port.inner.as_ref().and_then(|c| c.get_source())),*]
+            fn report(&self, name: &str) -> ReportNode {
+                let source_loc = [$(self.$port.source()),*]
                     .into_iter()
                     .flatten()
                     .next();
 
-                crate::report::ReportNode {
+                ReportNode {
                     name: name.to_string(),
                     type_name: stringify!($name).to_string(),
                     path: self.path.clone(),
@@ -97,15 +77,30 @@ macro_rules! impl_dff_primitive {
             }
         }
 
+        impl Pattern for $name<Search> {
+            type Match = $name<Match>;
 
-        impl Query for $name<Search> {
-            fn query<'a>(
+            fn instantiate(base_path: Instance) -> Self {
+                Self {
+                    path: base_path.clone(),
+                    $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
+                }
+            }
+
+            fn context(
+                _driver: &Driver,
+                _options: &ModuleConfig
+            ) -> Result<Context, Box<dyn std::error::Error>> {
+                Ok(Context::new())
+            }
+
+            fn execute(
                 &self,
                 _driver: &Driver,
-                context: &'a Context,
+                context: &Context,
                 key: &DriverKey,
                 _config: &Config
-            ) -> Vec<Self::Result> {
+            ) -> Vec<Self::Match> {
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
 
@@ -131,13 +126,10 @@ macro_rules! impl_dff_primitive {
                     .collect();
                 matches
             }
+        }
 
-            fn context(
-                _driver: &Driver,
-                _options: &ModuleConfig
-            ) -> Result<Context, Box<dyn std::error::Error>> {
-                Ok(Context::new())
-            }
+        impl Matched for $name<Match> {
+            type Search = $name<Search>;
         }
     };
 }

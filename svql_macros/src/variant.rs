@@ -158,29 +158,70 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 3. Component Implementation
+    // 3. Hardware Implementation
     let path_arms = variants_info.iter().map(|v| {
         let ident = &v.ident;
         quote! { Self::#ident(inner) => inner.path() }
     });
 
+    let children_arms = variants_info.iter().map(|v| {
+        let ident = &v.ident;
+        quote! { Self::#ident(inner) => vec![inner] }
+    });
+
+    // Logic for find_port with remapping
     let find_port_arms = variants_info.iter().map(|v| {
         let ident = &v.ident;
-        quote! { Self::#ident(inner) => inner.find_port(path) }
+
+        // Generate match arms for each mapped port
+        let port_checks = common_ports.iter().map(|port| {
+            let port_str = port.to_string();
+            if let Some(Some(mapped_name)) = v.port_map.get(&port_str) {
+                quote! {
+                    if first_segment.as_ref() == #port_str {
+                        // Construct the path the inner component expects
+                        // inner.path() is self.path()
+                        let target_path = self.path().child(#mapped_name);
+                        // We assume wires are leaves, so we don't handle tails here for now
+                        // or we delegate to inner.find_port with the mapped path
+                        return inner.find_port(&target_path);
+                    }
+                }
+            } else {
+                quote! {}
+            }
+        });
+
+        quote! {
+            Self::#ident(inner) => {
+                if !path.starts_with(self.path()) { return None; }
+                let rel = path.relative(self.path());
+                if let Some(first_segment) = rel.first() {
+                    #(#port_checks)*
+                }
+                // Fallback to default behavior (direct lookup if no map matched)
+                inner.find_port(path)
+            }
+        }
     });
 
-    let find_port_inner_arms = variants_info.iter().map(|v| {
+    let report_arms = variants_info.iter().map(|v| {
         let ident = &v.ident;
-        quote! { Self::#ident(inner) => inner.find_port_inner(rel_path) }
+        quote! {
+            Self::#ident(inner) => {
+                let mut node = inner.report(name);
+                node.details = Some(stringify!(#ident).to_string());
+                node
+            }
+        }
     });
 
-    // 4. Searchable Implementation (Instantiate)
+    // 4. Pattern Implementation (Search state)
     let abstract_init = common_ports.iter().map(|p| {
         let p_str = p.to_string();
         quote! { #p: ::svql_query::Wire::new(base_path.child(#p_str), ()) }
     });
 
-    // 5. Query Implementation
     let query_blocks = variants_info.iter().map(|v| {
         let v_ident = &v.ident;
         let v_ty = &v.ty;
@@ -188,10 +229,10 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
         quote! {
             {
-                let sub_query = <#search_type as ::svql_query::traits::Searchable>::instantiate(
-                    ::svql_query::traits::Component::path(self).clone()
+                let sub_query = <#search_type as ::svql_query::traits::Pattern>::instantiate(
+                    ::svql_query::traits::Hardware::path(self).clone()
                 );
-                let results = sub_query.query(driver, context, key, config);
+                let results = sub_query.execute(driver, context, key, config);
 
                 all_results.extend(
                     results.into_iter().map(#enum_name::<::svql_query::Match>::#v_ident)
@@ -209,18 +250,6 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // 6. Reportable Implementation
-    let report_arms = variants_info.iter().map(|v| {
-        let ident = &v.ident;
-        quote! {
-            Self::#ident(inner) => {
-                let mut node = inner.to_report(name);
-                node.details = Some(stringify!(#ident).to_string());
-                node
-            }
-        }
-    });
-
     let expanded = quote! {
         #expanded_enum
 
@@ -228,17 +257,9 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#accessors)*
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Projected for #search_type #spec_where_clause {
-            type Pattern = #search_type;
-            type Result = #match_type;
-        }
+        impl #impl_generics ::svql_query::traits::Hardware for #enum_name #ty_generics #where_clause {
+            type State = S;
 
-        impl #spec_impl_generics ::svql_query::traits::Projected for #match_type #spec_where_clause {
-            type Pattern = #search_type;
-            type Result = #match_type;
-        }
-
-        impl #impl_generics ::svql_query::traits::Component<S> for #enum_name #ty_generics #where_clause {
             fn path(&self) -> &::svql_query::instance::Instance {
                 match self {
                     #(#path_arms),*,
@@ -250,6 +271,13 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 stringify!(#enum_name)
             }
 
+            fn children(&self) -> Vec<&dyn ::svql_query::traits::Hardware<State = Self::State>> {
+                match self {
+                    #(#children_arms),*,
+                    Self::#abstract_ident { .. } => vec![],
+                }
+            }
+
             fn find_port(&self, path: &::svql_query::instance::Instance) -> Option<&::svql_query::Wire<S>> {
                 match self {
                     #(#find_port_arms),*,
@@ -257,27 +285,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn find_port_inner(&self, rel_path: &[std::sync::Arc<str>]) -> Option<&::svql_query::Wire<S>> {
-                match self {
-                    #(#find_port_inner_arms),*,
-                    Self::#abstract_ident { .. } => None,
-                }
-            }
-        }
-
-        impl #spec_impl_generics ::svql_query::traits::Searchable for #search_type #spec_where_clause {
-            fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
-                Self::#abstract_ident {
-                    path: base_path.clone(),
-                    #(#abstract_init),*
-                }
-            }
-        }
-
-        impl #spec_impl_generics ::svql_query::traits::Reportable for #match_type #spec_where_clause {
-            fn to_report(&self, name: &str) -> ::svql_query::report::ReportNode {
-                use ::svql_query::subgraph::cell::SourceLocation;
-
+            fn report(&self, name: &str) -> ::svql_query::report::ReportNode {
                 match self {
                     #(#report_arms),*,
                     Self::#abstract_ident { .. } => panic!("__Abstract variant found in Match state during reporting."),
@@ -285,22 +293,14 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Query for #search_type #spec_where_clause {
-            fn query<'a>(
-                &self,
-                driver: &::svql_query::driver::Driver,
-                context: &'a ::svql_query::driver::Context,
-                key: &::svql_query::driver::DriverKey,
-                config: &::svql_query::common::Config
-            ) -> Vec<Self::Result> {
-                use ::svql_query::traits::{Component, Searchable};
-                ::svql_query::tracing::info!("{} searching variants", self.log_label());
+        impl #spec_impl_generics ::svql_query::traits::Pattern for #search_type #spec_where_clause {
+            type Match = #match_type;
 
-                let mut all_results = Vec::new();
-                #(#query_blocks)*
-
-                ::svql_query::tracing::info!("{} found {} total matches across variants", self.log_label(), all_results.len());
-                all_results
+            fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
+                Self::#abstract_ident {
+                    path: base_path.clone(),
+                    #(#abstract_init),*
+                }
             }
 
             fn context(
@@ -311,6 +311,26 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 #(#context_merges)*
                 Ok(ctx)
             }
+
+            fn execute(
+                &self,
+                driver: &::svql_query::driver::Driver,
+                context: &::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config
+            ) -> Vec<Self::Match> {
+                ::svql_query::tracing::info!("{} searching variants", ::svql_query::traits::Hardware::type_name(self));
+
+                let mut all_results = Vec::new();
+                #(#query_blocks)*
+
+                ::svql_query::tracing::info!("{} found {} total matches across variants", ::svql_query::traits::Hardware::type_name(self), all_results.len());
+                all_results
+            }
+        }
+
+        impl #spec_impl_generics ::svql_query::traits::Matched for #match_type #spec_where_clause {
+            type Search = #search_type;
         }
     };
 

@@ -67,4 +67,9 @@ impl Instance {
     pub fn get_item(&self, idx: usize) -> Option<Arc<str>> {
         self.segments.get(idx).cloned()
     }
+
+    /// Returns the last segment of the path (the local name).
+    pub fn name(&self) -> &str {
+        self.segments.last().map(|s| s.as_ref()).unwrap_or("")
+    }
 }

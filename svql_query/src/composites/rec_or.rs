@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
@@ -30,20 +29,12 @@ where
     }
 }
 
-impl Projected for RecOr<Search> {
-    type Pattern = RecOr<Search>;
-    type Result = RecOr<Match>;
-}
-
-impl Projected for RecOr<Match> {
-    type Pattern = RecOr<Search>;
-    type Result = RecOr<Match>;
-}
-
-impl<S> Component<S> for RecOr<S>
+impl<S> Hardware for RecOr<S>
 where
     S: State,
 {
+    type State = S;
+
     fn path(&self) -> &Instance {
         &self.path
     }
@@ -52,107 +43,70 @@ where
         "RecOr"
     }
 
-    fn find_port(&self, p: &Instance) -> Option<&Wire<S>> {
-        if let Some(port) = self.or.find_port(p) {
-            return Some(port);
+    fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+        let mut children: Vec<&dyn Hardware<State = Self::State>> = vec![&self.or];
+        if let Some(child) = &self.child {
+            children.push(child.as_ref());
         }
-        if let Some(ref child) = self.child {
-            if let Some(port) = child.find_port(p) {
-                return Some(port);
-            }
-        }
-        None
+        children
     }
 
-    fn find_port_inner(&self, _rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-        None
-    }
-}
-
-impl<S> Topology<S> for RecOr<S>
-where
-    S: State,
-{
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        if let Some(ref child) = self.child {
-            ctx.connect_any(&[
-                (Some(&child.or.y), Some(&self.or.a)),
-                (Some(&child.or.y), Some(&self.or.b)),
-            ]);
-        }
-    }
-}
-
-impl Searchable for RecOr<Search> {
-    fn instantiate(base_path: Instance) -> Self {
-        Self::new(base_path)
-    }
-}
-
-impl<'a> crate::traits::Reportable for RecOr<Match> {
-    fn to_report(&self, name: &str) -> crate::report::ReportNode {
+    fn report(&self, name: &str) -> ReportNode {
         let mut children = Vec::new();
         let mut current = self.child.as_ref();
         let mut idx = 0;
 
         while let Some(child) = current {
-            children.push(child.or.to_report(&format!("[{}]", idx)));
+            children.push(child.or.report(&format!("[{}]", idx)));
             current = child.child.as_ref();
             idx += 1;
         }
 
-        crate::report::ReportNode {
+        ReportNode {
             name: name.to_string(),
             type_name: "RecOr".to_string(),
             path: self.path.clone(),
             details: Some(format!("Depth: {}", self.depth())),
-            source_loc: Some(
-                self.or
-                    .y
-                    .inner
-                    .as_ref()
-                    .and_then(|c| c.get_source())
-                    .unwrap_or_else(|| subgraph::cell::SourceLocation {
-                        file: std::sync::Arc::from(""),
-                        lines: Vec::new(),
-                    }),
-            ),
+            source_loc: self.or.y.source(),
             children,
         }
     }
 }
 
-impl RecOr<Search> {
-    pub fn new(path: Instance) -> Self {
-        Self {
-            path: path.clone(),
-            or: OrGate::instantiate(path.child("or")),
-            child: None,
-        }
-    }
-}
+impl Pattern for RecOr<Search> {
+    type Match = RecOr<Match>;
 
-impl Query for RecOr<Search> {
-    fn query(
+    fn instantiate(base_path: Instance) -> Self {
+        Self::new(base_path)
+    }
+
+    fn context(
+        driver: &Driver,
+        config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        OrGate::<Search>::context(driver, config)
+    }
+
+    fn execute(
         &self,
         driver: &Driver,
         context: &Context,
         key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Result> {
+    ) -> Vec<Self::Match> {
         tracing::event!(
             tracing::Level::INFO,
-            "RecOr::query: starting recursive OR gate search"
+            "RecOr::execute: starting recursive OR gate search"
         );
 
         let haystack_index = context.get(key).unwrap().index();
 
         let or_query = OrGate::<Search>::instantiate(self.path.child("or"));
-        let all_or_gates = or_query.query(driver, context, key, config);
+        let all_or_gates = or_query.execute(driver, context, key, config);
 
         tracing::event!(
             tracing::Level::INFO,
-            "RecOr::query: Found {} total OR gates in design",
+            "RecOr::execute: Found {} total OR gates in design",
             all_or_gates.len()
         );
 
@@ -178,7 +132,7 @@ impl Query for RecOr<Search> {
 
             tracing::event!(
                 tracing::Level::INFO,
-                "RecOr::query: Layer {} has {} matches",
+                "RecOr::execute: Layer {} has {} matches",
                 layer_num,
                 next_layer.len()
             );
@@ -196,12 +150,33 @@ impl Query for RecOr<Search> {
 
         all_results
     }
+}
 
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        OrGate::<Search>::context(driver, config)
+impl Matched for RecOr<Match> {
+    type Search = RecOr<Search>;
+}
+
+impl<S> Topology<S> for RecOr<S>
+where
+    S: State,
+{
+    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
+        if let Some(ref child) = self.child {
+            ctx.connect_any(&[
+                (Some(&child.or.y), Some(&self.or.a)),
+                (Some(&child.or.y), Some(&self.or.b)),
+            ]);
+        }
+    }
+}
+
+impl RecOr<Search> {
+    pub fn new(path: Instance) -> Self {
+        Self {
+            path: path.clone(),
+            or: OrGate::instantiate(path.child("or")),
+            child: None,
+        }
     }
 }
 

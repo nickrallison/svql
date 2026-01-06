@@ -17,8 +17,16 @@ pub mod security;
 pub mod traits;
 pub mod variants;
 
+/// Re-export of driver crate with Context flattened for macro compatibility
+pub mod driver {
+    pub use svql_driver::context::Context;
+    pub use svql_driver::*;
+}
+
+pub use svql_common as common;
+pub use svql_subgraph as subgraph;
+
 use prelude::*;
-use std::sync::Arc;
 
 /// A high-level helper to execute a query by type.
 ///
@@ -27,20 +35,16 @@ use std::sync::Arc;
 /// 2. Building the specific Context for this query.
 /// 3. Instantiating the query root.
 /// 4. Running the search.
-pub fn execute_query<Q>(
+pub fn execute_query<P>(
     driver: &Driver,
     key: &DriverKey,
     config: &Config,
-) -> Result<Vec<Q::Result>, Box<dyn std::error::Error>>
+) -> Result<Vec<P::Match>, Box<dyn std::error::Error>>
 where
-    // Q represents the <Search> version (e.g., Cwe1234<Search>)
-    Q: Projected + Query + Searchable + 'static,
-    // We ensure Q::Pattern is actually Q (sanity check)
-    Q: Projected<Pattern = Q>,
+    P: traits::Pattern + 'static,
 {
     // 1. Build the Context
-    // We use Q::context because Q implements Query
-    let needle_ctx = Q::context(driver, &config.needle_options)?;
+    let needle_ctx = P::context(driver, &config.needle_options)?;
 
     // 2. Add the Haystack to the context
     // We assume the driver already has the design loaded at `key`
@@ -51,16 +55,15 @@ where
     let context = needle_ctx.with_design(key.clone(), design_container);
 
     // 3. Instantiate the Query Root
-    // We use the type name as the root instance name (e.g., "cwe1234")
-    let root_name = std::any::type_name::<Q>()
+    let root_name = std::any::type_name::<P>()
         .split("::")
         .last()
         .unwrap_or("query")
         .to_lowercase();
-    let query_instance = Q::instantiate(Instance::root(root_name));
+    let query_instance = P::instantiate(Instance::root(root_name));
 
     // 4. Execute
-    let results = query_instance.query(driver, &context, key, config);
+    let results = query_instance.execute(driver, &context, key, config);
 
     Ok(results)
 }
@@ -73,6 +76,12 @@ where
 pub trait State: Clone + std::fmt::Debug + PartialEq {
     /// The internal data type held by a Wire in this state.
     type WireInner: Clone + std::fmt::Debug + PartialEq;
+
+    /// Helper to extract source location from the inner wire type.
+    fn wire_source(inner: &Self::WireInner) -> Option<SourceLocation> {
+        let _ = inner;
+        None
+    }
 }
 
 /// Represents a query in its search/definition phase.
@@ -99,6 +108,10 @@ impl Match {
 
 impl State for Match {
     type WireInner = Option<CellInfo>;
+
+    fn wire_source(inner: &Self::WireInner) -> Option<SourceLocation> {
+        inner.as_ref().and_then(|cell| cell.get_source())
+    }
 }
 
 /// A logical connection point within a query component.
@@ -132,44 +145,57 @@ impl<'ctx> Wire<Match> {
     }
 }
 
-impl crate::traits::Reportable for Wire<Match> {
-    fn to_report(&self, name: &str) -> crate::report::ReportNode {
-        crate::report::ReportNode {
-            name: name.to_string(),
-            type_name: "Wire".to_string(),
-            path: self.path.clone(),
-            details: None,
-            // inner is now Option<CellInfo>, so we map through it
-            source_loc: self.inner.as_ref().and_then(|cell| cell.get_source()),
-            children: Vec::new(),
-        }
-    }
-}
+use crate::traits::{Hardware, Matched, Pattern};
 
-impl<S: State> Component<S> for Wire<S> {
+impl<S: State> Hardware for Wire<S> {
+    type State = S;
+
     fn path(&self) -> &Instance {
         &self.path
     }
-
     fn type_name(&self) -> &'static str {
         "Wire"
     }
+    fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+        Vec::new()
+    }
 
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
-        if path.starts_with(&self.path) {
-            Some(self)
-        } else {
-            None
-        }
+        if path == &self.path { Some(self) } else { None }
     }
 
-    fn find_port_inner(&self, rel_path: &[Arc<str>]) -> Option<&Wire<S>> {
-        if rel_path.is_empty() {
-            Some(self)
-        } else {
-            None
-        }
+    fn source(&self) -> Option<SourceLocation> {
+        S::wire_source(&self.inner)
     }
+}
+
+impl Pattern for Wire<Search> {
+    type Match = Wire<Match>;
+
+    fn instantiate(base_path: Instance) -> Self {
+        Wire::new(base_path, ())
+    }
+
+    fn context(
+        _driver: &Driver,
+        _config: &ModuleConfig,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        Ok(Context::default())
+    }
+
+    fn execute(
+        &self,
+        _driver: &Driver,
+        _context: &Context,
+        _key: &DriverKey,
+        _config: &Config,
+    ) -> Vec<Self::Match> {
+        vec![]
+    }
+}
+
+impl Matched for Wire<Match> {
+    type Search = Wire<Search>;
 }
 
 /// Represents a connection between two wires.
