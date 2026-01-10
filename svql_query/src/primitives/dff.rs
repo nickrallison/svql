@@ -9,10 +9,12 @@ use crate::driver::{Context, Driver, DriverKey};
 use crate::subgraph::cell::CellKind;
 use crate::traits::{Hardware, Matched, Pattern};
 use crate::{Instance, Match, ReportNode, Search, State, Wire};
-use prjunnamed_netlist::Cell;
 
+#[macro_export]
 macro_rules! impl_dff_primitive {
     ($name:ident, [$($port:ident),*], $filter:expr, $description:expr) => {
+        #[allow(unused_imports)]
+        use crate::prelude::*;
         #[doc = $description]
         #[derive(Clone, Debug)]
         pub struct $name<S: State> {
@@ -109,7 +111,7 @@ macro_rules! impl_dff_primitive {
                     .flatten()
                     .filter(|cell_wrapper| {
                         match cell_wrapper.get() {
-                            Cell::Dff(ff) => {
+                            prjunnamed_netlist::Cell::Dff(ff) => {
                                 let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
                                 check(ff)
                             }
