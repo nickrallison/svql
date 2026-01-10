@@ -29,8 +29,6 @@ pub fn netlist(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```rust,ignore
 /// #[composite]
 /// pub struct MyComposite<S: State> {
-///     #[path]
-///     path: Instance,
 ///     #[submodule]
 ///     sub: SubQuery<S>,
 /// }

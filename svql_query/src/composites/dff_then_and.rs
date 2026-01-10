@@ -2,12 +2,8 @@ use crate::prelude::*;
 
 #[composite]
 pub struct SdffeThenAnd<S: State> {
-    #[path]
-    pub path: Instance,
-
     #[submodule]
     pub sdffe: Sdffe<S>,
-
     #[submodule]
     pub and_gate: AndGate<S>,
 }

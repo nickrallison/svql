@@ -7,12 +7,8 @@ use unlock_logic::UnlockLogic;
 
 #[composite]
 pub struct Cwe1234<S: State> {
-    #[path]
-    pub path: Instance,
-
     #[submodule]
     pub unlock_logic: UnlockLogic<S>,
-
     #[submodule]
     pub locked_register: LockedRegister<S>,
 }
