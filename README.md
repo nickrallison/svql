@@ -163,3 +163,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - **Complexity**: Subgraph isomorphism is NP-complete; SVQL mitigates this using hardware-specific heuristics such as cell types, and fan-in degree.
 - **Parallelism**: The matcher supports parallelizing the search across independent candidate branches via the use of `rayon`.
 - **Memory**: Large designs require a significant amount of memory to store the matches of a search when many matches are found.
+
+## Reproduce Results
+To reproduce the results, 
+1. Make sure you have `yosys` and `cargo` installed and available in your system `PATH`.
+2. Clone the repository and run the following commands:
+
+```bash
+sh scripts/setup.sh
+bash scripts/collect_data.bash
+```
+
+The results will be stored in the `bin/res` directory.
