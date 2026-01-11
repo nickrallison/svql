@@ -1,7 +1,6 @@
 use std::sync::Once;
 use svql_query::prelude::*;
 
-// Ensure logging only initializes once across all tests
 static INIT: Once = Once::new();
 
 pub fn setup_test_logging() {
@@ -13,7 +12,6 @@ pub fn setup_test_logging() {
     });
 }
 
-/// Configuration for a specific test case
 pub struct TestSpec<'a> {
     pub haystack_path: &'a str,
     pub haystack_module: &'a str,
@@ -33,7 +31,7 @@ impl<'a> Default for TestSpec<'a> {
     }
 }
 
-/// The generic runner function.
+#[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
     P: Pattern + 'static,
