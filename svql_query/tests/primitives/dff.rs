@@ -1,109 +1,51 @@
+use crate::query_test;
 use svql_query::prelude::*;
 
-fn setup_driver() -> Driver {
-    Driver::new_workspace().expect("Failed to create driver")
-}
+query_test!(
+    name: test_sdffe_primitive,
+    query: Sdffe<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/sdffe.il", "sdffe"),
+    expect: 1
+);
 
-fn get_context<'a, Q: Pattern>(driver: &Driver, path: &str, module: &str) -> (DriverKey, Context) {
-    let config = ModuleConfig::default().with_flatten(true);
-    let (key, design) = driver
-        .get_or_load_design(path, module, &config)
-        .expect("Failed to load design");
+query_test!(
+    name: test_adffe_primitive,
+    query: Adffe<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/adffe.il", "adffe"),
+    expect: 1
+);
 
-    let context = Q::context(driver, &config)
-        .unwrap()
-        .with_design(key.clone(), design);
+query_test!(
+    name: test_sdff_primitive,
+    query: Sdff<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/sdff.il", "sdff"),
+    expect: 1
+);
 
-    (key, context)
-}
+query_test!(
+    name: test_sdffe_negative_on_sdff,
+    query: Sdffe<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/sdff.il", "sdff"),
+    expect: 0
+);
 
-#[test]
-fn test_sdffe_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/sdffe.il";
-    let module = "sdffe";
+query_test!(
+    name: test_adff_primitive,
+    query: Adff<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/adff.il", "adff"),
+    expect: 1
+);
 
-    let (key, context) = get_context::<Sdffe<Search>>(&driver, path, module);
-    let query = Sdffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
+query_test!(
+    name: test_dffe_primitive,
+    query: Dffe<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/dffe.il", "dffe"),
+    expect: 1
+);
 
-    assert_eq!(matches.len(), 1, "Should find 1 Sdffe (Sync Reset + En)");
-}
-
-#[test]
-fn test_adffe_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/adffe.il";
-    let module = "adffe";
-
-    let (key, context) = get_context::<Adffe<Search>>(&driver, path, module);
-    let query = Adffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
-
-    assert_eq!(matches.len(), 1, "Should find 1 Adffe (Async Reset + En)");
-}
-
-#[test]
-fn test_sdff_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/sdff.il";
-    let module = "sdff";
-
-    let (key, context) = get_context::<Sdff<Search>>(&driver, path, module);
-    let query = Sdff::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
-
-    assert_eq!(matches.len(), 1, "Should find 1 Sdff (Sync Reset, No En)");
-
-    // Negative test: Sdffe should not match because enable is inactive
-    let matches_sdffe = Sdffe::<Search>::instantiate(Instance::root("q".to_string())).execute(
-        &driver,
-        &context,
-        &key,
-        &Config::default(),
-    );
-    assert_eq!(
-        matches_sdffe.len(),
-        0,
-        "Sdffe should not match Sdff fixture"
-    );
-}
-
-#[test]
-fn test_adff_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/adff.il";
-    let module = "adff";
-
-    let (key, context) = get_context::<Adff<Search>>(&driver, path, module);
-    let query = Adff::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
-
-    assert_eq!(matches.len(), 1, "Should find 1 Adff (Async Reset, No En)");
-}
-
-#[test]
-fn test_dffe_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/dffe.il";
-    let module = "dffe";
-
-    let (key, context) = get_context::<Dffe<Search>>(&driver, path, module);
-    let query = Dffe::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
-
-    assert_eq!(matches.len(), 1, "Should find 1 Dffe (No Reset, En)");
-}
-
-#[test]
-fn test_dff_any_primitive() {
-    let driver = setup_driver();
-    let path = "examples/patterns/basic/ff/rtlil/dff.il";
-    let module = "dff";
-
-    let (key, context) = get_context::<DffAny<Search>>(&driver, path, module);
-    let query = DffAny::<Search>::instantiate(Instance::root("q".to_string()));
-    let matches = query.execute(&driver, &context, &key, &Config::default());
-
-    assert_eq!(matches.len(), 1, "Should find 1 DffAny (Basic DFF)");
-}
+query_test!(
+    name: test_dff_any_primitive,
+    query: DffAny<Search>,
+    haystack: ("examples/patterns/basic/ff/rtlil/dff.il", "dff"),
+    expect: 1
+);

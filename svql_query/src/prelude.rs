@@ -20,7 +20,7 @@ pub use crate::{
     },
 };
 
-pub use common::{Config, Dedupe, MatchLength, ModuleConfig, YosysModule};
+pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};
 
 pub use subgraph::{
     AssignmentSet, SingleAssignment,
