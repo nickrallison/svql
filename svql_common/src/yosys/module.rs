@@ -41,14 +41,17 @@ impl YosysModule {
         })
     }
 
+    /// Returns the categorized design path.
     pub fn design_path(&self) -> &DesignPath {
         &self.path
     }
 
+    /// Returns the filesystem path.
     pub fn path(&self) -> &Path {
         self.path.path()
     }
 
+    /// Returns the top module name.
     pub fn module_name(&self) -> &str {
         &self.module
     }
@@ -155,6 +158,7 @@ impl YosysModule {
     }
 
     /// Imports the design into the internal netlist format by invoking Yosys.
+    /// Automatically locates the yosys binary in the system PATH.
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,
@@ -177,29 +181,28 @@ impl YosysModule {
         let args = self.generate_yosys_args(json_temp.path(), module_config, OutputFormat::Json);
         self.execute_yosys(args, yosys_binary)?;
 
-        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(json_temp.path())?)?;
-
-        designs.remove(self.module_name()).ok_or_else(|| {
-            format!(
-                "Module '{}' not found in Yosys output for {}",
-                self.module_name(),
-                self.path().display()
-            )
-            .into()
-        })
+        self.parse_json_output(json_temp.path())
     }
 
     /// Imports the design without any preprocessing by Yosys.
     pub fn import_design_raw(
         &self,
     ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
-        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(self.path())?)?;
+        self.parse_json_output(self.path())
+    }
+
+    /// Internal helper to parse Yosys JSON output and extract the target module.
+    fn parse_json_output(
+        &self,
+        path: &Path,
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+        let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(path)?)?;
 
         designs.remove(self.module_name()).ok_or_else(|| {
             format!(
                 "Module '{}' not found in Yosys output for {}",
                 self.module_name(),
-                self.path().display()
+                path.display()
             )
             .into()
         })

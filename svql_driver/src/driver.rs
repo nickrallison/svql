@@ -84,7 +84,21 @@ impl Driver {
         })
     }
 
-    /// Loads a design into the registry. Returns existing key if already loaded.
+    /// Internal helper to resolve a design path to an absolute path.
+    fn resolve_path(&self, design_path: &Path) -> PathBuf {
+        if design_path.is_absolute() {
+            design_path.to_path_buf()
+        } else {
+            self.root_path.join(design_path)
+        }
+    }
+
+    /// Internal helper to check if a key exists in the registry.
+    fn check_registry(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
+        self.registry.read().unwrap().get(key).cloned()
+    }
+
+    /// Loads a design into the registry.
     #[contracts::debug_requires(!module_name.is_empty())]
     pub fn load_design<P: AsRef<Path>>(
         &self,
@@ -92,44 +106,23 @@ impl Driver {
         module_name: String,
         module_config: &svql_common::ModuleConfig,
     ) -> Result<DriverKey, DriverError> {
-        let design_path = design_path.as_ref();
-        let absolute_path = if design_path.is_absolute() {
-            design_path.to_path_buf()
-        } else {
-            self.root_path.join(design_path)
-        };
-
+        let absolute_path = self.resolve_path(design_path.as_ref());
         let key = DriverKey::new(&absolute_path, module_name.clone());
-        {
-            let registry = self.registry.read().unwrap();
-            if registry.contains_key(&key) {
-                tracing::event!(tracing::Level::DEBUG, "Design already loaded: {:?}", key);
-                return Ok(key);
-            }
+
+        if let Some(_) = self.check_registry(&key) {
+            return Ok(key);
         }
 
-        tracing::event!(
-            tracing::Level::INFO,
-            "Loading design: {} ({})",
-            absolute_path.display(),
-            module_name
-        );
         let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
         let design = yosys_module
             .import_design_yosys(module_config, &self.yosys_path)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        {
-            let mut registry = self.registry.write().unwrap();
-            registry.insert(key.clone(), Arc::new(DesignContainer::build(design)));
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "Design stored in registry: {:?}",
-                &key
-            );
-        }
-
+        self.registry
+            .write()
+            .unwrap()
+            .insert(key.clone(), Arc::new(DesignContainer::build(design)));
         Ok(key)
     }
 
@@ -141,29 +134,12 @@ impl Driver {
         module_name: &str,
         module_config: &svql_common::ModuleConfig,
     ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
-        let design_path = Path::new(design_path);
-        let absolute_path = if design_path.is_absolute() {
-            design_path.to_path_buf()
-        } else {
-            self.root_path.join(design_path)
-        };
-
+        let absolute_path = self.resolve_path(Path::new(design_path));
         let key = DriverKey::new(&absolute_path, module_name.to_string());
 
-        {
-            let registry = self.registry.read().unwrap();
-            if let Some(design) = registry.get(&key) {
-                tracing::event!(tracing::Level::DEBUG, "Design found in registry: {:?}", key);
-                return Ok((key, design.clone()));
-            }
+        if let Some(design) = self.check_registry(&key) {
+            return Ok((key, design));
         }
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "Loading design: {} ({})",
-            absolute_path.display(),
-            module_name
-        );
 
         let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
@@ -171,18 +147,11 @@ impl Driver {
             .import_design_yosys(module_config, &self.yosys_path)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        let design_container = DesignContainer::build(design);
-        let design_arc = Arc::new(design_container);
-
-        {
-            let mut registry = self.registry.write().unwrap();
-            registry.insert(key.clone(), design_arc.clone());
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "Design stored in registry: {:?}",
-                key
-            );
-        }
+        let design_arc = Arc::new(DesignContainer::build(design));
+        self.registry
+            .write()
+            .unwrap()
+            .insert(key.clone(), design_arc.clone());
 
         Ok((key, design_arc))
     }
@@ -194,29 +163,12 @@ impl Driver {
         design_path: &str,
         module_name: &str,
     ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
-        let design_path = Path::new(design_path);
-        let absolute_path = if design_path.is_absolute() {
-            design_path.to_path_buf()
-        } else {
-            self.root_path.join(design_path)
-        };
-
+        let absolute_path = self.resolve_path(Path::new(design_path));
         let key = DriverKey::new(&absolute_path, module_name.to_string());
 
-        {
-            let registry = self.registry.read().unwrap();
-            if let Some(design) = registry.get(&key) {
-                tracing::event!(tracing::Level::DEBUG, "Design found in registry: {:?}", key);
-                return Ok((key, design.clone()));
-            }
+        if let Some(design) = self.check_registry(&key) {
+            return Ok((key, design));
         }
-
-        tracing::event!(
-            tracing::Level::INFO,
-            "Loading design: {} ({})",
-            absolute_path.display(),
-            module_name
-        );
 
         let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
@@ -224,40 +176,18 @@ impl Driver {
             .import_design_raw()
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
 
-        let design_container = DesignContainer::build(design);
-        let design_arc = Arc::new(design_container);
-
-        {
-            let mut registry = self.registry.write().unwrap();
-            registry.insert(key.clone(), design_arc.clone());
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "Design stored in registry: {:?}",
-                key
-            );
-        }
+        let design_arc = Arc::new(DesignContainer::build(design));
+        self.registry
+            .write()
+            .unwrap()
+            .insert(key.clone(), design_arc.clone());
 
         Ok((key, design_arc))
     }
 
     /// Retrieves a design from the registry if it exists.
     pub fn get_design(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
-        let registry = self.registry.read().unwrap();
-        let result = registry.get(key).cloned();
-        if result.is_some() {
-            tracing::event!(
-                tracing::Level::DEBUG,
-                "Design retrieved from registry: {:?}",
-                key
-            );
-        } else {
-            tracing::event!(
-                tracing::Level::WARN,
-                "Design not found in registry: {:?}",
-                key
-            );
-        }
-        result
+        self.check_registry(key)
     }
 
     /// Retrieves a design by path and module name if it exists.
@@ -277,20 +207,10 @@ impl Driver {
         let registry = self.registry.read().unwrap();
 
         for key in keys {
-            if let Some(design_container) = registry.get(key) {
-                context.insert(key.clone(), design_container.clone());
-                tracing::event!(tracing::Level::DEBUG, "Design added to context: {:?}", key);
-            } else {
-                tracing::event!(
-                    tracing::Level::WARN,
-                    "Design not found in registry: {:?}",
-                    key
-                );
-                return Err(DriverError::DesignLoading(format!(
-                    "Design not found for key: {:?}",
-                    key
-                )));
-            }
+            let design = registry.get(key).ok_or_else(|| {
+                DriverError::DesignLoading(format!("Design not found for key: {:?}", key))
+            })?;
+            context.insert(key.clone(), design.clone());
         }
 
         Ok(context)
@@ -298,22 +218,11 @@ impl Driver {
 
     /// Creates an execution context containing a single design.
     pub fn create_context_single(&self, key: &DriverKey) -> Result<Context, DriverError> {
-        tracing::event!(
-            tracing::Level::DEBUG,
-            "Creating context with single design: {:?}",
-            key
-        );
         self.create_context(&[key.clone()])
     }
 
     /// Returns a copy of all currently loaded designs.
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
-        let registry = self.registry.read().unwrap();
-        tracing::event!(
-            tracing::Level::DEBUG,
-            "Retrieved all designs from registry (count: {})",
-            registry.len()
-        );
-        registry.clone()
+        self.registry.read().unwrap().clone()
     }
 }
