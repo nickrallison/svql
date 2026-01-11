@@ -3,7 +3,6 @@ mod unlock_logic;
 use crate::query_test;
 use svql_query::prelude::*;
 use svql_query::security::cwe1234::Cwe1234;
-use svql_query::security::cwe1234::unlock_logic::UnlockLogic;
 
 // Common config for CWE-1234 tests
 fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
