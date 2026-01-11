@@ -1,7 +1,12 @@
-use crate::State;
-use crate::Wire;
-use crate::primitives::dff::{Adffe, Sdffe};
+use crate::{impl_dff_primitive, prelude::*};
 use svql_macros::{netlist, variant};
+
+impl_dff_primitive!(
+    LockedRegEn,
+    [clk, data_in, data_out, resetn, write_en],
+    |ff| ff.has_enable(),
+    "Matches primitive DFFs with an enable."
+);
 
 #[netlist(
     file = "examples/patterns/security/access_control/locked_reg/rtlil/sync_mux.il",
@@ -31,21 +36,12 @@ pub struct AsyncDffMuxEnable<S: State> {
 pub enum LockedRegister<S: State> {
     #[variant(map(
         clk = "clk",
-        data_in = "d",
-        data_out = "q",
-        resetn = "reset_n",
-        write_en = "en"
+        data_in = "data_in",
+        data_out = "data_out",
+        resetn = "resetn",
+        write_en = "write_en"
     ))]
-    AsyncEn(Adffe<S>),
-
-    #[variant(map(
-        clk = "clk",
-        data_in = "d",
-        data_out = "q",
-        resetn = "reset",
-        write_en = "en"
-    ))]
-    SyncEn(Sdffe<S>),
+    En(LockedRegEn<S>),
 
     #[variant(map(
         clk = "clk",
@@ -69,15 +65,5 @@ pub enum LockedRegister<S: State> {
 impl<S: State> LockedRegister<S> {
     pub fn enable_wire(&self) -> Option<&Wire<S>> {
         self.write_en()
-    }
-
-    pub fn register_type(&self) -> String {
-        match self {
-            LockedRegister::AsyncEn(_) => "Adffe (Primitive)".to_string(),
-            LockedRegister::SyncEn(_) => "Sdffe (Primitive)".to_string(),
-            LockedRegister::AsyncMux(_) => "AsyncDffMuxEnable".to_string(),
-            LockedRegister::SyncMux(_) => "SyncDffMuxEnable".to_string(),
-            _ => "Unknown".to_string(),
-        }
     }
 }
