@@ -1,6 +1,6 @@
 //! Graph indexing and connectivity analysis.
 //!
-//! This module provides efficient data structures for querying graph connectivity,
+//! Provides efficient data structures for querying graph connectivity,
 //! cell types, and I/O mappings.
 
 mod cell_registry;
@@ -24,6 +24,7 @@ pub struct GraphIndex<'a> {
 }
 
 impl<'a> GraphIndex<'a> {
+    /// Builds a new GraphIndex for the provided design.
     pub fn build(design: &'a Design) -> Self {
         let start = std::time::Instant::now();
 
@@ -50,10 +51,12 @@ impl<'a> GraphIndex<'a> {
         }
     }
 
+    /// Returns the total number of cells in the index.
     pub fn num_cells(&self) -> usize {
         self.cell_registry.len()
     }
 
+    /// Internal helper to collect cell references in reverse topological order.
     fn build_cell_refs_topo(design: &'a Design) -> Vec<CellRef<'a>> {
         design
             .iter_cells_topo()
@@ -65,6 +68,7 @@ impl<'a> GraphIndex<'a> {
             .collect()
     }
 
+    /// Returns an iterator over cells of a specific type.
     pub fn cells_of_type_iter(
         &self,
         node_type: CellKind,
@@ -72,14 +76,17 @@ impl<'a> GraphIndex<'a> {
         self.cell_registry.cells_of_type_iter(node_type)
     }
 
+    /// Returns a slice of all cells in topological order.
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
         self.cell_registry.cells_topo()
     }
 
+    /// Retrieves the internal index for a given cell wrapper.
     fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
         self.cell_registry.get_cell_index(cell)
     }
 
+    /// Returns the set of cells in the immediate fan-out of the specified cell.
     pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanout_indices_set(idx);
@@ -90,6 +97,7 @@ impl<'a> GraphIndex<'a> {
         Some(cells)
     }
 
+    /// Returns the set of cells in the immediate fan-in of the specified cell.
     pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanin_indices_set(idx);
@@ -100,6 +108,7 @@ impl<'a> GraphIndex<'a> {
         Some(cells)
     }
 
+    /// Returns the fan-out cells paired with their source pin indices.
     pub fn fanout_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -112,6 +121,7 @@ impl<'a> GraphIndex<'a> {
         )
     }
 
+    /// Returns the fan-in cells paired with their source pin indices.
     pub fn fanin_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -124,6 +134,7 @@ impl<'a> GraphIndex<'a> {
         )
     }
 
+    /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     pub fn get_intersect_fanout_of_fanin(
         &self,
         cell: &CellWrapper<'a>,
@@ -140,16 +151,19 @@ impl<'a> GraphIndex<'a> {
             .collect()
     }
 
+    /// Returns a map of input port names to their fan-out cells.
     pub fn get_input_fanout_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_input_fanout_by_name(&self.cell_registry)
     }
 
+    /// Returns a map of output port names to their fan-in cells.
     pub fn get_output_fanin_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_output_fanin_by_name(&self.cell_registry)
     }
 
+    /// Retrieves a cell wrapper by its unique debug identifier.
     pub fn get_cell_by_id(&self, id: usize) -> Option<CellWrapper<'a>> {
         self.cell_registry
             .cell_id_map()

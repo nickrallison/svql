@@ -9,25 +9,23 @@ pub mod variant;
 
 use crate::prelude::*;
 
-/// The central hardware abstraction.
-/// Replaces Component and Projected.
+/// The central hardware abstraction for query components.
 pub trait Hardware: std::fmt::Debug {
     /// The current state (Search or Match).
     type State: State;
 
-    /// Hierarchical path (Moved from Component).
+    /// Returns the hierarchical path of the component.
     fn path(&self) -> &Instance;
 
-    /// Static type name (Moved from Component).
+    /// Returns the static type name of the component.
     fn type_name(&self) -> &'static str;
 
-    /// Returns a list of immediate child wires/submodules.
+    /// Returns a list of immediate child wires or submodules.
     fn children(&self) -> Vec<&dyn Hardware<State = Self::State>>;
 
-    /// Generic implementation of port finding based on children.
+    /// Performs a recursive lookup for a port wire by its hierarchical path.
     fn find_port(&self, path: &Instance) -> Option<&Wire<Self::State>> {
         if path == self.path() {
-            // Wires should override this to return Some(self)
             return None;
         }
         for child in self.children() {
@@ -40,12 +38,12 @@ pub trait Hardware: std::fmt::Debug {
         None
     }
 
-    /// Source location retrieval.
+    /// Retrieves the source location by aggregating child source information.
     fn source(&self) -> Option<SourceLocation> {
         self.children().iter().find_map(|c| c.source())
     }
 
-    /// Reporting.
+    /// Generates a report node for the component and its children.
     fn report(&self, name: &str) -> ReportNode {
         let children_reports = self
             .children()
@@ -64,21 +62,21 @@ pub trait Hardware: std::fmt::Debug {
     }
 }
 
-/// The Pattern trait for Search state.
-/// Replaces Searchable and Query.
+/// Defines a pattern that can be instantiated and searched within a design.
 pub trait Pattern: Hardware<State = Search> + Sized + Clone {
+    /// The corresponding result type in the Match state.
     type Match: Matched<Search = Self>;
 
-    /// Constructor (Moved from Searchable).
+    /// Instantiates the pattern at the specified hierarchical path.
     fn instantiate(base_path: Instance) -> Self;
 
-    /// Context setup (Moved from Query).
+    /// Prepares the design context required for this pattern.
     fn context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>>;
 
-    /// Execution logic (Moved from Query).
+    /// Executes the pattern search against a design context.
     fn execute(
         &self,
         driver: &Driver,
@@ -88,9 +86,9 @@ pub trait Pattern: Hardware<State = Search> + Sized + Clone {
     ) -> Vec<Self::Match>;
 }
 
-/// The Matched trait for Match state.
-/// Replaces Reportable.
+/// Represents a query result bound to specific design elements.
 pub trait Matched: Hardware<State = Match> + Sized + Clone {
+    /// The corresponding pattern type in the Search state.
     type Search: Pattern<Match = Self>;
 }
 
@@ -103,7 +101,7 @@ pub fn validate_connection<'ctx>(
     validate_connection_inner(from, to, haystack_index).unwrap_or(false)
 }
 
-/// Private helper to resolve CellInfo to CellWrappers and check connectivity.
+/// Internal helper to resolve CellInfo to CellWrappers and check connectivity.
 fn validate_connection_inner<'ctx>(
     from: &Wire<Match>,
     to: &Wire<Match>,

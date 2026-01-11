@@ -84,9 +84,7 @@ impl Driver {
         })
     }
 
-    /// Loads a design into the registry.
-    ///
-    /// If the design is already present in the registry, the existing key is returned.
+    /// Loads a design into the registry. Returns existing key if already loaded.
     #[contracts::debug_requires(!module_name.is_empty())]
     pub fn load_design<P: AsRef<Path>>(
         &self,
