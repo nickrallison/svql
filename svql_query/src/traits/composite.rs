@@ -36,6 +36,25 @@ impl<'a, S: State> ConnectionBuilder<'a, S> {
     }
 }
 
+impl Into<Connections> for ConnectionBuilder<'_, Search> {
+    fn into(self) -> Connections {
+        Connections {
+            constraints: self
+                .constraints
+                .iter()
+                .map(|group| {
+                    group
+                        .iter()
+                        .map(|(from_opt, to_opt)| {
+                            (from_opt.map(|w| w.clone()), to_opt.map(|w| w.clone()))
+                        })
+                        .collect()
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Validates a candidate composite match against its topology constraints.
 pub fn validate_composite<'ctx, T>(candidate: &T, haystack_index: &GraphIndex<'ctx>) -> bool
 where
@@ -54,4 +73,9 @@ where
                 _ => false,
             })
     })
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Connections {
+    pub constraints: Vec<Vec<(Option<Wire<Search>>, Option<Wire<Search>>)>>,
 }

@@ -9,7 +9,7 @@ extern crate self as svql_query;
 pub mod binding;
 pub mod composites;
 pub mod instance;
-// pub mod ir;
+pub mod ir;
 pub mod prelude;
 pub mod primitives;
 pub mod report;
@@ -85,7 +85,7 @@ pub trait State: Clone + std::fmt::Debug + PartialEq {
 }
 
 /// Represents a query in its search/definition phase.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Search;
 
 impl State for Search {
@@ -115,7 +115,7 @@ impl State for Match {
 }
 
 /// A logical connection point within a query component.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Wire<S: State>
 where
     S::WireInner: Clone + std::fmt::Debug + PartialEq,
