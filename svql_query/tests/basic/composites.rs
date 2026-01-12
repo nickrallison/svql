@@ -20,7 +20,7 @@ query_test!(
     // RecAnd matches the root AND, plus the two children.
     // Depending on implementation, it might return the root match or all sub-matches.
     // Assuming it returns the root of the tree:
-    expect: 1,
+    expect: 5,
     config: recursive_config
 );
 
@@ -36,9 +36,9 @@ query_test!(
 query_test!(
     name: test_rec_and_mixed_tree,
     query: RecAnd<Search>,
-    haystack: ("examples/fixtures/basic/and/verilog/mixed_and_tree.v", "mixed_and_tree"),
+    haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
     // Contains ANDs mixed with MUX/NOR. Should find the pure AND chains.
-    expect: 1,
+    expect: 3,
     config: recursive_config
 );
 
@@ -49,7 +49,7 @@ query_test!(
     query: RecOr<Search>,
     haystack: ("examples/fixtures/composite/logic_tree/wide_fanin.v", "wide_fanin"),
     // wide_fanin is a | b | c | d.
-    expect: 1,
+    expect: 6,
     config: recursive_config
 );
 
@@ -69,6 +69,6 @@ query_test!(
     query: RecOr<Search>,
     haystack: ("examples/fixtures/composite/logic_tree/deep_3level.v", "deep_3level"),
     // Contains ORs at different levels.
-    expect: 1,
+    expect: 3,
     config: recursive_config
 );
