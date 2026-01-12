@@ -1,12 +1,10 @@
 //! Subgraph isomorphism matching implementation.
 //!
-//! This module provides the core matching engine that identifies instances of a
-//! needle design within a larger haystack design. It uses a
-//! backtracking search algorithm with topological ordering
-//! and fan-in/fan-out constraints.
+//! Identifies instances of a needle design within a larger haystack design
+//! using a backtracking search algorithm with topological ordering.
 
 use std::collections::{HashSet, VecDeque};
-use std::sync::atomic::{AtomicUsize, Ordering}; // New imports
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use prjunnamed_netlist::Design;
 use svql_common::Config;
@@ -21,39 +19,24 @@ use crate::utils::intersect_sets;
 
 /// Entry point for subgraph isomorphism searches.
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
-    /// The pattern design to search for.
     needle: &'needle Design,
-    /// The design to search within.
     haystack: &'haystack Design,
-    /// Structural index for the needle design.
     needle_index: GraphIndex<'needle>,
-    /// Structural index for the haystack design.
     haystack_index: GraphIndex<'haystack>,
-    /// Configuration settings for the matcher.
     pub(crate) config: &'cfg Config,
-    /// Name of Needle Design for logging purposes.
     needle_name: String,
-    /// Name of Haystack Design for logging purposes.
     haystack_name: String,
 }
 
-/// Core implementation of the subgraph matching algorithm.
+/// Core implementation of the subgraph matching algorithm with progress tracking.
 pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
-    /// The pattern design to search for.
     pub(crate) needle: &'needle Design,
-    /// The design to search within.
     pub(crate) haystack: &'haystack Design,
-    /// Reference to the structural index for the needle.
     pub(crate) needle_index: &'cfg GraphIndex<'needle>,
-    /// Reference to the structural index for the haystack.
     pub(crate) haystack_index: &'cfg GraphIndex<'haystack>,
-    /// Configuration settings for the matcher.
     pub(crate) config: &'cfg Config,
-    /// Name of Needle Design for logging purposes.
     pub(crate) needle_name: String,
-    /// Name of Haystack Design for logging purposes.
     pub(crate) haystack_name: String,
-    /// Progress tracking
     pub(crate) branches_explored: AtomicUsize,
     pub(crate) active_branches: AtomicUsize,
     pub(crate) matches_found: AtomicUsize,
@@ -62,9 +45,7 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
-    /// Performs a complete subgraph isomorphism search between the needle and haystack.
-    ///
-    /// This method builds the necessary indices and executes the matching algorithm.
+    /// Performs a complete subgraph isomorphism search. Builds indices internally.
     pub fn enumerate_all(
         needle: &'needle Design,
         haystack: &'haystack Design,
@@ -94,8 +75,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     }
 
     /// Performs a subgraph isomorphism search using pre-built indices.
-    ///
-    /// This is more efficient when performing multiple searches against the same designs.
     pub fn enumerate_with_indices(
         needle: &'needle Design,
         haystack: &'haystack Design,
@@ -124,7 +103,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
-    /// Executes the subgraph matching process and returns the set of all found mappings.
+    /// Executes the matching process and applies deduplication.
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
         tracing::info!(
             "[{} -> {}] starting subgraph search: needle cells: {}, haystack cells: {}",
@@ -158,7 +137,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
     }
 
-    /// Recursively matches gate cells from the needle to candidates in the haystack.
+    /// Recursive backtracking step for matching logic gates.
     fn match_gate_cells(
         &self,
         assignment: SingleAssignment<'needle, 'haystack>,
@@ -230,7 +209,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         results
     }
 
-    /// Recursively matches input cells from the needle to candidates in the haystack.
+    /// Recursive backtracking step for matching input ports.
     fn match_input_cells(
         &self,
         assignment: SingleAssignment<'needle, 'haystack>,
@@ -261,9 +240,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         .collect()
     }
 
-    /// Prepares queues for inputs and logic gates.
-    ///
-    /// Returns a tuple containing `(input_queue, gate_queue)`.
+    /// Separates needle cells into input and gate queues for topological traversal.
     fn prepare_search_queues(
         &self,
     ) -> (
@@ -284,7 +261,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         (inputs, gates)
     }
 
-    /// Identifies candidate haystack cells that could match a given needle gate cell.
+    /// Filters haystack cells based on type and fan-in constraints.
     fn find_candidates_for_cell(
         &self,
         needle_cell: CellWrapper<'needle>,
@@ -302,13 +279,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             .collect();
 
         let unfiltered: Vec<CellWrapper<'haystack>> = if mapped_haystack_fanin.is_empty() {
-            // When no inputs are yet mapped, consider all haystack cells of the matching type.
             self.haystack_index
                 .cells_of_type_iter(kind)
                 .map(|i| i.cloned().collect())
                 .unwrap_or_default()
         } else {
-            // When inputs are mapped, candidates are restricted to the intersection of their fan-outs.
             let fanout_sets: Vec<_> = mapped_haystack_fanin
                 .iter()
                 .filter_map(|haystack_pred| self.haystack_index.fanout_set(haystack_pred))
@@ -326,7 +301,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             .collect()
     }
 
-    /// Identifies candidate haystack cells that could match a given needle input.
+    /// Filters haystack cells for input ports based on fan-out connectivity.
     fn find_candidates_for_input(
         &self,
         needle_input: CellWrapper<'needle>,

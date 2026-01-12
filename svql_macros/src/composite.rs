@@ -4,7 +4,6 @@ use quote::quote;
 use syn::{Fields, ItemStruct, parse_macro_input};
 
 enum FieldKind {
-    Path,
     Submodule,
     Wire,
 }
@@ -36,22 +35,24 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     );
 
     let mut fields_info = Vec::new();
-    let mut path_ident = None;
 
     if let Fields::Named(ref fields) = item_struct.fields {
         for field in &fields.named {
             let ident = field.ident.clone().unwrap();
+
+            // Skip "path" if the user manually added it, as we inject it automatically now
+            if ident == "path" {
+                continue;
+            }
+
             let mut kind = FieldKind::Wire; // Default
             for attr in &field.attrs {
-                if attr.path().is_ident("path") {
-                    kind = FieldKind::Path;
-                } else if attr.path().is_ident("submodule") {
+                if attr.path().is_ident("submodule") {
                     kind = FieldKind::Submodule;
                 }
+                // We ignore #[path] attributes now as the field is auto-generated
             }
-            if let FieldKind::Path = kind {
-                path_ident = Some(ident.clone());
-            }
+
             fields_info.push(CompositeField {
                 ident,
                 ty: field.ty.clone(),
@@ -60,8 +61,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             });
         }
     }
-
-    let path_ident = path_ident.expect("Composite struct must have a #[path] field");
 
     // --- Generation Phase ---
 
@@ -76,7 +75,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let name_str = ident.to_string();
         match f.kind {
-            FieldKind::Path => quote! { #ident: base_path.clone() },
             FieldKind::Submodule => {
                 let ty = &f.ty;
                 let search_ty = common::replace_state_generic(ty);
@@ -104,9 +102,6 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 query_vars.push(ident);
                 construct_fields.push(quote! { #ident: #ident });
             }
-            FieldKind::Path => {
-                construct_fields.push(quote! { #ident: self.#ident.clone() });
-            }
             FieldKind::Wire => {
                 construct_fields.push(quote! {
                     #ident: ::svql_query::Wire::new(self.#ident.path.clone(), None)
@@ -115,13 +110,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
 
-    let children_impl = fields_info
-        .iter()
-        .filter(|f| !matches!(f.kind, FieldKind::Path))
-        .map(|f| {
-            let ident = &f.ident;
-            quote! { &self.#ident }
-        });
+    let children_impl = fields_info.iter().map(|f| {
+        let ident = &f.ident;
+        quote! { &self.#ident }
+    });
 
     let context_calls = fields_info.iter().filter_map(|f| {
         if let FieldKind::Submodule = f.kind {
@@ -139,6 +131,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[derive(Clone, Debug)]
         pub struct #struct_name #impl_generics #where_clause {
+            pub path: ::svql_query::instance::Instance,
             #(#struct_fields),*
         }
 
@@ -146,7 +139,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             type State = S;
 
             fn path(&self) -> &::svql_query::prelude::Instance {
-                &self.#path_ident
+                &self.path
             }
 
             fn type_name(&self) -> &'static str {
@@ -163,6 +156,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn instantiate(base_path: ::svql_query::prelude::Instance) -> Self {
                 Self {
+                    path: base_path.clone(),
                     #(#instantiate_fields),*
                 }
             }
@@ -193,7 +187,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
                 ::svql_query::itertools::iproduct!( #(#query_vars),* )
                     .map(|( #(#query_vars),* )| {
-                        #struct_name { #(#construct_fields),* }
+                        #struct_name {
+                            path: self.path.clone(),
+                            #(#construct_fields),*
+                        }
                     })
                     .filter(|candidate| validate_composite(candidate, haystack_index))
                     .collect()

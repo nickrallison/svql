@@ -3,23 +3,23 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-/// Computes the intersection of a vector of sets.
-pub fn intersect_sets<T: Eq + Hash + Clone>(mut items: Vec<HashSet<T>>) -> HashSet<T> {
-    items.pop().map_or_else(HashSet::new, |first| {
-        items.iter().fold(first, |acc, hs| &acc & hs)
-    })
-}
-
-pub fn intersect_sets_ref<T: Eq + Hash + Clone>(mut items: Vec<&HashSet<T>>) -> HashSet<T> {
-    let Some(first_fanin) = items.pop() else {
+/// Computes the intersection of multiple sets.
+/// Returns an empty set if the input is empty.
+pub fn intersect_sets<T, I>(mut items: Vec<I>) -> HashSet<T>
+where
+    T: Eq + Hash + Clone,
+    I: IntoIterator<Item = T>,
+{
+    let Some(first_iter) = items.pop() else {
         return HashSet::new();
     };
 
-    let first_fanin = first_fanin.clone();
+    let mut result: HashSet<T> = first_iter.into_iter().collect();
 
-    let intersection: HashSet<T> = items.iter().fold(first_fanin, |acc: HashSet<T>, hs| {
-        acc.intersection(hs).cloned().collect()
-    });
+    for item in items {
+        let other: HashSet<T> = item.into_iter().collect();
+        result.retain(|x| other.contains(x));
+    }
 
-    intersection
+    result
 }

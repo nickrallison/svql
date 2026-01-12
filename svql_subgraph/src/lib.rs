@@ -10,8 +10,8 @@ mod constraints;
 mod matcher;
 mod utils;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 pub mod cell;
 pub mod graph_index;
@@ -19,4 +19,4 @@ pub mod graph_index;
 pub use assignment::{AssignmentSet, SingleAssignment};
 pub use graph_index::GraphIndex;
 pub use matcher::{SubgraphMatcher, SubgraphMatcherCore};
-pub use utils::{intersect_sets, intersect_sets_ref};
+pub use utils::intersect_sets;

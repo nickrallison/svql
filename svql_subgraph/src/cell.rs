@@ -170,7 +170,7 @@ pub struct CellInfo {
     pub id: usize,
     /// The type of cell (AND, OR, DFF, etc.)
     pub kind: CellKind,
-    /// Source code location (Arc<str> is cheap to clone and owned)
+    /// Source code location (`Arc<str>` is cheap to clone and owned)
     pub source_loc: Option<SourceLocation>,
 }
 

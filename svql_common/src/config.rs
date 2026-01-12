@@ -25,6 +25,7 @@ pub struct Config {
 }
 
 impl Default for Config {
+    /// Returns default configuration with First match length and Inner deduplication.
     fn default() -> Self {
         Self {
             match_length: MatchLength::First,
@@ -97,7 +98,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Sets the Yosys configuration for the needle.
+    /// Sets the Yosys configuration for the needle and forces flattening.
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
@@ -188,12 +189,15 @@ pub enum MatchLength {
 }
 
 impl MatchLength {
+    /// Returns true if the strategy is First.
     pub fn first(&self) -> bool {
         matches!(self, MatchLength::First)
     }
+    /// Returns true if the strategy is NeedleSubsetHaystack.
     pub fn needle_subset_haystack(&self) -> bool {
         matches!(self, MatchLength::NeedleSubsetHaystack)
     }
+    /// Returns true if the strategy is Exact.
     pub fn exact(&self) -> bool {
         matches!(self, MatchLength::Exact)
     }
@@ -225,12 +229,15 @@ pub enum Dedupe {
 }
 
 impl Dedupe {
+    /// Returns true if the strategy is None.
     pub fn none(&self) -> bool {
         matches!(self, Dedupe::None)
     }
+    /// Returns true if the strategy is Inner.
     pub fn inner(&self) -> bool {
         matches!(self, Dedupe::Inner)
     }
+    /// Returns true if the strategy is All.
     pub fn all(&self) -> bool {
         matches!(self, Dedupe::All)
     }
