@@ -2,18 +2,6 @@ use crate::prelude::*;
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-// pub enum PortDir {
-//     In,
-//     Out,
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-// pub struct PortSpec {
-//     pub name: &'static str,
-//     pub dir: PortDir,
-// }
-
 pub trait Netlist {
     const MODULE_NAME: &'static str;
     const FILE_PATH: &'static str;
