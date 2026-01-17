@@ -164,10 +164,10 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Retrieves a cell wrapper by its unique debug identifier.
-    pub fn get_cell_by_id(&self, id: usize) -> Option<CellWrapper<'a>> {
+    pub fn get_cell_by_id(&self, id: usize) -> Option<&CellWrapper<'a>> {
         self.cell_registry
             .cell_id_map()
             .get(&id)
-            .map(|idx| self.cell_registry.get_cell_by_index(*idx).clone())
+            .map(|idx| self.cell_registry.get_cell_by_index(*idx))
     }
 }

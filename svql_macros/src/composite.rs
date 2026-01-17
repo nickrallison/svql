@@ -129,7 +129,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct #struct_name #impl_generics #where_clause {
             pub path: ::svql_query::instance::Instance,
             #(#struct_fields),*
@@ -202,7 +202,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
                 // 2. Cartesian Product & Filtering
                 let haystack_index = context.get(key).unwrap().index();
-
+                let mut cache = std::collections::HashMap::new();
                 ::svql_query::itertools::iproduct!( #(#query_vars),* )
                     .map(|( #(#query_vars),* )| {
                         #struct_name {
@@ -210,7 +210,15 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                             #(#construct_fields),*
                         }
                     })
-                    .filter(|candidate| validate_composite(candidate, haystack_index))
+                    .filter(|candidate| {
+                        if let Some(cached) = cache.get(candidate) {
+                            *cached
+                        } else {
+                            let is_valid = validate_composite(candidate, haystack_index);
+                            cache.insert(candidate.clone(), is_valid);
+                            is_valid
+                        }
+                    })
                     .collect()
             }
         }

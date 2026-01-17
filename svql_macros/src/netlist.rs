@@ -102,13 +102,8 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! { &self.#ident }
     });
 
-    let wire_refs = parsed_fields.iter().map(|f| {
-        let ident = &f.ident;
-        quote! { &self.#ident }
-    });
-
     let expanded = quote! {
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct #struct_name #impl_generics #where_clause {
             pub path: ::svql_query::instance::Instance,
             #(#struct_fields),*

@@ -13,7 +13,7 @@ use rayon::prelude::*;
 /// - Top-level AND gate (write enable)
 /// - Recursive OR tree (bypass conditions)
 /// - NOT gate somewhere in the OR tree (negated lock signal)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct UnlockLogic<S>
 where
     S: State,
@@ -219,10 +219,11 @@ impl SearchableComponent for UnlockLogic<Search> {
                                 let mut group_satisfied = false;
                                 for (from, to) in group {
                                     if let (Some(f), Some(t)) = (from, to)
-                                        && validate_connection(f, t, haystack_index) {
-                                            group_satisfied = true;
-                                            break;
-                                        }
+                                        && validate_connection(f, t, haystack_index)
+                                    {
+                                        group_satisfied = true;
+                                        break;
+                                    }
                                 }
                                 if !group_satisfied {
                                     valid = false;

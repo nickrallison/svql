@@ -7,7 +7,7 @@ use subgraph::{GraphIndex, cell::CellWrapper};
 use crate::prelude::*;
 use crate::traits::{MatchedComponent, SearchableComponent, kind};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct RecOr<S>
 where
     S: State,
@@ -144,9 +144,10 @@ impl SearchableComponent for RecOr<Search> {
             layer_num += 1;
 
             if let Some(max) = config.max_recursion_depth
-                && layer_num > max {
-                    break;
-                }
+                && layer_num > max
+            {
+                break;
+            }
         }
 
         all_results

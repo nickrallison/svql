@@ -125,7 +125,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     let expanded_enum = quote! {
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub enum #enum_name #generics {
             #(#variant_defs),*,
             #[doc(hidden)]

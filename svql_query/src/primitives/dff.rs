@@ -10,7 +10,7 @@ use crate::State;
 macro_rules! impl_dff_primitive {
     ($name:ident, [$($port:ident),*], $filter:expr, $description:expr) => {
         #[doc = $description]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct $name<S: State> {
             /// The hierarchical path of this flip-flop instance.
             pub path: ::svql_query::Instance,

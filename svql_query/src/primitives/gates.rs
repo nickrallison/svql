@@ -16,7 +16,7 @@ macro_rules! define_primitive_gate {
         [$($port:ident),*]
     ) => {
         #[doc = concat!("A primitive ", stringify!($kind), " gate component.")]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct $name<S: State> {
             /// The hierarchical path of this gate instance.
             pub path: Instance,

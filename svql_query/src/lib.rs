@@ -72,9 +72,9 @@ where
 /// Components exist in two primary states:
 /// 1. `Search`: The initial state where components define the pattern to find.
 /// 2. `Match`: The result state where components hold references to design elements.
-pub trait State: Clone + std::fmt::Debug + PartialEq {
+pub trait State: Clone + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
     /// The internal data type held by a Wire in this state.
-    type WireInner: Clone + std::fmt::Debug + PartialEq;
+    type WireInner: Clone + std::fmt::Debug + PartialEq + Eq + std::hash::Hash;
 
     /// Helper to extract source location from the inner wire type.
     fn wire_source(inner: &Self::WireInner) -> Option<SourceLocation> {
@@ -84,7 +84,7 @@ pub trait State: Clone + std::fmt::Debug + PartialEq {
 }
 
 /// Represents a query in its search/definition phase.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Search;
 
 impl State for Search {
@@ -108,10 +108,10 @@ impl State for Match {
 /// `Wire` is a simple data container, not a searchable pattern.
 /// In `Search` state, it holds only a path. In `Match` state,
 /// it additionally holds information about the matched design cell.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Wire<S: State>
 where
-    S::WireInner: Clone + std::fmt::Debug + PartialEq,
+    S::WireInner: Clone + std::fmt::Debug + PartialEq + Eq,
 {
     /// Hierarchical path of the wire.
     pub path: Instance,
