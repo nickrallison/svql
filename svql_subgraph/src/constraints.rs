@@ -163,10 +163,10 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             }
 
             (Input(_p_name, _p_width), Input(_d_name, _d_width)) => {
-                return true;
+                true
             }
             (Input(_p_name, _p_width), _d_cell) => {
-                return true;
+                true
             }
             (_needle_cell, Cell::Other(_haystack_instance)) => {
                 todo!("Implement other cell fan-in matching")
@@ -193,7 +193,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             svql_common::MatchLength::First => {
                 let first_p_net = needle_nets_vec.first().unwrap();
                 let first_d_net = haystack_nets_vec.first().unwrap();
-                return self.nets_match_fan_in(first_p_net, first_d_net, mapping);
+                self.nets_match_fan_in(first_p_net, first_d_net, mapping)
             }
             svql_common::MatchLength::NeedleSubsetHaystack => {
                 for p_net in needle_nets_vec.iter() {
@@ -208,7 +208,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                         return false;
                     }
                 }
-                return true;
+                true
             }
             svql_common::MatchLength::Exact => {
                 if needle_nets_vec.len() != haystack_nets_vec.len() {
@@ -219,7 +219,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                         return false;
                     }
                 }
-                return true;
+                true
             }
         }
     }

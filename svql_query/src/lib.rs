@@ -9,7 +9,6 @@ extern crate self as svql_query;
 pub mod binding;
 pub mod composites;
 pub mod instance;
-pub mod ir;
 pub mod prelude;
 pub mod primitives;
 pub mod report;
@@ -27,6 +26,7 @@ pub use svql_common as common;
 pub use svql_subgraph as subgraph;
 
 use prelude::*;
+use traits::Hardware;
 
 /// A high-level helper to execute a query by type.
 ///
@@ -47,7 +47,6 @@ where
     let needle_ctx = P::context(driver, &config.needle_options)?;
 
     // 2. Add the Haystack to the context
-    // We assume the driver already has the design loaded at `key`
     let design_container = driver
         .get_design(key)
         .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
@@ -94,17 +93,7 @@ impl State for Search {
 
 /// Represents a query result bound to specific design elements.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Match {
-    /// Owned metadata about the matched cell in the target design.
-    pub cell: Option<subgraph::cell::CellInfo>,
-}
-
-impl Match {
-    /// Retrieves the source code location of the matched design element.
-    pub fn source(&self) -> Option<SourceLocation> {
-        self.cell.as_ref().and_then(|cell| cell.get_source())
-    }
-}
+pub struct Match;
 
 impl State for Match {
     type WireInner = Option<CellInfo>;
@@ -115,6 +104,10 @@ impl State for Match {
 }
 
 /// A logical connection point within a query component.
+///
+/// `Wire` is a simple data container, not a searchable pattern.
+/// In `Search` state, it holds only a path. In `Match` state,
+/// it additionally holds information about the matched design cell.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Wire<S: State>
 where
@@ -122,7 +115,7 @@ where
 {
     /// Hierarchical path of the wire.
     pub path: Instance,
-    /// State-specific data (empty for Search, CellWrapper for Match).
+    /// State-specific data (empty for Search, CellInfo for Match).
     pub inner: S::WireInner,
 }
 
@@ -138,26 +131,42 @@ impl<S: State> Wire<S> {
     }
 }
 
-impl<'ctx> Wire<Match> {
+impl Wire<Search> {
+    /// Creates a search wire at the given path.
+    pub fn search(path: Instance) -> Self {
+        Self::new(path, ())
+    }
+}
+
+impl Wire<Match> {
     /// Returns the matched cell associated with this wire.
     pub fn cell(&self) -> Option<&subgraph::cell::CellInfo> {
         self.inner.as_ref()
     }
+
+    /// Creates a match wire with the given cell info.
+    pub fn matched(path: Instance, cell: Option<CellInfo>) -> Self {
+        Self::new(path, cell)
+    }
 }
 
-use crate::traits::{Hardware, Matched, Pattern};
-
+/// Hardware implementation for Wire.
+///
+/// Wire implements Hardware so it can be returned in `children()` trait object vectors,
+/// but it is NOT a searchable component - it's just a data container.
 impl<S: State> Hardware for Wire<S> {
     type State = S;
 
     fn path(&self) -> &Instance {
         &self.path
     }
+
     fn type_name(&self) -> &'static str {
         "Wire"
     }
+
     fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
-        Vec::new()
+        Vec::new() // Wires are leaf nodes
     }
 
     fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
@@ -167,35 +176,6 @@ impl<S: State> Hardware for Wire<S> {
     fn source(&self) -> Option<SourceLocation> {
         S::wire_source(&self.inner)
     }
-}
-
-impl Pattern for Wire<Search> {
-    type Match = Wire<Match>;
-
-    fn instantiate(base_path: Instance) -> Self {
-        Wire::new(base_path, ())
-    }
-
-    fn context(
-        _driver: &Driver,
-        _config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        Ok(Context::default())
-    }
-
-    fn execute(
-        &self,
-        _driver: &Driver,
-        _context: &Context,
-        _key: &DriverKey,
-        _config: &Config,
-    ) -> Vec<Self::Match> {
-        vec![]
-    }
-}
-
-impl Matched for Wire<Match> {
-    type Search = Wire<Search>;
 }
 
 /// Represents a connection between two wires.

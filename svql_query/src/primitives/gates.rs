@@ -6,7 +6,7 @@
 use crate::common::{Config, ModuleConfig};
 use crate::driver::{Context, Driver, DriverKey};
 use crate::subgraph::cell::CellKind;
-use crate::traits::{Hardware, Matched, Pattern};
+use crate::traits::{Hardware, MatchedComponent, SearchableComponent, kind};
 use crate::{Instance, Match, ReportNode, Search, State, Wire};
 
 macro_rules! define_primitive_gate {
@@ -79,17 +79,18 @@ macro_rules! define_primitive_gate {
             }
         }
 
-        impl Pattern for $name<Search> {
+        impl SearchableComponent for $name<Search> {
+            type Kind = kind::Netlist;
             type Match = $name<Match>;
 
-            fn instantiate(base_path: Instance) -> Self {
+            fn create_at(base_path: Instance) -> Self {
                 Self {
                     path: base_path.clone(),
                     $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
                 }
             }
 
-            fn context(
+            fn build_context(
                 _driver: &Driver,
                 _config: &ModuleConfig
             ) -> Result<Context, Box<dyn std::error::Error>> {
@@ -97,7 +98,7 @@ macro_rules! define_primitive_gate {
             }
 
             /// Scans the design index for all cells matching the primitive type.
-            fn execute(
+            fn execute_search(
                 &self,
                 _driver: &Driver,
                 context: &Context,
@@ -136,7 +137,7 @@ macro_rules! define_primitive_gate {
             }
         }
 
-        impl Matched for $name<Match> {
+        impl MatchedComponent for $name<Match> {
             type Search = $name<Search>;
         }
     };

@@ -1,4 +1,36 @@
+//! Composite component traits and utilities.
+//!
+//! Provides traits for hierarchical pattern components.
+
 use crate::prelude::*;
+use crate::traits::component::{MatchedComponent, SearchableComponent, kind};
+
+/// Trait for composite pattern components.
+///
+/// Implemented by types generated with `#[composite]`. Composites combine
+/// multiple sub-patterns with connectivity constraints.
+pub trait CompositeComponent:
+    SearchableComponent<Kind = kind::Composite> + Topology<Search>
+{
+    /// Executes all submodule queries and constructs candidate matches.
+    ///
+    /// The implementation performs:
+    /// 1. Execution of each submodule query
+    /// 2. Cartesian product of sub-matches
+    /// 3. Filtering via `Topology` connectivity constraints
+    fn execute_submodules(
+        &self,
+        driver: &Driver,
+        context: &Context,
+        key: &DriverKey,
+        config: &Config,
+    ) -> Vec<Self::Match>;
+}
+
+/// Trait for the matched state of composite components.
+pub trait CompositeMatched: MatchedComponent + Topology<Match> {
+    type SearchType: CompositeComponent<Match = Self>;
+}
 
 /// Implemented by Composites to define internal connectivity.
 pub trait Topology<S: State> {
@@ -9,7 +41,20 @@ pub struct ConnectionBuilder<'a, S: State> {
     pub constraints: Vec<Vec<(Option<&'a Wire<S>>, Option<&'a Wire<S>>)>>,
 }
 
+impl<'a, S: State> Default for ConnectionBuilder<'a, S> {
+    fn default() -> Self {
+        Self {
+            constraints: Vec::new(),
+        }
+    }
+}
+
 impl<'a, S: State> ConnectionBuilder<'a, S> {
+    /// Creates a new empty connection builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Adds a mandatory connection.
     /// If either 'from' or 'to' is None, this constraint evaluates to FALSE.
     pub fn connect<A, B>(&mut self, from: A, to: B)
@@ -20,7 +65,7 @@ impl<'a, S: State> ConnectionBuilder<'a, S> {
         self.constraints.push(vec![(from.into(), to.into())]);
     }
 
-    /// Adds a flexible connection group (CNF).
+    /// Adds a flexible connection group (CNF clause).
     /// At least one pair in the list must be valid and connected.
     pub fn connect_any<A, B>(&mut self, options: &[(A, B)])
     where
@@ -36,17 +81,17 @@ impl<'a, S: State> ConnectionBuilder<'a, S> {
     }
 }
 
-impl Into<Connections> for ConnectionBuilder<'_, Search> {
-    fn into(self) -> Connections {
+impl From<ConnectionBuilder<'_, Search>> for Connections {
+    fn from(builder: ConnectionBuilder<'_, Search>) -> Self {
         Connections {
-            constraints: self
+            constraints: builder
                 .constraints
                 .iter()
                 .map(|group| {
                     group
                         .iter()
                         .map(|(from_opt, to_opt)| {
-                            (from_opt.map(|w| w.clone()), to_opt.map(|w| w.clone()))
+                            (from_opt.cloned(), to_opt.cloned())
                         })
                         .collect()
                 })
@@ -60,9 +105,7 @@ pub fn validate_composite<'ctx, T>(candidate: &T, haystack_index: &GraphIndex<'c
 where
     T: Topology<Match>,
 {
-    let mut builder = ConnectionBuilder {
-        constraints: Vec::new(),
-    };
+    let mut builder = ConnectionBuilder::new();
     candidate.define_connections(&mut builder);
 
     builder.constraints.iter().all(|group| {

@@ -40,15 +40,13 @@ impl ConnectivityGraph {
             let sink_wrapper: CellWrapper<'a> = sink_ref.into();
             sink_ref.visit(|net| {
                 if let Ok((source_ref, source_pin_idx)) = design.find_cell(net) {
-                    let source_ref_idx = cell_id_map
+                    let source_ref_idx = *cell_id_map
                         .get(&source_ref.debug_index())
-                        .expect("Source cell should be in map")
-                        .clone();
+                        .expect("Source cell should be in map");
 
-                    let sink_wrapper_idx = cell_id_map
+                    let sink_wrapper_idx = *cell_id_map
                         .get(&sink_wrapper.debug_index())
-                        .expect("Sink cell should be in map")
-                        .clone();
+                        .expect("Sink cell should be in map");
 
                     fanout_map
                         .entry(source_ref_idx)

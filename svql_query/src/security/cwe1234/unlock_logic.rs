@@ -1,6 +1,7 @@
 use crate::composites::rec_or::RecOr;
 
 use crate::prelude::*;
+use crate::traits::{MatchedComponent, SearchableComponent, kind};
 
 use common::{Config, ModuleConfig};
 use driver::{Context, Driver, DriverKey};
@@ -59,25 +60,26 @@ where
     }
 }
 
-impl Pattern for UnlockLogic<Search> {
+impl SearchableComponent for UnlockLogic<Search> {
+    type Kind = kind::Composite;
     type Match = UnlockLogic<Match>;
 
-    fn instantiate(base_path: Instance) -> Self {
+    fn create_at(base_path: Instance) -> Self {
         Self::new(base_path)
     }
 
-    fn context(
+    fn build_context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        let and_ctx = AndGate::<Search>::context(driver, config)?;
-        let or_ctx = RecOr::<Search>::context(driver, config)?;
-        let not_ctx = NotGate::<Search>::context(driver, config)?;
+        let and_ctx = AndGate::<Search>::build_context(driver, config)?;
+        let or_ctx = RecOr::<Search>::build_context(driver, config)?;
+        let not_ctx = NotGate::<Search>::build_context(driver, config)?;
 
         Ok(and_ctx.merge(or_ctx).merge(not_ctx))
     }
 
-    fn execute(
+    fn execute_search(
         &self,
         driver: &Driver,
         context: &Context,
@@ -216,12 +218,11 @@ impl Pattern for UnlockLogic<Search> {
                             for group in builder.constraints {
                                 let mut group_satisfied = false;
                                 for (from, to) in group {
-                                    if let (Some(f), Some(t)) = (from, to) {
-                                        if validate_connection(f, t, haystack_index) {
+                                    if let (Some(f), Some(t)) = (from, to)
+                                        && validate_connection(f, t, haystack_index) {
                                             group_satisfied = true;
                                             break;
                                         }
-                                    }
                                 }
                                 if !group_satisfied {
                                     valid = false;
@@ -245,7 +246,7 @@ impl Pattern for UnlockLogic<Search> {
     }
 }
 
-impl Matched for UnlockLogic<Match> {
+impl MatchedComponent for UnlockLogic<Match> {
     type Search = UnlockLogic<Search>;
 }
 

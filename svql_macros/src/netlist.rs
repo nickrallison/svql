@@ -102,6 +102,11 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! { &self.#ident }
     });
 
+    let wire_refs = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        quote! { &self.#ident }
+    });
+
     let expanded = quote! {
         #[derive(Clone, Debug)]
         pub struct #struct_name #impl_generics #where_clause {
@@ -109,6 +114,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#struct_fields),*
         }
 
+        // Hardware implementation (state-generic)
         impl #impl_generics ::svql_query::traits::Hardware for #struct_name #ty_generics #where_clause {
             type State = S;
 
@@ -120,33 +126,35 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Pattern for #search_type #spec_where_clause {
+        // SearchableComponent implementation (Search state)
+        impl #spec_impl_generics ::svql_query::traits::SearchableComponent for #search_type #spec_where_clause {
+            type Kind = ::svql_query::traits::kind::Netlist;
             type Match = #match_type;
 
-            fn instantiate(base_path: ::svql_query::instance::Instance) -> Self {
+            fn create_at(base_path: ::svql_query::instance::Instance) -> Self {
                 Self {
                     path: base_path.clone(),
                     #(#init_fields),*
                 }
             }
 
-            fn context(
+            fn build_context(
                 driver: &::svql_query::prelude::Driver,
                 options: &::svql_query::prelude::ModuleConfig
             ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
-                use ::svql_query::prelude::Netlist;
+                use ::svql_query::traits::NetlistComponent;
                 let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
                 Ok(::svql_query::prelude::Context::from_single(Self::driver_key(), design))
             }
 
-            fn execute(
+            fn execute_search(
                 &self,
                 driver: &::svql_query::prelude::Driver,
                 context: &::svql_query::prelude::Context,
                 key: &::svql_query::prelude::DriverKey,
                 config: &::svql_query::prelude::Config
             ) -> Vec<Self::Match> {
-                use ::svql_query::prelude::{Netlist, execute_netlist_query};
+                use ::svql_query::traits::{NetlistComponent, execute_netlist_query};
                 use ::svql_query::prelude::PortResolver;
 
                 let assignments = execute_netlist_query(self, context, key, config);
@@ -154,21 +162,36 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let resolver = PortResolver::new(needle_container.index());
 
                 assignments.items.iter().map(|assignment| {
-                    #struct_name {
-                        path: self.path.clone(),
-                        #(#match_fields),*
-                    }
+                    self.bind_match(&resolver, assignment)
                 }).collect()
             }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::netlist::Netlist for #search_type #spec_where_clause {
+        // NetlistComponent implementation (Search state)
+        impl #spec_impl_generics ::svql_query::traits::NetlistComponent for #search_type #spec_where_clause {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
+
+            fn bind_match(
+                &self,
+                resolver: &::svql_query::prelude::PortResolver,
+                assignment: &::svql_query::prelude::SingleAssignment,
+            ) -> Self::Match {
+                #struct_name {
+                    path: self.path.clone(),
+                    #(#match_fields),*
+                }
+            }
         }
 
-        impl #spec_impl_generics ::svql_query::traits::Matched for #match_type #spec_where_clause {
+        // MatchedComponent implementation (Match state)
+        impl #spec_impl_generics ::svql_query::traits::MatchedComponent for #match_type #spec_where_clause {
             type Search = #search_type;
+        }
+
+        // NetlistMatched implementation (Match state)
+        impl #spec_impl_generics ::svql_query::traits::NetlistMatched for #match_type #spec_where_clause {
+            type SearchType = #search_type;
         }
     };
 

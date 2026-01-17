@@ -4,41 +4,35 @@
 //! flip-flops, including those with synchronous/asynchronous resets and
 //! clock enables.
 
-use crate::common::{Config, ModuleConfig};
-use crate::driver::{Context, Driver, DriverKey};
-use crate::subgraph::cell::CellKind;
-use crate::traits::{Hardware, Matched, Pattern};
-use crate::{Instance, Match, ReportNode, Search, State, Wire};
+use crate::State;
 
 #[macro_export]
 macro_rules! impl_dff_primitive {
     ($name:ident, [$($port:ident),*], $filter:expr, $description:expr) => {
-        #[allow(unused_imports)]
-        use crate::prelude::*;
         #[doc = $description]
         #[derive(Clone, Debug)]
         pub struct $name<S: State> {
             /// The hierarchical path of this flip-flop instance.
-            pub path: Instance,
+            pub path: ::svql_query::Instance,
             $(
                 #[doc = concat!("The ", stringify!($port), " port wire.")]
-                pub $port: Wire<S>
+                pub $port: ::svql_query::Wire<S>
             ),*
         }
 
         impl<S: State> $name<S> {
             $(
                 #[doc = concat!("Returns a reference to the ", stringify!($port), " port.")]
-                pub fn $port(&self) -> Option<&Wire<S>> {
+                pub fn $port(&self) -> Option<&::svql_query::Wire<S>> {
                     Some(&self.$port)
                 }
             )*
         }
 
-        impl<S: State> Hardware for $name<S> {
+        impl<S: State> ::svql_query::Hardware for $name<S> {
             type State = S;
 
-            fn path(&self) -> &Instance {
+            fn path(&self) -> &::svql_query::Instance {
                 &self.path
             }
 
@@ -46,11 +40,11 @@ macro_rules! impl_dff_primitive {
                 stringify!($name)
             }
 
-            fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
+            fn children(&self) -> Vec<&dyn ::svql_query::Hardware<State = Self::State>> {
                 vec![ $( &self.$port ),* ]
             }
 
-            fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
+            fn find_port(&self, path: &::svql_query::Instance) -> Option<&::svql_query::Wire<S>> {
                 if !path.starts_with(self.path()) {
                     return None;
                 }
@@ -62,13 +56,13 @@ macro_rules! impl_dff_primitive {
                 }
             }
 
-            fn report(&self, name: &str) -> ReportNode {
+            fn report(&self, name: &str) -> ::svql_query::ReportNode {
                 let source_loc = [$(self.$port.source()),*]
                     .into_iter()
                     .flatten()
                     .next();
 
-                ReportNode {
+                ::svql_query::ReportNode {
                     name: name.to_string(),
                     type_name: stringify!($name).to_string(),
                     path: self.path.clone(),
@@ -79,34 +73,35 @@ macro_rules! impl_dff_primitive {
             }
         }
 
-        impl Pattern for $name<Search> {
-            type Match = $name<Match>;
+        impl ::svql_query::traits::SearchableComponent for $name<::svql_query::Search> {
+            type Kind = ::svql_query::kind::Netlist;
+            type Match = $name<::svql_query::Match>;
 
-            fn instantiate(base_path: Instance) -> Self {
+            fn create_at(base_path: ::svql_query::Instance) -> Self {
                 Self {
                     path: base_path.clone(),
-                    $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
+                    $($port: ::svql_query::Wire::new(base_path.child(stringify!($port)), ()),)*
                 }
             }
 
-            fn context(
-                _driver: &Driver,
-                _options: &ModuleConfig
-            ) -> Result<Context, Box<dyn std::error::Error>> {
-                Ok(Context::new())
+            fn build_context(
+                _driver: &::svql_driver::Driver,
+                _options: &::svql_common::ModuleConfig
+            ) -> Result<::svql_query::Context, Box<dyn std::error::Error>> {
+                Ok(::svql_query::Context::new())
             }
 
-            fn execute(
+            fn execute_search(
                 &self,
-                _driver: &Driver,
-                context: &Context,
-                key: &DriverKey,
-                _config: &Config
+                _driver: &::svql_driver::Driver,
+                context: &::svql_query::Context,
+                key: &::svql_driver::DriverKey,
+                _config: &::svql_common::Config
             ) -> Vec<Self::Match> {
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
 
-                let matches: Vec<_> = index.cells_of_type_iter(CellKind::Dff)
+                let matches: Vec<_> = index.cells_of_type_iter(::svql_query::CellKind::Dff)
                     .into_iter()
                     .flatten()
                     .filter(|cell_wrapper| {
@@ -121,17 +116,16 @@ macro_rules! impl_dff_primitive {
                     .map(|cell| {
                         $name {
                             path: self.path.clone(),
-                            $($port: Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
+                            $($port: ::svql_query::Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
                         }
                     })
-
                     .collect();
                 matches
             }
         }
 
-        impl Matched for $name<Match> {
-            type Search = $name<Search>;
+        impl ::svql_query::traits::MatchedComponent for $name<::svql_query::Match> {
+            type Search = $name<::svql_query::Search>;
         }
     };
 }

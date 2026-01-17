@@ -40,17 +40,16 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         for field in &fields.named {
             let ident = field.ident.clone().unwrap();
 
-            // Skip "path" if the user manually added it, as we inject it automatically now
+            // Skip "path" if the user manually added it
             if ident == "path" {
                 continue;
             }
 
-            let mut kind = FieldKind::Wire; // Default
+            let mut kind = FieldKind::Wire;
             for attr in &field.attrs {
                 if attr.path().is_ident("submodule") {
                     kind = FieldKind::Submodule;
                 }
-                // We ignore #[path] attributes now as the field is auto-generated
             }
 
             fields_info.push(CompositeField {
@@ -79,7 +78,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 let ty = &f.ty;
                 let search_ty = common::replace_state_generic(ty);
                 quote! {
-                   #ident: <#search_ty as ::svql_query::traits::Pattern>::instantiate(base_path.child(#name_str))
+                   #ident: <#search_ty as ::svql_query::traits::SearchableComponent>::create_at(base_path.child(#name_str))
                 }
             },
             FieldKind::Wire => quote! {
@@ -97,7 +96,8 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         match f.kind {
             FieldKind::Submodule => {
                 query_calls.push(quote! {
-                    let #ident = self.#ident.execute(driver, context, key, config);
+                    let #ident = self.#ident.execute_search(driver, context, key, config);
+
                 });
                 query_vars.push(ident);
                 construct_fields.push(quote! { #ident: #ident });
@@ -120,7 +120,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             let ty = &f.ty;
             let search_ty = common::replace_state_generic(ty);
             Some(quote! {
-                let sub_ctx = <#search_ty>::context(driver, options)?;
+                let sub_ctx = <#search_ty as ::svql_query::traits::SearchableComponent>::build_context(driver, options)?;
                 ctx = ctx.merge(sub_ctx);
             })
         } else {
@@ -135,6 +135,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             #(#struct_fields),*
         }
 
+        // Hardware implementation (state-generic)
         impl #impl_generics ::svql_query::prelude::Hardware for #struct_name #ty_generics #where_clause {
             type State = S;
 
@@ -151,17 +152,19 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #spec_impl_generics ::svql_query::prelude::Pattern for #search_type #spec_where_clause {
+        // SearchableComponent implementation (Search state)
+        impl #spec_impl_generics ::svql_query::traits::SearchableComponent for #search_type #spec_where_clause {
+            type Kind = ::svql_query::traits::kind::Composite;
             type Match = #match_type;
 
-            fn instantiate(base_path: ::svql_query::prelude::Instance) -> Self {
+            fn create_at(base_path: ::svql_query::prelude::Instance) -> Self {
                 Self {
                     path: base_path.clone(),
                     #(#instantiate_fields),*
                 }
             }
 
-            fn context(
+            fn build_context(
                 driver: &::svql_query::prelude::Driver,
                 options: &::svql_query::prelude::ModuleConfig
             ) -> Result<::svql_query::prelude::Context, Box<dyn std::error::Error>> {
@@ -170,7 +173,21 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 Ok(ctx)
             }
 
-            fn execute(
+            fn execute_search(
+                &self,
+                driver: &::svql_query::prelude::Driver,
+                context: &::svql_query::prelude::Context,
+                key: &::svql_query::prelude::DriverKey,
+                config: &::svql_query::prelude::Config
+            ) -> Vec<Self::Match> {
+                use ::svql_query::traits::CompositeComponent;
+                self.execute_submodules(driver, context, key, config)
+            }
+        }
+
+        // CompositeComponent implementation (Search state)
+        impl #spec_impl_generics ::svql_query::traits::CompositeComponent for #search_type #spec_where_clause {
+            fn execute_submodules(
                 &self,
                 driver: &::svql_query::prelude::Driver,
                 context: &::svql_query::prelude::Context,
@@ -178,6 +195,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 config: &::svql_query::prelude::Config
             ) -> Vec<Self::Match> {
                 use ::svql_query::prelude::validate_composite;
+                use ::svql_query::traits::SearchableComponent;
 
                 // 1. Execute sub-queries
                 #(#query_calls)*
@@ -197,8 +215,14 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #spec_impl_generics ::svql_query::prelude::Matched for #match_type #spec_where_clause {
+        // MatchedComponent implementation (Match state)
+        impl #spec_impl_generics ::svql_query::traits::MatchedComponent for #match_type #spec_where_clause {
             type Search = #search_type;
+        }
+
+        // CompositeMatched implementation (Match state)
+        impl #spec_impl_generics ::svql_query::traits::CompositeMatched for #match_type #spec_where_clause {
+            type SearchType = #search_type;
         }
     };
 

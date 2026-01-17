@@ -3,6 +3,7 @@ use driver::{Context, Driver, DriverKey};
 use subgraph::GraphIndex;
 
 use crate::prelude::*;
+use crate::traits::{MatchedComponent, SearchableComponent, kind};
 
 #[derive(Debug, Clone)]
 pub struct RecAnd<S>
@@ -73,21 +74,22 @@ where
     }
 }
 
-impl Pattern for RecAnd<Search> {
+impl SearchableComponent for RecAnd<Search> {
+    type Kind = kind::Composite;
     type Match = RecAnd<Match>;
 
-    fn instantiate(base_path: Instance) -> Self {
+    fn create_at(base_path: Instance) -> Self {
         Self::new(base_path)
     }
 
-    fn context(
+    fn build_context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        AndGate::<Search>::context(driver, config)
+        AndGate::<Search>::build_context(driver, config)
     }
 
-    fn execute(
+    fn execute_search(
         &self,
         driver: &Driver,
         context: &Context,
@@ -152,8 +154,8 @@ impl Pattern for RecAnd<Search> {
             current_layer = next_layer;
             layer_num += 1;
 
-            if let Some(max) = config.max_recursion_depth {
-                if layer_num > max {
+            if let Some(max) = config.max_recursion_depth
+                && layer_num > max {
                     tracing::event!(
                         tracing::Level::INFO,
                         "RecAnd::execute: Reached max recursion depth of {}, stopping",
@@ -161,7 +163,6 @@ impl Pattern for RecAnd<Search> {
                     );
                     break;
                 }
-            }
         }
 
         tracing::event!(
@@ -175,7 +176,7 @@ impl Pattern for RecAnd<Search> {
     }
 }
 
-impl Matched for RecAnd<Match> {
+impl MatchedComponent for RecAnd<Match> {
     type Search = RecAnd<Search>;
 }
 

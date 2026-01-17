@@ -5,6 +5,7 @@ use driver::{Context, Driver, DriverKey};
 use subgraph::{GraphIndex, cell::CellWrapper};
 
 use crate::prelude::*;
+use crate::traits::{MatchedComponent, SearchableComponent, kind};
 
 #[derive(Debug, Clone)]
 pub struct RecOr<S>
@@ -73,21 +74,22 @@ where
     }
 }
 
-impl Pattern for RecOr<Search> {
+impl SearchableComponent for RecOr<Search> {
+    type Kind = kind::Composite;
     type Match = RecOr<Match>;
 
-    fn instantiate(base_path: Instance) -> Self {
+    fn create_at(base_path: Instance) -> Self {
         Self::new(base_path)
     }
 
-    fn context(
+    fn build_context(
         driver: &Driver,
         config: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>> {
-        OrGate::<Search>::context(driver, config)
+        OrGate::<Search>::build_context(driver, config)
     }
 
-    fn execute(
+    fn execute_search(
         &self,
         driver: &Driver,
         context: &Context,
@@ -141,18 +143,17 @@ impl Pattern for RecOr<Search> {
             current_layer = next_layer;
             layer_num += 1;
 
-            if let Some(max) = config.max_recursion_depth {
-                if layer_num > max {
+            if let Some(max) = config.max_recursion_depth
+                && layer_num > max {
                     break;
                 }
-            }
         }
 
         all_results
     }
 }
 
-impl Matched for RecOr<Match> {
+impl MatchedComponent for RecOr<Match> {
     type Search = RecOr<Search>;
 }
 

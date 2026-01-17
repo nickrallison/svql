@@ -630,15 +630,14 @@ fn extract_summary(query: &str, design: &str, node: ReportNode) -> MatchSummary 
 }
 
 fn collect_locations(node: &ReportNode, set: &mut HashSet<Location>) {
-    if let Some(loc) = &node.source_loc {
-        if !loc.lines.is_empty() {
+    if let Some(loc) = &node.source_loc
+        && !loc.lines.is_empty() {
             set.insert(Location {
                 subquery: node.name.clone(),
                 file: loc.file.to_string(),
                 lines: loc.lines.iter().map(|l| l.number).collect(),
             });
         }
-    }
 
     node.children
         .iter()

@@ -1,25 +1,32 @@
+//! Variant component traits and utilities.
+//!
+//! Provides traits for polymorphic pattern components.
+
 use crate::prelude::*;
+use crate::traits::component::{MatchedComponent, SearchableComponent, kind};
 
-pub trait Variant<S>
-where
-    S: State,
-{
-}
+/// Trait for variant (polymorphic) pattern components.
+///
+/// Implemented by types generated with `#[variant]`. Variants allow a single
+/// query point to match multiple different underlying implementations.
+pub trait VariantComponent: SearchableComponent<Kind = kind::Variant> {
+    /// Names of the common ports exposed across all variants.
+    const COMMON_PORTS: &'static [&'static str];
 
-pub trait SearchableVariant: Variant<Search> {
-    type Hit<'ctx>;
-
-    fn context(
+    /// Executes searches for all variant types and aggregates results.
+    fn search_variants(
+        &self,
         driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>>;
-
-    fn query<'ctx>(
-        haystack_key: &DriverKey,
-        context: &'ctx Context,
-        path: Instance,
+        context: &Context,
+        key: &DriverKey,
         config: &Config,
-    ) -> Vec<Self::Hit<'ctx>>;
+    ) -> Vec<Self::Match>;
 }
 
-pub trait MatchedVariant<'ctx>: Variant<Match> {}
+/// Trait for the matched state of variant components.
+pub trait VariantMatched: MatchedComponent {
+    type SearchType: VariantComponent<Match = Self>;
+
+    /// Returns which variant was matched.
+    fn variant_name(&self) -> &'static str;
+}

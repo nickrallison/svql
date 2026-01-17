@@ -3,9 +3,19 @@
 //! Defines the interfaces that all netlists, composites, and variants must
 //! implement to participate in the SVQL query system.
 
+pub mod component;
 pub mod composite;
 pub mod netlist;
 pub mod variant;
+
+// Re-export key traits
+pub use component::{MatchedComponent, SearchableComponent, kind};
+pub use composite::{
+    CompositeComponent, CompositeMatched, ConnectionBuilder, Connections, Topology,
+    validate_composite,
+};
+pub use netlist::{NetlistComponent, NetlistMatched, execute_netlist_query, report_netlist};
+pub use variant::{VariantComponent, VariantMatched};
 
 use crate::prelude::*;
 
@@ -29,11 +39,10 @@ pub trait Hardware: std::fmt::Debug {
             return None;
         }
         for child in self.children() {
-            if path.starts_with(child.path()) {
-                if let Some(port) = child.find_port(path) {
+            if path.starts_with(child.path())
+                && let Some(port) = child.find_port(path) {
                     return Some(port);
                 }
-            }
         }
         None
     }
@@ -63,6 +72,9 @@ pub trait Hardware: std::fmt::Debug {
 }
 
 /// Defines a pattern that can be instantiated and searched within a design.
+///
+/// **Note:** This trait has a blanket implementation for all types implementing
+/// `SearchableComponent`. Manual implementation is only required for custom patterns.
 pub trait Pattern: Hardware<State = Search> + Sized + Clone {
     /// The corresponding result type in the Match state.
     type Match: Matched<Search = Self>;
@@ -87,6 +99,9 @@ pub trait Pattern: Hardware<State = Search> + Sized + Clone {
 }
 
 /// Represents a query result bound to specific design elements.
+///
+/// **Note:** This trait has a blanket implementation for all types implementing
+/// `MatchedComponent`. Manual implementation is only required for custom patterns.
 pub trait Matched: Hardware<State = Match> + Sized + Clone {
     /// The corresponding pattern type in the Search state.
     type Search: Pattern<Match = Self>;

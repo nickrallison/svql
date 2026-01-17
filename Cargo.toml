@@ -26,6 +26,14 @@ default-members = [
     "svql_common",
 ]
 
+[workspace.package]
+authors = []
+edition = "2024"
+# license = "0BSD OR Apache-2.0"
+repository = "https://github.com/nickrallison/svql"
+rust-version = "1.87"
+version = "0.1.0"
+
 [workspace.dependencies]
 ###############
 # SVQL

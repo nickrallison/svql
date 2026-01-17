@@ -5,19 +5,33 @@ pub use svql_subgraph as subgraph;
 pub use tracing;
 
 pub use crate::{
-    Connection, Match, Search, State, Wire,
-    binding::PortResolver,
-    execute_query,
-    instance::Instance,
-    primitives::dff::*,
-    primitives::gates::*,
-    report::ReportNode,
-    traits::validate_connection,
-    traits::{
-        Hardware, Matched, Pattern,
-        composite::{ConnectionBuilder, Topology, validate_composite},
-        netlist::{Netlist, execute_netlist_query},
-    },
+    Connection, Match, Search, State, Wire, binding::PortResolver, execute_query,
+    instance::Instance, primitives::dff::*, primitives::gates::*, report::ReportNode,
+};
+
+// Trait re-exports
+pub use crate::traits::{
+    // Composite traits
+    CompositeComponent,
+    CompositeMatched,
+    ConnectionBuilder,
+    Hardware,
+    Matched,
+    MatchedComponent,
+    // Netlist traits
+    NetlistComponent,
+    NetlistMatched,
+    Pattern,
+    // Component traits
+    SearchableComponent,
+    Topology,
+    // Variant traits
+    VariantComponent,
+    VariantMatched,
+    execute_netlist_query,
+    kind,
+    validate_composite,
+    validate_connection,
 };
 
 pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};

@@ -147,7 +147,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
         let is_root = assignment.is_empty();
 
-        if total % 512 == 0 && total > 0 {
+        if total.is_multiple_of(512) && total > 0 {
             let active = self.active_branches.load(Ordering::Relaxed);
             let found = self.matches_found.load(Ordering::Relaxed);
             let top_done = self.initial_candidates_done.load(Ordering::Relaxed);
@@ -330,11 +330,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
                 self.haystack_index
                     .fanout_set(candidate)
-                    .map_or(false, |fanout| {
+                    .is_some_and(|fanout| {
                         fanout.iter().all(|haystack_succ| {
                             next_assignment
                                 .get_needle_cell(haystack_succ.clone())
-                                .map_or(true, |needle_succ| {
+                                .is_none_or(|needle_succ| {
                                     self.check_fanin_constraints(
                                         needle_succ,
                                         haystack_succ.clone(),
