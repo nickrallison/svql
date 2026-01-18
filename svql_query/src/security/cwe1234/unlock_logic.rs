@@ -254,8 +254,8 @@ impl MatchedComponent for UnlockLogic<Match> {
 // --- Dehydrate/Rehydrate implementations ---
 
 use crate::session::{
-    Dehydrate, Rehydrate, DehydratedRow, MatchRow, QuerySchema, 
-    WireFieldDesc, SubmoduleFieldDesc, RehydrateContext, SessionError
+    Dehydrate, Rehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, 
+    WireFieldDesc, SubmoduleFieldDesc, RehydrateContext, SearchDehydrate, SessionError
 };
 
 impl Dehydrate for UnlockLogic<Match> {
@@ -318,6 +318,136 @@ impl Rehydrate for UnlockLogic<Match> {
         let rec_or = RecOr::rehydrate_by_index(rec_or_idx, ctx)?;
         
         Ok(UnlockLogic { path, top_and, rec_or, not_gate })
+    }
+}
+
+impl SearchDehydrate for UnlockLogic<Search> {
+    const MATCH_SCHEMA: QuerySchema = <UnlockLogic<Match> as Dehydrate>::SCHEMA;
+
+    fn execute_dehydrated(
+        &self,
+        driver: &Driver,
+        context: &Context,
+        key: &DriverKey,
+        config: &Config,
+        results: &mut DehydratedResults,
+    ) -> Vec<u32> {
+        tracing::info!("UnlockLogic::execute_dehydrated: starting CWE1234 unlock pattern search");
+
+        let haystack_index = context.get(key).unwrap().index();
+
+        // Execute dehydrated searches for submodules
+        let and_indices = self.top_and.execute_dehydrated(driver, context, key, config, results);
+        let rec_or_indices = self.rec_or.execute_dehydrated(driver, context, key, config, results);
+        let not_indices = self.not_gate.execute_dehydrated(driver, context, key, config, results);
+
+        // Get the tables we need to read from
+        let and_table = results.tables.get("AndGate").cloned().unwrap_or_default();
+        let rec_or_table = results.tables.get("RecOr").cloned().unwrap_or_default();
+        let not_table = results.tables.get("NotGate").cloned().unwrap_or_default();
+
+        tracing::info!(
+            "UnlockLogic::execute_dehydrated: Found {} AND gates, {} RecOR trees, {} NOT gates",
+            and_indices.len(),
+            rec_or_indices.len(),
+            not_indices.len()
+        );
+
+        // Find (RecOr, AND) pairs where RecOr output connects to AND input
+        let mut rec_or_and_pairs: Vec<(u32, u32)> = Vec::new();
+
+        for &rec_or_idx in &rec_or_indices {
+            if let Some(rec_or_row) = rec_or_table.get(rec_or_idx as usize) {
+                let rec_or_y = rec_or_row.wire("or_y");
+                if let Some(rec_or_y_id) = rec_or_y {
+                    if let Some(from_wrapper) = haystack_index.get_cell_by_id(rec_or_y_id as usize) {
+                        let fanout = haystack_index.fanout_set(&from_wrapper);
+
+                        for &and_idx in &and_indices {
+                            if let Some(and_row) = and_table.get(and_idx as usize) {
+                                let connected = [and_row.wire("a"), and_row.wire("b")].iter().any(|wire| {
+                                    if let Some(wire_id) = wire {
+                                        if let Some(to_wrapper) = haystack_index.get_cell_by_id(*wire_id as usize) {
+                                            return fanout.as_ref().map(|f| f.contains(&to_wrapper)).unwrap_or(false);
+                                        }
+                                    }
+                                    false
+                                });
+
+                                if connected {
+                                    rec_or_and_pairs.push((rec_or_idx, and_idx));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::info!(
+            "UnlockLogic::execute_dehydrated: Found {} valid (RecOr, AND) pairs",
+            rec_or_and_pairs.len()
+        );
+
+        // For each (RecOr, AND) pair, check if any NOT gate's output is in RecOr's fanin
+        let mut result_indices: Vec<u32> = Vec::new();
+
+        for (rec_or_idx, and_idx) in rec_or_and_pairs {
+            // We need to compute rec_or's fanin set - this requires walking the tree
+            // For now, check if not_y connects to any or_a or or_b in the tree
+            // This is a simplified check - we just check direct connectivity
+
+            if let Some(and_row) = and_table.get(and_idx as usize) {
+                if let Some(rec_or_row) = rec_or_table.get(rec_or_idx as usize) {
+                    // Get the root OR gate's inputs
+                    let or_a = rec_or_row.wire("or_a");
+                    let or_b = rec_or_row.wire("or_b");
+
+                    for &not_idx in &not_indices {
+                        if let Some(not_row) = not_table.get(not_idx as usize) {
+                            let not_y = not_row.wire("y");
+
+                            if let Some(not_y_id) = not_y {
+                                if let Some(from_wrapper) = haystack_index.get_cell_by_id(not_y_id as usize) {
+                                    let fanout = haystack_index.fanout_set(&from_wrapper);
+
+                                    // Check if not_y connects to rec_or's OR inputs
+                                    let connected_to_or = [or_a, or_b].iter().any(|wire| {
+                                        if let Some(wire_id) = wire {
+                                            if let Some(to_wrapper) = haystack_index.get_cell_by_id(*wire_id as usize) {
+                                                return fanout.as_ref().map(|f| f.contains(&to_wrapper)).unwrap_or(false);
+                                            }
+                                        }
+                                        false
+                                    });
+
+                                    if connected_to_or {
+                                        // Create the UnlockLogic dehydrated row
+                                        let row = DehydratedRow::new(self.path.to_string())
+                                            .with_wire("top_and_a", and_row.wire("a"))
+                                            .with_wire("top_and_b", and_row.wire("b"))
+                                            .with_wire("top_and_y", and_row.wire("y"))
+                                            .with_wire("not_a", not_row.wire("a"))
+                                            .with_wire("not_y", not_y)
+                                            .with_submodule("rec_or", rec_or_idx);
+                                        
+                                        let idx = results.push("UnlockLogic", row);
+                                        result_indices.push(idx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::info!(
+            "UnlockLogic::execute_dehydrated: Found {} final valid patterns",
+            result_indices.len()
+        );
+
+        result_indices
     }
 }
 

@@ -5,6 +5,7 @@
 
 use crate::common::{Config, ModuleConfig};
 use crate::driver::{Context, Driver, DriverKey};
+use crate::session::{DehydratedResults, DehydratedRow, SearchDehydrate};
 use crate::subgraph::cell::CellKind;
 use crate::traits::{Hardware, MatchedComponent, SearchableComponent, kind};
 use crate::{Instance, Match, ReportNode, Search, State, Wire};
@@ -140,7 +141,7 @@ macro_rules! define_primitive_gate {
         impl MatchedComponent for $name<Match> {
             type Search = $name<Search>;
         }
-        
+
         impl crate::session::Dehydrate for $name<Match> {
             const SCHEMA: crate::session::QuerySchema = crate::session::QuerySchema::new(
                 stringify!($name),
@@ -149,7 +150,7 @@ macro_rules! define_primitive_gate {
                 ],
                 &[],
             );
-            
+
             fn dehydrate(&self) -> crate::session::DehydratedRow {
                 let mut row = crate::session::DehydratedRow::new(self.path.to_string());
                 $(
@@ -158,10 +159,10 @@ macro_rules! define_primitive_gate {
                 row
             }
         }
-        
+
         impl crate::session::Rehydrate for $name<Match> {
             const TYPE_NAME: &'static str = stringify!($name);
-            
+
             fn rehydrate(
                 row: &crate::session::MatchRow,
                 ctx: &crate::session::RehydrateContext<'_>,
@@ -173,6 +174,49 @@ macro_rules! define_primitive_gate {
                         $port: ctx.rehydrate_wire(path.child(stringify!($port)), row.wire(stringify!($port))),
                     )*
                 })
+            }
+        }
+
+        impl SearchDehydrate for $name<Search> {
+            const MATCH_SCHEMA: crate::session::QuerySchema = <$name<Match> as crate::session::Dehydrate>::SCHEMA;
+
+            fn execute_dehydrated(
+                &self,
+                _driver: &Driver,
+                context: &Context,
+                key: &DriverKey,
+                config: &Config,
+                results: &mut DehydratedResults,
+            ) -> Vec<u32> {
+                // Register our schema
+                results.register_schema(stringify!($name), &Self::MATCH_SCHEMA);
+
+                let haystack = context.get(key).expect("Haystack missing from context");
+                let index = haystack.index();
+
+                match config.dedupe {
+                    crate::common::Dedupe::All => { /* All Cells Deduplicated */ }
+                    _ => {
+                        if config.dedupe != crate::common::Dedupe::None {
+                            crate::tracing::warn!(
+                                "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
+                                self.type_name(),
+                                config.dedupe
+                            );
+                        }
+                    }
+                }
+
+                index.cells_of_type_iter(CellKind::$kind)
+                    .into_iter()
+                    .flatten()
+                    .map(|cell| {
+                        let cell_id = cell.to_info().id as u32;
+                        let row = DehydratedRow::new(self.path.to_string())
+                            $(.with_wire(stringify!($port), Some(cell_id)))*;
+                        results.push(stringify!($name), row)
+                    })
+                    .collect()
             }
         }
     };

@@ -7,17 +7,21 @@
 //! - Efficient columnar storage of dehydrated matches
 
 mod design_frame;
+mod foreign_key;
 mod rehydrate;
 mod result_store;
+mod search_dehydrate;
 
 pub use design_frame::{CellRow, DesignFrame};
+pub use foreign_key::{ForeignKey, ForeignKeyTarget};
 pub use rehydrate::{
     MatchRef, Rehydrate, RehydrateContext, RehydrateIter, SessionRehydrateExt, WireRef,
 };
 pub use result_store::{
-    Dehydrate, DehydratedRow, MatchRow, QueryResults, QuerySchema, RecursiveFieldDesc, ResultStore,
-    SubmoduleFieldDesc, WireFieldDesc,
+    Dehydrate, DehydratedResults, DehydratedRow, MatchRow, QueryResults, QuerySchema,
+    RecursiveFieldDesc, ResultStore, SubmoduleFieldDesc, WireFieldDesc,
 };
+pub use search_dehydrate::SearchDehydrate;
 
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -160,6 +164,39 @@ impl SessionBuilder {
         let type_name = <P::Match as Dehydrate>::SCHEMA.type_name.to_string();
         self.pending_results
             .insert(TypeId::of::<P>(), (type_name, results));
+        self
+    }
+
+    /// Adds multiple query results from a HashMap (for direct dehydration).
+    ///
+    /// This is used when results come from `SearchDehydrate::execute_dehydrated`
+    /// which produces results for multiple types (main query + submodules).
+    pub fn with_results_map<P>(mut self, results_map: HashMap<String, QueryResults>) -> Self
+    where
+        P: Pattern + 'static,
+        P::Match: Dehydrate,
+    {
+        // Insert the main query type with its proper TypeId
+        let main_type_name = <P::Match as Dehydrate>::SCHEMA.type_name.to_string();
+        if let Some(main_results) = results_map.get(&main_type_name) {
+            self.pending_results.insert(
+                TypeId::of::<P>(),
+                (main_type_name.clone(), main_results.clone()),
+            );
+        }
+
+        // Insert submodule results with generated TypeIds (keyed by name)
+        for (type_name, results) in results_map {
+            if type_name != main_type_name {
+                // Use a placeholder TypeId for submodules (they don't have a Rust type)
+                // These can only be looked up by name, not by type
+                // Note: We store these for name-based lookup, TypeId won't match any real type
+                self.pending_results.insert(
+                    TypeId::of::<()>(), // Placeholder - these are looked up by name
+                    (type_name, results),
+                );
+            }
+        }
         self
     }
 

@@ -10,8 +10,9 @@ use std::collections::HashMap;
 
 use polars::prelude::*;
 
-use crate::traits::Pattern;
 use super::SessionError;
+use super::foreign_key::ForeignKey;
+use crate::traits::Pattern;
 
 /// Descriptor for a wire field in a query type.
 #[derive(Debug, Clone)]
@@ -57,9 +58,14 @@ impl QuerySchema {
         wires: &'static [WireFieldDesc],
         submodules: &'static [SubmoduleFieldDesc],
     ) -> Self {
-        Self { type_name, wires, submodules, recursive_child: None }
+        Self {
+            type_name,
+            wires,
+            submodules,
+            recursive_child: None,
+        }
     }
-    
+
     /// Creates a new schema descriptor with a recursive child field.
     pub const fn with_recursive_child(
         type_name: &'static str,
@@ -67,7 +73,12 @@ impl QuerySchema {
         submodules: &'static [SubmoduleFieldDesc],
         recursive_child: &'static RecursiveFieldDesc,
     ) -> Self {
-        Self { type_name, wires, submodules, recursive_child: Some(recursive_child) }
+        Self {
+            type_name,
+            wires,
+            submodules,
+            recursive_child: Some(recursive_child),
+        }
     }
 }
 
@@ -111,13 +122,21 @@ impl DehydratedRow {
         self.submodules.insert(name, match_idx);
         self
     }
-    
+
+    /// Sets a submodule reference using a typed foreign key.
+    ///
+    /// This is the preferred method when you have a `ForeignKey<T>`.
+    pub fn with_submodule_fk<T>(mut self, name: &'static str, fk: ForeignKey<T>) -> Self {
+        self.submodules.insert(name, fk.raw());
+        self
+    }
+
     /// Sets the recursive child index.
     pub fn with_child(mut self, child_idx: Option<u32>) -> Self {
         self.child_idx = child_idx;
         self
     }
-    
+
     /// Sets the depth in the recursive structure.
     pub fn with_depth(mut self, depth: u32) -> Self {
         self.depth = depth;
@@ -133,7 +152,7 @@ impl DehydratedRow {
     pub fn submodule(&self, name: &str) -> Option<u32> {
         self.submodules.get(name).copied()
     }
-    
+
     /// Gets the child index for recursive types.
     pub fn child(&self) -> Option<u32> {
         self.child_idx
@@ -167,10 +186,32 @@ impl MatchRow {
     pub fn submodule(&self, name: &str) -> Option<u32> {
         self.submodule_refs.get(name).copied()
     }
-    
+
+    /// Gets a typed foreign key for a submodule field.
+    ///
+    /// This provides compile-time type safety for resolving the reference.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let rec_or_fk = row.foreign_key::<RecOr<Match>>("rec_or")?;
+    /// let rec_or_row = rec_or_fk.resolve(&store)?;
+    /// ```
+    pub fn foreign_key<T>(&self, name: &str) -> Option<ForeignKey<T>> {
+        self.submodule(name).map(ForeignKey::new)
+    }
+
     /// Gets the child index for recursive types.
     pub fn child(&self) -> Option<u32> {
         self.child_idx
+    }
+
+    /// Gets a typed foreign key for the recursive child.
+    ///
+    /// For self-referential types like `RecOr`, this returns a foreign key
+    /// pointing to another row in the same table.
+    pub fn child_key<T>(&self) -> Option<ForeignKey<T>> {
+        self.child_idx.map(ForeignKey::new)
     }
 }
 
@@ -202,16 +243,13 @@ impl QueryResults {
     }
 
     /// Creates QueryResults from a schema and dehydrated rows.
-    pub fn from_rows(
-        schema: &QuerySchema,
-        rows: Vec<DehydratedRow>,
-    ) -> Result<Self, SessionError> {
+    pub fn from_rows(schema: &QuerySchema, rows: Vec<DehydratedRow>) -> Result<Self, SessionError> {
         let n = rows.len();
-        
+
         // Build columns
         let match_indices: Vec<u32> = (0..n as u32).collect();
         let paths: Vec<String> = rows.iter().map(|r| r.path.clone()).collect();
-        
+
         let mut columns: Vec<Column> = vec![
             Column::new("match_idx".into(), &match_indices),
             Column::new("path".into(), &paths),
@@ -221,7 +259,8 @@ impl QueryResults {
         let mut wire_col_names = Vec::new();
         for wire in schema.wires {
             let col_name = format!("wire_{}_cell_id", wire.name);
-            let values: Vec<Option<u32>> = rows.iter()
+            let values: Vec<Option<u32>> = rows
+                .iter()
                 .map(|r| r.wires.get(wire.name).copied().flatten())
                 .collect();
             columns.push(Column::new(col_name.clone().into(), &values));
@@ -232,7 +271,8 @@ impl QueryResults {
         let mut submodule_col_map = HashMap::new();
         for sub in schema.submodules {
             let col_name = format!("sub_{}_idx", sub.name);
-            let values: Vec<u32> = rows.iter()
+            let values: Vec<u32> = rows
+                .iter()
                 .map(|r| r.submodules.get(sub.name).copied().unwrap_or(u32::MAX))
                 .collect();
             columns.push(Column::new(col_name.into(), &values));
@@ -271,14 +311,18 @@ impl QueryResults {
             return None;
         }
 
-        let path = self.matches.column("path").ok()?
-            .str().ok()?.get(idx)?
+        let path = self
+            .matches
+            .column("path")
+            .ok()?
+            .str()
+            .ok()?
+            .get(idx)?
             .to_string();
 
         let mut wire_cells = HashMap::new();
         for col_name in &self.wire_columns {
-            let cell_id = self.matches.column(col_name).ok()?
-                .u32().ok()?.get(idx);
+            let cell_id = self.matches.column(col_name).ok()?.u32().ok()?.get(idx);
             let field_name = col_name
                 .strip_prefix("wire_")
                 .and_then(|s| s.strip_suffix("_cell_id"))
@@ -302,12 +346,16 @@ impl QueryResults {
         }
 
         // Extract child_idx and depth columns if they exist
-        let child_idx = self.matches.column("child_idx")
+        let child_idx = self
+            .matches
+            .column("child_idx")
             .ok()
             .and_then(|c| c.u32().ok())
             .and_then(|c| c.get(idx));
-        
-        let depth = self.matches.column("depth")
+
+        let depth = self
+            .matches
+            .column("depth")
             .ok()
             .and_then(|c| c.u32().ok())
             .and_then(|c| c.get(idx))
@@ -368,12 +416,7 @@ impl ResultStore {
     }
 
     /// Inserts results with raw TypeId (for builder pattern).
-    pub(crate) fn insert_raw(
-        &mut self,
-        type_id: TypeId,
-        type_name: String,
-        results: QueryResults,
-    ) {
+    pub(crate) fn insert_raw(&mut self, type_id: TypeId, type_name: String, results: QueryResults) {
         self.name_to_type.insert(type_name, type_id);
         self.results.insert(type_id, results);
     }
@@ -398,6 +441,14 @@ impl ResultStore {
     pub fn type_names(&self) -> impl Iterator<Item = &str> {
         self.name_to_type.keys().map(|s| s.as_str())
     }
+
+    /// Gets a specific row by type name and index.
+    ///
+    /// This is used by `ForeignKey::resolve()` for type-safe lookups.
+    pub fn get_row(&self, type_name: &str, index: u32) -> Option<MatchRow> {
+        let results = self.get_by_name(type_name)?;
+        results.get(index)
+    }
 }
 
 /// Trait for query Match types that can be dehydrated into DataFrame rows.
@@ -413,5 +464,111 @@ pub trait Dehydrate: Sized {
     fn dehydrate_all(matches: &[Self]) -> Result<QueryResults, SessionError> {
         let rows: Vec<DehydratedRow> = matches.iter().map(|m| m.dehydrate()).collect();
         QueryResults::from_rows(&Self::SCHEMA, rows)
+    }
+}
+
+/// Accumulated dehydrated results during a search.
+///
+/// This is used by `SearchDehydrate` to collect results for the primary type
+/// and all submodule types during a single search pass.
+#[derive(Debug, Default)]
+pub struct DehydratedResults {
+    /// Results keyed by type name
+    pub tables: std::collections::HashMap<&'static str, Vec<DehydratedRow>>,
+    /// Schemas keyed by type name (first one registered wins)
+    schemas: std::collections::HashMap<&'static str, &'static QuerySchema>,
+}
+
+impl DehydratedResults {
+    /// Creates a new empty results collection.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds a row to the specified type's table, returning its index.
+    pub fn push(&mut self, type_name: &'static str, row: DehydratedRow) -> u32 {
+        let table = self.tables.entry(type_name).or_default();
+        let idx = table.len() as u32;
+        table.push(row);
+        idx
+    }
+
+    /// Registers a schema for a type. First registration wins.
+    pub fn register_schema(&mut self, type_name: &'static str, schema: &'static QuerySchema) {
+        self.schemas.entry(type_name).or_insert(schema);
+    }
+
+    /// Adds a row with schema registration, returning its index.
+    pub fn push_with_schema(
+        &mut self,
+        type_name: &'static str,
+        schema: &'static QuerySchema,
+        row: DehydratedRow,
+    ) -> u32 {
+        self.register_schema(type_name, schema);
+        self.push(type_name, row)
+    }
+
+    /// Adds a row for a typed Match, returning a typed foreign key.
+    ///
+    /// This automatically registers the schema from the `Dehydrate` trait
+    /// and returns a `ForeignKey<T>` for type-safe references.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let rec_or_fk: ForeignKey<RecOr<Match>> = results.push_typed::<RecOr<Match>>(row);
+    /// // Later: rec_or_fk.resolve(&store)
+    /// ```
+    pub fn push_typed<T: Dehydrate>(&mut self, row: DehydratedRow) -> ForeignKey<T> {
+        self.register_schema(T::SCHEMA.type_name, &T::SCHEMA);
+        let idx = self.push(T::SCHEMA.type_name, row);
+        ForeignKey::new(idx)
+    }
+
+    /// Gets the current count for a type (useful for generating indices).
+    pub fn len(&self, type_name: &str) -> usize {
+        self.tables.get(type_name).map(|t| t.len()).unwrap_or(0)
+    }
+
+    /// Merges another DehydratedResults into this one.
+    /// Returns a mapping of old indices to new indices for each type.
+    pub fn merge(
+        &mut self,
+        other: DehydratedResults,
+    ) -> std::collections::HashMap<&'static str, Vec<u32>> {
+        let mut index_maps = std::collections::HashMap::new();
+
+        // Merge schemas (first one wins)
+        for (type_name, schema) in other.schemas {
+            self.schemas.entry(type_name).or_insert(schema);
+        }
+
+        for (type_name, rows) in other.tables {
+            let table = self.tables.entry(type_name).or_default();
+            let base_idx = table.len() as u32;
+            let new_indices: Vec<u32> = (0..rows.len() as u32).map(|i| base_idx + i).collect();
+            table.extend(rows);
+            index_maps.insert(type_name, new_indices);
+        }
+
+        index_maps
+    }
+
+    /// Converts all accumulated results into QueryResults for storage.
+    /// Uses the internally registered schemas.
+    pub fn into_query_results(
+        self,
+    ) -> Result<std::collections::HashMap<String, QueryResults>, SessionError> {
+        let mut results = std::collections::HashMap::new();
+
+        for (type_name, rows) in self.tables {
+            if let Some(schema) = self.schemas.get(type_name) {
+                let qr = QueryResults::from_rows(schema, rows)?;
+                results.insert(type_name.to_string(), qr);
+            }
+        }
+
+        Ok(results)
     }
 }

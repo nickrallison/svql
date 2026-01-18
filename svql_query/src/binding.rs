@@ -50,6 +50,17 @@ impl<'a> PortResolver<'a> {
         Some(design_cell.to_info())
     }
 
+    /// Resolves a port name to just its cell ID (for dehydration).
+    pub fn get_cell_id(
+        &self,
+        assignment: &SingleAssignment<'a, 'a>,
+        port_name: &str,
+    ) -> Option<usize> {
+        let needle_cell = self.needle_anchors.get(port_name)?;
+        let design_cell = assignment.get_haystack_cell(needle_cell.clone())?;
+        Some(design_cell.to_info().id)
+    }
+
     /// Helper for macros to construct a Wire in the Match state.
     pub fn bind_wire(
         &self,

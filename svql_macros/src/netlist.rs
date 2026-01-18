@@ -104,14 +104,14 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     // --- Dehydrate/Rehydrate Generation ---
-    
+
     let wire_field_descs = parsed_fields.iter().map(|f| {
         let name = &f.ident.to_string();
         quote! {
             ::svql_query::session::WireFieldDesc { name: #name }
         }
     });
-    
+
     let dehydrate_wire_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let name = f.ident.to_string();
@@ -119,7 +119,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
         }
     });
-    
+
     let rehydrate_wire_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let name = f.ident.to_string();
@@ -129,6 +129,15 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 ::svql_query::instance::Instance::from_path(&row.path).child(#wire_name),
                 row.wire(#name)
             )
+        }
+    });
+
+    // SearchDehydrate: create dehydrated rows directly from subgraph matches
+    let search_dehydrate_wire_fields = parsed_fields.iter().map(|f| {
+        let name = f.ident.to_string();
+        let wire_name = &f.wire_name;
+        quote! {
+            .with_wire(#name, resolver.get_cell_id(assignment, #wire_name).map(|id| id as u32))
         }
     });
 
@@ -245,6 +254,36 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     path: ::svql_query::instance::Instance::from_path(&row.path),
                     #(#rehydrate_wire_fields),*
                 })
+            }
+        }
+
+        // SearchDehydrate implementation (Search state)
+        impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type #spec_where_clause {
+            const MATCH_SCHEMA: ::svql_query::session::QuerySchema = <#match_type as ::svql_query::session::Dehydrate>::SCHEMA;
+
+            fn execute_dehydrated(
+                &self,
+                driver: &::svql_query::driver::Driver,
+                context: &::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config,
+                results: &mut ::svql_query::session::DehydratedResults,
+            ) -> Vec<u32> {
+                use ::svql_query::traits::{NetlistComponent, execute_netlist_query, Hardware};
+                use ::svql_query::prelude::PortResolver;
+
+                let assignments = execute_netlist_query(self, context, key, config);
+                let needle_container = context.get(&Self::driver_key()).unwrap();
+                let resolver = PortResolver::new(needle_container.index());
+
+                let mut indices = Vec::with_capacity(assignments.items.len());
+                for assignment in &assignments.items {
+                    let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                        #(#search_dehydrate_wire_fields)*;
+                    let idx = results.push(#struct_name_str, row);
+                    indices.push(idx);
+                }
+                indices
             }
         }
     };

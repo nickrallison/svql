@@ -300,8 +300,8 @@ fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match>, new_path: Instance) {
 // --- Dehydrate/Rehydrate implementations for DataFrame storage ---
 
 use crate::session::{
-    Dehydrate, Rehydrate, DehydratedRow, MatchRow, QuerySchema, 
-    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SessionError
+    Dehydrate, Rehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, 
+    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SearchDehydrate, SessionError
 };
 
 /// Static schema for RecAnd - stores the AND gate's wire cell IDs plus child reference
@@ -358,5 +358,108 @@ impl Rehydrate for RecAnd<Match> {
         };
         
         Ok(RecAnd { path, and, child })
+    }
+}
+
+impl SearchDehydrate for RecAnd<Search> {
+    const MATCH_SCHEMA: QuerySchema = <RecAnd<Match> as Dehydrate>::SCHEMA;
+    
+    fn execute_dehydrated(
+        &self,
+        driver: &Driver,
+        context: &Context,
+        key: &DriverKey,
+        config: &Config,
+        results: &mut DehydratedResults,
+    ) -> Vec<u32> {
+        let haystack_index = context.get(key).unwrap().index();
+
+        // Get all AND gates (dehydrated)
+        let and_query = AndGate::<Search>::instantiate(self.path.child("and"));
+        let all_and_indices = and_query.execute_dehydrated(driver, context, key, config, results);
+        
+        // Get the AND gate table from results
+        let and_table = results.tables.get("AndGate").cloned().unwrap_or_default();
+        
+        // Build layer 1: single AND gates (no child)
+        let mut current_layer: Vec<(u32, u32)> = Vec::new(); // (rec_and_idx, and_cell_id)
+        
+        for &and_idx in &all_and_indices {
+            if let Some(and_row) = and_table.get(and_idx as usize) {
+                let and_cell_id = and_row.wire("y").unwrap_or(u32::MAX);
+                let rec_and_row = DehydratedRow::new(self.path.to_string())
+                    .with_wire("and_a", and_row.wire("a"))
+                    .with_wire("and_b", and_row.wire("b"))
+                    .with_wire("and_y", and_row.wire("y"))
+                    .with_depth(1)
+                    .with_child(None);
+                let rec_and_idx = results.push("RecAnd", rec_and_row);
+                current_layer.push((rec_and_idx, and_cell_id));
+            }
+        }
+        
+        let mut all_rec_and_indices: Vec<u32> = current_layer.iter().map(|(idx, _)| *idx).collect();
+        let mut layer_num = 2u32;
+        
+        // Build subsequent layers
+        loop {
+            let mut next_layer: Vec<(u32, u32)> = Vec::new();
+            
+            for &and_idx in &all_and_indices {
+                if let Some(and_row) = and_table.get(and_idx as usize) {
+                    let and_a = and_row.wire("a");
+                    let and_b = and_row.wire("b");
+                    
+                    // Check if any current layer output connects to this AND gate's inputs
+                    for &(child_rec_and_idx, child_y_cell_id) in &current_layer {
+                        let child_connects = [and_a, and_b].iter().any(|input| {
+                            if let Some(input_id) = input {
+                                // Check connectivity: child_y -> and_input
+                                if let (Some(from_cell), Some(to_cell)) = (
+                                    haystack_index.get_cell_by_id(child_y_cell_id as usize),
+                                    haystack_index.get_cell_by_id(*input_id as usize)
+                                ) {
+                                    haystack_index.fanout_set(&from_cell)
+                                        .map(|fanout| fanout.contains(&to_cell))
+                                        .unwrap_or(false)
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        });
+                        
+                        if child_connects {
+                            let rec_and_row = DehydratedRow::new(self.path.to_string())
+                                .with_wire("and_a", and_a)
+                                .with_wire("and_b", and_b)
+                                .with_wire("and_y", and_row.wire("y"))
+                                .with_depth(layer_num)
+                                .with_child(Some(child_rec_and_idx));
+                            let rec_and_idx = results.push("RecAnd", rec_and_row);
+                            let and_cell_id = and_row.wire("y").unwrap_or(u32::MAX);
+                            next_layer.push((rec_and_idx, and_cell_id));
+                        }
+                    }
+                }
+            }
+            
+            if next_layer.is_empty() {
+                break;
+            }
+            
+            all_rec_and_indices.extend(next_layer.iter().map(|(idx, _)| *idx));
+            current_layer = next_layer;
+            layer_num += 1;
+            
+            if let Some(max) = config.max_recursion_depth {
+                if layer_num > max as u32 {
+                    break;
+                }
+            }
+        }
+        
+        all_rec_and_indices
     }
 }

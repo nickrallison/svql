@@ -130,55 +130,67 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     // --- Dehydrate/Rehydrate Generation ---
-    
-    let wire_field_descs: Vec<_> = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Wire = f.kind {
-            let name = f.ident.to_string();
-            Some(quote! {
-                ::svql_query::session::WireFieldDesc { name: #name }
-            })
-        } else {
-            None
-        }
-    }).collect();
-    
-    // For submodule field descriptors, extract the base type name from the type path
-    let submodule_field_descs: Vec<_> = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Submodule = f.kind {
-            let name = f.ident.to_string();
-            let ty = &f.ty;
-            // Extract the type name from the path (e.g., "Sdffe" from "Sdffe<S>")
-            let type_name = if let syn::Type::Path(type_path) = ty {
-                type_path.path.segments.last()
-                    .map(|s| s.ident.to_string())
-                    .unwrap_or_else(|| "Unknown".to_string())
+
+    let wire_field_descs: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Wire = f.kind {
+                let name = f.ident.to_string();
+                Some(quote! {
+                    ::svql_query::session::WireFieldDesc { name: #name }
+                })
             } else {
-                "Unknown".to_string()
-            };
-            Some(quote! {
-                ::svql_query::session::SubmoduleFieldDesc { 
-                    name: #name,
-                    type_name: #type_name,
-                }
-            })
-        } else {
-            None
-        }
-    }).collect();
-    
+                None
+            }
+        })
+        .collect();
+
+    // For submodule field descriptors, extract the base type name from the type path
+    let submodule_field_descs: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let name = f.ident.to_string();
+                let ty = &f.ty;
+                // Extract the type name from the path (e.g., "Sdffe" from "Sdffe<S>")
+                let type_name = if let syn::Type::Path(type_path) = ty {
+                    type_path
+                        .path
+                        .segments
+                        .last()
+                        .map(|s| s.ident.to_string())
+                        .unwrap_or_else(|| "Unknown".to_string())
+                } else {
+                    "Unknown".to_string()
+                };
+                Some(quote! {
+                    ::svql_query::session::SubmoduleFieldDesc {
+                        name: #name,
+                        type_name: #type_name,
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // Generate wire-only dehydration (submodules need special handling)
-    let dehydrate_wire_only: Vec<_> = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Wire = f.kind {
-            let ident = &f.ident;
-            let name = f.ident.to_string();
-            Some(quote! {
-                .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
-            })
-        } else {
-            None
-        }
-    }).collect();
-    
+    let dehydrate_wire_only: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Wire = f.kind {
+                let ident = &f.ident;
+                let name = f.ident.to_string();
+                Some(quote! {
+                    .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // Rehydrate fields
     let rehydrate_fields: Vec<_> = fields_info.iter().map(|f| {
         let ident = &f.ident;
@@ -207,30 +219,38 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     }).collect();
-    
+
     // Collect submodule types for where clause bounds
-    let submodule_dehydrate_bounds: Vec<_> = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Submodule = f.kind {
-            let ty = &f.ty;
-            let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
-            Some(quote! { #match_ty: ::svql_query::session::Dehydrate })
-        } else {
-            None
-        }
-    }).collect();
-    
-    let submodule_rehydrate_bounds: Vec<_> = fields_info.iter().filter_map(|f| {
-        if let FieldKind::Submodule = f.kind {
-            let ty = &f.ty;
-            let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
-            Some(quote! { #match_ty: ::svql_query::session::Rehydrate })
-        } else {
-            None
-        }
-    }).collect();
-    
+    let submodule_dehydrate_bounds: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ty = &f.ty;
+                let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
+                Some(quote! { #match_ty: ::svql_query::session::Dehydrate })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let submodule_rehydrate_bounds: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ty = &f.ty;
+                let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
+                Some(quote! { #match_ty: ::svql_query::session::Rehydrate })
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // Check if there are any submodules requiring bounds
-    let has_submodules = fields_info.iter().any(|f| matches!(f.kind, FieldKind::Submodule));
+    let has_submodules = fields_info
+        .iter()
+        .any(|f| matches!(f.kind, FieldKind::Submodule));
 
     let expanded = quote! {
         #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -337,12 +357,12 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             type SearchType = #search_type;
         }
     };
-    
+
     // Generate Dehydrate/Rehydrate impls with appropriate where clauses
     let dehydrate_impl = if has_submodules {
         // Need where clause for submodule bounds
         quote! {
-            impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type 
+            impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type
             where
                 #(#submodule_dehydrate_bounds),*
             {
@@ -377,11 +397,11 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
     let rehydrate_impl = if has_submodules {
         // Need where clause for submodule bounds
         quote! {
-            impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type 
+            impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type
             where
                 #(#submodule_rehydrate_bounds),*
             {
@@ -416,11 +436,151 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
+    // --- SearchDehydrate Generation ---
+
+    // Collect SearchDehydrate bounds for submodules
+    let submodule_search_dehydrate_bounds: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ty = &f.ty;
+                let search_ty = common::replace_state_generic(ty);
+                Some(quote! { #search_ty: ::svql_query::session::SearchDehydrate })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Generate dehydrated submodule query calls
+    let dehydrated_query_calls: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Submodule = f.kind {
+            let ident = &f.ident;
+            let ident_indices = syn::Ident::new(&format!("{}_indices", ident), ident.span());
+            Some(quote! {
+                let #ident_indices = self.#ident.execute_dehydrated(driver, context, key, config, results);
+            })
+        } else {
+            None
+        }
+    }).collect();
+
+    // Generate the iproduct over submodule indices (the variable names for the Vec<u32>)
+    let submodule_indices_vecs: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ident = &f.ident;
+                let ident_indices = syn::Ident::new(&format!("{}_indices", ident), ident.span());
+                Some(ident_indices)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Generate the binding pattern for iproduct tuple (the _idx names that bind references)
+    let submodule_idx_bindings: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ident = &f.ident;
+                let ident_idx = syn::Ident::new(&format!("{}_idx", ident), ident.span());
+                Some(ident_idx)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Submodule fields with their indices
+    let dehydrated_submodule_fields: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ident = &f.ident;
+                let ident_idx = syn::Ident::new(&format!("{}_idx", ident), ident.span());
+                let name = f.ident.to_string();
+                Some(quote! { .with_submodule(#name, *#ident_idx) })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let search_dehydrate_impl = if has_submodules {
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type
+            where
+                #(#submodule_search_dehydrate_bounds),*
+            {
+                const MATCH_SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                    #struct_name_str,
+                    &[ #(#wire_field_descs),* ],
+                    &[ #(#submodule_field_descs),* ],
+                );
+
+                fn execute_dehydrated(
+                    &self,
+                    driver: &::svql_query::prelude::Driver,
+                    context: &::svql_query::prelude::Context,
+                    key: &::svql_query::prelude::DriverKey,
+                    config: &::svql_query::prelude::Config,
+                    results: &mut ::svql_query::session::DehydratedResults,
+                ) -> Vec<u32> {
+                    // 1. Execute submodule searches (dehydrated)
+                    #(#dehydrated_query_calls)*
+
+                    // 2. Cartesian product over submodule indices, validate, and store
+                    let _haystack_index = context.get(key).unwrap().index();
+
+                    ::svql_query::itertools::iproduct!( #(#submodule_indices_vecs.iter()),* )
+                        .filter_map(|( #(#submodule_idx_bindings),* )| {
+                            // TODO: Topology validation using cell IDs from dehydrated rows
+                            // For now, we skip validation (will be added in follow-up)
+
+                            // Create the composite row
+                            let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                                #(#dehydrated_submodule_fields)*;
+
+                            Some(results.push(#struct_name_str, row))
+                        })
+                        .collect()
+                }
+            }
+        }
+    } else {
+        // No submodules - simpler case, but composites without submodules are unusual
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type #spec_where_clause {
+                const MATCH_SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                    #struct_name_str,
+                    &[ #(#wire_field_descs),* ],
+                    &[],
+                );
+
+                fn execute_dehydrated(
+                    &self,
+                    _driver: &::svql_query::prelude::Driver,
+                    _context: &::svql_query::prelude::Context,
+                    _key: &::svql_query::prelude::DriverKey,
+                    _config: &::svql_query::prelude::Config,
+                    results: &mut ::svql_query::session::DehydratedResults,
+                ) -> Vec<u32> {
+                    // Composite with no submodules - just create a single row
+                    let row = ::svql_query::session::DehydratedRow::new(self.path.to_string());
+                    vec![results.push(#struct_name_str, row)]
+                }
+            }
+        }
+    };
+
     let full_expanded = quote! {
         #expanded
         #dehydrate_impl
         #rehydrate_impl
+        #search_dehydrate_impl
     };
 
     TokenStream::from(full_expanded)

@@ -280,6 +280,29 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
+    // SearchDehydrate: query each variant and collect dehydrated results  
+    let search_dehydrate_query_blocks = variants_info.iter().map(|v| {
+        let v_ty = &v.ty;
+        let search_type = common::replace_state_generic(v_ty);
+
+        quote! {
+            {
+                let sub_query = <#search_type as ::svql_query::traits::SearchableComponent>::create_at(
+                    ::svql_query::traits::Hardware::path(self).clone()
+                );
+                let indices = <#search_type as ::svql_query::session::SearchDehydrate>::execute_dehydrated(
+                    &sub_query,
+                    driver,
+                    context,
+                    key,
+                    config,
+                    results,
+                );
+                all_indices.extend(indices);
+            }
+        }
+    });
+
     let expanded = quote! {
         #expanded_enum
 
@@ -426,6 +449,24 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 Err(::svql_query::session::SessionError::RehydrationError(
                     format!("Could not rehydrate {} from row", stringify!(#enum_name))
                 ))
+            }
+        }
+
+        // SearchDehydrate implementation (Search state)
+        impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type #spec_where_clause {
+            const MATCH_SCHEMA: ::svql_query::session::QuerySchema = <#match_type as ::svql_query::session::Dehydrate>::SCHEMA;
+
+            fn execute_dehydrated(
+                &self,
+                driver: &::svql_query::driver::Driver,
+                context: &::svql_query::driver::Context,
+                key: &::svql_query::driver::DriverKey,
+                config: &::svql_query::common::Config,
+                results: &mut ::svql_query::session::DehydratedResults,
+            ) -> Vec<u32> {
+                let mut all_indices = Vec::new();
+                #(#search_dehydrate_query_blocks)*
+                all_indices
             }
         }
     };

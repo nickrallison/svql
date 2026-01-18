@@ -127,7 +127,7 @@ macro_rules! impl_dff_primitive {
         impl ::svql_query::traits::MatchedComponent for $name<::svql_query::Match> {
             type Search = $name<::svql_query::Search>;
         }
-        
+
         impl ::svql_query::session::Dehydrate for $name<::svql_query::Match> {
             const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
                 stringify!($name),
@@ -136,7 +136,7 @@ macro_rules! impl_dff_primitive {
                 ],
                 &[],
             );
-            
+
             fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
                 let mut row = ::svql_query::session::DehydratedRow::new(self.path.to_string());
                 $(
@@ -145,10 +145,10 @@ macro_rules! impl_dff_primitive {
                 row
             }
         }
-        
+
         impl ::svql_query::session::Rehydrate for $name<::svql_query::Match> {
             const TYPE_NAME: &'static str = stringify!($name);
-            
+
             fn rehydrate(
                 row: &::svql_query::session::MatchRow,
                 ctx: &::svql_query::session::RehydrateContext<'_>,
@@ -160,6 +160,43 @@ macro_rules! impl_dff_primitive {
                         $port: ctx.rehydrate_wire(path.child(stringify!($port)), row.wire(stringify!($port))),
                     )*
                 })
+            }
+        }
+
+        impl ::svql_query::session::SearchDehydrate for $name<::svql_query::Search> {
+            const MATCH_SCHEMA: ::svql_query::session::QuerySchema =
+                <$name<::svql_query::Match> as ::svql_query::session::Dehydrate>::SCHEMA;
+
+            fn execute_dehydrated(
+                &self,
+                _driver: &::svql_driver::Driver,
+                context: &::svql_query::Context,
+                key: &::svql_driver::DriverKey,
+                _config: &::svql_common::Config,
+                results: &mut ::svql_query::session::DehydratedResults,
+            ) -> Vec<u32> {
+                let haystack = context.get(key).expect("Haystack missing from context");
+                let index = haystack.index();
+
+                index.cells_of_type_iter(::svql_query::CellKind::Dff)
+                    .into_iter()
+                    .flatten()
+                    .filter(|cell_wrapper| {
+                        match cell_wrapper.get() {
+                            prjunnamed_netlist::Cell::Dff(ff) => {
+                                let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
+                                check(ff)
+                            }
+                            _ => false,
+                        }
+                    })
+                    .map(|cell| {
+                        let cell_id = cell.to_info().id as u32;
+                        let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                            $(.with_wire(stringify!($port), Some(cell_id)))*;
+                        results.push(stringify!($name), row)
+                    })
+                    .collect()
             }
         }
     };
