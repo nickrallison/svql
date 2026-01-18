@@ -69,7 +69,7 @@ where
         let matches: Vec<P::Match> = RehydrateIter::new(&ctx)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_default();
-        
+
         tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({})",
             spec.expected_count,
