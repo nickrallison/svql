@@ -13,6 +13,7 @@ pub mod prelude;
 pub mod primitives;
 pub mod report;
 pub mod security;
+pub mod session;
 pub mod traits;
 pub mod variants;
 

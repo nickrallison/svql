@@ -296,3 +296,67 @@ fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match>, new_path: Instance) {
         update_rec_and_path(child, new_path.child("child"));
     }
 }
+
+// --- Dehydrate/Rehydrate implementations for DataFrame storage ---
+
+use crate::session::{
+    Dehydrate, Rehydrate, DehydratedRow, MatchRow, QuerySchema, 
+    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SessionError
+};
+
+/// Static schema for RecAnd - stores the AND gate's wire cell IDs plus child reference
+static REC_AND_RECURSIVE_FIELD: RecursiveFieldDesc = RecursiveFieldDesc { name: "child" };
+
+impl Dehydrate for RecAnd<Match> {
+    const SCHEMA: QuerySchema = QuerySchema::with_recursive_child(
+        "RecAnd",
+        &[
+            WireFieldDesc { name: "and_a" },
+            WireFieldDesc { name: "and_b" },
+            WireFieldDesc { name: "and_y" },
+        ],
+        &[], // No external submodules, just the recursive child
+        &REC_AND_RECURSIVE_FIELD,
+    );
+    
+    fn dehydrate(&self) -> DehydratedRow {
+        DehydratedRow::new(self.path.to_string())
+            .with_wire("and_a", self.and.a.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("and_b", self.and.b.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("and_y", self.and.y.inner.as_ref().map(|c| c.id as u32))
+            .with_depth(self.depth() as u32)
+            // Note: child_idx must be set by the caller when building the results table
+            // because it requires knowing the index of the child row
+    }
+}
+
+impl Rehydrate for RecAnd<Match> {
+    const TYPE_NAME: &'static str = "RecAnd";
+    
+    fn rehydrate(
+        row: &MatchRow,
+        ctx: &RehydrateContext<'_>,
+    ) -> Result<Self, SessionError> {
+        let path = Instance::from_path(&row.path);
+        let and_path = path.child("and");
+        
+        // Rehydrate the AND gate
+        let and = AndGate {
+            path: and_path.clone(),
+            a: ctx.rehydrate_wire(and_path.child("a"), row.wire("and_a")),
+            b: ctx.rehydrate_wire(and_path.child("b"), row.wire("and_b")),
+            y: ctx.rehydrate_wire(and_path.child("and_y"), row.wire("and_y")),
+        };
+        
+        // Recursively rehydrate child if present
+        let child = if let Some(child_idx) = row.child() {
+            let child_row = ctx.get_match_row(Self::TYPE_NAME, child_idx)
+                .ok_or_else(|| SessionError::InvalidMatchIndex(child_idx))?;
+            Some(Box::new(Self::rehydrate(&child_row, ctx)?))
+        } else {
+            None
+        };
+        
+        Ok(RecAnd { path, and, child })
+    }
+}

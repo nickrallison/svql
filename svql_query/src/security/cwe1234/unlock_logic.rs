@@ -251,6 +251,76 @@ impl MatchedComponent for UnlockLogic<Match> {
     type Search = UnlockLogic<Search>;
 }
 
+// --- Dehydrate/Rehydrate implementations ---
+
+use crate::session::{
+    Dehydrate, Rehydrate, DehydratedRow, MatchRow, QuerySchema, 
+    WireFieldDesc, SubmoduleFieldDesc, RehydrateContext, SessionError
+};
+
+impl Dehydrate for UnlockLogic<Match> {
+    const SCHEMA: QuerySchema = QuerySchema::new(
+        "UnlockLogic",
+        &[
+            // Top AND gate wires
+            WireFieldDesc { name: "top_and_a" },
+            WireFieldDesc { name: "top_and_b" },
+            WireFieldDesc { name: "top_and_y" },
+            // NOT gate wires
+            WireFieldDesc { name: "not_a" },
+            WireFieldDesc { name: "not_y" },
+        ],
+        &[
+            SubmoduleFieldDesc { name: "rec_or", type_name: "RecOr" },
+        ],
+    );
+    
+    fn dehydrate(&self) -> DehydratedRow {
+        DehydratedRow::new(self.path.to_string())
+            .with_wire("top_and_a", self.top_and.a.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("top_and_b", self.top_and.b.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("top_and_y", self.top_and.y.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("not_a", self.not_gate.a.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("not_y", self.not_gate.y.inner.as_ref().map(|c| c.id as u32))
+            // rec_or submodule index must be set by caller
+    }
+}
+
+impl Rehydrate for UnlockLogic<Match> {
+    const TYPE_NAME: &'static str = "UnlockLogic";
+    
+    fn rehydrate(
+        row: &MatchRow,
+        ctx: &RehydrateContext<'_>,
+    ) -> Result<Self, SessionError> {
+        let path = Instance::from_path(&row.path);
+        
+        // Rehydrate top_and
+        let top_and_path = path.child("top_and");
+        let top_and = AndGate {
+            path: top_and_path.clone(),
+            a: ctx.rehydrate_wire(top_and_path.child("a"), row.wire("top_and_a")),
+            b: ctx.rehydrate_wire(top_and_path.child("b"), row.wire("top_and_b")),
+            y: ctx.rehydrate_wire(top_and_path.child("y"), row.wire("top_and_y")),
+        };
+        
+        // Rehydrate not_gate
+        let not_path = path.child("not_gate");
+        let not_gate = NotGate {
+            path: not_path.clone(),
+            a: ctx.rehydrate_wire(not_path.child("a"), row.wire("not_a")),
+            y: ctx.rehydrate_wire(not_path.child("y"), row.wire("not_y")),
+        };
+        
+        // Rehydrate rec_or from submodule index
+        let rec_or_idx = row.submodule("rec_or")
+            .ok_or_else(|| SessionError::RehydrationError("Missing rec_or submodule index".into()))?;
+        let rec_or = RecOr::rehydrate_by_index(rec_or_idx, ctx)?;
+        
+        Ok(UnlockLogic { path, top_and, rec_or, not_gate })
+    }
+}
+
 impl<S> Topology<S> for UnlockLogic<S>
 where
     S: State,

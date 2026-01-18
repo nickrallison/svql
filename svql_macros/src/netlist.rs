@@ -16,6 +16,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         .clone();
 
     let struct_name = &item_struct.ident;
+    let struct_name_str = struct_name.to_string();
 
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
     let specialized_generics = common::remove_state_generic(&item_struct.generics);
@@ -100,6 +101,35 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let children_impl = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         quote! { &self.#ident }
+    });
+
+    // --- Dehydrate/Rehydrate Generation ---
+    
+    let wire_field_descs = parsed_fields.iter().map(|f| {
+        let name = &f.ident.to_string();
+        quote! {
+            ::svql_query::session::WireFieldDesc { name: #name }
+        }
+    });
+    
+    let dehydrate_wire_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let name = f.ident.to_string();
+        quote! {
+            .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
+        }
+    });
+    
+    let rehydrate_wire_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let name = f.ident.to_string();
+        let wire_name = &f.wire_name;
+        quote! {
+            #ident: ctx.rehydrate_wire(
+                ::svql_query::instance::Instance::from_path(&row.path).child(#wire_name),
+                row.wire(#name)
+            )
+        }
     });
 
     let expanded = quote! {
@@ -187,6 +217,35 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         // NetlistMatched implementation (Match state)
         impl #spec_impl_generics ::svql_query::traits::NetlistMatched for #match_type #spec_where_clause {
             type SearchType = #search_type;
+        }
+
+        // Dehydrate implementation (Match state)
+        impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type #spec_where_clause {
+            const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                #struct_name_str,
+                &[ #(#wire_field_descs),* ],
+                &[], // Netlists have no submodules
+            );
+
+            fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
+                ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                    #(#dehydrate_wire_fields)*
+            }
+        }
+
+        // Rehydrate implementation (Match state)
+        impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type #spec_where_clause {
+            const TYPE_NAME: &'static str = #struct_name_str;
+
+            fn rehydrate(
+                row: &::svql_query::session::MatchRow,
+                ctx: &::svql_query::session::RehydrateContext<'_>,
+            ) -> Result<Self, ::svql_query::session::SessionError> {
+                Ok(#struct_name {
+                    path: ::svql_query::instance::Instance::from_path(&row.path),
+                    #(#rehydrate_wire_fields),*
+                })
+            }
         }
     };
 

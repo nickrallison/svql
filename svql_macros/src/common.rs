@@ -168,3 +168,32 @@ pub fn make_replaced_type(
         quote! { #ident < #args > }
     }
 }
+
+/// Like `replace_state_generic`, but allows specifying an arbitrary replacement type.
+/// This version assumes the type has a single generic parameter (the state) and replaces it.
+/// Useful for replacing `SubQuery<S>` with `SubQuery<Match>`.
+pub fn replace_state_generic_with(
+    ty: &syn::Type,
+    replacement: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let syn::Type::Path(type_path) = ty else {
+        return quote! { #ty };
+    };
+
+    let mut path = type_path.path.clone();
+    
+    // Modify the last segment to replace its generic argument
+    if let Some(last) = path.segments.last_mut() {
+        if let syn::PathArguments::AngleBracketed(ref mut args) = last.arguments {
+            if let Some(first_arg) = args.args.first_mut() {
+                if let syn::GenericArgument::Type(_) = first_arg {
+                    *first_arg = syn::GenericArgument::Type(
+                        syn::parse2(replacement).expect("replacement should be a valid type")
+                    );
+                }
+            }
+        }
+    }
+    
+    quote! { #path }
+}

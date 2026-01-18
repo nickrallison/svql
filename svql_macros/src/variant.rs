@@ -257,6 +257,29 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
+    // Dehydrate arms: delegate to inner type's dehydrate
+    let dehydrate_arms = variants_info.iter().map(|v| {
+        let v_ident = &v.ident;
+        quote! {
+            Self::#v_ident(inner) => {
+                use ::svql_query::session::Dehydrate;
+                inner.dehydrate()
+            }
+        }
+    });
+
+    // Rehydrate attempts: try each variant in order
+    let rehydrate_attempts = variants_info.iter().map(|v| {
+        let v_ident = &v.ident;
+        let v_ty = &v.ty;
+        let match_ty = common::replace_state_generic_with(v_ty, quote!(::svql_query::Match));
+        quote! {
+            if let Ok(inner) = <#match_ty as ::svql_query::session::Rehydrate>::rehydrate(row, ctx) {
+                return Ok(Self::#v_ident(inner));
+            }
+        }
+    });
+
     let expanded = quote! {
         #expanded_enum
 
@@ -369,6 +392,40 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     #(#variant_name_arms),*,
                     Self::#abstract_ident { .. } => panic!("__Abstract variant in Match state"),
                 }
+            }
+        }
+
+        // Dehydrate implementation (Match state)
+        impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type #spec_where_clause {
+            const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                stringify!(#enum_name),
+                &[ #(::svql_query::session::WireFieldDesc { name: #port_names }),* ],
+                &[], // Variants delegate to inner types
+            );
+
+            fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
+                match self {
+                    #(#dehydrate_arms),*,
+                    Self::#abstract_ident { .. } => panic!("__Abstract variant in Match state"),
+                }
+            }
+        }
+
+        // Rehydrate implementation (Match state)
+        impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type #spec_where_clause {
+            const TYPE_NAME: &'static str = stringify!(#enum_name);
+
+            fn rehydrate(
+                row: &::svql_query::session::MatchRow,
+                ctx: &::svql_query::session::RehydrateContext<'_>,
+            ) -> Result<Self, ::svql_query::session::SessionError> {
+                // For variants, we need to store which variant was matched
+                // This requires a special "variant_type" column in the row
+                // For now, we'll attempt each variant in order
+                #(#rehydrate_attempts)*
+                Err(::svql_query::session::SessionError::RehydrationError(
+                    format!("Could not rehydrate {} from row", stringify!(#enum_name))
+                ))
             }
         }
     };

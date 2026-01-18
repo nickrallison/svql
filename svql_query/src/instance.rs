@@ -4,6 +4,7 @@
 //! within a nested query or design hierarchy.
 
 use std::sync::Arc;
+use std::fmt;
 
 /// Represents a hierarchical path in a design or query.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -18,6 +19,14 @@ impl Instance {
         Self {
             segments: vec![Arc::from(name)],
         }
+    }
+    
+    /// Creates an instance from a dot-separated path string.
+    pub fn from_path(path: &str) -> Self {
+        let segments = path.split('.')
+            .map(Arc::from)
+            .collect();
+        Self { segments }
     }
 
     /// Creates a new instance representing a child of the current path.
@@ -71,5 +80,11 @@ impl Instance {
     /// Returns the last segment of the path (the local name).
     pub fn name(&self) -> &str {
         self.segments.last().map(|s| s.as_ref()).unwrap_or("")
+    }
+}
+
+impl fmt::Display for Instance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.inst_path())
     }
 }

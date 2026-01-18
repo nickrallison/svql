@@ -308,3 +308,67 @@ fn update_rec_or_path<'ctx>(rec_or: &mut RecOr<Match>, new_path: Instance) {
         update_rec_or_path(child, new_path.child("child"));
     }
 }
+
+// --- Dehydrate/Rehydrate implementations for DataFrame storage ---
+
+use crate::session::{
+    Dehydrate, Rehydrate, DehydratedRow, MatchRow, QuerySchema, 
+    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SessionError
+};
+
+/// Static schema for RecOr - stores the OR gate's wire cell IDs plus child reference
+static REC_OR_RECURSIVE_FIELD: RecursiveFieldDesc = RecursiveFieldDesc { name: "child" };
+
+impl Dehydrate for RecOr<Match> {
+    const SCHEMA: QuerySchema = QuerySchema::with_recursive_child(
+        "RecOr",
+        &[
+            WireFieldDesc { name: "or_a" },
+            WireFieldDesc { name: "or_b" },
+            WireFieldDesc { name: "or_y" },
+        ],
+        &[], // No external submodules, just the recursive child
+        &REC_OR_RECURSIVE_FIELD,
+    );
+    
+    fn dehydrate(&self) -> DehydratedRow {
+        DehydratedRow::new(self.path.to_string())
+            .with_wire("or_a", self.or.a.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("or_b", self.or.b.inner.as_ref().map(|c| c.id as u32))
+            .with_wire("or_y", self.or.y.inner.as_ref().map(|c| c.id as u32))
+            .with_depth(self.depth() as u32)
+            // Note: child_idx must be set by the caller when building the results table
+            // because it requires knowing the index of the child row
+    }
+}
+
+impl Rehydrate for RecOr<Match> {
+    const TYPE_NAME: &'static str = "RecOr";
+    
+    fn rehydrate(
+        row: &MatchRow,
+        ctx: &RehydrateContext<'_>,
+    ) -> Result<Self, SessionError> {
+        let path = Instance::from_path(&row.path);
+        let or_path = path.child("or");
+        
+        // Rehydrate the OR gate
+        let or = OrGate {
+            path: or_path.clone(),
+            a: ctx.rehydrate_wire(or_path.child("a"), row.wire("or_a")),
+            b: ctx.rehydrate_wire(or_path.child("b"), row.wire("or_b")),
+            y: ctx.rehydrate_wire(or_path.child("or_y"), row.wire("or_y")),
+        };
+        
+        // Recursively rehydrate child if present
+        let child = if let Some(child_idx) = row.child() {
+            let child_row = ctx.get_match_row(Self::TYPE_NAME, child_idx)
+                .ok_or_else(|| SessionError::InvalidMatchIndex(child_idx))?;
+            Some(Box::new(Self::rehydrate(&child_row, ctx)?))
+        } else {
+            None
+        };
+        
+        Ok(RecOr { path, or, child })
+    }
+}

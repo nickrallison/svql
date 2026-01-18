@@ -34,6 +34,13 @@ pub use crate::traits::{
     validate_connection,
 };
 
+// Session re-exports (DataFrame-based result storage)
+pub use crate::session::{
+    CellRow, Dehydrate, DehydratedRow, DesignFrame, MatchRef, MatchRow, QueryResults, QuerySchema,
+    RecursiveFieldDesc, Rehydrate, RehydrateContext, RehydrateIter, ResultStore, Session,
+    SessionBuilder, SessionError, SessionRehydrateExt, SubmoduleFieldDesc, WireFieldDesc, WireRef,
+};
+
 pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};
 
 pub use subgraph::{

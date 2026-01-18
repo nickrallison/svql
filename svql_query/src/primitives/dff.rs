@@ -127,6 +127,41 @@ macro_rules! impl_dff_primitive {
         impl ::svql_query::traits::MatchedComponent for $name<::svql_query::Match> {
             type Search = $name<::svql_query::Search>;
         }
+        
+        impl ::svql_query::session::Dehydrate for $name<::svql_query::Match> {
+            const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                stringify!($name),
+                &[
+                    $(::svql_query::session::WireFieldDesc { name: stringify!($port) }),*
+                ],
+                &[],
+            );
+            
+            fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
+                let mut row = ::svql_query::session::DehydratedRow::new(self.path.to_string());
+                $(
+                    row = row.with_wire(stringify!($port), self.$port.inner.as_ref().map(|c| c.id as u32));
+                )*
+                row
+            }
+        }
+        
+        impl ::svql_query::session::Rehydrate for $name<::svql_query::Match> {
+            const TYPE_NAME: &'static str = stringify!($name);
+            
+            fn rehydrate(
+                row: &::svql_query::session::MatchRow,
+                ctx: &::svql_query::session::RehydrateContext<'_>,
+            ) -> Result<Self, ::svql_query::session::SessionError> {
+                let path = ::svql_query::Instance::from_path(&row.path);
+                Ok(Self {
+                    path: path.clone(),
+                    $(
+                        $port: ctx.rehydrate_wire(path.child(stringify!($port)), row.wire(stringify!($port))),
+                    )*
+                })
+            }
+        }
     };
 }
 

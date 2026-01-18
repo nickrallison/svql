@@ -140,6 +140,41 @@ macro_rules! define_primitive_gate {
         impl MatchedComponent for $name<Match> {
             type Search = $name<Search>;
         }
+        
+        impl crate::session::Dehydrate for $name<Match> {
+            const SCHEMA: crate::session::QuerySchema = crate::session::QuerySchema::new(
+                stringify!($name),
+                &[
+                    $(crate::session::WireFieldDesc { name: stringify!($port) }),*
+                ],
+                &[],
+            );
+            
+            fn dehydrate(&self) -> crate::session::DehydratedRow {
+                let mut row = crate::session::DehydratedRow::new(self.path.to_string());
+                $(
+                    row = row.with_wire(stringify!($port), self.$port.inner.as_ref().map(|c| c.id as u32));
+                )*
+                row
+            }
+        }
+        
+        impl crate::session::Rehydrate for $name<Match> {
+            const TYPE_NAME: &'static str = stringify!($name);
+            
+            fn rehydrate(
+                row: &crate::session::MatchRow,
+                ctx: &crate::session::RehydrateContext<'_>,
+            ) -> Result<Self, crate::session::SessionError> {
+                let path = Instance::from_path(&row.path);
+                Ok(Self {
+                    path: path.clone(),
+                    $(
+                        $port: ctx.rehydrate_wire(path.child(stringify!($port)), row.wire(stringify!($port))),
+                    )*
+                })
+            }
+        }
     };
 }
 

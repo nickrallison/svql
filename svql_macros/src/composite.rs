@@ -18,6 +18,7 @@ struct CompositeField {
 pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let item_struct = parse_macro_input!(input as ItemStruct);
     let struct_name = &item_struct.ident;
+    let struct_name_str = struct_name.to_string();
 
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
     let specialized_generics = common::remove_state_generic(&item_struct.generics);
@@ -128,6 +129,109 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
+    // --- Dehydrate/Rehydrate Generation ---
+    
+    let wire_field_descs: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Wire = f.kind {
+            let name = f.ident.to_string();
+            Some(quote! {
+                ::svql_query::session::WireFieldDesc { name: #name }
+            })
+        } else {
+            None
+        }
+    }).collect();
+    
+    // For submodule field descriptors, extract the base type name from the type path
+    let submodule_field_descs: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Submodule = f.kind {
+            let name = f.ident.to_string();
+            let ty = &f.ty;
+            // Extract the type name from the path (e.g., "Sdffe" from "Sdffe<S>")
+            let type_name = if let syn::Type::Path(type_path) = ty {
+                type_path.path.segments.last()
+                    .map(|s| s.ident.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string())
+            } else {
+                "Unknown".to_string()
+            };
+            Some(quote! {
+                ::svql_query::session::SubmoduleFieldDesc { 
+                    name: #name,
+                    type_name: #type_name,
+                }
+            })
+        } else {
+            None
+        }
+    }).collect();
+    
+    // Generate wire-only dehydration (submodules need special handling)
+    let dehydrate_wire_only: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Wire = f.kind {
+            let ident = &f.ident;
+            let name = f.ident.to_string();
+            Some(quote! {
+                .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
+            })
+        } else {
+            None
+        }
+    }).collect();
+    
+    // Rehydrate fields
+    let rehydrate_fields: Vec<_> = fields_info.iter().map(|f| {
+        let ident = &f.ident;
+        let name = f.ident.to_string();
+        match f.kind {
+            FieldKind::Wire => {
+                quote! {
+                    #ident: ctx.rehydrate_wire(
+                        ::svql_query::instance::Instance::from_path(&row.path).child(#name),
+                        row.wire(#name)
+                    )
+                }
+            }
+            FieldKind::Submodule => {
+                let ty = &f.ty;
+                let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
+                quote! {
+                    #ident: {
+                        let sub_idx = row.submodule(#name)
+                            .ok_or_else(|| ::svql_query::session::SessionError::RehydrationError(
+                                format!("Missing submodule index for {}", #name)
+                            ))?;
+                        <#match_ty as ::svql_query::session::Rehydrate>::rehydrate_by_index(sub_idx, ctx)?
+                    }
+                }
+            }
+        }
+    }).collect();
+    
+    // Collect submodule types for where clause bounds
+    let submodule_dehydrate_bounds: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Submodule = f.kind {
+            let ty = &f.ty;
+            let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
+            Some(quote! { #match_ty: ::svql_query::session::Dehydrate })
+        } else {
+            None
+        }
+    }).collect();
+    
+    let submodule_rehydrate_bounds: Vec<_> = fields_info.iter().filter_map(|f| {
+        if let FieldKind::Submodule = f.kind {
+            let ty = &f.ty;
+            let match_ty = common::replace_state_generic_with(ty, quote!(::svql_query::Match));
+            Some(quote! { #match_ty: ::svql_query::session::Rehydrate })
+        } else {
+            None
+        }
+    }).collect();
+    
+    // Check if there are any submodules requiring bounds
+    let has_submodules = fields_info.iter().any(|f| matches!(f.kind, FieldKind::Submodule));
+
     let expanded = quote! {
         #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct #struct_name #impl_generics #where_clause {
@@ -233,6 +337,91 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             type SearchType = #search_type;
         }
     };
+    
+    // Generate Dehydrate/Rehydrate impls with appropriate where clauses
+    let dehydrate_impl = if has_submodules {
+        // Need where clause for submodule bounds
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type 
+            where
+                #(#submodule_dehydrate_bounds),*
+            {
+                const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                    #struct_name_str,
+                    &[ #(#wire_field_descs),* ],
+                    &[ #(#submodule_field_descs),* ],
+                );
 
-    TokenStream::from(expanded)
+                fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
+                    // Note: For composites with submodules, the caller must set submodule indices
+                    // after calling dehydrate() since those are foreign keys requiring index lookup
+                    ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                        #(#dehydrate_wire_only)*
+                }
+            }
+        }
+    } else {
+        // No submodules, no extra bounds needed
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type #spec_where_clause {
+                const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
+                    #struct_name_str,
+                    &[ #(#wire_field_descs),* ],
+                    &[],
+                );
+
+                fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
+                    ::svql_query::session::DehydratedRow::new(self.path.to_string())
+                        #(#dehydrate_wire_only)*
+                }
+            }
+        }
+    };
+    
+    let rehydrate_impl = if has_submodules {
+        // Need where clause for submodule bounds
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type 
+            where
+                #(#submodule_rehydrate_bounds),*
+            {
+                const TYPE_NAME: &'static str = #struct_name_str;
+
+                fn rehydrate(
+                    row: &::svql_query::session::MatchRow,
+                    ctx: &::svql_query::session::RehydrateContext<'_>,
+                ) -> Result<Self, ::svql_query::session::SessionError> {
+                    Ok(#struct_name {
+                        path: ::svql_query::instance::Instance::from_path(&row.path),
+                        #(#rehydrate_fields),*
+                    })
+                }
+            }
+        }
+    } else {
+        // No submodules, simpler rehydration
+        quote! {
+            impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type #spec_where_clause {
+                const TYPE_NAME: &'static str = #struct_name_str;
+
+                fn rehydrate(
+                    row: &::svql_query::session::MatchRow,
+                    ctx: &::svql_query::session::RehydrateContext<'_>,
+                ) -> Result<Self, ::svql_query::session::SessionError> {
+                    Ok(#struct_name {
+                        path: ::svql_query::instance::Instance::from_path(&row.path),
+                        #(#rehydrate_fields),*
+                    })
+                }
+            }
+        }
+    };
+    
+    let full_expanded = quote! {
+        #expanded
+        #dehydrate_impl
+        #rehydrate_impl
+    };
+
+    TokenStream::from(full_expanded)
 }
