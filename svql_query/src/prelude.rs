@@ -6,7 +6,8 @@ pub use tracing;
 
 pub use crate::{
     Connection, Match, Search, State, Wire, binding::PortResolver, execute_query,
-    instance::Instance, primitives::dff::*, primitives::gates::*, report::ReportNode,
+    execute_query_session, instance::Instance, primitives::dff::*, primitives::gates::*,
+    report::ReportNode,
 };
 
 // Trait re-exports

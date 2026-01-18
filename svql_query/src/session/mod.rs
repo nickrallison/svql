@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use polars::prelude::*;
 use prjunnamed_netlist::Design;
+use svql_driver::design_container::DesignContainer;
 use thiserror::Error;
 
 use crate::traits::Pattern;
@@ -56,19 +57,19 @@ pub struct Session {
     design: DesignFrame,
     /// Query results keyed by query type name
     results: ResultStore,
-    /// Original design reference for rehydration
-    design_ref: Arc<Design>,
+    /// Original design container reference for rehydration
+    design_container: Arc<DesignContainer>,
 }
 
 impl Session {
-    /// Creates a new session from a design.
-    pub fn new(design: Arc<Design>) -> Result<Self, SessionError> {
-        let design_frame = DesignFrame::from_design(&design)?;
+    /// Creates a new session from a design container.
+    pub fn new(design_container: Arc<DesignContainer>) -> Result<Self, SessionError> {
+        let design_frame = DesignFrame::from_design(design_container.design())?;
 
         Ok(Self {
             design: design_frame,
             results: ResultStore::new(),
-            design_ref: design,
+            design_container,
         })
     }
 
@@ -89,7 +90,7 @@ impl Session {
 
     /// Returns the original design reference.
     pub fn design(&self) -> &Design {
-        &self.design_ref
+        self.design_container.design()
     }
 
     /// Stores dehydrated results for a query type.
@@ -108,7 +109,7 @@ impl Session {
 
     /// Creates a rehydration context for lazily converting dehydrated matches.
     pub fn rehydrate_context(&self) -> RehydrateContext<'_> {
-        RehydrateContext::new(&self.design, &self.results, &self.design_ref)
+        RehydrateContext::new(&self.design, &self.results, self.design_container.design())
     }
 
     /// Returns the number of cells in the design.
@@ -134,22 +135,29 @@ impl Session {
 
 /// Builder for constructing a Session with query results.
 pub struct SessionBuilder {
-    design: Arc<Design>,
+    design_container: Arc<DesignContainer>,
     pending_results: HashMap<TypeId, (String, QueryResults)>,
 }
 
 impl SessionBuilder {
     /// Creates a new session builder.
-    pub fn new(design: Arc<Design>) -> Self {
+    pub fn new(design_container: Arc<DesignContainer>) -> Self {
         Self {
-            design,
+            design_container,
             pending_results: HashMap::new(),
         }
     }
 
     /// Adds query results to the session.
-    pub fn with_results<P: Pattern + 'static>(mut self, results: QueryResults) -> Self {
-        let type_name = std::any::type_name::<P>().to_string();
+    ///
+    /// Uses the schema's type_name from `Dehydrate::SCHEMA` for consistent
+    /// lookup during rehydration.
+    pub fn with_results<P>(mut self, results: QueryResults) -> Self
+    where
+        P: Pattern + 'static,
+        P::Match: Dehydrate,
+    {
+        let type_name = <P::Match as Dehydrate>::SCHEMA.type_name.to_string();
         self.pending_results
             .insert(TypeId::of::<P>(), (type_name, results));
         self
@@ -157,7 +165,7 @@ impl SessionBuilder {
 
     /// Builds the session.
     pub fn build(self) -> Result<Session, SessionError> {
-        let mut session = Session::new(self.design)?;
+        let mut session = Session::new(self.design_container)?;
 
         for (type_id, (type_name, results)) in self.pending_results {
             session.results.insert_raw(type_id, type_name, results);

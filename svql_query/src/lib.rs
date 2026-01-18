@@ -68,6 +68,55 @@ where
     Ok(results)
 }
 
+/// Execute a query and return results directly in a Session with DataFrame storage.
+///
+/// This is the preferred method for production use as it:
+/// - Dehydrates matches directly into columnar storage
+/// - Avoids allocating full Match objects
+/// - Enables lazy rehydration when individual matches are needed
+///
+/// The returned Session contains:
+/// - The design data as a DesignFrame
+/// - Query results as DataFrames with foreign key references
+pub fn execute_query_session<P>(
+    driver: &Driver,
+    key: &DriverKey,
+    config: &Config,
+) -> Result<session::Session, Box<dyn std::error::Error>>
+where
+    P: traits::Pattern + 'static,
+    P::Match: session::Dehydrate,
+{
+    // 1. Build the Context
+    let needle_ctx = P::context(driver, &config.needle_options)?;
+
+    // 2. Add the Haystack to the context
+    let design_container = driver
+        .get_design(key)
+        .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
+
+    let context = needle_ctx.with_design(key.clone(), design_container.clone());
+
+    // 3. Instantiate the Query Root
+    let root_name = std::any::type_name::<P>()
+        .split("::")
+        .last()
+        .unwrap_or("query")
+        .to_lowercase();
+    let query_instance = P::instantiate(Instance::root(root_name));
+
+    // 4. Execute and get matches
+    let matches = query_instance.execute(driver, &context, key, config);
+
+    // 5. Dehydrate into session
+    let dehydrated = session::Dehydrate::dehydrate_all(&matches)?;
+    let session = session::SessionBuilder::new(design_container)
+        .with_results::<P>(dehydrated)
+        .build()?;
+
+    Ok(session)
+}
+
 /// Defines the state of a query component.
 ///
 /// Components exist in two primary states:

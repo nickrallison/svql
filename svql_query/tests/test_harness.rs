@@ -35,6 +35,7 @@ impl<'a> Default for TestSpec<'a> {
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
     P: Pattern + 'static,
+    P::Match: Dehydrate + Rehydrate,
 {
     setup_test_logging();
 
@@ -52,13 +53,27 @@ where
         &config.haystack_options,
     )?;
 
-    let matches = execute_query::<P>(&driver, &key, &config)?;
+    // Execute query directly into session (dehydrated storage)
+    let session = execute_query_session::<P>(&driver, &key, &config)?;
 
-    if matches.len() != spec.expected_count {
+    // Verify dehydrated count matches
+    let stored_count = session
+        .results()
+        .get_by_name(<P::Match as Dehydrate>::SCHEMA.type_name)
+        .map(|r| r.len())
+        .unwrap_or(0);
+
+    if stored_count != spec.expected_count {
+        // Rehydrate for error reporting
+        let ctx = session.rehydrate_context();
+        let matches: Vec<P::Match> = RehydrateIter::new(&ctx)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_default();
+        
         tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({})",
             spec.expected_count,
-            matches.len(),
+            stored_count,
             std::any::type_name::<P>(),
             spec.haystack_module,
             spec.haystack_path
@@ -70,7 +85,7 @@ where
     }
 
     assert_eq!(
-        matches.len(),
+        stored_count,
         spec.expected_count,
         "Match count mismatch for {}",
         std::any::type_name::<P>()
