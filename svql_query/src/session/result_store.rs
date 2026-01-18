@@ -511,8 +511,8 @@ impl DehydratedResults {
 
     /// Adds a row for a typed Match, returning a typed foreign key.
     ///
-    /// This automatically registers the schema from the `Dehydrate` trait
-    /// and returns a `ForeignKey<T>` for type-safe references.
+    /// This automatically registers the schema and uses the full type path
+    /// (`std::any::type_name::<T>()`) as the storage key.
     ///
     /// # Example
     ///
@@ -521,8 +521,9 @@ impl DehydratedResults {
     /// // Later: rec_or_fk.resolve(&store)
     /// ```
     pub fn push_typed<T: Dehydrate>(&mut self, row: DehydratedRow) -> ForeignKey<T> {
-        self.register_schema(T::SCHEMA.type_name, &T::SCHEMA);
-        let idx = self.push(T::SCHEMA.type_name, row);
+        let type_key = std::any::type_name::<T>();
+        self.register_schema(type_key, &T::SCHEMA);
+        let idx = self.push(type_key, row);
         ForeignKey::new(idx)
     }
 

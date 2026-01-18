@@ -529,6 +529,10 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     config: &::svql_query::prelude::Config,
                     results: &mut ::svql_query::session::DehydratedResults,
                 ) -> Vec<u32> {
+                    // Register our schema using full type path
+                    let type_key = Self::type_key();
+                    results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
                     // 1. Execute submodule searches (dehydrated)
                     #(#dehydrated_query_calls)*
 
@@ -544,7 +548,7 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                             let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
                                 #(#dehydrated_submodule_fields)*;
 
-                            Some(results.push(#struct_name_str, row))
+                            Some(results.push(type_key, row))
                         })
                         .collect()
                 }
@@ -568,9 +572,13 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     _config: &::svql_query::prelude::Config,
                     results: &mut ::svql_query::session::DehydratedResults,
                 ) -> Vec<u32> {
+                    // Register our schema using full type path
+                    let type_key = Self::type_key();
+                    results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
                     // Composite with no submodules - just create a single row
                     let row = ::svql_query::session::DehydratedRow::new(self.path.to_string());
-                    vec![results.push(#struct_name_str, row)]
+                    vec![results.push(type_key, row)]
                 }
             }
         }

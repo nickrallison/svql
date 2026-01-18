@@ -31,11 +31,13 @@ impl<'a> Default for TestSpec<'a> {
     }
 }
 
+/// Run a query test using the new direct dehydration path (SearchDehydrate).
+/// This avoids allocating intermediate Match objects entirely.
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: Pattern + 'static,
-    P::Match: Dehydrate + Rehydrate,
+    P: Pattern + SearchDehydrate + 'static,
+    <P as Pattern>::Match: Dehydrate + Rehydrate,
 {
     setup_test_logging();
 
@@ -53,20 +55,21 @@ where
         &config.haystack_options,
     )?;
 
-    // Execute query directly into session (dehydrated storage)
-    let session = execute_query_session::<P>(&driver, &key, &config)?;
+    // Execute query directly into session using SearchDehydrate (no Match allocation)
+    let session = execute_query_session_direct::<P>(&driver, &key, &config)?;
 
-    // Verify dehydrated count matches
+    // Verify dehydrated count matches (using full type path for lookup)
+    let type_name = std::any::type_name::<<P as Pattern>::Match>();
     let stored_count = session
         .results()
-        .get_by_name(<P::Match as Dehydrate>::SCHEMA.type_name)
+        .get_by_name(type_name)
         .map(|r| r.len())
         .unwrap_or(0);
 
     if stored_count != spec.expected_count {
         // Rehydrate for error reporting
         let ctx = session.rehydrate_context();
-        let matches: Vec<P::Match> = RehydrateIter::new(&ctx)
+        let matches: Vec<<P as Pattern>::Match> = RehydrateIter::new(&ctx)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_default();
 

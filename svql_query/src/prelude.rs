@@ -6,8 +6,8 @@ pub use tracing;
 
 pub use crate::{
     Connection, Match, Search, State, Wire, binding::PortResolver, execute_query,
-    execute_query_session, instance::Instance, primitives::dff::*, primitives::gates::*,
-    report::ReportNode,
+    execute_query_session, execute_query_session_direct, instance::Instance, primitives::dff::*,
+    primitives::gates::*, report::ReportNode,
 };
 
 // Trait re-exports
@@ -37,9 +37,10 @@ pub use crate::traits::{
 
 // Session re-exports (DataFrame-based result storage)
 pub use crate::session::{
-    CellRow, Dehydrate, DehydratedRow, DesignFrame, MatchRef, MatchRow, QueryResults, QuerySchema,
-    RecursiveFieldDesc, Rehydrate, RehydrateContext, RehydrateIter, ResultStore, Session,
-    SessionBuilder, SessionError, SessionRehydrateExt, SubmoduleFieldDesc, WireFieldDesc, WireRef,
+    CellRow, Dehydrate, DehydratedResults, DehydratedRow, DesignFrame, ForeignKey,
+    ForeignKeyTarget, MatchRef, MatchRow, QueryResults, QuerySchema, RecursiveFieldDesc, Rehydrate,
+    RehydrateContext, RehydrateIter, ResultStore, SearchDehydrate, Session, SessionBuilder,
+    SessionError, SessionRehydrateExt, SubmoduleFieldDesc, WireFieldDesc, WireRef,
 };
 
 pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};

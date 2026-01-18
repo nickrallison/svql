@@ -312,8 +312,8 @@ fn update_rec_or_path<'ctx>(rec_or: &mut RecOr<Match>, new_path: Instance) {
 // --- Dehydrate/Rehydrate implementations for DataFrame storage ---
 
 use crate::session::{
-    Dehydrate, Rehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, 
-    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SearchDehydrate, SessionError
+    Dehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, RecursiveFieldDesc,
+    Rehydrate, RehydrateContext, SearchDehydrate, SessionError, WireFieldDesc,
 };
 
 /// Static schema for RecOr - stores the OR gate's wire cell IDs plus child reference
@@ -330,28 +330,25 @@ impl Dehydrate for RecOr<Match> {
         &[], // No external submodules, just the recursive child
         &REC_OR_RECURSIVE_FIELD,
     );
-    
+
     fn dehydrate(&self) -> DehydratedRow {
         DehydratedRow::new(self.path.to_string())
             .with_wire("or_a", self.or.a.inner.as_ref().map(|c| c.id as u32))
             .with_wire("or_b", self.or.b.inner.as_ref().map(|c| c.id as u32))
             .with_wire("or_y", self.or.y.inner.as_ref().map(|c| c.id as u32))
             .with_depth(self.depth() as u32)
-            // Note: child_idx must be set by the caller when building the results table
-            // because it requires knowing the index of the child row
+        // Note: child_idx must be set by the caller when building the results table
+        // because it requires knowing the index of the child row
     }
 }
 
 impl Rehydrate for RecOr<Match> {
     const TYPE_NAME: &'static str = "RecOr";
-    
-    fn rehydrate(
-        row: &MatchRow,
-        ctx: &RehydrateContext<'_>,
-    ) -> Result<Self, SessionError> {
+
+    fn rehydrate(row: &MatchRow, ctx: &RehydrateContext<'_>) -> Result<Self, SessionError> {
         let path = Instance::from_path(&row.path);
         let or_path = path.child("or");
-        
+
         // Rehydrate the OR gate
         let or = OrGate {
             path: or_path.clone(),
@@ -359,23 +356,24 @@ impl Rehydrate for RecOr<Match> {
             b: ctx.rehydrate_wire(or_path.child("b"), row.wire("or_b")),
             y: ctx.rehydrate_wire(or_path.child("or_y"), row.wire("or_y")),
         };
-        
+
         // Recursively rehydrate child if present
         let child = if let Some(child_idx) = row.child() {
-            let child_row = ctx.get_match_row(Self::TYPE_NAME, child_idx)
+            let child_row = ctx
+                .get_match_row(Self::TYPE_NAME, child_idx)
                 .ok_or_else(|| SessionError::InvalidMatchIndex(child_idx))?;
             Some(Box::new(Self::rehydrate(&child_row, ctx)?))
         } else {
             None
         };
-        
+
         Ok(RecOr { path, or, child })
     }
 }
 
 impl SearchDehydrate for RecOr<Search> {
     const MATCH_SCHEMA: QuerySchema = <RecOr<Match> as Dehydrate>::SCHEMA;
-    
+
     fn execute_dehydrated(
         &self,
         driver: &Driver,
@@ -384,18 +382,23 @@ impl SearchDehydrate for RecOr<Search> {
         config: &Config,
         results: &mut DehydratedResults,
     ) -> Vec<u32> {
+        // Register our schema using full type path
+        let type_key = Self::type_key();
+        let or_type_key = <OrGate<Search> as SearchDehydrate>::type_key();
+        results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
         let haystack_index = context.get(key).unwrap().index();
 
         // Get all OR gates (dehydrated)
         let or_query = OrGate::<Search>::instantiate(self.path.child("or"));
         let all_or_indices = or_query.execute_dehydrated(driver, context, key, config, results);
-        
-        // Get the OR gate table from results
-        let or_table = results.tables.get("OrGate").cloned().unwrap_or_default();
-        
+
+        // Get the OR gate table from results (using full type path)
+        let or_table = results.tables.get(or_type_key).cloned().unwrap_or_default();
+
         // Build layer 1: single OR gates (no child)
         let mut current_layer: Vec<(u32, u32)> = Vec::new(); // (rec_or_idx, or_cell_id)
-        
+
         for &or_idx in &all_or_indices {
             if let Some(or_row) = or_table.get(or_idx as usize) {
                 let or_cell_id = or_row.wire("y").unwrap_or(u32::MAX);
@@ -405,23 +408,23 @@ impl SearchDehydrate for RecOr<Search> {
                     .with_wire("or_y", or_row.wire("y"))
                     .with_depth(1)
                     .with_child(None);
-                let rec_or_idx = results.push("RecOr", rec_or_row);
+                let rec_or_idx = results.push(type_key, rec_or_row);
                 current_layer.push((rec_or_idx, or_cell_id));
             }
         }
-        
+
         let mut all_rec_or_indices: Vec<u32> = current_layer.iter().map(|(idx, _)| *idx).collect();
         let mut layer_num = 2u32;
-        
+
         // Build subsequent layers
         loop {
             let mut next_layer: Vec<(u32, u32)> = Vec::new();
-            
+
             for &or_idx in &all_or_indices {
                 if let Some(or_row) = or_table.get(or_idx as usize) {
                     let or_a = or_row.wire("a");
                     let or_b = or_row.wire("b");
-                    
+
                     // Check if any current layer output connects to this OR gate's inputs
                     for &(child_rec_or_idx, child_y_cell_id) in &current_layer {
                         let child_connects = [or_a, or_b].iter().any(|input| {
@@ -429,9 +432,10 @@ impl SearchDehydrate for RecOr<Search> {
                                 // Check connectivity: child_y -> or_input
                                 if let (Some(from_cell), Some(to_cell)) = (
                                     haystack_index.get_cell_by_id(child_y_cell_id as usize),
-                                    haystack_index.get_cell_by_id(*input_id as usize)
+                                    haystack_index.get_cell_by_id(*input_id as usize),
                                 ) {
-                                    haystack_index.fanout_set(&from_cell)
+                                    haystack_index
+                                        .fanout_set(&from_cell)
                                         .map(|fanout| fanout.contains(&to_cell))
                                         .unwrap_or(false)
                                 } else {
@@ -441,7 +445,7 @@ impl SearchDehydrate for RecOr<Search> {
                                 false
                             }
                         });
-                        
+
                         if child_connects {
                             let rec_or_row = DehydratedRow::new(self.path.to_string())
                                 .with_wire("or_a", or_a)
@@ -449,29 +453,29 @@ impl SearchDehydrate for RecOr<Search> {
                                 .with_wire("or_y", or_row.wire("y"))
                                 .with_depth(layer_num)
                                 .with_child(Some(child_rec_or_idx));
-                            let rec_or_idx = results.push("RecOr", rec_or_row);
+                            let rec_or_idx = results.push(type_key, rec_or_row);
                             let or_cell_id = or_row.wire("y").unwrap_or(u32::MAX);
                             next_layer.push((rec_or_idx, or_cell_id));
                         }
                     }
                 }
             }
-            
+
             if next_layer.is_empty() {
                 break;
             }
-            
+
             all_rec_or_indices.extend(next_layer.iter().map(|(idx, _)| *idx));
             current_layer = next_layer;
             layer_num += 1;
-            
+
             if let Some(max) = config.max_recursion_depth {
                 if layer_num > max as u32 {
                     break;
                 }
             }
         }
-        
+
         all_rec_or_indices
     }
 }

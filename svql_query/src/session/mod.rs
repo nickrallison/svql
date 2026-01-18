@@ -177,7 +177,9 @@ impl SessionBuilder {
         P::Match: Dehydrate,
     {
         // Insert the main query type with its proper TypeId
-        let main_type_name = <P::Match as Dehydrate>::SCHEMA.type_name.to_string();
+        // Use full type path for consistent lookup
+        let main_type_name = std::any::type_name::<P::Match>().to_string();
+
         if let Some(main_results) = results_map.get(&main_type_name) {
             self.pending_results.insert(
                 TypeId::of::<P>(),

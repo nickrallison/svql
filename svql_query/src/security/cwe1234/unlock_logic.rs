@@ -332,6 +332,13 @@ impl SearchDehydrate for UnlockLogic<Search> {
         config: &Config,
         results: &mut DehydratedResults,
     ) -> Vec<u32> {
+        // Register our schema using full type path
+        let type_key = Self::type_key();
+        let and_type_key = <AndGate<Search> as SearchDehydrate>::type_key();
+        let rec_or_type_key = <RecOr<Search> as SearchDehydrate>::type_key();
+        let not_type_key = <NotGate<Search> as SearchDehydrate>::type_key();
+        results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
         tracing::info!("UnlockLogic::execute_dehydrated: starting CWE1234 unlock pattern search");
 
         let haystack_index = context.get(key).unwrap().index();
@@ -341,10 +348,10 @@ impl SearchDehydrate for UnlockLogic<Search> {
         let rec_or_indices = self.rec_or.execute_dehydrated(driver, context, key, config, results);
         let not_indices = self.not_gate.execute_dehydrated(driver, context, key, config, results);
 
-        // Get the tables we need to read from
-        let and_table = results.tables.get("AndGate").cloned().unwrap_or_default();
-        let rec_or_table = results.tables.get("RecOr").cloned().unwrap_or_default();
-        let not_table = results.tables.get("NotGate").cloned().unwrap_or_default();
+        // Get the tables we need to read from (using full type paths)
+        let and_table = results.tables.get(and_type_key).cloned().unwrap_or_default();
+        let rec_or_table = results.tables.get(rec_or_type_key).cloned().unwrap_or_default();
+        let not_table = results.tables.get(not_type_key).cloned().unwrap_or_default();
 
         tracing::info!(
             "UnlockLogic::execute_dehydrated: Found {} AND gates, {} RecOR trees, {} NOT gates",
@@ -431,7 +438,7 @@ impl SearchDehydrate for UnlockLogic<Search> {
                                             .with_wire("not_y", not_y)
                                             .with_submodule("rec_or", rec_or_idx);
                                         
-                                        let idx = results.push("UnlockLogic", row);
+                                        let idx = results.push(type_key, row);
                                         result_indices.push(idx);
                                     }
                                 }

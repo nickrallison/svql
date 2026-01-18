@@ -24,6 +24,15 @@ pub trait SearchDehydrate: SearchableComponent {
     /// The schema for the dehydrated Match type.
     const MATCH_SCHEMA: QuerySchema;
 
+    /// Returns the full type path for storage/lookup.
+    ///
+    /// Uses `std::any::type_name` to get a unique key that includes
+    /// the full module path, avoiding collisions between types with
+    /// the same simple name (e.g., variants vs their inner types).
+    fn type_key() -> &'static str {
+        std::any::type_name::<Self::Match>()
+    }
+
     /// Executes the search and directly produces dehydrated results.
     ///
     /// The results are accumulated into the provided `DehydratedResults`,

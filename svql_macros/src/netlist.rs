@@ -272,6 +272,10 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 use ::svql_query::traits::{NetlistComponent, execute_netlist_query, Hardware};
                 use ::svql_query::prelude::PortResolver;
 
+                // Register our schema using full type path
+                let type_key = Self::type_key();
+                results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
                 let assignments = execute_netlist_query(self, context, key, config);
                 let needle_container = context.get(&Self::driver_key()).unwrap();
                 let resolver = PortResolver::new(needle_container.index());
@@ -280,7 +284,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 for assignment in &assignments.items {
                     let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
                         #(#search_dehydrate_wire_fields)*;
-                    let idx = results.push(#struct_name_str, row);
+                    let idx = results.push(type_key, row);
                     indices.push(idx);
                 }
                 indices

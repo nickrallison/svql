@@ -155,14 +155,15 @@ impl SearchableComponent for RecAnd<Search> {
             layer_num += 1;
 
             if let Some(max) = config.max_recursion_depth
-                && layer_num > max {
-                    tracing::event!(
-                        tracing::Level::INFO,
-                        "RecAnd::execute: Reached max recursion depth of {}, stopping",
-                        max
-                    );
-                    break;
-                }
+                && layer_num > max
+            {
+                tracing::event!(
+                    tracing::Level::INFO,
+                    "RecAnd::execute: Reached max recursion depth of {}, stopping",
+                    max
+                );
+                break;
+            }
         }
 
         tracing::event!(
@@ -300,8 +301,8 @@ fn update_rec_and_path<'ctx>(rec_and: &mut RecAnd<Match>, new_path: Instance) {
 // --- Dehydrate/Rehydrate implementations for DataFrame storage ---
 
 use crate::session::{
-    Dehydrate, Rehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, 
-    WireFieldDesc, RecursiveFieldDesc, RehydrateContext, SearchDehydrate, SessionError
+    Dehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, RecursiveFieldDesc,
+    Rehydrate, RehydrateContext, SearchDehydrate, SessionError, WireFieldDesc,
 };
 
 /// Static schema for RecAnd - stores the AND gate's wire cell IDs plus child reference
@@ -318,28 +319,25 @@ impl Dehydrate for RecAnd<Match> {
         &[], // No external submodules, just the recursive child
         &REC_AND_RECURSIVE_FIELD,
     );
-    
+
     fn dehydrate(&self) -> DehydratedRow {
         DehydratedRow::new(self.path.to_string())
             .with_wire("and_a", self.and.a.inner.as_ref().map(|c| c.id as u32))
             .with_wire("and_b", self.and.b.inner.as_ref().map(|c| c.id as u32))
             .with_wire("and_y", self.and.y.inner.as_ref().map(|c| c.id as u32))
             .with_depth(self.depth() as u32)
-            // Note: child_idx must be set by the caller when building the results table
-            // because it requires knowing the index of the child row
+        // Note: child_idx must be set by the caller when building the results table
+        // because it requires knowing the index of the child row
     }
 }
 
 impl Rehydrate for RecAnd<Match> {
     const TYPE_NAME: &'static str = "RecAnd";
-    
-    fn rehydrate(
-        row: &MatchRow,
-        ctx: &RehydrateContext<'_>,
-    ) -> Result<Self, SessionError> {
+
+    fn rehydrate(row: &MatchRow, ctx: &RehydrateContext<'_>) -> Result<Self, SessionError> {
         let path = Instance::from_path(&row.path);
         let and_path = path.child("and");
-        
+
         // Rehydrate the AND gate
         let and = AndGate {
             path: and_path.clone(),
@@ -347,23 +345,24 @@ impl Rehydrate for RecAnd<Match> {
             b: ctx.rehydrate_wire(and_path.child("b"), row.wire("and_b")),
             y: ctx.rehydrate_wire(and_path.child("and_y"), row.wire("and_y")),
         };
-        
+
         // Recursively rehydrate child if present
         let child = if let Some(child_idx) = row.child() {
-            let child_row = ctx.get_match_row(Self::TYPE_NAME, child_idx)
+            let child_row = ctx
+                .get_match_row(Self::TYPE_NAME, child_idx)
                 .ok_or_else(|| SessionError::InvalidMatchIndex(child_idx))?;
             Some(Box::new(Self::rehydrate(&child_row, ctx)?))
         } else {
             None
         };
-        
+
         Ok(RecAnd { path, and, child })
     }
 }
 
 impl SearchDehydrate for RecAnd<Search> {
     const MATCH_SCHEMA: QuerySchema = <RecAnd<Match> as Dehydrate>::SCHEMA;
-    
+
     fn execute_dehydrated(
         &self,
         driver: &Driver,
@@ -372,18 +371,23 @@ impl SearchDehydrate for RecAnd<Search> {
         config: &Config,
         results: &mut DehydratedResults,
     ) -> Vec<u32> {
+        // Register our schema using full type path
+        let type_key = Self::type_key();
+        let and_type_key = <AndGate<Search> as SearchDehydrate>::type_key();
+        results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
         let haystack_index = context.get(key).unwrap().index();
 
         // Get all AND gates (dehydrated)
         let and_query = AndGate::<Search>::instantiate(self.path.child("and"));
         let all_and_indices = and_query.execute_dehydrated(driver, context, key, config, results);
-        
-        // Get the AND gate table from results
-        let and_table = results.tables.get("AndGate").cloned().unwrap_or_default();
-        
+
+        // Get the AND gate table from results (using full type path)
+        let and_table = results.tables.get(and_type_key).cloned().unwrap_or_default();
+
         // Build layer 1: single AND gates (no child)
         let mut current_layer: Vec<(u32, u32)> = Vec::new(); // (rec_and_idx, and_cell_id)
-        
+
         for &and_idx in &all_and_indices {
             if let Some(and_row) = and_table.get(and_idx as usize) {
                 let and_cell_id = and_row.wire("y").unwrap_or(u32::MAX);
@@ -393,23 +397,23 @@ impl SearchDehydrate for RecAnd<Search> {
                     .with_wire("and_y", and_row.wire("y"))
                     .with_depth(1)
                     .with_child(None);
-                let rec_and_idx = results.push("RecAnd", rec_and_row);
+                let rec_and_idx = results.push(type_key, rec_and_row);
                 current_layer.push((rec_and_idx, and_cell_id));
             }
         }
-        
+
         let mut all_rec_and_indices: Vec<u32> = current_layer.iter().map(|(idx, _)| *idx).collect();
         let mut layer_num = 2u32;
-        
+
         // Build subsequent layers
         loop {
             let mut next_layer: Vec<(u32, u32)> = Vec::new();
-            
+
             for &and_idx in &all_and_indices {
                 if let Some(and_row) = and_table.get(and_idx as usize) {
                     let and_a = and_row.wire("a");
                     let and_b = and_row.wire("b");
-                    
+
                     // Check if any current layer output connects to this AND gate's inputs
                     for &(child_rec_and_idx, child_y_cell_id) in &current_layer {
                         let child_connects = [and_a, and_b].iter().any(|input| {
@@ -417,9 +421,10 @@ impl SearchDehydrate for RecAnd<Search> {
                                 // Check connectivity: child_y -> and_input
                                 if let (Some(from_cell), Some(to_cell)) = (
                                     haystack_index.get_cell_by_id(child_y_cell_id as usize),
-                                    haystack_index.get_cell_by_id(*input_id as usize)
+                                    haystack_index.get_cell_by_id(*input_id as usize),
                                 ) {
-                                    haystack_index.fanout_set(&from_cell)
+                                    haystack_index
+                                        .fanout_set(&from_cell)
                                         .map(|fanout| fanout.contains(&to_cell))
                                         .unwrap_or(false)
                                 } else {
@@ -429,7 +434,7 @@ impl SearchDehydrate for RecAnd<Search> {
                                 false
                             }
                         });
-                        
+
                         if child_connects {
                             let rec_and_row = DehydratedRow::new(self.path.to_string())
                                 .with_wire("and_a", and_a)
@@ -437,29 +442,29 @@ impl SearchDehydrate for RecAnd<Search> {
                                 .with_wire("and_y", and_row.wire("y"))
                                 .with_depth(layer_num)
                                 .with_child(Some(child_rec_and_idx));
-                            let rec_and_idx = results.push("RecAnd", rec_and_row);
+                            let rec_and_idx = results.push(type_key, rec_and_row);
                             let and_cell_id = and_row.wire("y").unwrap_or(u32::MAX);
                             next_layer.push((rec_and_idx, and_cell_id));
                         }
                     }
                 }
             }
-            
+
             if next_layer.is_empty() {
                 break;
             }
-            
+
             all_rec_and_indices.extend(next_layer.iter().map(|(idx, _)| *idx));
             current_layer = next_layer;
             layer_num += 1;
-            
+
             if let Some(max) = config.max_recursion_depth {
                 if layer_num > max as u32 {
                     break;
                 }
             }
         }
-        
+
         all_rec_and_indices
     }
 }

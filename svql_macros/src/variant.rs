@@ -280,7 +280,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // SearchDehydrate: query each variant and collect dehydrated results  
+    // SearchDehydrate: query each variant and collect dehydrated results
     let search_dehydrate_query_blocks = variants_info.iter().map(|v| {
         let v_ty = &v.ty;
         let search_type = common::replace_state_generic(v_ty);
@@ -298,7 +298,7 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     config,
                     results,
                 );
-                all_indices.extend(indices);
+                all_inner_indices.extend(indices);
             }
         }
     });
@@ -464,9 +464,27 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 config: &::svql_query::common::Config,
                 results: &mut ::svql_query::session::DehydratedResults,
             ) -> Vec<u32> {
-                let mut all_indices = Vec::new();
+                // Register our schema using full type path
+                let type_key = Self::type_key();
+                results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
+                let mut all_inner_indices = Vec::new();
                 #(#search_dehydrate_query_blocks)*
-                all_indices
+
+                // For variants, we store results under our own type key
+                // by creating rows that reference the inner type results
+                // (wasteful but correct - allows lookup by variant name)
+                // Return indices to OUR table, not the inner types' tables
+                let mut variant_indices = Vec::new();
+                for _ in &all_inner_indices {
+                    let row = ::svql_query::session::DehydratedRow::new(
+                        ::svql_query::traits::Hardware::path(self).to_string()
+                    );
+                    let idx = results.push(type_key, row);
+                    variant_indices.push(idx);
+                }
+
+                variant_indices
             }
         }
     };

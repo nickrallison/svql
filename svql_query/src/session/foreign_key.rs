@@ -55,14 +55,15 @@ impl<T> ForeignKey<T> {
 impl<T: Dehydrate> ForeignKey<T> {
     /// Resolves this foreign key to a row from the correct table.
     ///
-    /// Uses the type's schema to determine which table to look up.
+    /// Uses `std::any::type_name::<T>()` to look up the correct table,
+    /// which includes the full module path for unique identification.
     pub fn resolve<'a>(&self, store: &'a ResultStore) -> Option<MatchRow> {
-        store.get_row(T::SCHEMA.type_name, self.index)
+        store.get_row(std::any::type_name::<T>(), self.index)
     }
 
-    /// Returns the type name of the target table.
-    pub const fn type_name() -> &'static str {
-        T::SCHEMA.type_name
+    /// Returns the full type path of the target table.
+    pub fn type_key() -> &'static str {
+        std::any::type_name::<T>()
     }
 }
 
@@ -86,12 +87,14 @@ impl<T> From<ForeignKey<T>> for u32 {
 ///
 /// This is automatically implemented for types that implement `Dehydrate`.
 pub trait ForeignKeyTarget {
-    /// The table name where rows of this type are stored.
-    const TABLE_NAME: &'static str;
+    /// The table name where rows of this type are stored (full type path).
+    fn table_name() -> &'static str;
 }
 
 impl<T: Dehydrate> ForeignKeyTarget for T {
-    const TABLE_NAME: &'static str = T::SCHEMA.type_name;
+    fn table_name() -> &'static str {
+        std::any::type_name::<T>()
+    }
 }
 
 #[cfg(test)]

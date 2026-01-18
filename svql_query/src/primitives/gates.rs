@@ -188,8 +188,9 @@ macro_rules! define_primitive_gate {
                 config: &Config,
                 results: &mut DehydratedResults,
             ) -> Vec<u32> {
-                // Register our schema
-                results.register_schema(stringify!($name), &Self::MATCH_SCHEMA);
+                // Register our schema using full type path
+                let type_key = Self::type_key();
+                results.register_schema(type_key, &Self::MATCH_SCHEMA);
 
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
@@ -214,7 +215,7 @@ macro_rules! define_primitive_gate {
                         let cell_id = cell.to_info().id as u32;
                         let row = DehydratedRow::new(self.path.to_string())
                             $(.with_wire(stringify!($port), Some(cell_id)))*;
-                        results.push(stringify!($name), row)
+                        results.push(type_key, row)
                     })
                     .collect()
             }

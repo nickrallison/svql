@@ -175,6 +175,10 @@ macro_rules! impl_dff_primitive {
                 _config: &::svql_common::Config,
                 results: &mut ::svql_query::session::DehydratedResults,
             ) -> Vec<u32> {
+                // Register our schema using full type path
+                let type_key = Self::type_key();
+                results.register_schema(type_key, &Self::MATCH_SCHEMA);
+
                 let haystack = context.get(key).expect("Haystack missing from context");
                 let index = haystack.index();
 
@@ -194,7 +198,7 @@ macro_rules! impl_dff_primitive {
                         let cell_id = cell.to_info().id as u32;
                         let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
                             $(.with_wire(stringify!($port), Some(cell_id)))*;
-                        results.push(stringify!($name), row)
+                        results.push(type_key, row)
                     })
                     .collect()
             }
