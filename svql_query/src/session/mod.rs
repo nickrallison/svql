@@ -23,6 +23,9 @@ pub use result_store::{
 };
 pub use search_dehydrate::SearchDehydrate;
 
+// Re-export validation helper for use by macros
+pub use self::validate_dehydrated_connection as validate_connection;
+
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -211,6 +214,33 @@ impl SessionBuilder {
         }
 
         Ok(session)
+    }
+}
+
+/// Validates that two cells (by ID) are connected in the design graph.
+///
+/// This is used by composite SearchDehydrate implementations to validate
+/// topology connections between submodule wires.
+pub fn validate_dehydrated_connection<'ctx>(
+    from_cell_id: Option<u32>,
+    to_cell_id: Option<u32>,
+    haystack_index: &svql_subgraph::GraphIndex<'ctx>,
+) -> bool {
+    match (from_cell_id, to_cell_id) {
+        (Some(from_id), Some(to_id)) => {
+            if let (Some(from_cell), Some(to_cell)) = (
+                haystack_index.get_cell_by_id(from_id as usize),
+                haystack_index.get_cell_by_id(to_id as usize),
+            ) {
+                haystack_index
+                    .fanout_set(&from_cell)
+                    .map(|fanout| fanout.contains(&to_cell))
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        }
+        _ => false,
     }
 }
 

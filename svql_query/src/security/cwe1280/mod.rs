@@ -1,6 +1,7 @@
 pub mod grant_access;
 
 use crate::prelude::*;
+use crate::traits::DehydratedTopologyValidation;
 
 use crate::security::cwe1280::grant_access::GrantAccess;
 use crate::security::primitives::locked_register::LockedRegister;
@@ -24,6 +25,8 @@ impl<S: State> Topology<S> for DelayedGrantAccess<S> {
     }
 }
 
+impl DehydratedTopologyValidation for DelayedGrantAccess<Search> {}
+
 /// Complete CWE-1280 pattern: Access Control with Stale Access Check
 #[composite]
 pub struct Cwe1280<S: State> {
@@ -45,3 +48,5 @@ impl<S: State> Topology<S> for Cwe1280<S> {
         );
     }
 }
+
+impl DehydratedTopologyValidation for Cwe1280<Search> {}

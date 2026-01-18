@@ -280,16 +280,30 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    // SearchDehydrate: query each variant and collect dehydrated results
+    // SearchDehydrate: query each variant and collect dehydrated results with type info
+    // We need to track which inner type each index belongs to for port mapping
     let search_dehydrate_query_blocks = variants_info.iter().map(|v| {
         let v_ty = &v.ty;
         let search_type = common::replace_state_generic(v_ty);
+
+        // Get port mappings for this variant (variant_port -> inner_field)
+        let port_wire_copies: Vec<_> = port_names.iter().filter_map(|port| {
+            if let Some(Some(inner_field)) = v.port_map.get(port) {
+                let port_str = port.as_str();
+                Some(quote! {
+                    .with_wire(#port_str, inner_row.wire(#inner_field))
+                })
+            } else {
+                None
+            }
+        }).collect();
 
         quote! {
             {
                 let sub_query = <#search_type as ::svql_query::traits::SearchableComponent>::create_at(
                     ::svql_query::traits::Hardware::path(self).clone()
                 );
+                let inner_type_key = <#search_type as ::svql_query::session::SearchDehydrate>::type_key();
                 let indices = <#search_type as ::svql_query::session::SearchDehydrate>::execute_dehydrated(
                     &sub_query,
                     driver,
@@ -298,7 +312,18 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     config,
                     results,
                 );
-                all_inner_indices.extend(indices);
+                // For each result, create a variant row that copies the port wires
+                let inner_table = results.tables.get(inner_type_key).cloned().unwrap_or_default();
+                for &idx in &indices {
+                    if let Some(inner_row) = inner_table.get(idx as usize) {
+                        let row = ::svql_query::session::DehydratedRow::new(
+                            ::svql_query::traits::Hardware::path(self).to_string()
+                        )
+                        #(#port_wire_copies)*;
+                        let variant_idx = results.push(type_key, row);
+                        variant_indices.push(variant_idx);
+                    }
+                }
             }
         }
     });
@@ -468,21 +493,8 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 let type_key = Self::type_key();
                 results.register_schema(type_key, &Self::MATCH_SCHEMA);
 
-                let mut all_inner_indices = Vec::new();
-                #(#search_dehydrate_query_blocks)*
-
-                // For variants, we store results under our own type key
-                // by creating rows that reference the inner type results
-                // (wasteful but correct - allows lookup by variant name)
-                // Return indices to OUR table, not the inner types' tables
                 let mut variant_indices = Vec::new();
-                for _ in &all_inner_indices {
-                    let row = ::svql_query::session::DehydratedRow::new(
-                        ::svql_query::traits::Hardware::path(self).to_string()
-                    );
-                    let idx = results.push(type_key, row);
-                    variant_indices.push(idx);
-                }
+                #(#search_dehydrate_query_blocks)*
 
                 variant_indices
             }

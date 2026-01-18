@@ -12,7 +12,7 @@ pub mod variant;
 pub use component::{MatchedComponent, SearchableComponent, kind};
 pub use composite::{
     CompositeComponent, CompositeMatched, ConnectionBuilder, Connections, Topology,
-    validate_composite,
+    validate_composite, DehydratedTopologyValidation,
 };
 pub use netlist::{NetlistComponent, NetlistMatched, execute_netlist_query, report_netlist};
 pub use variant::{VariantComponent, VariantMatched};

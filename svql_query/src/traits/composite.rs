@@ -118,6 +118,30 @@ where
     })
 }
 
+/// Trait for composites that can validate their topology using dehydrated row data.
+///
+/// This allows composites to validate submodule connections during the
+/// SearchDehydrate pass without needing to construct full Match objects.
+///
+/// Implement this trait for composites that have non-trivial topology connections.
+/// The default implementation returns true (no validation).
+pub trait DehydratedTopologyValidation {
+    /// Validates that the topology constraints are satisfied using dehydrated data.
+    ///
+    /// # Arguments
+    /// * `submodule_rows` - Map from submodule field name to the dehydrated row
+    /// * `haystack_index` - The design graph index for checking connectivity
+    ///
+    /// Returns true if the topology is valid, false otherwise.
+    /// The default implementation returns true (always valid).
+    fn validate_dehydrated<'ctx>(
+        _submodule_rows: &std::collections::HashMap<&str, &crate::session::DehydratedRow>,
+        _haystack_index: &GraphIndex<'ctx>,
+    ) -> bool {
+        true // Default: no validation
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Connections {
     pub constraints: Vec<Vec<(Option<Wire<Search>>, Option<Wire<Search>>)>>,

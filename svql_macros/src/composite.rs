@@ -509,6 +509,47 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Generate type key lookups for submodules (for validation)
+    let submodule_type_keys: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ident = &f.ident;
+                let type_key_var = syn::Ident::new(&format!("{}_type_key", ident), ident.span());
+                let ty = &f.ty;
+                let search_ty = common::replace_state_generic(ty);
+                Some(quote! {
+                    let #type_key_var = <#search_ty as ::svql_query::session::SearchDehydrate>::type_key();
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Generate row lookups and validation map building
+    let validation_map_entries: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ident = &f.ident;
+                let ident_idx = syn::Ident::new(&format!("{}_idx", ident), ident.span());
+                let type_key_var = syn::Ident::new(&format!("{}_type_key", ident), ident.span());
+                let row_var = syn::Ident::new(&format!("{}_row", ident), ident.span());
+                let name = f.ident.to_string();
+                Some(quote! {
+                    let #row_var = results.tables.get(#type_key_var)
+                        .and_then(|t| t.get(*#ident_idx as usize));
+                    if let Some(row) = #row_var {
+                        validation_map.insert(#name, row);
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let search_dehydrate_impl = if has_submodules {
         quote! {
             impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type
@@ -533,16 +574,25 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     let type_key = Self::type_key();
                     results.register_schema(type_key, &Self::MATCH_SCHEMA);
 
+                    // Get type keys for submodule lookups
+                    #(#submodule_type_keys)*
+
                     // 1. Execute submodule searches (dehydrated)
                     #(#dehydrated_query_calls)*
 
                     // 2. Cartesian product over submodule indices, validate, and store
-                    let _haystack_index = context.get(key).unwrap().index();
+                    let haystack_index = context.get(key).unwrap().index();
 
                     ::svql_query::itertools::iproduct!( #(#submodule_indices_vecs.iter()),* )
                         .filter_map(|( #(#submodule_idx_bindings),* )| {
-                            // TODO: Topology validation using cell IDs from dehydrated rows
-                            // For now, we skip validation (will be added in follow-up)
+                            // Build validation map
+                            let mut validation_map: std::collections::HashMap<&str, &::svql_query::session::DehydratedRow> = std::collections::HashMap::new();
+                            #(#validation_map_entries)*
+
+                            // Validate topology using DehydratedTopologyValidation trait
+                            if !<Self as ::svql_query::traits::DehydratedTopologyValidation>::validate_dehydrated(&validation_map, haystack_index) {
+                                return None;
+                            }
 
                             // Create the composite row
                             let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())

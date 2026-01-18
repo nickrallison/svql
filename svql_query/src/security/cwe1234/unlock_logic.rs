@@ -397,38 +397,68 @@ impl SearchDehydrate for UnlockLogic<Search> {
         );
 
         // For each (RecOr, AND) pair, check if any NOT gate's output is in RecOr's fanin
+        // Deduplicate by (AND, NOT) pairs - the same NOT gate shouldn't match multiple times
+        // with the same AND gate (via different RecOr subtrees)
         let mut result_indices: Vec<u32> = Vec::new();
+        let mut seen_patterns: std::collections::HashSet<(u32, u32)> = std::collections::HashSet::new();
 
         for (rec_or_idx, and_idx) in rec_or_and_pairs {
-            // We need to compute rec_or's fanin set - this requires walking the tree
-            // For now, check if not_y connects to any or_a or or_b in the tree
-            // This is a simplified check - we just check direct connectivity
+            // Check if any NOT gate's output is in the transitive fanin of the RecOr tree
+            // This handles deep trees where NOT connects to an intermediate OR gate
 
             if let Some(and_row) = and_table.get(and_idx as usize) {
                 if let Some(rec_or_row) = rec_or_table.get(rec_or_idx as usize) {
-                    // Get the root OR gate's inputs
-                    let or_a = rec_or_row.wire("or_a");
-                    let or_b = rec_or_row.wire("or_b");
+                    // Get the root OR gate's output - we'll compute its transitive fanin
+                    let or_y = rec_or_row.wire("or_y");
 
                     for &not_idx in &not_indices {
+                        // Skip if we've already found this (AND, NOT) combination
+                        if seen_patterns.contains(&(and_idx, not_idx)) {
+                            continue;
+                        }
+
                         if let Some(not_row) = not_table.get(not_idx as usize) {
                             let not_y = not_row.wire("y");
 
                             if let Some(not_y_id) = not_y {
-                                if let Some(from_wrapper) = haystack_index.get_cell_by_id(not_y_id as usize) {
-                                    let fanout = haystack_index.fanout_set(&from_wrapper);
-
-                                    // Check if not_y connects to rec_or's OR inputs
-                                    let connected_to_or = [or_a, or_b].iter().any(|wire| {
-                                        if let Some(wire_id) = wire {
-                                            if let Some(to_wrapper) = haystack_index.get_cell_by_id(*wire_id as usize) {
-                                                return fanout.as_ref().map(|f| f.contains(&to_wrapper)).unwrap_or(false);
+                                if let Some(not_cell) = haystack_index.get_cell_by_id(not_y_id as usize) {
+                                    // Check if not_y is in the transitive fanin of or_y
+                                    // Do a BFS backwards from or_y to see if we can reach not_y
+                                    let connected = if let Some(or_y_id) = or_y {
+                                        if let Some(or_cell) = haystack_index.get_cell_by_id(or_y_id as usize) {
+                                            // BFS to check transitive connectivity
+                                            let mut visited = std::collections::HashSet::new();
+                                            let mut queue = std::collections::VecDeque::new();
+                                            queue.push_back(or_cell.clone());
+                                            visited.insert(or_cell.debug_index());
+                                            
+                                            let mut found = false;
+                                            while let Some(current) = queue.pop_front() {
+                                                if let Some(fanin) = haystack_index.fanin_set(&current) {
+                                                    for pred in fanin {
+                                                        if pred.debug_index() == not_cell.debug_index() {
+                                                            found = true;
+                                                            break;
+                                                        }
+                                                        if visited.insert(pred.debug_index()) {
+                                                            queue.push_back(pred);
+                                                        }
+                                                    }
+                                                }
+                                                if found { break; }
                                             }
+                                            found
+                                        } else {
+                                            false
                                         }
+                                    } else {
                                         false
-                                    });
+                                    };
 
-                                    if connected_to_or {
+                                    if connected {
+                                        // Mark this (AND, NOT) pair as seen
+                                        seen_patterns.insert((and_idx, not_idx));
+                                        
                                         // Create the UnlockLogic dehydrated row
                                         let row = DehydratedRow::new(self.path.to_string())
                                             .with_wire("top_and_a", and_row.wire("a"))
