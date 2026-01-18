@@ -90,9 +90,7 @@ impl From<ConnectionBuilder<'_, Search>> for Connections {
                 .map(|group| {
                     group
                         .iter()
-                        .map(|(from_opt, to_opt)| {
-                            (from_opt.cloned(), to_opt.cloned())
-                        })
+                        .map(|(from_opt, to_opt)| (from_opt.cloned(), to_opt.cloned()))
                         .collect()
                 })
                 .collect(),

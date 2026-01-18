@@ -254,8 +254,8 @@ impl MatchedComponent for UnlockLogic<Match> {
 // --- Dehydrate/Rehydrate implementations ---
 
 use crate::session::{
-    Dehydrate, Rehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, 
-    WireFieldDesc, SubmoduleFieldDesc, RehydrateContext, SearchDehydrate, SessionError
+    Dehydrate, DehydratedResults, DehydratedRow, MatchRow, QuerySchema, Rehydrate,
+    RehydrateContext, SearchDehydrate, SessionError, SubmoduleFieldDesc, WireFieldDesc,
 };
 
 impl Dehydrate for UnlockLogic<Match> {
@@ -270,31 +270,38 @@ impl Dehydrate for UnlockLogic<Match> {
             WireFieldDesc { name: "not_a" },
             WireFieldDesc { name: "not_y" },
         ],
-        &[
-            SubmoduleFieldDesc { name: "rec_or", type_name: "RecOr" },
-        ],
+        &[SubmoduleFieldDesc {
+            name: "rec_or",
+            type_name: "RecOr",
+        }],
     );
-    
+
     fn dehydrate(&self) -> DehydratedRow {
         DehydratedRow::new(self.path.to_string())
-            .with_wire("top_and_a", self.top_and.a.inner.as_ref().map(|c| c.id as u32))
-            .with_wire("top_and_b", self.top_and.b.inner.as_ref().map(|c| c.id as u32))
-            .with_wire("top_and_y", self.top_and.y.inner.as_ref().map(|c| c.id as u32))
+            .with_wire(
+                "top_and_a",
+                self.top_and.a.inner.as_ref().map(|c| c.id as u32),
+            )
+            .with_wire(
+                "top_and_b",
+                self.top_and.b.inner.as_ref().map(|c| c.id as u32),
+            )
+            .with_wire(
+                "top_and_y",
+                self.top_and.y.inner.as_ref().map(|c| c.id as u32),
+            )
             .with_wire("not_a", self.not_gate.a.inner.as_ref().map(|c| c.id as u32))
             .with_wire("not_y", self.not_gate.y.inner.as_ref().map(|c| c.id as u32))
-            // rec_or submodule index must be set by caller
+        // rec_or submodule index must be set by caller
     }
 }
 
 impl Rehydrate for UnlockLogic<Match> {
     const TYPE_NAME: &'static str = "UnlockLogic";
-    
-    fn rehydrate(
-        row: &MatchRow,
-        ctx: &RehydrateContext<'_>,
-    ) -> Result<Self, SessionError> {
+
+    fn rehydrate(row: &MatchRow, ctx: &RehydrateContext<'_>) -> Result<Self, SessionError> {
         let path = Instance::from_path(&row.path);
-        
+
         // Rehydrate top_and
         let top_and_path = path.child("top_and");
         let top_and = AndGate {
@@ -303,7 +310,7 @@ impl Rehydrate for UnlockLogic<Match> {
             b: ctx.rehydrate_wire(top_and_path.child("b"), row.wire("top_and_b")),
             y: ctx.rehydrate_wire(top_and_path.child("y"), row.wire("top_and_y")),
         };
-        
+
         // Rehydrate not_gate
         let not_path = path.child("not_gate");
         let not_gate = NotGate {
@@ -311,13 +318,19 @@ impl Rehydrate for UnlockLogic<Match> {
             a: ctx.rehydrate_wire(not_path.child("a"), row.wire("not_a")),
             y: ctx.rehydrate_wire(not_path.child("y"), row.wire("not_y")),
         };
-        
+
         // Rehydrate rec_or from submodule index
-        let rec_or_idx = row.submodule("rec_or")
-            .ok_or_else(|| SessionError::RehydrationError("Missing rec_or submodule index".into()))?;
+        let rec_or_idx = row.submodule("rec_or").ok_or_else(|| {
+            SessionError::RehydrationError("Missing rec_or submodule index".into())
+        })?;
         let rec_or = RecOr::rehydrate_by_index(rec_or_idx, ctx)?;
-        
-        Ok(UnlockLogic { path, top_and, rec_or, not_gate })
+
+        Ok(UnlockLogic {
+            path,
+            top_and,
+            rec_or,
+            not_gate,
+        })
     }
 }
 
@@ -344,14 +357,32 @@ impl SearchDehydrate for UnlockLogic<Search> {
         let haystack_index = context.get(key).unwrap().index();
 
         // Execute dehydrated searches for submodules
-        let and_indices = self.top_and.execute_dehydrated(driver, context, key, config, results);
-        let rec_or_indices = self.rec_or.execute_dehydrated(driver, context, key, config, results);
-        let not_indices = self.not_gate.execute_dehydrated(driver, context, key, config, results);
+        let and_indices = self
+            .top_and
+            .execute_dehydrated(driver, context, key, config, results);
+        let rec_or_indices = self
+            .rec_or
+            .execute_dehydrated(driver, context, key, config, results);
+        let not_indices = self
+            .not_gate
+            .execute_dehydrated(driver, context, key, config, results);
 
         // Get the tables we need to read from (using full type paths)
-        let and_table = results.tables.get(and_type_key).cloned().unwrap_or_default();
-        let rec_or_table = results.tables.get(rec_or_type_key).cloned().unwrap_or_default();
-        let not_table = results.tables.get(not_type_key).cloned().unwrap_or_default();
+        let and_table = results
+            .tables
+            .get(and_type_key)
+            .cloned()
+            .unwrap_or_default();
+        let rec_or_table = results
+            .tables
+            .get(rec_or_type_key)
+            .cloned()
+            .unwrap_or_default();
+        let not_table = results
+            .tables
+            .get(not_type_key)
+            .cloned()
+            .unwrap_or_default();
 
         tracing::info!(
             "UnlockLogic::execute_dehydrated: Found {} AND gates, {} RecOR trees, {} NOT gates",
@@ -367,19 +398,26 @@ impl SearchDehydrate for UnlockLogic<Search> {
             if let Some(rec_or_row) = rec_or_table.get(rec_or_idx as usize) {
                 let rec_or_y = rec_or_row.wire("or_y");
                 if let Some(rec_or_y_id) = rec_or_y {
-                    if let Some(from_wrapper) = haystack_index.get_cell_by_id(rec_or_y_id as usize) {
+                    if let Some(from_wrapper) = haystack_index.get_cell_by_id(rec_or_y_id as usize)
+                    {
                         let fanout = haystack_index.fanout_set(&from_wrapper);
 
                         for &and_idx in &and_indices {
                             if let Some(and_row) = and_table.get(and_idx as usize) {
-                                let connected = [and_row.wire("a"), and_row.wire("b")].iter().any(|wire| {
-                                    if let Some(wire_id) = wire {
-                                        if let Some(to_wrapper) = haystack_index.get_cell_by_id(*wire_id as usize) {
-                                            return fanout.as_ref().map(|f| f.contains(&to_wrapper)).unwrap_or(false);
+                                let connected =
+                                    [and_row.wire("a"), and_row.wire("b")].iter().any(|wire| {
+                                        if let Some(wire_id) = wire {
+                                            if let Some(to_wrapper) =
+                                                haystack_index.get_cell_by_id(*wire_id as usize)
+                                            {
+                                                return fanout
+                                                    .as_ref()
+                                                    .map(|f| f.contains(&to_wrapper))
+                                                    .unwrap_or(false);
+                                            }
                                         }
-                                    }
-                                    false
-                                });
+                                        false
+                                    });
 
                                 if connected {
                                     rec_or_and_pairs.push((rec_or_idx, and_idx));
@@ -400,7 +438,8 @@ impl SearchDehydrate for UnlockLogic<Search> {
         // Deduplicate by (AND, NOT) pairs - the same NOT gate shouldn't match multiple times
         // with the same AND gate (via different RecOr subtrees)
         let mut result_indices: Vec<u32> = Vec::new();
-        let mut seen_patterns: std::collections::HashSet<(u32, u32)> = std::collections::HashSet::new();
+        let mut seen_patterns: std::collections::HashSet<(u32, u32)> =
+            std::collections::HashSet::new();
 
         for (rec_or_idx, and_idx) in rec_or_and_pairs {
             // Check if any NOT gate's output is in the transitive fanin of the RecOr tree
@@ -421,22 +460,30 @@ impl SearchDehydrate for UnlockLogic<Search> {
                             let not_y = not_row.wire("y");
 
                             if let Some(not_y_id) = not_y {
-                                if let Some(not_cell) = haystack_index.get_cell_by_id(not_y_id as usize) {
+                                if let Some(not_cell) =
+                                    haystack_index.get_cell_by_id(not_y_id as usize)
+                                {
                                     // Check if not_y is in the transitive fanin of or_y
                                     // Do a BFS backwards from or_y to see if we can reach not_y
                                     let connected = if let Some(or_y_id) = or_y {
-                                        if let Some(or_cell) = haystack_index.get_cell_by_id(or_y_id as usize) {
+                                        if let Some(or_cell) =
+                                            haystack_index.get_cell_by_id(or_y_id as usize)
+                                        {
                                             // BFS to check transitive connectivity
                                             let mut visited = std::collections::HashSet::new();
                                             let mut queue = std::collections::VecDeque::new();
                                             queue.push_back(or_cell.clone());
                                             visited.insert(or_cell.debug_index());
-                                            
+
                                             let mut found = false;
                                             while let Some(current) = queue.pop_front() {
-                                                if let Some(fanin) = haystack_index.fanin_set(&current) {
+                                                if let Some(fanin) =
+                                                    haystack_index.fanin_set(&current)
+                                                {
                                                     for pred in fanin {
-                                                        if pred.debug_index() == not_cell.debug_index() {
+                                                        if pred.debug_index()
+                                                            == not_cell.debug_index()
+                                                        {
                                                             found = true;
                                                             break;
                                                         }
@@ -445,7 +492,9 @@ impl SearchDehydrate for UnlockLogic<Search> {
                                                         }
                                                     }
                                                 }
-                                                if found { break; }
+                                                if found {
+                                                    break;
+                                                }
                                             }
                                             found
                                         } else {
@@ -458,7 +507,7 @@ impl SearchDehydrate for UnlockLogic<Search> {
                                     if connected {
                                         // Mark this (AND, NOT) pair as seen
                                         seen_patterns.insert((and_idx, not_idx));
-                                        
+
                                         // Create the UnlockLogic dehydrated row
                                         let row = DehydratedRow::new(self.path.to_string())
                                             .with_wire("top_and_a", and_row.wire("a"))
@@ -467,7 +516,7 @@ impl SearchDehydrate for UnlockLogic<Search> {
                                             .with_wire("not_a", not_row.wire("a"))
                                             .with_wire("not_y", not_y)
                                             .with_submodule("rec_or", rec_or_idx);
-                                        
+
                                         let idx = results.push(type_key, row);
                                         result_indices.push(idx);
                                     }
