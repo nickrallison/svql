@@ -307,6 +307,13 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 use ::svql_query::traits::CompositeComponent;
                 self.execute_submodules(driver, context, key, config)
             }
+
+            // --- New DataFrame API methods (Phase 4) ---
+            // Composites use default implementations for now
+            // TODO: Implement proper composite df_search that:
+            // 1. Fetches dependency tables from ExecutionContext
+            // 2. Performs cartesian product + validation
+            // 3. Returns Table with submodule Refs
         }
 
         // CompositeComponent implementation (Search state)

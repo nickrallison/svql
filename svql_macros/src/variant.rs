@@ -403,6 +403,13 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 use ::svql_query::traits::VariantComponent;
                 self.search_variants(driver, context, key, config)
             }
+
+            // --- New DataFrame API methods (Phase 4) ---
+            // Variants use default implementations for now
+            // TODO: Implement proper variant df_search that:
+            // 1. Searches all sub-variant types
+            // 2. Unions results into a single table
+            // 3. Uses VariantRef for type-safe variant iteration
         }
 
         // VariantComponent implementation (Search state)

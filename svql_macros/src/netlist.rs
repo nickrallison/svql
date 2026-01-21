@@ -112,6 +112,39 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
+    // --- New DataFrame API columns (Phase 4) ---
+    let column_defs = parsed_fields.iter().map(|f| {
+        let name = f.ident.to_string();
+        quote! {
+            ::svql_query::session::ColumnDef::wire(#name)
+        }
+    });
+
+    let rehydrate_from_row_fields = parsed_fields.iter().map(|f| {
+        let ident = &f.ident;
+        let name = f.ident.to_string();
+        let wire_name = &f.wire_name;
+        quote! {
+            #ident: {
+                // Construct wire from Row data - cell info lookup happens lazily via Store
+                let wire_path = ::svql_query::instance::Instance::from_path(row.path()).child(#wire_name);
+                let cell_id = row.wire(#name);
+                // For now, we don't have cell info in the new API - just the CellId
+                // The Match state requires Option<CellInfo>, so we return None
+                // This can be improved later with a design lookup
+                ::svql_query::Wire::matched(wire_path, None)
+            }
+        }
+    });
+
+    let row_wire_fields = parsed_fields.iter().map(|f| {
+        let name = f.ident.to_string();
+        let wire_name = &f.wire_name;
+        quote! {
+            .with_wire(#name, resolver.get_cell_id(assignment, #wire_name).map(|id| ::svql_query::session::CellId::new(id as u32)))
+        }
+    });
+
     let dehydrate_wire_fields = parsed_fields.iter().map(|f| {
         let ident = &f.ident;
         let name = f.ident.to_string();
@@ -198,6 +231,90 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 assignments.items.iter().map(|assignment| {
                     self.bind_match(&resolver, assignment)
                 }).collect()
+            }
+
+            // --- New DataFrame API methods (Phase 4) ---
+
+            fn df_columns() -> &'static [::svql_query::session::ColumnDef] {
+                static COLUMNS: ::std::sync::OnceLock<Vec<::svql_query::session::ColumnDef>> = ::std::sync::OnceLock::new();
+                COLUMNS.get_or_init(|| vec![
+                    #(#column_defs),*
+                ])
+            }
+
+            fn df_dependencies() -> &'static [::std::any::TypeId] {
+                &[] // Netlists have no dependencies
+            }
+
+            fn df_register_all(registry: &mut ::svql_query::session::PatternRegistry) {
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                );
+            }
+
+            fn df_search(
+                _ctx: &::svql_query::session::ExecutionContext<'_>,
+            ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {
+                use ::svql_query::traits::{NetlistComponent, execute_netlist_query, Hardware, SearchableComponent};
+                use ::svql_query::prelude::PortResolver;
+                use ::svql_query::session::{TableBuilder, Row, QueryError};
+
+                // Get driver from ExecutionContext
+                let driver = _ctx.driver();
+                let haystack_key = _ctx.driver_key();
+
+                // Build the query context (loads needle design)
+                let options = ::svql_query::prelude::ModuleConfig::default();
+                let needle_context = Self::build_context(driver, &options)
+                    .map_err(|e| QueryError::needle_load(e.to_string()))?;
+
+                // Get the haystack context
+                let haystack_design = driver.get_design(&haystack_key)
+                    .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
+                let haystack_context = ::svql_query::prelude::Context::from_single(haystack_key.clone(), haystack_design);
+
+                // Merge contexts
+                let full_context = needle_context.merge(haystack_context);
+
+                // Get configuration
+                let config = ::svql_common::Config::default();
+
+                // Create a search instance at root
+                let search_instance = Self::create_at(::svql_query::instance::Instance::from_path(""));
+                let needle_key = Self::driver_key();
+
+                // Execute the netlist query
+                let assignments = execute_netlist_query(&search_instance, &full_context, &haystack_key, &config);
+
+                // Early return for empty results
+                if assignments.items.is_empty() {
+                    return ::svql_query::session::Table::empty(Self::df_columns());
+                }
+
+                let needle_container = full_context.get(&needle_key)
+                    .ok_or_else(|| QueryError::missing_dep(stringify!(#struct_name).to_string()))?;
+                let resolver = PortResolver::new(needle_container.index());
+
+                let mut builder = TableBuilder::<Self>::new(Self::df_columns());
+                for assignment in &assignments.items {
+                    let row = Row::<Self>::new(0, search_instance.path.to_string())
+                        #(#row_wire_fields)*;
+                    builder.push(row);
+                }
+
+                builder.build()
+            }
+
+            fn df_rehydrate(
+                row: &::svql_query::session::Row<Self>,
+                _store: &::svql_query::session::Store,
+            ) -> Option<#match_type> {
+                Some(#struct_name {
+                    path: ::svql_query::instance::Instance::from_path(row.path()),
+                    #(#rehydrate_from_row_fields),*
+                })
             }
         }
 
