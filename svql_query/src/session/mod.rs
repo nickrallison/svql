@@ -37,6 +37,12 @@ mod row;
 mod store;
 mod table;
 
+// --- New modules (Phase 5) ---
+mod variant_ref;
+
+// --- New modules (Phase 6) ---
+mod tree;
+
 // --- Legacy exports (to be deprecated) ---
 pub use design_frame::{CellRow, DesignFrame};
 pub use foreign_key::{ForeignKey, ForeignKeyTarget};
@@ -59,6 +65,14 @@ pub use registry::{PatternEntry, PatternRegistry};
 pub use row::Row;
 pub use store::Store;
 pub use table::{AnyTable, Table, TableBuilder};
+
+// --- New exports (Phase 5) ---
+pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
+
+// --- New exports (Phase 6) ---
+pub use tree::{
+    TempRef, TreePostOrderIter, TreePreOrderIter, TreeRowBuilder, TreeRowExt, TreeTableBuilder,
+};
 
 // Re-export validation helper for use by macros
 pub use self::validate_dehydrated_connection as validate_connection;

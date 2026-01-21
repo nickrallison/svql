@@ -4,7 +4,12 @@
 //! (Netlist, Composite, Variant) implement. Blanket implementations of
 //! `Pattern` and `Matched` are provided for any type implementing these traits.
 
+use std::any::TypeId;
+
 use crate::prelude::*;
+use crate::session::{
+    ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, Store, Table,
+};
 
 /// Marker types for component kinds.
 pub mod kind {
@@ -43,12 +48,16 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
     ///
     /// This typically involves loading needle designs and merging
     /// contexts from sub-components.
+    ///
+    /// **Legacy API** - Will be deprecated.
     fn build_context(
         driver: &Driver,
         options: &ModuleConfig,
     ) -> Result<Context, Box<dyn std::error::Error>>;
 
     /// Executes the search against the provided design context.
+    ///
+    /// **Legacy API** - Will be deprecated. Use `df_search()` instead.
     fn execute_search(
         &self,
         driver: &Driver,
@@ -56,6 +65,63 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Match>;
+
+    // =========================================================================
+    // New DataFrame API (Phase 4)
+    // =========================================================================
+
+    /// Column schema for DataFrame storage.
+    ///
+    /// # Default Implementation
+    /// Returns an empty slice.
+    fn df_columns() -> &'static [ColumnDef] {
+        &[]
+    }
+
+    /// Dependencies as TypeIds.
+    ///
+    /// # Default Implementation
+    /// Returns an empty slice.
+    fn df_dependencies() -> &'static [TypeId] {
+        &[]
+    }
+
+    /// Register this component and all dependencies into the registry.
+    ///
+    /// # Default Implementation
+    /// Registers self with no dependencies.
+    fn df_register_all(registry: &mut PatternRegistry)
+    where
+        Self: 'static,
+    {
+        registry.register(
+            TypeId::of::<Self>(),
+            std::any::type_name::<Self>(),
+            Self::df_dependencies(),
+        );
+    }
+
+    /// Execute the search and return results as a Table.
+    ///
+    /// # Default Implementation
+    /// Returns an empty table.
+    fn df_search(_ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        Table::empty(Self::df_columns())
+    }
+
+    /// Rehydrate a Row back to the Match type-state.
+    ///
+    /// # Default Implementation
+    /// Returns `None`.
+    fn df_rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self::Match>
+    where
+        Self: 'static,
+    {
+        None
+    }
 }
 
 /// Core trait for all matched result components.
@@ -95,6 +161,37 @@ where
         config: &Config,
     ) -> Vec<Self::Match> {
         self.execute_search(driver, context, key, config)
+    }
+
+    // New DataFrame API delegations
+
+    fn columns() -> &'static [ColumnDef] {
+        T::df_columns()
+    }
+
+    fn dependencies() -> &'static [TypeId] {
+        T::df_dependencies()
+    }
+
+    fn register_all(registry: &mut PatternRegistry)
+    where
+        Self: 'static,
+    {
+        T::df_register_all(registry)
+    }
+
+    fn search(ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        T::df_search(ctx)
+    }
+
+    fn rehydrate(row: &Row<Self>, store: &Store) -> Option<Self::Match>
+    where
+        Self: 'static,
+    {
+        T::df_rehydrate(row, store)
     }
 }
 
