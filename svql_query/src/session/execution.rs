@@ -51,6 +51,12 @@ impl Config {
 /// They are provided by `Pattern::search()` implementations.
 pub type SearchFn = fn(&ExecutionContext<'_>) -> Result<Box<dyn AnyTable>, QueryError>;
 
+/// Slot for storing a table during execution.
+///
+/// Uses `OnceLock<Arc<dyn AnyTable>>` so tables can be shared during execution
+/// and then cloned into the final Store.
+type TableSlot = OnceLock<Arc<dyn AnyTable>>;
+
 /// A node in the execution DAG.
 pub struct ExecutionNode {
     /// The pattern type this node represents.
@@ -249,7 +255,7 @@ impl ExecutionPlan {
         config: Config,
     ) -> Result<Store, QueryError> {
         // Create slots for each node
-        let slots: HashMap<TypeId, OnceLock<Box<dyn AnyTable>>> = self
+        let slots: HashMap<TypeId, TableSlot> = self
             .nodes
             .iter()
             .map(|node| (node.type_id, OnceLock::new()))
@@ -327,9 +333,9 @@ impl ExecutionPlan {
         // Execute search
         let result = (node.search_fn)(ctx)?;
 
-        // Store result (OnceLock ensures single write)
+        // Store result wrapped in Arc (OnceLock ensures single write)
         if let Some(slot) = ctx.slots.get(&node.type_id) {
-            let _ = slot.set(result); // Ignore if already set (race condition)
+            let _ = slot.set(Arc::from(result)); // Ignore if already set (race condition)
         }
 
         Ok(())
@@ -350,7 +356,7 @@ pub struct ExecutionContext<'d> {
     /// Execution configuration.
     config: Config,
     /// Slots for storing results (shared with plan).
-    slots: Arc<HashMap<TypeId, OnceLock<Box<dyn AnyTable>>>>,
+    slots: Arc<HashMap<TypeId, TableSlot>>,
 }
 
 impl<'d> ExecutionContext<'d> {
@@ -381,27 +387,24 @@ impl<'d> ExecutionContext<'d> {
         self.slots
             .get(&TypeId::of::<T>())
             .and_then(|lock| lock.get())
-            .and_then(|boxed| boxed.as_any().downcast_ref())
+            .and_then(|arc| arc.as_any().downcast_ref())
     }
 
     /// Convert the context into a Store after execution completes.
     fn into_store(self) -> Store {
-        let store = Store::with_capacity(self.slots.len());
+        let mut store = Store::with_capacity(self.slots.len());
 
-        // Move tables from slots to store
-        // Note: We can't move out of OnceLock directly, so we iterate
-        // and use the TypeId mapping
+        // Clone tables from slots into the store
+        // Since we use Arc<dyn AnyTable>, we can clone the Arc and then
+        // use Arc::try_unwrap or just clone the inner table
         for (&type_id, slot) in self.slots.iter() {
-            if slot.get().is_some() {
-                // The table exists, but we can't move it out of OnceLock
-                // We'll use insert_any which takes a TypeId directly
-                // For a proper impl, we'd need Arc<dyn AnyTable> in slots
-                let _ = type_id; // placeholder
+            if let Some(arc_table) = slot.get() {
+                // Clone the Arc and then box it for the store
+                // This is a cheap reference count bump
+                store.insert_arc(type_id, Arc::clone(arc_table));
             }
         }
 
-        // TODO: Proper ownership transfer from OnceLock to Store
-        // This requires restructuring to use Arc<dyn AnyTable> or similar
         store
     }
 }

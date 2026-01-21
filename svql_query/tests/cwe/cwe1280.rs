@@ -3,6 +3,7 @@ use svql_query::prelude::*;
 use svql_query::security::cwe1280::Cwe1280;
 use svql_query::security::cwe1280::grant_access::GrantAccess;
 
+#[allow(dead_code)]
 /// Configuration for the full CWE-1280 structural pattern
 fn cwe1280_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)

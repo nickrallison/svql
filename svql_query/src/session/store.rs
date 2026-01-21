@@ -5,6 +5,7 @@
 
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::ref_type::Ref;
 use super::row::Row;
@@ -36,7 +37,7 @@ use super::table::{AnyTable, Table};
 /// ```
 pub struct Store {
     /// Type-erased table storage.
-    tables: HashMap<TypeId, Box<dyn AnyTable>>,
+    tables: HashMap<TypeId, Arc<dyn AnyTable>>,
 }
 
 impl Store {
@@ -58,7 +59,7 @@ impl Store {
     ///
     /// Overwrites any existing table for this type.
     pub fn insert<T: Send + Sync + 'static>(&mut self, table: Table<T>) {
-        self.tables.insert(TypeId::of::<T>(), Box::new(table));
+        self.tables.insert(TypeId::of::<T>(), Arc::new(table));
     }
 
     /// Get a table for pattern type `T`.
@@ -67,7 +68,7 @@ impl Store {
     pub fn get<T: 'static>(&self) -> Option<&Table<T>> {
         self.tables
             .get(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.as_any().downcast_ref::<Table<T>>())
+            .and_then(|arc| arc.as_any().downcast_ref::<Table<T>>())
     }
 
     /// Check if a table exists for pattern type `T`.
@@ -101,13 +102,20 @@ impl Store {
     ///
     /// This is useful for generic code that doesn't know the concrete type.
     pub fn get_any(&self, type_id: TypeId) -> Option<&dyn AnyTable> {
-        self.tables.get(&type_id).map(|b| b.as_ref())
+        self.tables.get(&type_id).map(|arc| arc.as_ref())
     }
 
-    /// Insert a type-erased table.
+    /// Insert a type-erased table from a Box.
     ///
     /// This is used by the execution engine.
     pub fn insert_any(&mut self, type_id: TypeId, table: Box<dyn AnyTable>) {
+        self.tables.insert(type_id, Arc::from(table));
+    }
+
+    /// Insert a type-erased table from an Arc.
+    ///
+    /// This is used by the execution engine when transferring from OnceLock slots.
+    pub fn insert_arc(&mut self, type_id: TypeId, table: Arc<dyn AnyTable>) {
         self.tables.insert(type_id, table);
     }
 }

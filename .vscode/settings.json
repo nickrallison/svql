@@ -12,7 +12,11 @@
     },
     "rust-analyzer.cargo.extraArgs": ["--locked"],
     "rust-analyzer.procMacro.enable": true,
-    "rust-analyzer.linkedProjects": ["Cargo.toml"]
-
+    "rust-analyzer.linkedProjects": ["Cargo.toml"],
+    "lldb.displayFormat": "auto",
+    "lldb.showDisassembly": "never",
+    "lldb.dereferencePointers": true,
+    "lldb.adapterType": "classic",
+    "rust-analyzer.debug.engine": "vadimcn.vscode-lldb"
 
 }

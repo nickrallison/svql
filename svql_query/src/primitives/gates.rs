@@ -136,6 +136,87 @@ macro_rules! define_primitive_gate {
                     .collect()
 
             }
+
+            // DataFrame API
+
+            fn df_columns() -> &'static [crate::session::ColumnDef] {
+                static COLUMNS: &[crate::session::ColumnDef] = &[
+                    $(crate::session::ColumnDef::wire(stringify!($port))),*
+                ];
+                COLUMNS
+            }
+
+            fn df_dependencies() -> &'static [::std::any::TypeId] {
+                &[] // Primitive gates have no dependencies
+            }
+
+            fn df_register_search(registry: &mut crate::session::SearchRegistry) {
+                use crate::session::{SearchFn, AnyTable};
+
+                let search_fn: SearchFn = |ctx| {
+                    let table = Self::df_search(ctx)?;
+                    Ok(Box::new(table) as Box<dyn AnyTable>)
+                };
+
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                    search_fn,
+                );
+            }
+
+            fn df_search(
+                ctx: &crate::session::ExecutionContext<'_>,
+            ) -> Result<crate::session::Table<Self>, crate::session::QueryError> {
+                use crate::session::{TableBuilder, Row, QueryError, CellId};
+
+                let driver = ctx.driver();
+                let haystack_key = ctx.driver_key();
+
+                // Get the haystack design
+                let haystack_design = driver.get_design(&haystack_key)
+                    .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
+                let index = haystack_design.index();
+
+                // Build the search instance at root
+                let search_instance = Self::create_at(Instance::from_path(""));
+
+                // Find matching cells
+                let mut builder = TableBuilder::<Self>::new(Self::df_columns());
+
+                for cell in index.cells_of_type_iter(CellKind::$kind).into_iter().flatten() {
+                    let cell_id = CellId::new(cell.to_info().id as u32);
+                    let row = Row::<Self>::new(builder.len() as u32, search_instance.path.to_string())
+                        $(.with_wire(stringify!($port), Some(cell_id)))*;
+                    builder.push(row);
+                }
+
+                builder.build()
+            }
+
+            fn df_rehydrate(
+                row: &crate::session::Row<Self>,
+                _store: &crate::session::Store,
+            ) -> Option<Self::Match> {
+                let path = Instance::from_path(row.path());
+                // For primitive gates, all ports map to the same cell
+                Some($name {
+                    path: path.clone(),
+                    $(
+                        $port: {
+                            let cell_opt = row.wire(stringify!($port)).map(|c| {
+                                crate::subgraph::cell::CellInfo {
+                                    id: c.cell_idx() as usize,
+                                    kind: CellKind::$kind,
+                                    source_loc: None,
+                                }
+                            });
+                            Wire::new(path.child(stringify!($port)), cell_opt)
+                        }
+                    ),*
+                })
+            }
         }
 
         impl MatchedComponent for $name<Match> {

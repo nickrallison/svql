@@ -122,6 +122,98 @@ macro_rules! impl_dff_primitive {
                     .collect();
                 matches
             }
+
+            // DataFrame API
+
+            fn df_columns() -> &'static [::svql_query::session::ColumnDef] {
+                static COLUMNS: &[::svql_query::session::ColumnDef] = &[
+                    $(::svql_query::session::ColumnDef::wire(stringify!($port))),*
+                ];
+                COLUMNS
+            }
+
+            fn df_dependencies() -> &'static [::std::any::TypeId] {
+                &[] // DFF primitives have no dependencies
+            }
+
+            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry) {
+                use ::svql_query::session::{SearchFn, AnyTable};
+
+                let search_fn: SearchFn = |ctx| {
+                    let table = Self::df_search(ctx)?;
+                    Ok(Box::new(table) as Box<dyn AnyTable>)
+                };
+
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                    search_fn,
+                );
+            }
+
+            fn df_search(
+                ctx: &::svql_query::session::ExecutionContext<'_>,
+            ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {
+                use ::svql_query::session::{TableBuilder, Row, QueryError, CellId};
+
+                let driver = ctx.driver();
+                let haystack_key = ctx.driver_key();
+
+                // Get the haystack design
+                let haystack_design = driver.get_design(&haystack_key)
+                    .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
+                let index = haystack_design.index();
+
+                // Build the search instance at root
+                let search_instance = Self::create_at(::svql_query::Instance::from_path(""));
+
+                // Find matching cells
+                let mut builder = TableBuilder::<Self>::new(Self::df_columns());
+
+                for cell in index.cells_of_type_iter(::svql_query::CellKind::Dff).into_iter().flatten() {
+                    let matches = match cell.get() {
+                        prjunnamed_netlist::Cell::Dff(ff) => {
+                            let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
+                            check(ff)
+                        }
+                        _ => false,
+                    };
+
+                    if matches {
+                        let cell_id = CellId::new(cell.to_info().id as u32);
+                        let row = Row::<Self>::new(builder.len() as u32, search_instance.path.to_string())
+                            $(.with_wire(stringify!($port), Some(cell_id)))*;
+                        builder.push(row);
+                    }
+                }
+
+                builder.build()
+            }
+
+            fn df_rehydrate(
+                row: &::svql_query::session::Row<Self>,
+                _store: &::svql_query::session::Store,
+            ) -> Option<Self::Match> {
+                let path = ::svql_query::Instance::from_path(row.path());
+                // For DFF primitives, all ports map to the same cell
+                // (the DFF cell itself - we store the cell ID in each wire column)
+                Some($name {
+                    path: path.clone(),
+                    $(
+                        $port: {
+                            let cell_opt = row.wire(stringify!($port)).map(|c| {
+                                ::svql_query::CellInfo {
+                                    id: c.cell_idx() as usize,
+                                    kind: ::svql_query::CellKind::Dff,
+                                    source_loc: None,
+                                }
+                            });
+                            ::svql_query::Wire::new(path.child(stringify!($port)), cell_opt)
+                        }
+                    ),*
+                })
+            }
         }
 
         impl ::svql_query::traits::MatchedComponent for $name<::svql_query::Match> {

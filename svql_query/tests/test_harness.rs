@@ -1,5 +1,6 @@
 use std::sync::Once;
 use svql_query::prelude::*;
+use svql_query::traits::SearchableComponent;
 
 static INIT: Once = Once::new();
 
@@ -31,13 +32,12 @@ impl<'a> Default for TestSpec<'a> {
     }
 }
 
-/// Run a query test using the new direct dehydration path (SearchDehydrate).
-/// This avoids allocating intermediate Match objects entirely.
+/// Run a query test using the new DataFrame API (ExecutionPlan + Store).
+/// This uses the new `run_query` function which works for all pattern types.
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: Pattern + SearchDehydrate + 'static,
-    <P as Pattern>::Match: Dehydrate + Rehydrate,
+    P: SearchableComponent + Send + Sync + 'static,
 {
     setup_test_logging();
 
@@ -55,24 +55,13 @@ where
         &config.haystack_options,
     )?;
 
-    // Execute query directly into session using SearchDehydrate (no Match allocation)
-    let session = execute_query_session_direct::<P>(&driver, &key, &config)?;
+    // Execute query using the new DataFrame API
+    let store = svql_query::run_query::<P>(&driver, &key)?;
 
-    // Verify dehydrated count matches (using full type path for lookup)
-    let type_name = std::any::type_name::<<P as Pattern>::Match>();
-    let stored_count = session
-        .results()
-        .get_by_name(type_name)
-        .map(|r| r.len())
-        .unwrap_or(0);
+    // Get the result count from the store
+    let stored_count = store.get::<P>().map(|table| table.len()).unwrap_or(0);
 
     if stored_count != spec.expected_count {
-        // Rehydrate for error reporting
-        let ctx = session.rehydrate_context();
-        let matches: Vec<<P as Pattern>::Match> = RehydrateIter::new(&ctx)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_default();
-
         tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({})",
             spec.expected_count,
@@ -81,9 +70,12 @@ where
             spec.haystack_module,
             spec.haystack_path
         );
-        for (i, m) in matches.iter().enumerate() {
-            let report = m.report(&format!("Match #{}", i));
-            tracing::error!("{}", report.render());
+
+        // Log match details if available
+        if let Some(table) = store.get::<P>() {
+            for (i, row) in table.rows().enumerate() {
+                tracing::error!("Match #{}: path={}", i, row.path());
+            }
         }
     }
 
