@@ -1,4 +1,7 @@
-use svql_query::{prelude::*, security::{cwe1234::Cwe1234, primitives::locked_register::AsyncDffMuxEnable}};
+use svql_query::{
+    prelude::*,
+    security::{cwe1234::Cwe1234, primitives::locked_register::AsyncDffMuxEnable},
+};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
