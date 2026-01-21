@@ -4,6 +4,24 @@
 //! - Cell IDs in the design
 //! - Match indices in other query result tables
 //! - Self-references for recursive types (parent_idx for linked structures)
+//!
+//! # Deprecation Notice
+//!
+//! This module is deprecated and will be removed in a future version.
+//! Use the new `Store` and `Table<T>` API instead:
+//!
+//! ```ignore
+//! // Instead of:
+//! let results = ResultStore::new();
+//! results.insert_results(schema, rows);
+//! let query_results = results.get::<T>();
+//!
+//! // Use:
+//! let mut store = Store::new();
+//! let mut builder = store.builder::<T::Match>();
+//! builder.insert(&match_obj);
+//! let table = store.table::<T>();
+//! ```
 
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -216,6 +234,9 @@ impl MatchRow {
 }
 
 /// Results for a single query type.
+///
+/// **Deprecated:** Use `Table<T>` from the new API instead.
+#[deprecated(since = "0.2.0", note = "Use Table<T> instead")]
 #[derive(Debug, Clone)]
 pub struct QueryResults {
     /// The type name for display/debugging.
@@ -383,6 +404,9 @@ impl QueryResults {
 }
 
 /// Central storage for all query results.
+///
+/// **Deprecated:** Use `Store` from the new API instead.
+#[deprecated(since = "0.2.0", note = "Use Store instead")]
 #[derive(Debug, Default)]
 pub struct ResultStore {
     /// Results keyed by TypeId.
@@ -453,6 +477,9 @@ impl ResultStore {
 
 /// Trait for query Match types that can be dehydrated into DataFrame rows.
 /// This is implemented by macros for each query type.
+///
+/// **Deprecated:** Use `Pattern::df_insert()` instead for DataFrame operations.
+#[deprecated(since = "0.2.0", note = "Use Pattern::df_insert() instead")]
 pub trait Dehydrate: Sized {
     /// The schema describing this type's structure.
     const SCHEMA: QuerySchema;
@@ -461,6 +488,7 @@ pub trait Dehydrate: Sized {
     fn dehydrate(&self) -> DehydratedRow;
 
     /// Dehydrates a collection of matches into QueryResults.
+    #[allow(deprecated)]
     fn dehydrate_all(matches: &[Self]) -> Result<QueryResults, SessionError> {
         let rows: Vec<DehydratedRow> = matches.iter().map(|m| m.dehydrate()).collect();
         QueryResults::from_rows(&Self::SCHEMA, rows)
@@ -471,6 +499,9 @@ pub trait Dehydrate: Sized {
 ///
 /// This is used by `SearchDehydrate` to collect results for the primary type
 /// and all submodule types during a single search pass.
+///
+/// **Deprecated:** Use `Store` from the new API instead.
+#[deprecated(since = "0.2.0", note = "Use Store instead")]
 #[derive(Debug, Default)]
 pub struct DehydratedResults {
     /// Results keyed by type name

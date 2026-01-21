@@ -2,9 +2,13 @@
 //!
 //! A `ForeignKey<T>` is a zero-cost wrapper around `u32` that carries compile-time
 //! information about which table to look up when resolving the reference.
+//!
+//! **DEPRECATED**: Use [`Ref<T>`](super::Ref) instead. `ForeignKey<T>` is an alias
+//! for backwards compatibility and will be removed in a future version.
 
 use std::marker::PhantomData;
 
+use super::ref_type::Ref;
 use super::{Dehydrate, MatchRow, ResultStore};
 
 /// A typed foreign key reference to a row in another table.
@@ -83,14 +87,46 @@ impl<T> From<ForeignKey<T>> for u32 {
     }
 }
 
+// --- Interop with Ref<T> ---
+
+impl<T> From<Ref<T>> for ForeignKey<T> {
+    #[inline]
+    fn from(r: Ref<T>) -> Self {
+        Self::new(r.index())
+    }
+}
+
+impl<T> From<ForeignKey<T>> for Ref<T> {
+    #[inline]
+    fn from(fk: ForeignKey<T>) -> Self {
+        Ref::new(fk.raw())
+    }
+}
+
+impl<T> ForeignKey<T> {
+    /// Convert to the new `Ref<T>` type.
+    #[inline]
+    pub fn to_ref(self) -> Ref<T> {
+        Ref::new(self.index)
+    }
+
+    /// Create from a `Ref<T>`.
+    #[inline]
+    pub fn from_ref(r: Ref<T>) -> Self {
+        Self::new(r.index())
+    }
+}
+
 /// Trait for types that can be the target of a foreign key.
 ///
 /// This is automatically implemented for types that implement `Dehydrate`.
+#[deprecated(since = "0.2.0", note = "Use Pattern trait instead")]
 pub trait ForeignKeyTarget {
     /// The table name where rows of this type are stored (full type path).
     fn table_name() -> &'static str;
 }
 
+#[allow(deprecated)]
 impl<T: Dehydrate> ForeignKeyTarget for T {
     fn table_name() -> &'static str {
         std::any::type_name::<T>()

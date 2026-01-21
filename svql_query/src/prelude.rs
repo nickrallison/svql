@@ -36,11 +36,43 @@ pub use crate::traits::{
 };
 
 // Session re-exports (DataFrame-based result storage)
+// Legacy types (deprecated, use new API instead)
+#[allow(deprecated)]
 pub use crate::session::{
     CellRow, Dehydrate, DehydratedResults, DehydratedRow, DesignFrame, ForeignKey,
     ForeignKeyTarget, MatchRef, MatchRow, QueryResults, QuerySchema, RecursiveFieldDesc, Rehydrate,
     RehydrateContext, RehydrateIter, ResultStore, SearchDehydrate, Session, SessionBuilder,
     SessionError, SessionRehydrateExt, SubmoduleFieldDesc, WireFieldDesc, WireRef,
+};
+
+// New API types (Phase 1-6)
+pub use crate::session::{
+    // Core types
+    CellId,
+    ColumnDef,
+    ColumnKind,
+    // Execution
+    ExecutionContext,
+    ExecutionPlan,
+    PatternRegistry,
+    QueryError,
+    Ref,
+    Row,
+    Store,
+    // Variants
+    StoreVariantExt,
+    Table,
+    TableBuilder,
+    // Trees
+    TempRef,
+    TreePostOrderIter,
+    TreePreOrderIter,
+    TreeRowBuilder,
+    TreeRowExt,
+    TreeTableBuilder,
+    VariantIter,
+    VariantPattern,
+    VariantRef,
 };
 
 pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};

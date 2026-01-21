@@ -3,11 +3,26 @@
 //! This module provides the `SearchDehydrate` trait which enables search types
 //! to directly produce `DehydratedRow`s during the search process, bypassing
 //! the intermediate `Match` object allocation.
+//!
+//! # Deprecation Notice
+//!
+//! This module is deprecated and will be removed in a future version.
+//! Use the new `ExecutionPlan` API instead:
+//!
+//! ```ignore
+//! // Instead of:
+//! let results = DehydratedResults::new();
+//! search.execute_dehydrated(driver, context, key, config, &mut results);
+//!
+//! // Use:
+//! let plan = ExecutionPlan::for_pattern::<T>();
+//! let store = plan.execute(driver, context, key, config)?;
+//! ```
 
-use svql_driver::{Context, Driver, DriverKey};
+use super::{DehydratedResults, QuerySchema};
 use crate::common::Config;
 use crate::traits::SearchableComponent;
-use super::{DehydratedResults, QuerySchema};
+use svql_driver::{Context, Driver, DriverKey};
 
 /// Trait for Search types that can directly produce dehydrated results.
 ///
@@ -20,6 +35,10 @@ use super::{DehydratedResults, QuerySchema};
 /// 1. Search → DehydratedResults (directly populates DataFrames)
 ///
 /// This avoids allocating intermediate Match objects entirely.
+///
+/// **Deprecated:** Use `ExecutionPlan` instead.
+#[deprecated(since = "0.2.0", note = "Use ExecutionPlan instead")]
+#[allow(deprecated)]
 pub trait SearchDehydrate: SearchableComponent {
     /// The schema for the dehydrated Match type.
     const MATCH_SCHEMA: QuerySchema;

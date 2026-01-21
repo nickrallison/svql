@@ -109,6 +109,10 @@ pub enum SessionError {
 /// - Design data stored as a `DesignFrame` (cells, connectivity as columns)
 /// - Query results stored per-type with foreign key references
 /// - Lazy rehydration back to full `Match` state objects
+///
+/// **Deprecated:** Use `Store` and `ExecutionPlan` instead.
+#[deprecated(since = "0.2.0", note = "Use Store and ExecutionPlan instead")]
+#[allow(deprecated)]
 #[derive(Debug)]
 pub struct Session {
     /// The design being queried, stored in DataFrame format
@@ -119,6 +123,7 @@ pub struct Session {
     design_container: Arc<DesignContainer>,
 }
 
+#[allow(deprecated)]
 impl Session {
     /// Creates a new session from a design container.
     pub fn new(design_container: Arc<DesignContainer>) -> Result<Self, SessionError> {
@@ -192,11 +197,16 @@ impl Session {
 }
 
 /// Builder for constructing a Session with query results.
+///
+/// **Deprecated:** Use `Store` and `ExecutionPlan` instead.
+#[deprecated(since = "0.2.0", note = "Use Store and ExecutionPlan instead")]
+#[allow(deprecated)]
 pub struct SessionBuilder {
     design_container: Arc<DesignContainer>,
     pending_results: HashMap<TypeId, (String, QueryResults)>,
 }
 
+#[allow(deprecated)]
 impl SessionBuilder {
     /// Creates a new session builder.
     pub fn new(design_container: Arc<DesignContainer>) -> Self {
