@@ -139,9 +139,10 @@ impl ExecutionPlan {
         }
 
         // Get root node
-        let root = node_map.get(&root_type_id).cloned().ok_or_else(|| {
-            QueryError::missing_dep("Root pattern not found in registry")
-        })?;
+        let root = node_map
+            .get(&root_type_id)
+            .cloned()
+            .ok_or_else(|| QueryError::missing_dep("Root pattern not found in registry"))?;
 
         // Collect all nodes in topo order
         let nodes: Vec<Arc<ExecutionNode>> = topo_order
@@ -155,9 +156,11 @@ impl ExecutionPlan {
     /// Build an execution plan for a pattern type.
     ///
     /// This is a convenience method that:
-    /// 1. Creates a registry
-    /// 2. Registers the pattern and all its dependencies
-    /// 3. Builds the plan with search functions from `df_search`
+    /// 1. Creates a search registry
+    /// 2. Registers the pattern and all its dependencies with their search functions
+    /// 3. Builds the plan
+    ///
+    /// This works for all pattern types (netlist, composite, variant).
     ///
     /// # Type Parameters
     ///
@@ -166,36 +169,70 @@ impl ExecutionPlan {
     where
         P: crate::traits::SearchableComponent + Send + Sync + 'static,
     {
-        use crate::traits::SearchableComponent;
+        use super::registry::SearchRegistry;
 
-        // Create and populate registry
-        let mut registry = PatternRegistry::new();
-        P::df_register_all(&mut registry);
+        // Create and populate the combined registry with search functions
+        let mut registry = SearchRegistry::new();
+        P::df_register_search(&mut registry);
 
-        // Build search function map
-        let mut search_fns: HashMap<TypeId, (&'static str, SearchFn)> = HashMap::new();
+        // Build the plan using the combined registry
+        Self::from_search_registry(TypeId::of::<P>(), registry)
+    }
 
-        // For each registered type, we need to create a search function.
-        // This is tricky because we can only create the search function for types
-        // we know about statically. For now, we only handle the root type.
-        // In a full implementation, we'd need a trait object or registration system.
+    /// Build an execution plan from a SearchRegistry.
+    ///
+    /// The SearchRegistry contains both pattern metadata and search functions,
+    /// collected via `df_register_search` calls.
+    pub fn from_search_registry(
+        root_type_id: TypeId,
+        registry: super::registry::SearchRegistry,
+    ) -> Result<Self, QueryError> {
+        // Build nodes, sharing Arc for diamond deps
+        let mut node_map: HashMap<TypeId, Arc<ExecutionNode>> = HashMap::new();
 
-        // Register the root type's search function
-        let search_fn: SearchFn = |ctx| {
-            let table = P::df_search(ctx)?;
-            Ok(Box::new(table) as Box<dyn AnyTable>)
-        };
-        search_fns.insert(
-            TypeId::of::<P>(),
-            (std::any::type_name::<P>(), search_fn),
-        );
+        // Get topological order
+        let topo_order = registry.topological_order()?;
 
-        // For dependencies, we need to use a different approach since we don't have
-        // their types statically. This requires a trait object registration pattern.
-        // For now, this only works for patterns without dependencies (netlists).
+        // Build nodes in topological order (deps first)
+        for type_id in &topo_order {
+            let entry = registry.get(*type_id).ok_or_else(|| {
+                QueryError::missing_dep(&format!("Missing registry entry for {:?}", type_id))
+            })?;
 
-        let root_type_id = TypeId::of::<P>();
-        Self::build(root_type_id, &registry, &search_fns)
+            let search_fn = registry.get_search_fn(*type_id).ok_or_else(|| {
+                QueryError::missing_dep(&format!("Missing search function for {}", entry.type_name))
+            })?;
+
+            // Collect dep nodes (already built due to topo order)
+            let deps: Vec<Arc<ExecutionNode>> = entry
+                .dependencies
+                .iter()
+                .filter_map(|dep_id| node_map.get(dep_id).cloned())
+                .collect();
+
+            let node = Arc::new(ExecutionNode {
+                type_id: *type_id,
+                type_name: entry.type_name,
+                search_fn,
+                deps,
+            });
+
+            node_map.insert(*type_id, node);
+        }
+
+        // Get root node
+        let root = node_map
+            .get(&root_type_id)
+            .cloned()
+            .ok_or_else(|| QueryError::missing_dep("Root pattern not found in registry"))?;
+
+        // Collect all nodes in topo order
+        let nodes: Vec<Arc<ExecutionNode>> = topo_order
+            .iter()
+            .filter_map(|tid| node_map.get(tid).cloned())
+            .collect();
+
+        Ok(Self { root, nodes })
     }
 
     /// Execute the plan and return a Store with all results.
@@ -250,9 +287,9 @@ impl ExecutionPlan {
         use rayon::prelude::*;
 
         // Execute all nodes - OnceLock ensures each runs exactly once
-        self.nodes.par_iter().try_for_each(|node| {
-            self.execute_node(node, ctx)
-        })?;
+        self.nodes
+            .par_iter()
+            .try_for_each(|node| self.execute_node(node, ctx))?;
 
         Ok(())
     }

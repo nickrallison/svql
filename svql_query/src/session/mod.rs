@@ -61,7 +61,7 @@ pub use column::{ColumnDef, ColumnKind};
 pub use error::QueryError;
 pub use execution::{Config, ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
-pub use registry::{PatternEntry, PatternRegistry};
+pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
 pub use store::Store;
 pub use table::{AnyTable, Table, TableBuilder};

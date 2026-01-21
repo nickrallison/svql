@@ -5,11 +5,22 @@ pub use svql_subgraph as subgraph;
 pub use tracing;
 
 pub use crate::{
-    Connection, Match, Search, State, Wire, binding::PortResolver, execute_query,
-    execute_query_session, execute_query_session_direct, instance::Instance, primitives::dff::*,
-    primitives::gates::*, report::ReportNode,
+    Connection,
+    Match,
+    Search,
+    State,
+    Wire,
+    binding::PortResolver,
+    execute_query,
+    execute_query_session,
+    execute_query_session_direct,
+    instance::Instance,
+    primitives::dff::*,
+    primitives::gates::*,
+    report::ReportNode,
     // New DataFrame API
-    run_query, run_query_with_config,
+    run_query,
+    run_query_with_config,
 };
 
 // Trait re-exports
@@ -54,12 +65,14 @@ pub use crate::session::{
     ColumnDef,
     ColumnKind,
     // Execution
+    Config as ExecConfig,
     ExecutionContext,
     ExecutionPlan,
     PatternRegistry,
     QueryError,
     Ref,
     Row,
+    SearchRegistry,
     Store,
     // Variants
     StoreVariantExt,

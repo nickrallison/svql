@@ -116,9 +116,10 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     // --- DataFrame API Generation ---
 
     // Collect search types for all variants (for df_dependencies)
-    let variant_search_types: Vec<_> = variants_info.iter().map(|v| {
-        common::replace_state_generic(&v.ty)
-    }).collect();
+    let variant_search_types: Vec<_> = variants_info
+        .iter()
+        .map(|v| common::replace_state_generic(&v.ty))
+        .collect();
 
     // Generate the df_search blocks for each variant
     let df_variant_search_blocks: Vec<_> = variants_info.iter().map(|v| {
@@ -478,6 +479,31 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                     ::std::any::TypeId::of::<Self>(),
                     ::std::any::type_name::<Self>(),
                     Self::df_dependencies(),
+                );
+            }
+
+            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry)
+            where
+                Self: Send + Sync + 'static,
+            {
+                use ::svql_query::session::{AnyTable, SearchFn};
+
+                // First register all variant inner types with their search functions
+                #(
+                    <#variant_search_types as ::svql_query::traits::SearchableComponent>::df_register_search(registry);
+                )*
+
+                // Then register self with its search function
+                let search_fn: SearchFn = |ctx| {
+                    let table = Self::df_search(ctx)?;
+                    Ok(Box::new(table) as Box<dyn AnyTable>)
+                };
+
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                    search_fn,
                 );
             }
 

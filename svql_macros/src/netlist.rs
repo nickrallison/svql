@@ -254,6 +254,26 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
                 );
             }
 
+            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry)
+            where
+                Self: Send + Sync + 'static,
+            {
+                use ::svql_query::session::{AnyTable, SearchFn};
+
+                // Netlists have no dependencies, so just register self
+                let search_fn: SearchFn = |ctx| {
+                    let table = Self::df_search(ctx)?;
+                    Ok(Box::new(table) as Box<dyn AnyTable>)
+                };
+
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                    search_fn,
+                );
+            }
+
             fn df_search(
                 _ctx: &::svql_query::session::ExecutionContext<'_>,
             ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {

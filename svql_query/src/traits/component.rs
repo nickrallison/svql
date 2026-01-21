@@ -8,7 +8,8 @@ use std::any::TypeId;
 
 use crate::prelude::*;
 use crate::session::{
-    ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, Store, Table,
+    AnyTable, ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, SearchFn,
+    SearchRegistry, Store, Table,
 };
 
 /// Marker types for component kinds.
@@ -98,6 +99,31 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
             TypeId::of::<Self>(),
             std::any::type_name::<Self>(),
             Self::df_dependencies(),
+        );
+    }
+
+    /// Register this component and all dependencies with search functions.
+    ///
+    /// This is the preferred registration method for `ExecutionPlan::for_pattern`.
+    /// It registers both the metadata and the search function in a single pass.
+    ///
+    /// # Default Implementation
+    /// Registers self with a default search function that calls `df_search`.
+    fn df_register_search(registry: &mut SearchRegistry)
+    where
+        Self: Send + Sync + 'static,
+    {
+        // Default: create a search function that calls df_search
+        let search_fn: SearchFn = |ctx| {
+            let table = Self::df_search(ctx)?;
+            Ok(Box::new(table) as Box<dyn AnyTable>)
+        };
+
+        registry.register(
+            TypeId::of::<Self>(),
+            std::any::type_name::<Self>(),
+            Self::df_dependencies(),
+            search_fn,
         );
     }
 

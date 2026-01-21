@@ -332,6 +332,22 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Generate calls to register dependencies with search functions
+    let df_register_search_deps: Vec<_> = fields_info
+        .iter()
+        .filter_map(|f| {
+            if let FieldKind::Submodule = f.kind {
+                let ty = &f.ty;
+                let search_ty = common::replace_state_generic(ty);
+                Some(quote! {
+                    <#search_ty as ::svql_query::traits::SearchableComponent>::df_register_search(registry);
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // Generate code to get dependency tables from ExecutionContext
     let df_get_dep_tables: Vec<_> = fields_info
         .iter()
@@ -372,42 +388,61 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     } else {
         // Build nested for loops for cartesian product
-        let table_vars: Vec<_> = submodule_field_names.iter().map(|id| {
-            syn::Ident::new(&format!("{}_table", id), id.span())
-        }).collect();
-        let row_vars: Vec<_> = submodule_field_names.iter().map(|id| {
-            syn::Ident::new(&format!("{}_row", id), id.span())
-        }).collect();
-        let idx_vars: Vec<_> = submodule_field_names.iter().map(|id| {
-            syn::Ident::new(&format!("{}_idx", id), id.span())
-        }).collect();
+        let table_vars: Vec<_> = submodule_field_names
+            .iter()
+            .map(|id| syn::Ident::new(&format!("{}_table", id), id.span()))
+            .collect();
+        let row_vars: Vec<_> = submodule_field_names
+            .iter()
+            .map(|id| syn::Ident::new(&format!("{}_row", id), id.span()))
+            .collect();
+        let idx_vars: Vec<_> = submodule_field_names
+            .iter()
+            .map(|id| syn::Ident::new(&format!("{}_idx", id), id.span()))
+            .collect();
 
         // Generate the with_sub calls for building the row
-        let with_sub_calls: Vec<_> = submodule_field_names.iter().zip(idx_vars.iter()).map(|(field, idx)| {
-            let name = field.to_string();
-            quote! { .with_sub_idx(#name, #idx as u32) }
-        }).collect();
+        let with_sub_calls: Vec<_> = submodule_field_names
+            .iter()
+            .zip(idx_vars.iter())
+            .map(|(field, idx)| {
+                let name = field.to_string();
+                quote! { .with_sub_idx(#name, #idx as u32) }
+            })
+            .collect();
 
         // Generate iproduct over table indices
-        let iproduct_args: Vec<_> = table_vars.iter().map(|tv| {
-            quote! { (0..#tv.len()) }
-        }).collect();
+        let iproduct_args: Vec<_> = table_vars
+            .iter()
+            .map(|tv| {
+                quote! { (0..#tv.len()) }
+            })
+            .collect();
 
         // Generate row lookups for validation
-        let row_lookups: Vec<_> = table_vars.iter().zip(row_vars.iter()).zip(idx_vars.iter()).map(|((tv, rv), iv)| {
-            quote! { let #rv = #tv.row(#iv as u32)?; }
-        }).collect();
+        let row_lookups: Vec<_> = table_vars
+            .iter()
+            .zip(row_vars.iter())
+            .zip(idx_vars.iter())
+            .map(|((tv, rv), iv)| {
+                quote! { let #rv = #tv.row(#iv as u32)?; }
+            })
+            .collect();
 
         // Generate validation map entries from submodule rows
-        let validation_entries: Vec<_> = submodule_field_names.iter().zip(row_vars.iter()).map(|(_field, rv)| {
-            quote! {
-                // Get first wire cell_id from the submodule row for validation
-                // (Simplified - assumes submodules have wires we can validate)
-                if let Some(cell_id) = #rv.wire_any() {
-                    wire_cells.push(cell_id);
+        let validation_entries: Vec<_> = submodule_field_names
+            .iter()
+            .zip(row_vars.iter())
+            .map(|(_field, rv)| {
+                quote! {
+                    // Get first wire cell_id from the submodule row for validation
+                    // (Simplified - assumes submodules have wires we can validate)
+                    if let Some(cell_id) = #rv.wire_any() {
+                        wire_cells.push(cell_id);
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         quote! {
             for ( #(#idx_vars),* ) in ::svql_query::itertools::iproduct!( #(#iproduct_args),* ) {
@@ -568,6 +603,29 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                     ::std::any::TypeId::of::<Self>(),
                     ::std::any::type_name::<Self>(),
                     Self::df_dependencies(),
+                );
+            }
+
+            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry)
+            where
+                Self: Send + Sync + 'static,
+            {
+                use ::svql_query::session::{AnyTable, SearchFn};
+
+                // First register all dependencies with their search functions
+                #(#df_register_search_deps)*
+
+                // Then register self with its search function
+                let search_fn: SearchFn = |ctx| {
+                    let table = Self::df_search(ctx)?;
+                    Ok(Box::new(table) as Box<dyn AnyTable>)
+                };
+
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                    search_fn,
                 );
             }
 

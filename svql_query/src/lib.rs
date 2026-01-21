@@ -175,22 +175,35 @@ where
 ///
 /// This is the new, preferred API that uses the DataFrame-based execution model:
 /// - Uses `ExecutionPlan` for DAG-based parallel execution
+/// - Automatically registers all pattern dependencies
 /// - Results stored in `Table<T>` with column-oriented storage
 /// - Supports lazy iteration via `Table::rows()`
 /// - Type-safe references via `Ref<T>`
+///
+/// Works for all pattern types:
+/// - **Netlist patterns**: Atomic patterns loaded from HDL files
+/// - **Composite patterns**: Hierarchical patterns with sub-components
+/// - **Variant patterns**: Polymorphic patterns that match multiple alternatives
 ///
 /// # Example
 ///
 /// ```ignore
 /// use svql_query::prelude::*;
 ///
-/// let store = run_query::<MyPattern<Search>>(&driver, &key)?;
-/// let table = store.get::<MyPattern<Search>>()?;
+/// // Works with any pattern type
+/// let store = run_query::<MyCompositePattern<Search>>(&driver, &key)?;
+///
+/// // Access the root pattern's results
+/// let table = store.get::<MyCompositePattern<Search>>()?;
 ///
 /// for row in table.rows() {
 ///     let wire_cell = row.wire("clk");
+///     // Access sub-component results via typed references
 ///     let sub_ref: Ref<SubPattern<Search>> = row.sub("sub_field")?;
 /// }
+///
+/// // Dependency tables are also available
+/// let dep_table = store.get::<SubPattern<Search>>()?;
 /// ```
 pub fn run_query<P>(
     driver: &Driver,
@@ -199,9 +212,9 @@ pub fn run_query<P>(
 where
     P: traits::SearchableComponent + Send + Sync + 'static,
 {
-    use session::{ExecutionPlan, Config as ExecConfig};
+    use session::{Config as ExecConfig, ExecutionPlan};
 
-    // Build execution plan from pattern
+    // Build execution plan from pattern (registers all dependencies)
     let plan = ExecutionPlan::for_pattern::<P>()?;
 
     // Execute with default config
@@ -214,6 +227,20 @@ where
 /// Execute a query with custom execution configuration.
 ///
 /// Allows specifying parallel vs sequential execution and thread limits.
+///
+/// # Example
+///
+/// ```ignore
+/// use svql_query::prelude::*;
+///
+/// // Run in parallel with default thread count
+/// let config = ExecConfig::parallel();
+/// let store = run_query_with_config::<MyPattern<Search>>(&driver, &key, config)?;
+///
+/// // Or limit threads
+/// let config = ExecConfig { parallel: true, max_threads: Some(4) };
+/// let store = run_query_with_config::<MyPattern<Search>>(&driver, &key, config)?;
+/// ```
 pub fn run_query_with_config<P>(
     driver: &Driver,
     key: &DriverKey,
