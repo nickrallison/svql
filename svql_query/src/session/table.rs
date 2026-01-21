@@ -205,6 +205,148 @@ impl<T> std::fmt::Debug for Table<T> {
     }
 }
 
+impl<T> std::fmt::Display for Table<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let type_name = std::any::type_name::<T>();
+        writeln!(f, "╔═══ Table: {} ({} rows) ═══", type_name, self.len())?;
+        
+        if self.is_empty() {
+            writeln!(f, "╚═══ (empty)")?;
+            return Ok(());
+        }
+        
+        // Collect column names
+        let mut col_names = vec!["path".to_string()];
+        for col in self.columns {
+            col_names.push(col.name.to_string());
+        }
+        
+        // Calculate column widths (max of header and first 10 rows)
+        let max_rows = self.len().min(10);
+        let mut col_widths: Vec<usize> = col_names.iter().map(|s| s.len()).collect();
+        
+        // Sample rows to determine widths
+        for idx in 0..max_rows {
+            if let Some(row) = self.row(idx as u32) {
+                // Path column
+                col_widths[0] = col_widths[0].max(row.path().len().min(40));
+                
+                // Other columns
+                for (i, col) in self.columns.iter().enumerate() {
+                    let width = match col.kind {
+                        ColumnKind::Wire => {
+                            if let Some(cell_id) = row.wire(col.name) {
+                                format!("{}", cell_id.cell_idx()).len()
+                            } else {
+                                4 // "NULL"
+                            }
+                        }
+                        ColumnKind::Sub(_) => {
+                            if let Ok(sub_idx) = row.sub_raw(col.name) {
+                                if sub_idx != u32::MAX {
+                                    format!("@{}", sub_idx).len()
+                                } else {
+                                    4 // "NULL"
+                                }
+                            } else {
+                                4
+                            }
+                        }
+                        ColumnKind::Metadata => {
+                            if col.name == "depth" {
+                                row.depth().map(|d| format!("{}", d).len()).unwrap_or(1)
+                            } else {
+                                1
+                            }
+                        }
+                    };
+                    col_widths[i + 1] = col_widths[i + 1].max(width);
+                }
+            }
+        }
+        
+        // Print header row
+        write!(f, "║ ")?;
+        for (i, (name, &width)) in col_names.iter().zip(col_widths.iter()).enumerate() {
+            if i > 0 {
+                write!(f, " │ ")?;
+            }
+            write!(f, "{:width$}", name, width = width)?;
+        }
+        writeln!(f, " ║")?;
+        
+        // Print separator
+        write!(f, "╟─")?;
+        for (i, &width) in col_widths.iter().enumerate() {
+            if i > 0 {
+                write!(f, "─┼─")?;
+            }
+            write!(f, "{:─<width$}", "", width = width)?;
+        }
+        writeln!(f, "─╢")?;
+        
+        // Print data rows
+        for idx in 0..max_rows {
+            if let Some(row) = self.row(idx as u32) {
+                write!(f, "║ ")?;
+                
+                // Path column
+                let path = if row.path().len() > 40 {
+                    format!("{}...", &row.path()[..37])
+                } else {
+                    row.path().to_string()
+                };
+                write!(f, "{:width$}", path, width = col_widths[0])?;
+                
+                // Other columns
+                for (i, col) in self.columns.iter().enumerate() {
+                    write!(f, " │ ")?;
+                    let width = col_widths[i + 1];
+                    
+                    match col.kind {
+                        ColumnKind::Wire => {
+                            if let Some(cell_id) = row.wire(col.name) {
+                                write!(f, "{:>width$}", cell_id.cell_idx(), width = width)?;
+                            } else {
+                                write!(f, "{:>width$}", "NULL", width = width)?;
+                            }
+                        }
+                        ColumnKind::Sub(_) => {
+                            if let Ok(sub_idx) = row.sub_raw(col.name) {
+                                if sub_idx != u32::MAX {
+                                    write!(f, "{:>width$}", format!("@{}", sub_idx), width = width)?;
+                                } else {
+                                    write!(f, "{:>width$}", "NULL", width = width)?;
+                                }
+                            } else {
+                                write!(f, "{:>width$}", "-", width = width)?;
+                            }
+                        }
+                        ColumnKind::Metadata => {
+                            if col.name == "depth" {
+                                if let Some(depth) = row.depth() {
+                                    write!(f, "{:>width$}", depth, width = width)?;
+                                } else {
+                                    write!(f, "{:>width$}", "-", width = width)?;
+                                }
+                            }
+                        }
+                    }
+                }
+                writeln!(f, " ║")?;
+            }
+        }
+        
+        if self.len() > max_rows {
+            writeln!(f, "╟─ ... {} more rows ...", self.len() - max_rows)?;
+        }
+        
+        writeln!(f, "╚═══════════════════════════════════════")?;
+        
+        Ok(())
+    }
+}
+
 /// Type-erased table trait for storing in `Store`.
 pub trait AnyTable: Send + Sync + 'static {
     /// Downcast to concrete type.
@@ -217,6 +359,9 @@ pub trait AnyTable: Send + Sync + 'static {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Get the type name of the table.
+    fn type_name(&self) -> &str;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T> {
@@ -226,6 +371,10 @@ impl<T: Send + Sync + 'static> AnyTable for Table<T> {
 
     fn len(&self) -> usize {
         self.df.height()
+    }
+
+    fn type_name(&self) -> &str {
+        std::any::type_name::<T>()
     }
 }
 

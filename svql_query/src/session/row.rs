@@ -92,6 +92,13 @@ impl<T> Row<T> {
         }
     }
 
+    /// Get the raw submodule index by column name (for debugging).
+    ///
+    /// Returns the raw u32 index value, including NULL_REF (u32::MAX) for NULL values.
+    pub fn sub_raw(&self, name: &str) -> Result<u32, ()> {
+        self.subs.get(name).copied().ok_or(())
+    }
+
     /// Get the tree depth (for recursive types like RecOr/RecAnd).
     ///
     /// Returns `None` for non-tree types.

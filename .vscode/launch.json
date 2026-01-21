@@ -7,18 +7,14 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug integration test 'integration_tests'",
+            "name": "Debug integration test 'test_locked_reg_not_positions'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--test=integration_tests",
-                    "--package=svql_driver"
-                ],
-                "filter": {
-                    "name": "integration_tests",
-                    "kind": "test"
-                }
+                    "--package=svql_query",
+                    "test_locked_reg_not_positions"
+                ]
             },
             "args": [],
             "cwd": "${workspaceFolder}",
