@@ -5,13 +5,39 @@
 //! - Foreign-key style references between result tables
 //! - Lazy rehydration of match results
 //! - Efficient columnar storage of dehydrated matches
+//!
+//! ## New API (Phase 1-3)
+//!
+//! The following types are part of the new DataFrame-based API:
+//! - [`CellId`] - 64-bit cell identifier with multi-design support
+//! - [`Ref<T>`](ref_type::Ref) - Typed reference to a row in another pattern's table
+//! - [`Row<T>`] - Owned snapshot of a single row
+//! - [`Table<T>`] - Typed DataFrame wrapper
+//! - [`Store`] - Central storage for all pattern result tables
+//! - [`ColumnDef`], [`ColumnKind`] - Schema definitions
+//! - [`QueryError`] - Error types
+//! - [`PatternRegistry`] - Type registration for DAG construction
+//! - [`ExecutionPlan`], [`ExecutionContext`] - Parallel execution
 
+// --- Legacy modules (to be deprecated) ---
 mod design_frame;
 mod foreign_key;
 mod rehydrate;
 mod result_store;
 mod search_dehydrate;
 
+// --- New modules (Phase 1-3) ---
+mod cell_id;
+mod column;
+mod error;
+mod execution;
+mod ref_type;
+mod registry;
+mod row;
+mod store;
+mod table;
+
+// --- Legacy exports (to be deprecated) ---
 pub use design_frame::{CellRow, DesignFrame};
 pub use foreign_key::{ForeignKey, ForeignKeyTarget};
 pub use rehydrate::{
@@ -22,6 +48,17 @@ pub use result_store::{
     RecursiveFieldDesc, ResultStore, SubmoduleFieldDesc, WireFieldDesc,
 };
 pub use search_dehydrate::SearchDehydrate;
+
+// --- New exports (Phase 1-3) ---
+pub use cell_id::CellId;
+pub use column::{ColumnDef, ColumnKind};
+pub use error::QueryError;
+pub use execution::{Config, ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
+pub use ref_type::Ref;
+pub use registry::{PatternEntry, PatternRegistry};
+pub use row::Row;
+pub use store::Store;
+pub use table::{AnyTable, Table, TableBuilder};
 
 // Re-export validation helper for use by macros
 pub use self::validate_dehydrated_connection as validate_connection;
