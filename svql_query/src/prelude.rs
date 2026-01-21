@@ -8,6 +8,8 @@ pub use crate::{
     Connection, Match, Search, State, Wire, binding::PortResolver, execute_query,
     execute_query_session, execute_query_session_direct, instance::Instance, primitives::dff::*,
     primitives::gates::*, report::ReportNode,
+    // New DataFrame API
+    run_query, run_query_with_config,
 };
 
 // Trait re-exports

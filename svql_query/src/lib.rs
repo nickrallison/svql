@@ -167,6 +167,69 @@ where
     Ok(session)
 }
 
+// ============================================================================
+// New DataFrame-based API (recommended)
+// ============================================================================
+
+/// Execute a query and return results in a Store with DataFrame storage.
+///
+/// This is the new, preferred API that uses the DataFrame-based execution model:
+/// - Uses `ExecutionPlan` for DAG-based parallel execution
+/// - Results stored in `Table<T>` with column-oriented storage
+/// - Supports lazy iteration via `Table::rows()`
+/// - Type-safe references via `Ref<T>`
+///
+/// # Example
+///
+/// ```ignore
+/// use svql_query::prelude::*;
+///
+/// let store = run_query::<MyPattern<Search>>(&driver, &key)?;
+/// let table = store.get::<MyPattern<Search>>()?;
+///
+/// for row in table.rows() {
+///     let wire_cell = row.wire("clk");
+///     let sub_ref: Ref<SubPattern<Search>> = row.sub("sub_field")?;
+/// }
+/// ```
+pub fn run_query<P>(
+    driver: &Driver,
+    key: &DriverKey,
+) -> Result<session::Store, Box<dyn std::error::Error>>
+where
+    P: traits::SearchableComponent + Send + Sync + 'static,
+{
+    use session::{ExecutionPlan, Config as ExecConfig};
+
+    // Build execution plan from pattern
+    let plan = ExecutionPlan::for_pattern::<P>()?;
+
+    // Execute with default config
+    let config = ExecConfig::sequential(); // Start with sequential for simplicity
+    let store = plan.execute(driver, key.clone(), config)?;
+
+    Ok(store)
+}
+
+/// Execute a query with custom execution configuration.
+///
+/// Allows specifying parallel vs sequential execution and thread limits.
+pub fn run_query_with_config<P>(
+    driver: &Driver,
+    key: &DriverKey,
+    config: session::Config,
+) -> Result<session::Store, Box<dyn std::error::Error>>
+where
+    P: traits::SearchableComponent + Send + Sync + 'static,
+{
+    use session::ExecutionPlan;
+
+    let plan = ExecutionPlan::for_pattern::<P>()?;
+    let store = plan.execute(driver, key.clone(), config)?;
+
+    Ok(store)
+}
+
 /// Defines the state of a query component.
 ///
 /// Components exist in two primary states:

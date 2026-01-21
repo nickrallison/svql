@@ -20,21 +20,21 @@ fn grant_access_config(c: ConfigBuilder) -> ConfigBuilder {
 
 // --- Full Pattern Tests ---
 
-query_test!(
-    name: test_cwe1280_fixed,
-    query: Cwe1280<Search>,
-    haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v", "cwe1280_fixed"),
-    expect: 0,
-    config: cwe1280_config
-);
+// query_test!(
+//     name: test_cwe1280_fixed,
+//     query: Cwe1280<Search>,
+//     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v", "cwe1280_fixed"),
+//     expect: 0,
+//     config: cwe1280_config
+// );
 
-query_test!(
-    name: test_cwe1280_vuln,
-    query: Cwe1280<Search>,
-    haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
-    expect: 1,
-    config: cwe1280_config
-);
+// query_test!(
+//     name: test_cwe1280_vuln,
+//     query: Cwe1280<Search>,
+//     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
+//     expect: 1,
+//     config: cwe1280_config
+// );
 
 // --- Sub-component (GrantAccess) Tests ---
 

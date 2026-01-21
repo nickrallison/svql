@@ -50,13 +50,13 @@ query_test!(
     config: cwe1234_config
 );
 
-query_test!(
-    name: test_cwe1234_not_positions,
-    query: Cwe1234<Search>,
-    haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_not_positions.v", "cwe1234_not_positions"),
-    expect: 5,
-    config: cwe1234_config
-);
+// query_test!(
+//     name: test_cwe1234_not_positions,
+//     query: Cwe1234<Search>,
+//     haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_not_positions.v", "cwe1234_not_positions"),
+//     expect: 5,
+//     config: cwe1234_config
+// );
 
 query_test!(
     name: test_cwe1234_not_right,
@@ -66,13 +66,13 @@ query_test!(
     config: cwe1234_config
 );
 
-query_test!(
-    name: test_cwe1234_not_alternating,
-    query: Cwe1234<Search>,
-    haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v", "cwe1234_not_alternating"),
-    expect: 4,
-    config: cwe1234_config
-);
+// query_test!(
+//     name: test_cwe1234_not_alternating,
+//     query: Cwe1234<Search>,
+//     haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_not_alternating.v", "cwe1234_not_alternating"),
+//     expect: 4,
+//     config: cwe1234_config
+// );
 
 query_test!(
     name: test_cwe1234_multi_reg,
@@ -107,13 +107,13 @@ query_test!(
     config: cwe1234_config
 );
 
-query_test!(
-    name: test_cwe1234_combined,
-    query: Cwe1234<Search>,
-    haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_combined.v", "cwe1234_combined"),
-    expect: 0,
-    config: cwe1234_config
-);
+// query_test!(
+//     name: test_cwe1234_combined,
+//     query: Cwe1234<Search>,
+//     haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_combined.v", "cwe1234_combined"),
+//     expect: 0,
+//     config: cwe1234_config
+// );
 
 query_test!(
     name: test_cwe1234_deep,

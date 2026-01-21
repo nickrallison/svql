@@ -116,6 +116,18 @@ impl<T> Row<T> {
         self.sub("right_child")
     }
 
+    /// Get any wire's CellId value from this row.
+    ///
+    /// Returns the first non-NULL wire value found, or `None` if all wires are NULL.
+    /// Useful for simple connectivity validation.
+    pub fn wire_any(&self) -> Option<u32> {
+        self.wires
+            .values()
+            .filter_map(|&opt| opt)
+            .next()
+            .map(|cid| cid.cell_idx())
+    }
+
     // --- Builder methods (used by Table when constructing rows) ---
 
     /// Set a wire column value.
@@ -124,9 +136,17 @@ impl<T> Row<T> {
         self
     }
 
-    /// Set a submodule column value.
+    /// Set a submodule column value (with optional index).
     pub fn with_sub(mut self, name: &'static str, idx: Option<u32>) -> Self {
         self.subs.insert(name, idx.unwrap_or(NULL_REF));
+        self
+    }
+
+    /// Set a submodule column value (with non-null index).
+    ///
+    /// This is a convenience method when you know the index is not NULL.
+    pub fn with_sub_idx(mut self, name: &'static str, idx: u32) -> Self {
+        self.subs.insert(name, idx);
         self
     }
 

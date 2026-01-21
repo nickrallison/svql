@@ -152,6 +152,52 @@ impl ExecutionPlan {
         Ok(Self { root, nodes })
     }
 
+    /// Build an execution plan for a pattern type.
+    ///
+    /// This is a convenience method that:
+    /// 1. Creates a registry
+    /// 2. Registers the pattern and all its dependencies
+    /// 3. Builds the plan with search functions from `df_search`
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - A pattern type that implements `SearchableComponent`
+    pub fn for_pattern<P>() -> Result<Self, QueryError>
+    where
+        P: crate::traits::SearchableComponent + Send + Sync + 'static,
+    {
+        use crate::traits::SearchableComponent;
+
+        // Create and populate registry
+        let mut registry = PatternRegistry::new();
+        P::df_register_all(&mut registry);
+
+        // Build search function map
+        let mut search_fns: HashMap<TypeId, (&'static str, SearchFn)> = HashMap::new();
+
+        // For each registered type, we need to create a search function.
+        // This is tricky because we can only create the search function for types
+        // we know about statically. For now, we only handle the root type.
+        // In a full implementation, we'd need a trait object or registration system.
+
+        // Register the root type's search function
+        let search_fn: SearchFn = |ctx| {
+            let table = P::df_search(ctx)?;
+            Ok(Box::new(table) as Box<dyn AnyTable>)
+        };
+        search_fns.insert(
+            TypeId::of::<P>(),
+            (std::any::type_name::<P>(), search_fn),
+        );
+
+        // For dependencies, we need to use a different approach since we don't have
+        // their types statically. This requires a trait object registration pattern.
+        // For now, this only works for patterns without dependencies (netlists).
+
+        let root_type_id = TypeId::of::<P>();
+        Self::build(root_type_id, &registry, &search_fns)
+    }
+
     /// Execute the plan and return a Store with all results.
     ///
     /// # Arguments

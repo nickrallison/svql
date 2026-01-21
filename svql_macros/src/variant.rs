@@ -113,6 +113,47 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let abstract_ident = format_ident!("__Abstract");
     let port_names: Vec<String> = common_ports.iter().map(|p| p.to_string()).collect();
 
+    // --- DataFrame API Generation ---
+
+    // Collect search types for all variants (for df_dependencies)
+    let variant_search_types: Vec<_> = variants_info.iter().map(|v| {
+        common::replace_state_generic(&v.ty)
+    }).collect();
+
+    // Generate the df_search blocks for each variant
+    let df_variant_search_blocks: Vec<_> = variants_info.iter().map(|v| {
+        let v_ty = &v.ty;
+        let search_type = common::replace_state_generic(v_ty);
+
+        // Get port mappings for this variant (variant_port -> inner_field)
+        let port_wire_copies: Vec<_> = port_names.iter().filter_map(|port| {
+            if let Some(Some(inner_field)) = v.port_map.get(port) {
+                let port_str = port.as_str();
+                Some(quote! {
+                    .with_wire(#port_str, inner_row.wire(#inner_field))
+                })
+            } else {
+                None
+            }
+        }).collect();
+
+        quote! {
+            {
+                // Get the table for this variant's inner type
+                if let Some(inner_table) = ctx.get::<#search_type>() {
+                    for idx in 0..inner_table.len() {
+                        if let Some(inner_row) = inner_table.row(idx as u32) {
+                            // Create a variant row with mapped port wires
+                            let row = Row::<Self>::new(builder.len() as u32, inner_row.path().to_string())
+                                #(#port_wire_copies)*;
+                            builder.push(row);
+                        }
+                    }
+                }
+            }
+        }
+    }).collect();
+
     // 1. Enum Definition
     let variant_defs = variants_info.iter().map(|v| {
         let ident = &v.ident;
@@ -405,11 +446,66 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             // --- New DataFrame API methods (Phase 4) ---
-            // Variants use default implementations for now
-            // TODO: Implement proper variant df_search that:
-            // 1. Searches all sub-variant types
-            // 2. Unions results into a single table
-            // 3. Uses VariantRef for type-safe variant iteration
+
+            fn df_columns() -> &'static [::svql_query::session::ColumnDef] {
+                // Variants have their common port columns as wires + a variant_type column
+                static COLUMNS: ::std::sync::OnceLock<Vec<::svql_query::session::ColumnDef>> = ::std::sync::OnceLock::new();
+                COLUMNS.get_or_init(|| vec![
+                    #(::svql_query::session::ColumnDef {
+                        name: #port_names,
+                        kind: ::svql_query::session::ColumnKind::Wire,
+                        nullable: true,
+                    }),*
+                ])
+            }
+
+            fn df_dependencies() -> &'static [::std::any::TypeId] {
+                // Variants depend on all their inner types
+                static DEPS: ::std::sync::OnceLock<Vec<::std::any::TypeId>> = ::std::sync::OnceLock::new();
+                DEPS.get_or_init(|| vec![
+                    #(::std::any::TypeId::of::<#variant_search_types>()),*
+                ])
+            }
+
+            fn df_register_all(registry: &mut ::svql_query::session::PatternRegistry) {
+                // First register all variant inner types
+                #(
+                    <#variant_search_types as ::svql_query::traits::SearchableComponent>::df_register_all(registry);
+                )*
+
+                // Then register self
+                registry.register(
+                    ::std::any::TypeId::of::<Self>(),
+                    ::std::any::type_name::<Self>(),
+                    Self::df_dependencies(),
+                );
+            }
+
+            fn df_search(
+                ctx: &::svql_query::session::ExecutionContext<'_>,
+            ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {
+                use ::svql_query::session::{TableBuilder, Row, QueryError};
+
+                let search_instance = Self::create_at(::svql_query::instance::Instance::from_path(""));
+
+                let mut builder = TableBuilder::<Self>::new(Self::df_columns());
+
+                // Search each variant type and collect results
+                #(#df_variant_search_blocks)*
+
+                builder.build()
+            }
+
+            fn df_rehydrate(
+                row: &::svql_query::session::Row<Self>,
+                store: &::svql_query::session::Store,
+            ) -> Option<#match_type> {
+                // For variants, the row stores the common ports
+                // We need to figure out which variant type it came from
+                // For now, we'll return None (proper impl needs variant tag column)
+                // TODO: Add variant_type column to identify which inner type
+                None
+            }
         }
 
         // VariantComponent implementation (Search state)
