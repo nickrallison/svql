@@ -17,6 +17,7 @@
     "lldb.showDisassembly": "never",
     "lldb.dereferencePointers": true,
     "lldb.adapterType": "classic",
-    "rust-analyzer.debug.engine": "vadimcn.vscode-lldb"
+    "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
+    "lldb.library": "/Applications/Xcode.app/Contents/SharedFrameworks/LLDB.framework/LLDB"
 
 }

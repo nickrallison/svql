@@ -102,6 +102,14 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         );
     }
 
+    fn search_function(ctx: &ExecutionContext<'_>) -> Result<Box<dyn AnyTable>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        let table = Self::df_search(ctx)?.deduplicate()?;
+        Ok(Box::new(table) as Box<dyn AnyTable>)
+    }
+
     /// Register this component and all dependencies with search functions.
     ///
     /// This is the preferred registration method for `ExecutionPlan::for_pattern`.
@@ -114,16 +122,16 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         Self: Send + Sync + 'static,
     {
         // Default: create a search function that calls df_search
-        let search_fn: SearchFn = |ctx| {
-            let table = Self::df_search(ctx)?;
-            Ok(Box::new(table) as Box<dyn AnyTable>)
-        };
+        // let search_fn: SearchFn = |ctx| {
+        //     let table = Self::df_search(ctx)?;
+        //     Ok(Box::new(table) as Box<dyn AnyTable>)
+        // };
 
         registry.register(
             TypeId::of::<Self>(),
             std::any::type_name::<Self>(),
             Self::df_dependencies(),
-            search_fn,
+            Self::search_function,
         );
     }
 

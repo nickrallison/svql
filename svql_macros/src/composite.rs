@@ -492,17 +492,17 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
                 // First register all dependencies with their search functions
                 #(#df_register_search_deps)*
 
-                // Then register self with its search function
-                let search_fn: SearchFn = |ctx| {
-                    let table = Self::df_search(ctx)?;
-                    Ok(Box::new(table) as Box<dyn AnyTable>)
-                };
+                // // Then register self with its search function
+                // let search_fn: SearchFn = |ctx| {
+                //     let table = Self::df_search(ctx)?;
+                //     Ok(Box::new(table) as Box<dyn AnyTable>)
+                // };
 
                 registry.register(
                     ::std::any::TypeId::of::<Self>(),
                     ::std::any::type_name::<Self>(),
                     Self::df_dependencies(),
-                    search_fn,
+                    Self::search_function,
                 );
             }
 

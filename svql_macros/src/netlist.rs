@@ -222,17 +222,17 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             {
                 use ::svql_query::session::{AnyTable, SearchFn};
 
-                // Netlists have no dependencies, so just register self
-                let search_fn: SearchFn = |ctx| {
-                    let table = Self::df_search(ctx)?;
-                    Ok(Box::new(table) as Box<dyn AnyTable>)
-                };
+                // // Netlists have no dependencies, so just register self
+                // let search_fn: SearchFn = |ctx| {
+                //     let table = Self::df_search(ctx)?;
+                //     Ok(Box::new(table) as Box<dyn AnyTable>)
+                // };
 
                 registry.register(
                     ::std::any::TypeId::of::<Self>(),
                     ::std::any::type_name::<Self>(),
                     Self::df_dependencies(),
-                    search_fn,
+                    Self::search_function,
                 );
             }
 

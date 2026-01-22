@@ -94,6 +94,31 @@ impl<T> Table<T> {
         Ok(Self::new(df, columns))
     }
 
+    /// Deduplicate rows in the table.
+    pub fn deduplicate(&self) -> Result<Self, QueryError> {
+        // Only use structural columns for uniqueness checks, ignoring "path"
+        let subset: Vec<String> = self.columns.iter().map(|c| c.name.to_string()).collect();
+
+        let df = if subset.is_empty() {
+            // If no columns defined, check all columns (including path)
+            println!("Deduplicating using all columns");
+            self.df
+                .clone()
+                .unique::<Vec<String>, String>(None, UniqueKeepStrategy::First, None)?
+        } else {
+            // Check only structural columns
+            let res = self.df.clone().unique::<Vec<String>, String>(
+                Some(&subset),
+                UniqueKeepStrategy::First,
+                None,
+            )?;
+            println!("Deduplicated from {} to {}", self.len(), res.height());
+            res
+        };
+
+        Ok(Self::new(df, self.columns))
+    }
+
     /// Get the number of rows (matches) in this table.
     #[inline]
     pub fn len(&self) -> usize {
@@ -245,6 +270,9 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
 
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
+
+    /// Deduplicate the table.
+    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError>;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T> {
@@ -258,6 +286,11 @@ impl<T: Send + Sync + 'static> AnyTable for Table<T> {
 
     fn type_name(&self) -> &str {
         std::any::type_name::<T>()
+    }
+
+    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError> {
+        let deduped = self.deduplicate()?;
+        Ok(Box::new(deduped))
     }
 }
 

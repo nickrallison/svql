@@ -332,6 +332,9 @@ impl ExecutionPlan {
 
         // Execute search
         let result = (node.search_fn)(ctx)?;
+        // let deduped = result.deduplicate_any()?;
+
+        println!("Table: {}", result);
 
         // Store result wrapped in Arc (OnceLock ensures single write)
         if let Some(slot) = ctx.slots.get(&node.type_id) {
