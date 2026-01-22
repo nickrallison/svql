@@ -66,26 +66,12 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         key: &DriverKey,
         config: &Config,
     ) -> Vec<Self::Match>;
-
-    // =========================================================================
-    // New DataFrame API (Phase 4)
-    // =========================================================================
-
+    
     /// Column schema for DataFrame storage.
-    ///
-    /// # Default Implementation
-    /// Returns an empty slice.
-    fn df_columns() -> &'static [ColumnDef] {
-        &[]
-    }
+    fn df_columns() -> &'static [ColumnDef];
 
     /// Dependencies as TypeIds.
-    ///
-    /// # Default Implementation
-    /// Returns an empty slice.
-    fn df_dependencies() -> &'static [TypeId] {
-        &[]
-    }
+    fn df_dependencies() -> &'static [TypeId];
 
     /// Register this component and all dependencies into the registry.
     ///
@@ -136,26 +122,14 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
     }
 
     /// Execute the search and return results as a Table.
-    ///
-    /// # Default Implementation
-    /// Returns an empty table.
     fn df_search(_ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
     where
-        Self: Send + Sync + 'static,
-    {
-        Table::empty(Self::df_columns())
-    }
+        Self: Send + Sync + 'static;
 
     /// Rehydrate a Row back to the Match type-state.
-    ///
-    /// # Default Implementation
-    /// Returns `None`.
     fn df_rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self::Match>
     where
-        Self: 'static,
-    {
-        None
-    }
+        Self: 'static;
 }
 
 /// Core trait for all matched result components.
