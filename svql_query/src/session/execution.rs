@@ -398,13 +398,6 @@ impl<'d> ExecutionContext<'d> {
     /// Convert the context into a Store after execution completes.
     fn into_store(self) -> Store {
         let mut store = Store::with_capacity(self.slots.len());
-        // let cells: Vec<Cell> = self
-        //     .graph_index
-        //     .cells_topo()
-        //     .iter()
-        //     .map(|c| c.get().clone())
-        //     .collect();
-        // store.add_cells(&cells);
 
         // Clone tables from slots into the store
         // Since we use Arc<dyn AnyTable>, we can clone the Arc and then
