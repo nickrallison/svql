@@ -3,12 +3,7 @@
 //! This module provides standard logic and arithmetic gates used as the
 //! atomic building blocks for structural queries.
 
-use crate::common::{Config, ModuleConfig};
-use crate::driver::{Context, Driver, DriverKey};
-// DataFrame API imports only - old API removed
-use crate::subgraph::cell::CellKind;
-use crate::traits::{Hardware, MatchedComponent, SearchableComponent, kind};
-use crate::{Instance, Match, ReportNode, Search, State, Wire};
+use svql_query::prelude::*;
 
 macro_rules! define_primitive_gate {
     (
@@ -139,9 +134,9 @@ macro_rules! define_primitive_gate {
 
             // DataFrame API
 
-            fn df_columns() -> &'static [crate::session::ColumnDef] {
-                static COLUMNS: &[crate::session::ColumnDef] = &[
-                    $(crate::session::ColumnDef::wire(stringify!($port))),*
+            fn df_columns() -> &'static [::svql_query::session::ColumnDef] {
+                static COLUMNS: &[::svql_query::session::ColumnDef] = &[
+                    $(::svql_query::session::ColumnDef::wire(stringify!($port))),*
                 ];
                 COLUMNS
             }
@@ -150,8 +145,8 @@ macro_rules! define_primitive_gate {
                 &[] // Primitive gates have no dependencies
             }
 
-            fn df_register_search(registry: &mut crate::session::SearchRegistry) {
-                use crate::session::{SearchFn, AnyTable};
+            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry) {
+                use ::svql_query::session::{SearchFn, AnyTable};
 
                 let search_fn: SearchFn = |ctx| {
                     let table = Self::df_search(ctx)?;
@@ -167,9 +162,9 @@ macro_rules! define_primitive_gate {
             }
 
             fn df_search(
-                ctx: &crate::session::ExecutionContext<'_>,
-            ) -> Result<crate::session::Table<Self>, crate::session::QueryError> {
-                use crate::session::{TableBuilder, Row, QueryError, CellId};
+                ctx: &::svql_query::session::ExecutionContext<'_>,
+            ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {
+                use ::svql_query::session::{TableBuilder, Row, QueryError, CellId};
 
                 let driver = ctx.driver();
                 let haystack_key = ctx.driver_key();
@@ -193,8 +188,8 @@ macro_rules! define_primitive_gate {
             }
 
             fn df_rehydrate(
-                row: &crate::session::Row<Self>,
-                _store: &crate::session::Store,
+                row: &::svql_query::session::Row<Self>,
+                _store: &::svql_query::session::Store,
             ) -> Option<Self::Match> {
                 let path = Instance::from_path(row.path());
                 // For primitive gates, all ports map to the same cell
@@ -203,7 +198,7 @@ macro_rules! define_primitive_gate {
                     $(
                         $port: {
                             let cell_opt = row.wire(stringify!($port)).map(|c| {
-                                crate::subgraph::cell::CellInfo {
+                                ::svql_query::prelude::CellInfo {
                                     id: c.cell_idx() as usize,
                                     kind: CellKind::$kind,
                                     source_loc: None,

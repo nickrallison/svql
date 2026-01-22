@@ -4,7 +4,7 @@
 //! flip-flops, including those with synchronous/asynchronous resets and
 //! clock enables.
 
-use crate::State;
+use svql_query::prelude::*;
 
 #[macro_export]
 macro_rules! impl_dff_primitive {
@@ -13,10 +13,10 @@ macro_rules! impl_dff_primitive {
         #[derive(Debug, Clone, Eq, PartialEq, Hash)]
         pub struct $name<S: State> {
             /// The hierarchical path of this flip-flop instance.
-            pub path: ::svql_query::Instance,
+            pub path: ::svql_query::prelude::Instance,
             $(
                 #[doc = concat!("The ", stringify!($port), " port wire.")]
-                pub $port: ::svql_query::Wire<S>
+                pub $port: ::svql_query::prelude::Wire<S>
             ),*
         }
 
@@ -29,10 +29,10 @@ macro_rules! impl_dff_primitive {
             )*
         }
 
-        impl<S: State> ::svql_query::Hardware for $name<S> {
+        impl<S: State> ::svql_query::prelude::Hardware for $name<S> {
             type State = S;
 
-            fn path(&self) -> &::svql_query::Instance {
+            fn path(&self) -> &::svql_query::prelude::Instance {
                 &self.path
             }
 
@@ -40,11 +40,11 @@ macro_rules! impl_dff_primitive {
                 stringify!($name)
             }
 
-            fn children(&self) -> Vec<&dyn ::svql_query::Hardware<State = Self::State>> {
+            fn children(&self) -> Vec<&dyn ::svql_query::prelude::Hardware<State = Self::State>> {
                 vec![ $( &self.$port ),* ]
             }
 
-            fn find_port(&self, path: &::svql_query::Instance) -> Option<&::svql_query::Wire<S>> {
+            fn find_port(&self, path: &::svql_query::prelude::Instance) -> Option<&::svql_query::prelude::Wire<S>> {
                 if !path.starts_with(self.path()) {
                     return None;
                 }
@@ -56,13 +56,13 @@ macro_rules! impl_dff_primitive {
                 }
             }
 
-            fn report(&self, name: &str) -> ::svql_query::ReportNode {
+            fn report(&self, name: &str) -> ::svql_query::prelude::ReportNode {
                 let source_loc = [$(self.$port.source()),*]
                     .into_iter()
                     .flatten()
                     .next();
 
-                ::svql_query::ReportNode {
+                ::svql_query::prelude::ReportNode {
                     name: name.to_string(),
                     type_name: stringify!($name).to_string(),
                     path: self.path.clone(),
@@ -74,7 +74,7 @@ macro_rules! impl_dff_primitive {
         }
 
         impl ::svql_query::traits::SearchableComponent for $name<::svql_query::Search> {
-            type Kind = ::svql_query::kind::Netlist;
+            type Kind = ::svql_query::traits::kind::Netlist;
             type Match = $name<::svql_query::Match>;
 
             // fn create_at(base_path: ::svql_query::Instance) -> Self {
@@ -168,7 +168,7 @@ macro_rules! impl_dff_primitive {
                 // Find matching cells
                 let mut builder = TableBuilder::<Self>::new(Self::df_columns());
 
-                for cell in index.cells_of_type_iter(::svql_query::CellKind::Dff).into_iter().flatten() {
+                for cell in index.cells_of_type_iter(::svql_query::prelude::CellKind::Dff).into_iter().flatten() {
                     let matches = match cell.get() {
                         prjunnamed_netlist::Cell::Dff(ff) => {
                             let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
@@ -192,7 +192,7 @@ macro_rules! impl_dff_primitive {
                 row: &::svql_query::session::Row<Self>,
                 _store: &::svql_query::session::Store,
             ) -> Option<Self::Match> {
-                let path = ::svql_query::Instance::from_path(row.path());
+                let path = ::svql_query::prelude::Instance::from_path(row.path());
                 // For DFF primitives, all ports map to the same cell
                 // (the DFF cell itself - we store the cell ID in each wire column)
                 Some($name {
@@ -200,9 +200,9 @@ macro_rules! impl_dff_primitive {
                     $(
                         $port: {
                             let cell_opt = row.wire(stringify!($port)).map(|c| {
-                                ::svql_query::CellInfo {
+                                ::svql_query::prelude::CellInfo {
                                     id: c.cell_idx() as usize,
-                                    kind: ::svql_query::CellKind::Dff,
+                                    kind: ::svql_query::prelude::CellKind::Dff,
                                     source_loc: None,
                                 }
                             });

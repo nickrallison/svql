@@ -1,5 +1,5 @@
 [package]
-name = "svql_query"
+name = "svql_query_lib"
 edition = "2024"
 version = "0.1.0"
 
@@ -13,7 +13,9 @@ version = "0.1.0"
 ###############
 svql_common.workspace = true
 svql_driver.workspace = true
+svql_macros.workspace = true
 svql_subgraph.workspace = true
+svql_query.workspace = true
 
 ###############
 # PRJUNNAMED

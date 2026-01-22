@@ -3,8 +3,8 @@
 //! Provides the `Instance` type used to track the location of components
 //! within a nested query or design hierarchy.
 
-use std::sync::Arc;
 use std::fmt;
+use std::sync::Arc;
 
 /// Represents a hierarchical path in a design or query.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -20,12 +20,10 @@ impl Instance {
             segments: vec![Arc::from(name)],
         }
     }
-    
+
     /// Creates an instance from a dot-separated path string.
     pub fn from_path(path: &str) -> Self {
-        let segments = path.split('.')
-            .map(Arc::from)
-            .collect();
+        let segments = path.split('.').map(Arc::from).collect();
         Self { segments }
     }
 

@@ -7,6 +7,7 @@ members = [
     "svql_subgraph",
     "svql_common",
     "svql_macros",
+    "svql_query_lib",
 
     # PRJUNNAMED
     "prjunnamed/generic",
@@ -22,6 +23,7 @@ members = [
 default-members = [
     "svql_driver",
     "svql_query",
+    "svql_query_lib",
     "svql_subgraph",
     "svql_common",
 ]
@@ -41,6 +43,7 @@ version = "0.1.0"
 svql_common = { path = "svql_common" }
 svql_driver = { path = "svql_driver" }
 svql_query = { path = "svql_query" }
+svql_query_lib = { path = "svql_query_lib" }
 svql_macros = { path = "svql_macros" }
 svql_subgraph = { path = "svql_subgraph" }
 

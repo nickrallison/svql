@@ -11,9 +11,8 @@ pub use crate::{
     State,
     Wire,
     binding::PortResolver,
-    instance::Instance,
-    primitives::dff::*,
-    primitives::gates::*,
+    // primitives::dff::*,
+    // primitives::gates::*,
     report::ReportNode,
     // DataFrame API
     run_query,
@@ -87,4 +86,4 @@ pub use subgraph::{
 
 pub use driver::{Driver, DriverKey, context::Context};
 
-pub use svql_macros::{composite, netlist, variant};
+// pub use svql_macros::{composite, netlist, variant};

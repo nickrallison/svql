@@ -2185,7 +2185,38 @@ dependencies = [
  "serde_json",
  "svql_common",
  "svql_driver",
+ "svql_subgraph",
+ "syn 2.0.104",
+ "sysinfo",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+ "unstringify",
+ "walkdir",
+]
+
+[[package]]
+name = "svql_query_lib"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "argparse",
+ "contracts",
+ "itertools",
+ "lazy_static",
+ "polars",
+ "prjunnamed-netlist",
+ "proc-macro2",
+ "quote",
+ "rayon",
+ "regex",
+ "rstest",
+ "serde",
+ "serde_json",
+ "svql_common",
+ "svql_driver",
  "svql_macros",
+ "svql_query",
  "svql_subgraph",
  "syn 2.0.104",
  "sysinfo",

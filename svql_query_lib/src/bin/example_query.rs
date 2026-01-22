@@ -1,8 +1,7 @@
-use svql_query::{
-    prelude::*,
-    security::primitives::locked_register::LockedRegister,
-};
+use svql_query::prelude::*;
 use tracing::{Level, info};
+
+use svql_query_lib::security::primitives::locked_register::LockedRegister;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
