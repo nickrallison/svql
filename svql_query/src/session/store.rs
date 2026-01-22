@@ -136,54 +136,24 @@ impl std::fmt::Debug for Store {
 
 impl std::fmt::Display for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "╔═══════════════════════════════════════════════════════════════════════════════"
-        )?;
-        writeln!(
-            f,
-            "║ Store Summary ({} tables)                                                     ║",
-            self.tables.len()
-        )?;
-        writeln!(
-            f,
-            "╠═══════════════════════════════════════════════════════════════════════════════╣"
-        )?;
+        writeln!(f, "\n╔══════════════════════════════════════════════════════════════════════════════")?;
+        writeln!(f, "║ Store: {} tables", self.tables.len())?;
+        writeln!(f, "╚══════════════════════════════════════════════════════════════════════════════")?;
 
         if self.is_empty() {
-            writeln!(
-                f,
-                "║ (empty)                                                                       ║"
-            )?;
-        } else {
-            writeln!(f, "║ {:3} │ {:64} │ {:6} ║", "#", "Type", "Rows")?;
-            writeln!(
-                f,
-                "╟─────┼──────────────────────────────────────────────────────────────────────┼────────╢"
-            )?;
-
-            // Iterate over all tables and show summary
-            for (idx, type_id) in self.type_ids().enumerate() {
-                if let Some(table) = self.get_any(type_id) {
-                    let type_name = table.type_name();
-                    let row_count = table.len();
-
-                    // Truncate type name if too long
-                    let display_name = if type_name.len() > 64 {
-                        format!("{}...", &type_name[..61])
-                    } else {
-                        type_name.to_string()
-                    };
-
-                    writeln!(f, "║ {:3} │ {:64} │ {:6} ║", idx, display_name, row_count)?;
-                }
-            }
+            writeln!(f, "(empty store)")?;
+            return Ok(());
         }
 
-        writeln!(
-            f,
-            "╚═══════════════════════════════════════════════════════════════════════════════╝"
-        )?;
+        // Show summary table of contents
+        for (idx, type_id) in self.type_ids().enumerate() {
+            if let Some(table) = self.get_any(type_id) {
+                let type_name = table.type_name();
+                let row_count = table.len();
+                writeln!(f, "  [{:2}] {} - {} rows", idx, type_name, row_count)?;
+            }
+        }
+        
         Ok(())
     }
 }
