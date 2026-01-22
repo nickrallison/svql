@@ -136,9 +136,15 @@ impl std::fmt::Debug for Store {
 
 impl std::fmt::Display for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "\n╔══════════════════════════════════════════════════════════════════════════════")?;
+        writeln!(
+            f,
+            "\n╔══════════════════════════════════════════════════════════════════════════════"
+        )?;
         writeln!(f, "║ Store: {} tables", self.tables.len())?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════════════════════════")?;
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════════════════════════"
+        )?;
 
         if self.is_empty() {
             writeln!(f, "(empty store)")?;
@@ -153,7 +159,7 @@ impl std::fmt::Display for Store {
                 writeln!(f, "  [{:2}] {} - {} rows", idx, type_name, row_count)?;
             }
         }
-        
+
         Ok(())
     }
 }

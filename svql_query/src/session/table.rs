@@ -208,18 +208,24 @@ impl<T> std::fmt::Debug for Table<T> {
 impl<T> std::fmt::Display for Table<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let type_name = std::any::type_name::<T>();
-        writeln!(f, "\n╔══════════════════════════════════════════════════════════════════════════════")?;
+        writeln!(
+            f,
+            "\n╔══════════════════════════════════════════════════════════════════════════════"
+        )?;
         writeln!(f, "║ Table: {}  ", type_name)?;
         writeln!(f, "║ Rows: {}", self.len())?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════════════════════════")?;
-        
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════════════════════════"
+        )?;
+
         if self.is_empty() {
             writeln!(f, "(empty table)")?;
         } else {
             // Use Polars' built-in DataFrame display which handles formatting beautifully
-            write!(f, "{}" , self.df)?;
+            write!(f, "{}", self.df)?;
         }
-        
+
         Ok(())
     }
 }
