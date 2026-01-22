@@ -19,9 +19,6 @@
 //! - [`PatternRegistry`] - Type registration for DAG construction
 //! - [`ExecutionPlan`], [`ExecutionContext`] - Parallel execution
 
-mod design_frame;
-mod foreign_key;
-
 // --- New modules (Phase 1-3) ---
 mod cell_id;
 mod column;
