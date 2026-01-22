@@ -77,51 +77,51 @@ macro_rules! impl_dff_primitive {
             type Kind = ::svql_query::kind::Netlist;
             type Match = $name<::svql_query::Match>;
 
-            fn create_at(base_path: ::svql_query::Instance) -> Self {
-                Self {
-                    path: base_path.clone(),
-                    $($port: ::svql_query::Wire::new(base_path.child(stringify!($port)), ()),)*
-                }
-            }
+            // fn create_at(base_path: ::svql_query::Instance) -> Self {
+            //     Self {
+            //         path: base_path.clone(),
+            //         $($port: ::svql_query::Wire::new(base_path.child(stringify!($port)), ()),)*
+            //     }
+            // }
 
-            fn build_context(
-                _driver: &::svql_driver::Driver,
-                _options: &::svql_common::ModuleConfig
-            ) -> Result<::svql_query::Context, Box<dyn std::error::Error>> {
-                Ok(::svql_query::Context::new())
-            }
+            // fn build_context(
+            //     _driver: &::svql_driver::Driver,
+            //     _options: &::svql_common::ModuleConfig
+            // ) -> Result<::svql_query::Context, Box<dyn std::error::Error>> {
+            //     Ok(::svql_query::Context::new())
+            // }
 
-            fn execute_search(
-                &self,
-                _driver: &::svql_driver::Driver,
-                context: &::svql_query::Context,
-                key: &::svql_driver::DriverKey,
-                _config: &::svql_common::Config
-            ) -> Vec<Self::Match> {
-                let haystack = context.get(key).expect("Haystack missing from context");
-                let index = haystack.index();
+            // fn execute_search(
+            //     &self,
+            //     _driver: &::svql_driver::Driver,
+            //     context: &::svql_query::Context,
+            //     key: &::svql_driver::DriverKey,
+            //     _config: &::svql_common::Config
+            // ) -> Vec<Self::Match> {
+            //     let haystack = context.get(key).expect("Haystack missing from context");
+            //     let index = haystack.index();
 
-                let matches: Vec<_> = index.cells_of_type_iter(::svql_query::CellKind::Dff)
-                    .into_iter()
-                    .flatten()
-                    .filter(|cell_wrapper| {
-                        match cell_wrapper.get() {
-                            prjunnamed_netlist::Cell::Dff(ff) => {
-                                let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
-                                check(ff)
-                            }
-                            _ => false,
-                        }
-                    })
-                    .map(|cell| {
-                        $name {
-                            path: self.path.clone(),
-                            $($port: ::svql_query::Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
-                        }
-                    })
-                    .collect();
-                matches
-            }
+            //     let matches: Vec<_> = index.cells_of_type_iter(::svql_query::CellKind::Dff)
+            //         .into_iter()
+            //         .flatten()
+            //         .filter(|cell_wrapper| {
+            //             match cell_wrapper.get() {
+            //                 prjunnamed_netlist::Cell::Dff(ff) => {
+            //                     let check: fn(&prjunnamed_netlist::FlipFlop) -> bool = $filter;
+            //                     check(ff)
+            //                 }
+            //                 _ => false,
+            //             }
+            //         })
+            //         .map(|cell| {
+            //             $name {
+            //                 path: self.path.clone(),
+            //                 $($port: ::svql_query::Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
+            //             }
+            //         })
+            //         .collect();
+            //     matches
+            // }
 
             // DataFrame API
 
@@ -165,9 +165,6 @@ macro_rules! impl_dff_primitive {
                     .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
                 let index = haystack_design.index();
 
-                // Build the search instance at root
-                let search_instance = Self::create_at(::svql_query::Instance::from_path(""));
-
                 // Find matching cells
                 let mut builder = TableBuilder::<Self>::new(Self::df_columns());
 
@@ -182,7 +179,7 @@ macro_rules! impl_dff_primitive {
 
                     if matches {
                         let cell_id = CellId::new(cell.to_info().id as u32);
-                        let row = Row::<Self>::new(builder.len() as u32, search_instance.path.to_string())
+                        let row = Row::<Self>::new(builder.len() as u32, "".to_string())
                             $(.with_wire(stringify!($port), Some(cell_id)))*;
                         builder.push(row);
                     }

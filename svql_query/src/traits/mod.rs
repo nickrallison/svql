@@ -92,27 +92,27 @@ pub trait Pattern: Hardware<State = Search> + Sized + Clone {
     /// The corresponding result type in the Match state.
     type Match: Matched<Search = Self>;
 
-    /// Instantiates the pattern at the specified hierarchical path.
-    fn instantiate(base_path: Instance) -> Self;
+    // /// Instantiates the pattern at the specified hierarchical path.
+    // fn instantiate(base_path: Instance) -> Self;
 
-    /// Prepares the design context required for this pattern.
-    ///
-    /// **Legacy API** - Will be deprecated. Use `search()` instead.
-    fn context(
-        driver: &Driver,
-        config: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>>;
+    // /// Prepares the design context required for this pattern.
+    // ///
+    // /// **Legacy API** - Will be deprecated. Use `search()` instead.
+    // fn context(
+    //     driver: &Driver,
+    //     config: &ModuleConfig,
+    // ) -> Result<Context, Box<dyn std::error::Error>>;
 
-    /// Executes the pattern search against a design context.
-    ///
-    /// **Legacy API** - Will be deprecated. Use `search()` instead.
-    fn execute(
-        &self,
-        driver: &Driver,
-        context: &Context,
-        key: &DriverKey,
-        config: &Config,
-    ) -> Vec<Self::Match>;
+    // /// Executes the pattern search against a design context.
+    // ///
+    // /// **Legacy API** - Will be deprecated. Use `search()` instead.
+    // fn execute(
+    //     &self,
+    //     driver: &Driver,
+    //     context: &Context,
+    //     key: &DriverKey,
+    //     config: &Config,
+    // ) -> Vec<Self::Match>;
 
     // =========================================================================
     // New DataFrame API (Phase 4)

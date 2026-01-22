@@ -160,40 +160,40 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             type Kind = ::svql_query::traits::kind::Netlist;
             type Match = #match_type;
 
-            fn create_at(base_path: ::svql_query::instance::Instance) -> Self {
-                Self {
-                    path: base_path.clone(),
-                    #(#init_fields),*
-                }
-            }
+            // fn create_at(base_path: ::svql_query::instance::Instance) -> Self {
+            //     Self {
+            //         path: base_path.clone(),
+            //         #(#init_fields),*
+            //     }
+            // }
 
-            fn build_context(
-                driver: &::svql_query::prelude::Driver,
-                options: &::svql_query::prelude::ModuleConfig
-            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
-                use ::svql_query::traits::NetlistComponent;
-                let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
-                Ok(::svql_query::prelude::Context::from_single(Self::driver_key(), design))
-            }
+            // fn build_context(
+            //     driver: &::svql_query::prelude::Driver,
+            //     options: &::svql_query::prelude::ModuleConfig
+            // ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
+            //     use ::svql_query::traits::NetlistComponent;
+            //     let (_, design) = driver.get_or_load_design(Self::FILE_PATH, Self::MODULE_NAME, options)?;
+            //     Ok(::svql_query::prelude::Context::from_single(Self::driver_key(), design))
+            // }
 
-            fn execute_search(
-                &self,
-                driver: &::svql_query::prelude::Driver,
-                context: &::svql_query::prelude::Context,
-                key: &::svql_query::prelude::DriverKey,
-                config: &::svql_query::prelude::Config
-            ) -> Vec<Self::Match> {
-                use ::svql_query::traits::{NetlistComponent, execute_netlist_query};
-                use ::svql_query::prelude::PortResolver;
+            // fn execute_search(
+            //     &self,
+            //     driver: &::svql_query::prelude::Driver,
+            //     context: &::svql_query::prelude::Context,
+            //     key: &::svql_query::prelude::DriverKey,
+            //     config: &::svql_query::prelude::Config
+            // ) -> Vec<Self::Match> {
+            //     use ::svql_query::traits::{NetlistComponent, execute_netlist_query};
+            //     use ::svql_query::prelude::PortResolver;
 
-                let assignments = execute_netlist_query(self, context, key, config);
-                let needle_container = context.get(&Self::driver_key()).unwrap();
-                let resolver = PortResolver::new(needle_container.index());
+            //     let assignments = execute_netlist_query(self, context, key, config);
+            //     let needle_container = context.get(&Self::driver_key()).unwrap();
+            //     let resolver = PortResolver::new(needle_container.index());
 
-                assignments.items.iter().map(|assignment| {
-                    self.bind_match(&resolver, assignment)
-                }).collect()
-            }
+            //     assignments.items.iter().map(|assignment| {
+            //         self.bind_match(&resolver, assignment)
+            //     }).collect()
+            // }
 
             // --- New DataFrame API methods (Phase 4) ---
 

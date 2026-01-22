@@ -428,32 +428,32 @@ pub fn composite_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
             type Kind = ::svql_query::traits::kind::Composite;
             type Match = #match_type;
 
-            fn create_at(base_path: ::svql_query::prelude::Instance) -> Self {
-                Self {
-                    path: base_path.clone(),
-                    #(#instantiate_fields),*
-                }
-            }
+            // fn create_at(base_path: ::svql_query::prelude::Instance) -> Self {
+            //     Self {
+            //         path: base_path.clone(),
+            //         #(#instantiate_fields),*
+            //     }
+            // }
 
-            fn build_context(
-                driver: &::svql_query::prelude::Driver,
-                options: &::svql_query::prelude::ModuleConfig
-            ) -> Result<::svql_query::prelude::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::prelude::Context::new();
-                #(#context_calls)*
-                Ok(ctx)
-            }
+            // fn build_context(
+            //     driver: &::svql_query::prelude::Driver,
+            //     options: &::svql_query::prelude::ModuleConfig
+            // ) -> Result<::svql_query::prelude::Context, Box<dyn std::error::Error>> {
+            //     let mut ctx = ::svql_query::prelude::Context::new();
+            //     #(#context_calls)*
+            //     Ok(ctx)
+            // }
 
-            fn execute_search(
-                &self,
-                driver: &::svql_query::prelude::Driver,
-                context: &::svql_query::prelude::Context,
-                key: &::svql_query::prelude::DriverKey,
-                config: &::svql_query::prelude::Config
-            ) -> Vec<Self::Match> {
-                use ::svql_query::traits::CompositeComponent;
-                self.execute_submodules(driver, context, key, config)
-            }
+            // fn execute_search(
+            //     &self,
+            //     driver: &::svql_query::prelude::Driver,
+            //     context: &::svql_query::prelude::Context,
+            //     key: &::svql_query::prelude::DriverKey,
+            //     config: &::svql_query::prelude::Config
+            // ) -> Vec<Self::Match> {
+            //     use ::svql_query::traits::CompositeComponent;
+            //     self.execute_submodules(driver, context, key, config)
+            // }
 
             // --- New DataFrame API methods (Phase 4) ---
 

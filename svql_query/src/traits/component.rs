@@ -43,29 +43,7 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
     type Match: MatchedComponent<Search = Self>;
 
     /// Creates a new search instance rooted at the given hierarchical path.
-    fn create_at(base_path: Instance) -> Self;
-
-    /// Builds the context required to execute this search.
-    ///
-    /// This typically involves loading needle designs and merging
-    /// contexts from sub-components.
-    ///
-    /// **Legacy API** - Will be deprecated.
-    fn build_context(
-        driver: &Driver,
-        options: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>>;
-
-    /// Executes the search against the provided design context.
-    ///
-    /// **Legacy API** - Will be deprecated. Use `df_search()` instead.
-    fn execute_search(
-        &self,
-        driver: &Driver,
-        context: &Context,
-        key: &DriverKey,
-        config: &Config,
-    ) -> Vec<Self::Match>;
+    // fn create_at(base_path: Instance) -> Self;
 
     // =========================================================================
     // New DataFrame API (Phase 4)
@@ -168,26 +146,26 @@ where
 {
     type Match = T::Match;
 
-    fn instantiate(base_path: Instance) -> Self {
-        T::create_at(base_path)
-    }
+    // fn instantiate(base_path: Instance) -> Self {
+    //     T::create_at(base_path)
+    // }
 
-    fn context(
-        driver: &Driver,
-        options: &ModuleConfig,
-    ) -> Result<Context, Box<dyn std::error::Error>> {
-        T::build_context(driver, options)
-    }
+    // fn context(
+    //     driver: &Driver,
+    //     options: &ModuleConfig,
+    // ) -> Result<Context, Box<dyn std::error::Error>> {
+    //     T::build_context(driver, options)
+    // }
 
-    fn execute(
-        &self,
-        driver: &Driver,
-        context: &Context,
-        key: &DriverKey,
-        config: &Config,
-    ) -> Vec<Self::Match> {
-        self.execute_search(driver, context, key, config)
-    }
+    // fn execute(
+    //     &self,
+    //     driver: &Driver,
+    //     context: &Context,
+    //     key: &DriverKey,
+    //     config: &Config,
+    // ) -> Vec<Self::Match> {
+    //     self.execute_search(driver, context, key, config)
+    // }
 
     // New DataFrame API delegations
 

@@ -348,32 +348,32 @@ pub fn variant_impl(args: TokenStream, input: TokenStream) -> TokenStream {
             type Kind = ::svql_query::traits::kind::Variant;
             type Match = #match_type;
 
-            fn create_at(base_path: ::svql_query::instance::Instance) -> Self {
-                Self::#abstract_ident {
-                    path: base_path.clone(),
-                    #(#abstract_init),*
-                }
-            }
+            // fn create_at(base_path: ::svql_query::instance::Instance) -> Self {
+            //     Self::#abstract_ident {
+            //         path: base_path.clone(),
+            //         #(#abstract_init),*
+            //     }
+            // }
 
-            fn build_context(
-                driver: &::svql_query::driver::Driver,
-                options: &::svql_query::common::ModuleConfig
-            ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
-                let mut ctx = ::svql_query::driver::Context::new();
-                #(#context_merges)*
-                Ok(ctx)
-            }
+            // fn build_context(
+            //     driver: &::svql_query::driver::Driver,
+            //     options: &::svql_query::common::ModuleConfig
+            // ) -> Result<::svql_query::driver::Context, Box<dyn std::error::Error>> {
+            //     let mut ctx = ::svql_query::driver::Context::new();
+            //     #(#context_merges)*
+            //     Ok(ctx)
+            // }
 
-            fn execute_search(
-                &self,
-                driver: &::svql_query::driver::Driver,
-                context: &::svql_query::driver::Context,
-                key: &::svql_query::driver::DriverKey,
-                config: &::svql_query::common::Config
-            ) -> Vec<Self::Match> {
-                use ::svql_query::traits::VariantComponent;
-                self.search_variants(driver, context, key, config)
-            }
+            // fn execute_search(
+            //     &self,
+            //     driver: &::svql_query::driver::Driver,
+            //     context: &::svql_query::driver::Context,
+            //     key: &::svql_query::driver::DriverKey,
+            //     config: &::svql_query::common::Config
+            // ) -> Vec<Self::Match> {
+            //     use ::svql_query::traits::VariantComponent;
+            //     self.search_variants(driver, context, key, config)
+            // }
 
             // --- New DataFrame API methods (Phase 4) ---
 

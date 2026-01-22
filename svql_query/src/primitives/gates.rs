@@ -84,58 +84,58 @@ macro_rules! define_primitive_gate {
             type Kind = kind::Netlist;
             type Match = $name<Match>;
 
-            fn create_at(base_path: Instance) -> Self {
-                Self {
-                    path: base_path.clone(),
-                    $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
-                }
-            }
+            // fn create_at(base_path: Instance) -> Self {
+            //     Self {
+            //         path: base_path.clone(),
+            //         $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
+            //     }
+            // }
 
-            fn build_context(
-                _driver: &Driver,
-                _config: &ModuleConfig
-            ) -> Result<Context, Box<dyn std::error::Error>> {
-                Ok(Context::new())
-            }
+            // fn build_context(
+            //     _driver: &Driver,
+            //     _config: &ModuleConfig
+            // ) -> Result<Context, Box<dyn std::error::Error>> {
+            //     Ok(Context::new())
+            // }
 
-            /// Scans the design index for all cells matching the primitive type.
-            fn execute_search(
-                &self,
-                _driver: &Driver,
-                context: &Context,
-                key: &DriverKey,
-                config: &Config
-            ) -> Vec<Self::Match> {
-                let haystack = context.get(key).expect("Haystack missing from context");
-                let index = haystack.index();
+            // /// Scans the design index for all cells matching the primitive type.
+            // fn execute_search(
+            //     &self,
+            //     _driver: &Driver,
+            //     context: &Context,
+            //     key: &DriverKey,
+            //     config: &Config
+            // ) -> Vec<Self::Match> {
+            //     let haystack = context.get(key).expect("Haystack missing from context");
+            //     let index = haystack.index();
 
-                match config.dedupe {
-                    crate::common::Dedupe::All => {
-                        /* All Cells Deduplicated */
-                    }
-                    _ => {
-                        if config.dedupe != crate::common::Dedupe::None {
-                            crate::tracing::warn!(
-                                "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
-                                self.type_name(),
-                                config.dedupe
-                            );
-                        }
-                    }
-                }
+            //     match config.dedupe {
+            //         crate::common::Dedupe::All => {
+            //             /* All Cells Deduplicated */
+            //         }
+            //         _ => {
+            //             if config.dedupe != crate::common::Dedupe::None {
+            //                 crate::tracing::warn!(
+            //                     "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
+            //                     self.type_name(),
+            //                     config.dedupe
+            //                 );
+            //             }
+            //         }
+            //     }
 
-                index.cells_of_type_iter(CellKind::$kind)
-                    .into_iter()
-                    .flatten()
-                    .map(|cell| {
-                        $name {
-                            path: self.path.clone(),
-                            $($port: Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
-                        }
-                    })
-                    .collect()
+            //     index.cells_of_type_iter(CellKind::$kind)
+            //         .into_iter()
+            //         .flatten()
+            //         .map(|cell| {
+            //             $name {
+            //                 path: self.path.clone(),
+            //                 $($port: Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
+            //             }
+            //         })
+            //         .collect()
 
-            }
+            // }
 
             // DataFrame API
 
@@ -179,15 +179,12 @@ macro_rules! define_primitive_gate {
                     .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
                 let index = haystack_design.index();
 
-                // Build the search instance at root
-                let search_instance = Self::create_at(Instance::from_path(""));
-
                 // Find matching cells
                 let mut builder = TableBuilder::<Self>::new(Self::df_columns());
 
                 for cell in index.cells_of_type_iter(CellKind::$kind).into_iter().flatten() {
                     let cell_id = CellId::new(cell.to_info().id as u32);
-                    let row = Row::<Self>::new(builder.len() as u32, search_instance.path.to_string())
+                    let row = Row::<Self>::new(builder.len() as u32, "".to_string())
                         $(.with_wire(stringify!($port), Some(cell_id)))*;
                     builder.push(row);
                 }
