@@ -8,8 +8,8 @@ use std::any::TypeId;
 
 use crate::prelude::*;
 use crate::session::{
-    AnyTable, ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, SearchFn,
-    SearchRegistry, Store, Table,
+    AnyTable, ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, SearchRegistry, Store,
+    Table,
 };
 
 /// Marker types for component kinds.

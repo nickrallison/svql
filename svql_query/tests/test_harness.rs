@@ -49,7 +49,7 @@ where
     }
     let config = config_builder.build();
 
-    let (key, _) = driver.get_or_load_design(
+    let (key, design) = driver.get_or_load_design(
         spec.haystack_path,
         spec.haystack_module,
         &config.haystack_options,
@@ -62,15 +62,29 @@ where
     let stored_count = store.get::<P>().map(|table| table.len()).unwrap_or(0);
 
     if stored_count != spec.expected_count {
+        let cells = design.index().cells_topo();
         tracing::error!(
-            "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({})",
+            "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
             stored_count,
             std::any::type_name::<P>(),
             spec.haystack_module,
-            spec.haystack_path
+            spec.haystack_path,
+            store
         );
 
+        tracing::error!("Tables:");
+        for (_, table) in store.tables() {
+            tracing::error!("{}", table);
+        }
+
+        let cells_str = cells
+            .iter()
+            .map(|c| format!(" - {:#?}", c))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        tracing::error!("Cell List: {}", cells_str);
         // Log match details if available
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {

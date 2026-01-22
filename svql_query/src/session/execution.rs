@@ -11,7 +11,9 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
+use prjunnamed_netlist::Cell;
 use svql_driver::{Driver, DriverKey};
+use svql_subgraph::GraphIndex;
 
 use super::error::QueryError;
 use super::registry::PatternRegistry;
@@ -334,7 +336,7 @@ impl ExecutionPlan {
         let result = (node.search_fn)(ctx)?;
         // let deduped = result.deduplicate_any()?;
 
-        println!("Table: {}", result);
+        // println!("Table: {}", result);
 
         // Store result wrapped in Arc (OnceLock ensures single write)
         if let Some(slot) = ctx.slots.get(&node.type_id) {
@@ -396,6 +398,13 @@ impl<'d> ExecutionContext<'d> {
     /// Convert the context into a Store after execution completes.
     fn into_store(self) -> Store {
         let mut store = Store::with_capacity(self.slots.len());
+        // let cells: Vec<Cell> = self
+        //     .graph_index
+        //     .cells_topo()
+        //     .iter()
+        //     .map(|c| c.get().clone())
+        //     .collect();
+        // store.add_cells(&cells);
 
         // Clone tables from slots into the store
         // Since we use Arc<dyn AnyTable>, we can clone the Arc and then

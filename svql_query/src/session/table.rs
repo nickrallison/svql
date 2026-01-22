@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use polars::prelude::*;
+use svql_subgraph::cell::CellWrapper;
 
 use super::cell_id::CellId;
 use super::column::{ColumnDef, ColumnKind};
@@ -101,19 +102,16 @@ impl<T> Table<T> {
 
         let df = if subset.is_empty() {
             // If no columns defined, check all columns (including path)
-            println!("Deduplicating using all columns");
             self.df
                 .clone()
                 .unique::<Vec<String>, String>(None, UniqueKeepStrategy::First, None)?
         } else {
             // Check only structural columns
-            let res = self.df.clone().unique::<Vec<String>, String>(
+            self.df.clone().unique::<Vec<String>, String>(
                 Some(&subset),
                 UniqueKeepStrategy::First,
                 None,
-            )?;
-            println!("Deduplicated from {} to {}", self.len(), res.height());
-            res
+            )?
         };
 
         Ok(Self::new(df, self.columns))

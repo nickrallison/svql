@@ -4,8 +4,12 @@
 //! to access their dependencies' results during search and rehydration.
 
 use std::any::TypeId;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use prjunnamed_netlist::Cell;
+use svql_subgraph::GraphIndex;
 
 use super::ref_type::Ref;
 use super::row::Row;
@@ -38,6 +42,7 @@ use super::table::{AnyTable, Table};
 pub struct Store {
     /// Type-erased table storage.
     tables: HashMap<TypeId, Arc<dyn AnyTable>>,
+    // cells: Vec<Cell>,
 }
 
 impl Store {
@@ -45,6 +50,7 @@ impl Store {
     pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
+            // cells: Vec::new(),
         }
     }
 
@@ -52,8 +58,17 @@ impl Store {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             tables: HashMap::with_capacity(capacity),
+            // cells: Vec::new(),
         }
     }
+
+    // pub fn add_cells(&mut self, new_cells: &[Cell]) {
+    //     // self.cells.extend_from_slice(new_cells);
+    // }
+
+    // pub fn cells(&self) -> &[Cell] {
+    //     &self.cells
+    // }
 
     /// Return an iterator over all tables in the store.
     pub fn tables(&self) -> impl Iterator<Item = (&TypeId, &dyn AnyTable)> {
