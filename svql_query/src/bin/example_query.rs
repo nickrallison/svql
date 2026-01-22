@@ -1,6 +1,6 @@
 use svql_query::{
     prelude::*,
-    security::{cwe1234::Cwe1234, primitives::locked_register::AsyncDffMuxEnable},
+    security::primitives::locked_register::{AsyncDffMuxEnable, LockedRegister},
 };
 use tracing::{Level, info};
 
@@ -51,28 +51,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    info!("Executing query with old API...");
-    let query_results = execute_query::<Cwe1234<Search>>(&driver, &haystack_key, &config)?;
-    info!("Found {} matches with old API", query_results.len());
+    // Test the DataFrame API
+    info!("Executing query with DataFrame API...");
+    let store = svql_query::run_query::<LockedRegister<Search>>(&driver, &haystack_key)?;
 
-    println!("\n=== Old API Results ===");
-    for (i, match_inst) in query_results.iter().take(3).enumerate() {
-        let report = match_inst.report(&format!("[Match #{}]", i + 1));
-        println!("{}", report.render());
-    }
-    if query_results.len() > 3 {
-        println!("... and {} more matches", query_results.len() - 3);
-    }
-
-    // Now test the new DataFrame API
-    info!("\nExecuting query with new DataFrame API...");
-    let store = svql_query::run_query::<Cwe1234<Search>>(&driver, &haystack_key)?;
-
-    println!("\n=== New DataFrame API Results ===");
+    println!("\n=== DataFrame API Results ===");
     println!("{}", store);
 
-    if let Some(table) = store.get::<Cwe1234<Search>>() {
-        println!("\n=== Cwe1234 Table Details ===");
+    if let Some(table) = store.get::<LockedRegister<Search>>() {
+        println!("\n=== LockedRegister Table Details ===");
         println!("{}", table);
     }
 

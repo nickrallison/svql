@@ -13,8 +13,8 @@ pub mod variant;
 // Re-export key traits
 pub use component::{MatchedComponent, SearchableComponent, kind};
 pub use composite::{
-    CompositeComponent, CompositeMatched, ConnectionBuilder, Connections,
-    DehydratedTopologyValidation, Topology, validate_composite,
+    CompositeComponent, CompositeMatched, ConnectionBuilder, Connections, Topology,
+    validate_composite,
 };
 pub use netlist::{NetlistComponent, NetlistMatched, execute_netlist_query, report_netlist};
 pub use variant::{VariantComponent, VariantMatched};

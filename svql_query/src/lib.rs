@@ -36,37 +36,37 @@ use traits::Hardware;
 /// 2. Building the specific Context for this query.
 /// 3. Instantiating the query root.
 /// 4. Running the search.
-pub fn execute_query<P>(
-    driver: &Driver,
-    key: &DriverKey,
-    config: &Config,
-) -> Result<Vec<P::Match>, Box<dyn std::error::Error>>
-where
-    P: traits::Pattern + 'static,
-{
-    // 1. Build the Context
-    let needle_ctx = P::context(driver, &config.needle_options)?;
+// pub fn execute_query<P>(
+//     driver: &Driver,
+//     key: &DriverKey,
+//     config: &Config,
+// ) -> Result<Vec<P::Match>, Box<dyn std::error::Error>>
+// where
+//     P: traits::Pattern + 'static,
+// {
+//     // 1. Build the Context
+//     let needle_ctx = P::context(driver, &config.needle_options)?;
 
-    // 2. Add the Haystack to the context
-    let design_container = driver
-        .get_design(key)
-        .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
+//     // 2. Add the Haystack to the context
+//     let design_container = driver
+//         .get_design(key)
+//         .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
 
-    let context = needle_ctx.with_design(key.clone(), design_container);
+//     let context = needle_ctx.with_design(key.clone(), design_container);
 
-    // 3. Instantiate the Query Root
-    let root_name = std::any::type_name::<P>()
-        .split("::")
-        .last()
-        .unwrap_or("query")
-        .to_lowercase();
-    let query_instance = P::instantiate(Instance::root(root_name));
+//     // 3. Instantiate the Query Root
+//     let root_name = std::any::type_name::<P>()
+//         .split("::")
+//         .last()
+//         .unwrap_or("query")
+//         .to_lowercase();
+//     let query_instance = P::instantiate(Instance::root(root_name));
 
-    // 4. Execute
-    let results = query_instance.execute(driver, &context, key, config);
+//     // 4. Execute
+//     let results = query_instance.execute(driver, &context, key, config);
 
-    Ok(results)
-}
+//     Ok(results)
+// }
 
 /// Execute a query and return results directly in a Session with DataFrame storage.
 ///
@@ -78,94 +78,94 @@ where
 /// The returned Session contains:
 /// - The design data as a DesignFrame
 /// - Query results as DataFrames with foreign key references
-pub fn execute_query_session<P>(
-    driver: &Driver,
-    key: &DriverKey,
-    config: &Config,
-) -> Result<session::Session, Box<dyn std::error::Error>>
-where
-    P: traits::Pattern + 'static,
-    P::Match: session::Dehydrate,
-{
-    // 1. Build the Context
-    let needle_ctx = P::context(driver, &config.needle_options)?;
+// pub fn execute_query_session<P>(
+//     driver: &Driver,
+//     key: &DriverKey,
+//     config: &Config,
+// ) -> Result<session::Session, Box<dyn std::error::Error>>
+// where
+//     P: traits::Pattern + 'static,
+//     P::Match: session::Dehydrate,
+// {
+//     // 1. Build the Context
+//     let needle_ctx = P::context(driver, &config.needle_options)?;
 
-    // 2. Add the Haystack to the context
-    let design_container = driver
-        .get_design(key)
-        .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
+//     // 2. Add the Haystack to the context
+//     let design_container = driver
+//         .get_design(key)
+//         .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
 
-    let context = needle_ctx.with_design(key.clone(), design_container.clone());
+//     let context = needle_ctx.with_design(key.clone(), design_container.clone());
 
-    // 3. Instantiate the Query Root
-    let root_name = std::any::type_name::<P>()
-        .split("::")
-        .last()
-        .unwrap_or("query")
-        .to_lowercase();
-    let query_instance = P::instantiate(Instance::root(root_name));
+//     // 3. Instantiate the Query Root
+//     let root_name = std::any::type_name::<P>()
+//         .split("::")
+//         .last()
+//         .unwrap_or("query")
+//         .to_lowercase();
+//     let query_instance = P::instantiate(Instance::root(root_name));
 
-    // 4. Execute and get matches
-    let matches = query_instance.execute(driver, &context, key, config);
+//     // 4. Execute and get matches
+//     let matches = query_instance.execute(driver, &context, key, config);
 
-    // 5. Dehydrate into session
-    let dehydrated = session::Dehydrate::dehydrate_all(&matches)?;
-    let session = session::SessionBuilder::new(design_container)
-        .with_results::<P>(dehydrated)
-        .build()?;
+//     // 5. Dehydrate into session
+//     let dehydrated = session::Dehydrate::dehydrate_all(&matches)?;
+//     let session = session::SessionBuilder::new(design_container)
+//         .with_results::<P>(dehydrated)
+//         .build()?;
 
-    Ok(session)
-}
+//     Ok(session)
+// }
 
-/// Execute a query and return results directly in a Session without allocating Match objects.
-///
-/// This is the most efficient method for query execution as it:
-/// - Directly produces dehydrated rows during search
-/// - Never allocates intermediate Match objects
-/// - Stores all results in efficient columnar storage
-///
-/// The returned Session contains:
-/// - The design data as a DesignFrame
-/// - Query results for all types (main query + submodules) as DataFrames
-pub fn execute_query_session_direct<P>(
-    driver: &Driver,
-    key: &DriverKey,
-    config: &Config,
-) -> Result<session::Session, Box<dyn std::error::Error>>
-where
-    P: traits::Pattern + session::SearchDehydrate + 'static,
-    <P as traits::Pattern>::Match: session::Dehydrate,
-{
-    // 1. Build the Context
-    let needle_ctx = P::context(driver, &config.needle_options)?;
+// /// Execute a query and return results directly in a Session without allocating Match objects.
+// ///
+// /// This is the most efficient method for query execution as it:
+// /// - Directly produces dehydrated rows during search
+// /// - Never allocates intermediate Match objects
+// /// - Stores all results in efficient columnar storage
+// ///
+// /// The returned Session contains:
+// /// - The design data as a DesignFrame
+// /// - Query results for all types (main query + submodules) as DataFrames
+// pub fn execute_query_session_direct<P>(
+//     driver: &Driver,
+//     key: &DriverKey,
+//     config: &Config,
+// ) -> Result<session::Session, Box<dyn std::error::Error>>
+// where
+//     P: traits::Pattern + session::SearchDehydrate + 'static,
+//     <P as traits::Pattern>::Match: session::Dehydrate,
+// {
+//     // 1. Build the Context
+//     let needle_ctx = P::context(driver, &config.needle_options)?;
 
-    // 2. Add the Haystack to the context
-    let design_container = driver
-        .get_design(key)
-        .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
+//     // 2. Add the Haystack to the context
+//     let design_container = driver
+//         .get_design(key)
+//         .ok_or_else(|| format!("Design not found in driver: {:?}", key))?;
 
-    let context = needle_ctx.with_design(key.clone(), design_container.clone());
+//     let context = needle_ctx.with_design(key.clone(), design_container.clone());
 
-    // 3. Instantiate the Query Root
-    let root_name = std::any::type_name::<P>()
-        .split("::")
-        .last()
-        .unwrap_or("query")
-        .to_lowercase();
-    let query_instance = P::instantiate(Instance::root(root_name));
+//     // 3. Instantiate the Query Root
+//     let root_name = std::any::type_name::<P>()
+//         .split("::")
+//         .last()
+//         .unwrap_or("query")
+//         .to_lowercase();
+//     let query_instance = P::instantiate(Instance::root(root_name));
 
-    // 4. Execute directly into dehydrated results
-    let mut results = session::DehydratedResults::new();
-    let _ = query_instance.execute_dehydrated(driver, &context, key, config, &mut results);
+//     // 4. Execute directly into dehydrated results
+//     let mut results = session::DehydratedResults::new();
+//     let _ = query_instance.execute_dehydrated(driver, &context, key, config, &mut results);
 
-    // 5. Build session from dehydrated results
-    let query_results_map = results.into_query_results()?;
-    let session = session::SessionBuilder::new(design_container)
-        .with_results_map::<P>(query_results_map)
-        .build()?;
+//     // 5. Build session from dehydrated results
+//     let query_results_map = results.into_query_results()?;
+//     let session = session::SessionBuilder::new(design_container)
+//         .with_results_map::<P>(query_results_map)
+//         .build()?;
 
-    Ok(session)
-}
+//     Ok(session)
+// }
 
 // ============================================================================
 // New DataFrame-based API (recommended)

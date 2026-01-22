@@ -11,14 +11,11 @@ pub use crate::{
     State,
     Wire,
     binding::PortResolver,
-    execute_query,
-    execute_query_session,
-    execute_query_session_direct,
     instance::Instance,
     primitives::dff::*,
     primitives::gates::*,
     report::ReportNode,
-    // New DataFrame API
+    // DataFrame API
     run_query,
     run_query_with_config,
 };
@@ -46,16 +43,6 @@ pub use crate::traits::{
     kind,
     validate_composite,
     validate_connection,
-};
-
-// Session re-exports (DataFrame-based result storage)
-// Legacy types (deprecated, use new API instead)
-#[allow(deprecated)]
-pub use crate::session::{
-    CellRow, Dehydrate, DehydratedResults, DehydratedRow, DesignFrame, ForeignKey,
-    ForeignKeyTarget, MatchRef, MatchRow, QueryResults, QuerySchema, RecursiveFieldDesc, Rehydrate,
-    RehydrateContext, RehydrateIter, ResultStore, SearchDehydrate, Session, SessionBuilder,
-    SessionError, SessionRehydrateExt, SubmoduleFieldDesc, WireFieldDesc, WireRef,
 };
 
 // New API types (Phase 1-6)

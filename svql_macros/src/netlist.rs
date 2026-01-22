@@ -16,7 +16,7 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         .clone();
 
     let struct_name = &item_struct.ident;
-    let struct_name_str = struct_name.to_string();
+    let _struct_name_str = struct_name.to_string(); // Kept for potential future use
 
     let (impl_generics, ty_generics, where_clause) = item_struct.generics.split_for_impl();
     let specialized_generics = common::remove_state_generic(&item_struct.generics);
@@ -103,15 +103,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! { &self.#ident }
     });
 
-    // --- Dehydrate/Rehydrate Generation ---
-
-    let wire_field_descs = parsed_fields.iter().map(|f| {
-        let name = &f.ident.to_string();
-        quote! {
-            ::svql_query::session::WireFieldDesc { name: #name }
-        }
-    });
-
     // --- New DataFrame API columns (Phase 4) ---
     let column_defs = parsed_fields.iter().map(|f| {
         let name = f.ident.to_string();
@@ -142,35 +133,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         let wire_name = &f.wire_name;
         quote! {
             .with_wire(#name, resolver.get_cell_id(assignment, #wire_name).map(|id| ::svql_query::session::CellId::new(id as u32)))
-        }
-    });
-
-    let dehydrate_wire_fields = parsed_fields.iter().map(|f| {
-        let ident = &f.ident;
-        let name = f.ident.to_string();
-        quote! {
-            .with_wire(#name, self.#ident.inner.as_ref().map(|c| c.id as u32))
-        }
-    });
-
-    let rehydrate_wire_fields = parsed_fields.iter().map(|f| {
-        let ident = &f.ident;
-        let name = f.ident.to_string();
-        let wire_name = &f.wire_name;
-        quote! {
-            #ident: ctx.rehydrate_wire(
-                ::svql_query::instance::Instance::from_path(&row.path).child(#wire_name),
-                row.wire(#name)
-            )
-        }
-    });
-
-    // SearchDehydrate: create dehydrated rows directly from subgraph matches
-    let search_dehydrate_wire_fields = parsed_fields.iter().map(|f| {
-        let name = f.ident.to_string();
-        let wire_name = &f.wire_name;
-        quote! {
-            .with_wire(#name, resolver.get_cell_id(assignment, #wire_name).map(|id| id as u32))
         }
     });
 
@@ -363,69 +325,6 @@ pub fn netlist_impl(args: TokenStream, input: TokenStream) -> TokenStream {
         // NetlistMatched implementation (Match state)
         impl #spec_impl_generics ::svql_query::traits::NetlistMatched for #match_type #spec_where_clause {
             type SearchType = #search_type;
-        }
-
-        // Dehydrate implementation (Match state)
-        impl #spec_impl_generics ::svql_query::session::Dehydrate for #match_type #spec_where_clause {
-            const SCHEMA: ::svql_query::session::QuerySchema = ::svql_query::session::QuerySchema::new(
-                #struct_name_str,
-                &[ #(#wire_field_descs),* ],
-                &[], // Netlists have no submodules
-            );
-
-            fn dehydrate(&self) -> ::svql_query::session::DehydratedRow {
-                ::svql_query::session::DehydratedRow::new(self.path.to_string())
-                    #(#dehydrate_wire_fields)*
-            }
-        }
-
-        // Rehydrate implementation (Match state)
-        impl #spec_impl_generics ::svql_query::session::Rehydrate for #match_type #spec_where_clause {
-            const TYPE_NAME: &'static str = #struct_name_str;
-
-            fn rehydrate(
-                row: &::svql_query::session::MatchRow,
-                ctx: &::svql_query::session::RehydrateContext<'_>,
-            ) -> Result<Self, ::svql_query::session::SessionError> {
-                Ok(#struct_name {
-                    path: ::svql_query::instance::Instance::from_path(&row.path),
-                    #(#rehydrate_wire_fields),*
-                })
-            }
-        }
-
-        // SearchDehydrate implementation (Search state)
-        impl #spec_impl_generics ::svql_query::session::SearchDehydrate for #search_type #spec_where_clause {
-            const MATCH_SCHEMA: ::svql_query::session::QuerySchema = <#match_type as ::svql_query::session::Dehydrate>::SCHEMA;
-
-            fn execute_dehydrated(
-                &self,
-                driver: &::svql_query::driver::Driver,
-                context: &::svql_query::driver::Context,
-                key: &::svql_query::driver::DriverKey,
-                config: &::svql_query::common::Config,
-                results: &mut ::svql_query::session::DehydratedResults,
-            ) -> Vec<u32> {
-                use ::svql_query::traits::{NetlistComponent, execute_netlist_query, Hardware};
-                use ::svql_query::prelude::PortResolver;
-
-                // Register our schema using full type path
-                let type_key = Self::type_key();
-                results.register_schema(type_key, &Self::MATCH_SCHEMA);
-
-                let assignments = execute_netlist_query(self, context, key, config);
-                let needle_container = context.get(&Self::driver_key()).unwrap();
-                let resolver = PortResolver::new(needle_container.index());
-
-                let mut indices = Vec::with_capacity(assignments.items.len());
-                for assignment in &assignments.items {
-                    let row = ::svql_query::session::DehydratedRow::new(self.path.to_string())
-                        #(#search_dehydrate_wire_fields)*;
-                    let idx = results.push(type_key, row);
-                    indices.push(idx);
-                }
-                indices
-            }
         }
     };
 

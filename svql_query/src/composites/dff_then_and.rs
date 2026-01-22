@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::traits::DehydratedTopologyValidation;
 
 #[composite]
 pub struct SdffeThenAnd<S: State> {
@@ -15,5 +14,3 @@ impl<S: State> Topology<S> for SdffeThenAnd<S> {
         ctx.connect(Some(&self.sdffe.q), Some(&self.and_gate.b));
     }
 }
-
-impl DehydratedTopologyValidation for SdffeThenAnd<Search> {}
