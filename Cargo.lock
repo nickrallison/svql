@@ -2243,6 +2243,7 @@ dependencies = [
  "regex",
  "rstest",
  "svql_common",
+ "svql_driver",
  "tempfile",
  "thiserror",
  "tracing",

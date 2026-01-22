@@ -113,10 +113,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             self.haystack_index.num_cells()
         );
 
-        let (input_queue, gate_queue) = self.prepare_search_queues();
+        let (input_queue, gate_queue, output_queue) = self.prepare_search_queues();
         let initial_assignment = SingleAssignment::new();
 
-        let mut results = self.match_gate_cells(initial_assignment, gate_queue, input_queue);
+        let mut results =
+            self.match_gate_cells(initial_assignment, gate_queue, input_queue, output_queue);
 
         let total_found = results.len();
 
@@ -143,6 +144,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         assignment: SingleAssignment<'needle, 'haystack>,
         mut gate_queue: VecDeque<CellWrapper<'needle>>,
         input_queue: VecDeque<CellWrapper<'needle>>,
+        output_queue: VecDeque<CellWrapper<'needle>>,
     ) -> Vec<SingleAssignment<'needle, 'haystack>> {
         let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
         let is_root = assignment.is_empty();
@@ -166,7 +168,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         }
 
         let Some(current_needle) = gate_queue.pop_front() else {
-            return self.match_input_cells(assignment, input_queue);
+            return self.match_input_cells(assignment, input_queue, output_queue);
         };
 
         let candidates = self.find_candidates_for_cell(current_needle.clone(), &assignment);
@@ -195,8 +197,12 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 let mut next_assignment = assignment.clone();
                 next_assignment.assign(current_needle.clone(), candidate);
 
-                let res =
-                    self.match_gate_cells(next_assignment, gate_queue.clone(), input_queue.clone());
+                let res = self.match_gate_cells(
+                    next_assignment,
+                    gate_queue.clone(),
+                    input_queue.clone(),
+                    output_queue.clone(),
+                );
 
                 if is_root {
                     self.initial_candidates_done.fetch_add(1, Ordering::SeqCst);
@@ -214,16 +220,16 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         &self,
         assignment: SingleAssignment<'needle, 'haystack>,
         mut input_queue: VecDeque<CellWrapper<'needle>>,
+        output_queue: VecDeque<CellWrapper<'needle>>,
     ) -> Vec<SingleAssignment<'needle, 'haystack>> {
         let Some(current_needle) = input_queue.pop_front() else {
-            self.matches_found.fetch_add(1, Ordering::Relaxed);
-            return vec![assignment];
+            return self.match_output_cells(assignment, output_queue);
         };
 
         let candidates = self.find_candidates_for_input(current_needle.clone(), &assignment);
 
         if candidates.is_empty() && self.config.pattern_vars_match_design_consts {
-            return self.match_input_cells(assignment, input_queue);
+            return self.match_input_cells(assignment, input_queue, output_queue);
         }
 
         #[cfg(feature = "rayon")]
@@ -235,30 +241,103 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             let mut next_assignment = assignment.clone();
             next_assignment.assign(current_needle.clone(), candidate);
 
-            self.match_input_cells(next_assignment, input_queue.clone())
+            self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
         })
         .collect()
     }
 
-    /// Separates needle cells into input and gate queues for topological traversal.
+    /// Recursive backtracking step for matching output ports.
+    fn match_output_cells(
+        &self,
+        assignment: SingleAssignment<'needle, 'haystack>,
+        mut output_queue: VecDeque<CellWrapper<'needle>>,
+    ) -> Vec<SingleAssignment<'needle, 'haystack>> {
+        let Some(current_needle) = output_queue.pop_front() else {
+            self.matches_found.fetch_add(1, Ordering::Relaxed);
+            return vec![assignment];
+        };
+
+        let candidates = self.find_candidates_for_output(current_needle.clone(), &assignment);
+
+        if candidates.is_empty() {
+            return vec![];
+        }
+
+        #[cfg(feature = "rayon")]
+        let iter = candidates.into_par_iter();
+        #[cfg(not(feature = "rayon"))]
+        let iter = candidates.into_iter();
+
+        iter.flat_map(|candidate| {
+            let mut next_assignment = assignment.clone();
+            next_assignment.assign(current_needle.clone(), candidate);
+
+            self.match_output_cells(next_assignment, output_queue.clone())
+        })
+        .collect()
+    }
+
+    /// Filters haystack cells for output ports based on fan-in connectivity.
+    /// Output cells in the pattern can match any logic gate in the haystack.
+    fn find_candidates_for_output(
+        &self,
+        needle_output: CellWrapper<'needle>,
+        assignment: &SingleAssignment<'needle, 'haystack>,
+    ) -> Vec<CellWrapper<'haystack>> {
+        let needle_fanin = self
+            .needle_index
+            .fanin_with_ports(&needle_output)
+            .unwrap_or_default();
+
+        let mapped_haystack_fanin: Vec<_> = needle_fanin
+            .iter()
+            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred.clone()))
+            .collect();
+
+        if mapped_haystack_fanin.is_empty() {
+            // If no fanin is mapped yet, allow matching to any logic gate
+            return self
+                .haystack_index
+                .cells_topo()
+                .iter()
+                .filter(|cell| cell.cell_type().is_logic_gate())
+                .filter(|candidate| assignment.get_needle_cell((*candidate).clone()).is_none())
+                .cloned()
+                .collect();
+        }
+
+        let fanout_sets: Vec<_> = mapped_haystack_fanin
+            .iter()
+            .filter_map(|haystack_pred| self.haystack_index.fanout_set(haystack_pred))
+            .collect();
+
+        intersect_sets(fanout_sets)
+            .into_iter()
+            .filter(|candidate| assignment.get_needle_cell(candidate.clone()).is_none())
+            .collect()
+    }
+
+    /// Separates needle cells into input, output, and gate queues for topological traversal.
     fn prepare_search_queues(
         &self,
     ) -> (
         VecDeque<CellWrapper<'needle>>,
         VecDeque<CellWrapper<'needle>>,
+        VecDeque<CellWrapper<'needle>>,
     ) {
         let mut inputs = VecDeque::new();
         let mut gates = VecDeque::new();
+        let mut outputs = VecDeque::new();
 
         for cell in self.needle_index.cells_topo().iter().rev() {
             match cell.cell_type() {
-                CellKind::Output => continue,
+                CellKind::Output => outputs.push_back(cell.clone()),
                 CellKind::Input => inputs.push_back(cell.clone()),
                 _ => gates.push_back(cell.clone()),
             }
         }
 
-        (inputs, gates)
+        (inputs, gates, outputs)
     }
 
     /// Filters haystack cells based on type and fan-in constraints.

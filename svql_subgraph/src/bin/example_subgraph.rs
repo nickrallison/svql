@@ -26,16 +26,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     for (match_idx, assignment) in assignment_set.items.iter().enumerate() {
-        if match_idx % 1000 != 0 {
-            continue;
-        }
         println!("--- Match {} ---", match_idx);
         for (haystack_cell, needle_cell) in assignment.haystack_mapping().iter() {
-            let needle_cell = needle_cell.get();
-            let haystack_cell = haystack_cell.get();
             println!(
-                "Needle Cell: {:?} -> Haystack Cell: {:?}",
-                needle_cell, haystack_cell
+                "Needle Cell [id={}]: {:?} -> Haystack Cell [id={}]: {:?}",
+                needle_cell.debug_index(),
+                needle_cell.get(),
+                haystack_cell.debug_index(),
+                haystack_cell.get()
             );
         }
     }
