@@ -55,6 +55,13 @@ impl Store {
         }
     }
 
+    /// Return an iterator over all tables in the store.
+    pub fn tables(&self) -> impl Iterator<Item = (&TypeId, &dyn AnyTable)> {
+        self.tables
+            .iter()
+            .map(|(type_id, arc)| (type_id, arc.as_ref()))
+    }
+
     /// Insert a table for pattern type `T`.
     ///
     /// Overwrites any existing table for this type.

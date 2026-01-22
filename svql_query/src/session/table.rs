@@ -231,7 +231,7 @@ impl<T> std::fmt::Display for Table<T> {
 }
 
 /// Type-erased table trait for storing in `Store`.
-pub trait AnyTable: Send + Sync + 'static {
+pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Downcast to concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
