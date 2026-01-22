@@ -25,8 +25,6 @@ use super::ref_type::Ref;
 pub struct Row<T> {
     /// Row index in the source table.
     pub(crate) idx: u32,
-    /// Hierarchical path (e.g., "top.cpu.alu.adder").
-    pub(crate) path: String,
     /// Wire columns: name → CellId (None if NULL).
     pub(crate) wires: HashMap<&'static str, Option<CellId>>,
     /// Submodule columns: name → row index in target table.

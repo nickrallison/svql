@@ -12,8 +12,9 @@
 ///
 /// Current single-design mode: `design_id` is always 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct CellId(u64);
+pub struct CellId {
+    cell_idx: u32,
+}
 
 impl CellId {
     /// Design ID for the root/flattened design (single-design mode).

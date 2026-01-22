@@ -123,68 +123,68 @@ pub trait MatchedComponent: Hardware<State = Match> + Sized + Clone {
 // Blanket Implementations
 // ============================================================================
 
-impl<T> Pattern for T
-where
-    T: SearchableComponent,
-{
-    type Match = T::Match;
+// impl<T> Pattern for T
+// where
+//     T: SearchableComponent,
+// {
+//     type Match = T::Match;
 
-    // fn instantiate(base_path: Instance) -> Self {
-    //     T::create_at(base_path)
-    // }
+//     // fn instantiate(base_path: Instance) -> Self {
+//     //     T::create_at(base_path)
+//     // }
 
-    // fn context(
-    //     driver: &Driver,
-    //     options: &ModuleConfig,
-    // ) -> Result<Context, Box<dyn std::error::Error>> {
-    //     T::build_context(driver, options)
-    // }
+//     // fn context(
+//     //     driver: &Driver,
+//     //     options: &ModuleConfig,
+//     // ) -> Result<Context, Box<dyn std::error::Error>> {
+//     //     T::build_context(driver, options)
+//     // }
 
-    // fn execute(
-    //     &self,
-    //     driver: &Driver,
-    //     context: &Context,
-    //     key: &DriverKey,
-    //     config: &Config,
-    // ) -> Vec<Self::Match> {
-    //     self.execute_search(driver, context, key, config)
-    // }
+//     // fn execute(
+//     //     &self,
+//     //     driver: &Driver,
+//     //     context: &Context,
+//     //     key: &DriverKey,
+//     //     config: &Config,
+//     // ) -> Vec<Self::Match> {
+//     //     self.execute_search(driver, context, key, config)
+//     // }
 
-    // New DataFrame API delegations
+//     // New DataFrame API delegations
 
-    fn columns() -> &'static [ColumnDef] {
-        T::df_columns()
-    }
+//     fn columns() -> &'static [ColumnDef] {
+//         T::df_columns()
+//     }
 
-    fn dependencies() -> &'static [TypeId] {
-        T::df_dependencies()
-    }
+//     fn dependencies() -> &'static [TypeId] {
+//         T::df_dependencies()
+//     }
 
-    fn register_all(registry: &mut PatternRegistry)
-    where
-        Self: 'static,
-    {
-        T::df_register_all(registry)
-    }
+//     fn register_all(registry: &mut PatternRegistry)
+//     where
+//         Self: 'static,
+//     {
+//         T::df_register_all(registry)
+//     }
 
-    fn search(ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
-    where
-        Self: Send + Sync + 'static,
-    {
-        T::df_search(ctx)
-    }
+//     fn search(ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
+//     where
+//         Self: Send + Sync + 'static,
+//     {
+//         T::df_search(ctx)
+//     }
 
-    fn rehydrate(row: &Row<Self>, store: &Store) -> Option<Self::Match>
-    where
-        Self: 'static,
-    {
-        T::df_rehydrate(row, store)
-    }
-}
+//     fn rehydrate(row: &Row<Self>, store: &Store) -> Option<Self::Match>
+//     where
+//         Self: 'static,
+//     {
+//         T::df_rehydrate(row, store)
+//     }
+// }
 
-impl<T> Matched for T
-where
-    T: MatchedComponent,
-{
-    type Search = T::Search;
-}
+// impl<T> Matched for T
+// where
+//     T: MatchedComponent,
+// {
+//     type Search = T::Search;
+// }

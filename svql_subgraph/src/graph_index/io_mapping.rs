@@ -91,4 +91,12 @@ impl IoMapping {
             })
             .collect()
     }
+
+    pub fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+        &self.input_fanout_by_name
+    }
+
+    pub fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+        &self.output_fanin_by_name
+    }
 }

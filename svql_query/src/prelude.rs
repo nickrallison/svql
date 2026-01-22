@@ -6,17 +6,12 @@ pub use tracing;
 
 pub use crate::{
     Connection,
-    Match,
-    Search,
-    State,
-    Wire,
     binding::PortResolver,
     // primitives::dff::*,
     // primitives::gates::*,
     report::ReportNode,
     // DataFrame API
     run_query,
-    run_query_with_config,
 };
 
 // Trait re-exports
@@ -25,8 +20,6 @@ pub use crate::traits::{
     CompositeComponent,
     CompositeMatched,
     ConnectionBuilder,
-    Hardware,
-    Matched,
     MatchedComponent,
     // Netlist traits
     NetlistComponent,

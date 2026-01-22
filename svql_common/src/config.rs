@@ -22,6 +22,8 @@ pub struct Config {
     pub pattern_vars_match_design_consts: bool,
     /// Maximum recursion depth for the search.
     pub max_recursion_depth: Option<usize>,
+    /// Whether to run the search in parallel.
+    pub parallel: bool,
 }
 
 impl Default for Config {
@@ -34,6 +36,7 @@ impl Default for Config {
             haystack_options: Default::default(),
             pattern_vars_match_design_consts: true,
             max_recursion_depth: None,
+            parallel: false,
         }
     }
 }
@@ -47,6 +50,7 @@ impl Config {
         haystack_options: ModuleConfig,
         pattern_vars_match_design_consts: bool,
         max_recursion_depth: Option<usize>,
+        parallel: bool,
     ) -> Self {
         Self {
             match_length,
@@ -55,6 +59,7 @@ impl Config {
             haystack_options,
             pattern_vars_match_design_consts,
             max_recursion_depth,
+            parallel,
         }
     }
 
@@ -83,6 +88,7 @@ pub struct ConfigBuilder {
     haystack_options: ModuleConfig,
     pub pattern_vars_match_design_consts: bool,
     max_recursion_depth: Option<usize>,
+    parallel: bool,
 }
 
 impl ConfigBuilder {
@@ -163,6 +169,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Sets whether to run the search in parallel.
+    pub fn parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
+    }
+
     /// Finalizes the builder into a `Config` instance.
     pub fn build(self) -> Config {
         Config {
@@ -172,6 +184,7 @@ impl ConfigBuilder {
             haystack_options: self.haystack_options,
             pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,
             max_recursion_depth: self.max_recursion_depth,
+            parallel: self.parallel,
         }
     }
 }

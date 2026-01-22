@@ -19,33 +19,6 @@ use super::registry::PatternRegistry;
 use super::store::Store;
 use super::table::AnyTable;
 
-/// Configuration for query execution.
-#[derive(Debug, Clone, Default)]
-pub struct Config {
-    /// Whether to run in parallel (default: true).
-    pub parallel: bool,
-    /// Maximum number of threads (default: rayon default).
-    pub max_threads: Option<usize>,
-}
-
-impl Config {
-    /// Create a default parallel config.
-    pub fn parallel() -> Self {
-        Self {
-            parallel: true,
-            max_threads: None,
-        }
-    }
-
-    /// Create a sequential (single-threaded) config.
-    pub fn sequential() -> Self {
-        Self {
-            parallel: false,
-            max_threads: Some(1),
-        }
-    }
-}
-
 /// Type alias for a search function.
 ///
 /// Search functions take an `ExecutionContext` and return a type-erased table.
@@ -283,7 +256,7 @@ impl ExecutionPlan {
         &self,
         driver: &Driver,
         key: DriverKey,
-        config: Config,
+        config: &svql_common::Config,
     ) -> Result<Store, QueryError> {
         // Create slots for each node
         let slots: HashMap<TypeId, TableSlot> = self
@@ -295,7 +268,7 @@ impl ExecutionPlan {
         // Create shared context
         let ctx = ExecutionContext {
             driver,
-            driver_key: key,
+            design_key: key,
             config: config.clone(),
             slots: Arc::new(slots),
         };
@@ -383,9 +356,9 @@ pub struct ExecutionContext<'d> {
     /// The driver for design/needle operations.
     driver: &'d Driver,
     /// Key for the design being searched.
-    driver_key: DriverKey,
+    design_key: DriverKey,
     /// Execution configuration.
-    config: Config,
+    config: svql_common::Config,
     /// Slots for storing results (shared with plan).
     slots: Arc<HashMap<TypeId, TableSlot>>,
 }
@@ -397,12 +370,12 @@ impl<'d> ExecutionContext<'d> {
     }
 
     /// Get the driver key.
-    pub fn driver_key(&self) -> DriverKey {
-        self.driver_key.clone()
+    pub fn design_key(&self) -> DriverKey {
+        self.design_key.clone()
     }
 
     /// Get the configuration.
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &svql_common::Config {
         &self.config
     }
 
@@ -442,15 +415,14 @@ impl<'d> ExecutionContext<'d> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_config_defaults() {
-        let parallel = Config::parallel();
+        let parallel = svql_common::Config::parallel();
         assert!(parallel.parallel);
         assert!(parallel.max_threads.is_none());
 
-        let sequential = Config::sequential();
+        let sequential = !svql_common::Config::parallel();
         assert!(!sequential.parallel);
         assert_eq!(sequential.max_threads, Some(1));
     }

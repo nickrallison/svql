@@ -3,7 +3,7 @@
 //! Provides functions to map named ports and bit indices from a pattern
 //! to the corresponding cells discovered during subgraph isomorphism.
 
-use crate::{Match, Wire, instance::Instance};
+use crate::instance::Instance;
 use std::collections::HashMap;
 use svql_subgraph::{GraphIndex, SingleAssignment, cell::CellWrapper};
 

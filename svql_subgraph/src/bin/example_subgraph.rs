@@ -3,15 +3,15 @@ use svql_common::YosysModule;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Load the design
     let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json",
-        "tile",
+        "examples/fixtures/cwes/cwe1234/cwe1234_not_deep.v",
+        "cwe1234_not_deep",
     )?;
     let needle_module: YosysModule =
-        YosysModule::new("examples/patterns/basic/and/json/and_gate.json", "and_gate")?;
+        YosysModule::new("examples/fixtures/basic/or/verilog/or_gate.v", "or_gate")?;
 
     // 2. Import the design
-    let design = design_module.import_design_raw()?;
-    let needle = needle_module.import_design_raw()?;
+    let design = design_module.import_design(&Default::default())?;
+    let needle = needle_module.import_design(&Default::default())?;
 
     // 3. Create the matcher
     let config = svql_common::Config {

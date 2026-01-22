@@ -18,6 +18,8 @@ pub struct ModuleConfig {
     pub other_steps: Vec<String>,
     /// Whether to use Verific for parsing.
     pub verific: bool,
+    /// Whether to load the raw unprocessed design, must be in json format.
+    pub load_raw: bool,
 }
 
 impl ModuleConfig {
@@ -51,6 +53,10 @@ impl ModuleConfig {
     }
     pub fn with_verific(mut self, verific: bool) -> Self {
         self.verific = verific;
+        self
+    }
+    pub fn with_load_raw(mut self, load_raw: bool) -> Self {
+        self.load_raw = load_raw;
         self
     }
 }

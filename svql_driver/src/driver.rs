@@ -7,8 +7,8 @@ use std::sync::{Arc, RwLock};
 use svql_common::YosysModule;
 use thiserror::Error;
 
+use crate::DriverKey;
 use crate::design_container::DesignContainer;
-use crate::{Context, DriverKey};
 
 /// Errors encountered during design ingestion or driver management.
 #[derive(Debug, Error)]
@@ -98,127 +98,52 @@ impl Driver {
         self.registry.read().unwrap().get(key).cloned()
     }
 
-    /// Loads a design into the registry.
-    #[contracts::debug_requires(!module_name.is_empty())]
-    pub fn load_design<P: AsRef<Path>>(
+    pub fn preload_design(
         &self,
-        design_path: P,
-        module_name: String,
+        key: &DriverKey,
         module_config: &svql_common::ModuleConfig,
-    ) -> Result<DriverKey, DriverError> {
-        let absolute_path = self.resolve_path(design_path.as_ref());
-        let key = DriverKey::new(&absolute_path, module_name.clone());
-
-        if let Some(_) = self.check_registry(&key) {
-            return Ok(key);
-        }
-
-        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), &module_name)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-        let design = yosys_module
-            .import_design_yosys(module_config, &self.yosys_path)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-
-        self.registry
-            .write()
-            .unwrap()
-            .insert(key.clone(), Arc::new(DesignContainer::build(design)));
-        Ok(key)
+    ) -> Result<(), DriverError> {
+        Self::get_design(&self, key, module_config)?;
+        Ok(())
     }
 
-    /// Retrieves a design from the registry or loads it if missing.
-    #[contracts::debug_requires(!module_name.is_empty())]
-    pub fn get_or_load_design(
+    pub fn get_design(
         &self,
-        design_path: &str,
-        module_name: &str,
+        key: &DriverKey,
         module_config: &svql_common::ModuleConfig,
-    ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
-        let absolute_path = self.resolve_path(Path::new(design_path));
-        let key = DriverKey::new(&absolute_path, module_name.to_string());
-
+    ) -> Result<Arc<DesignContainer>, DriverError> {
         if let Some(design) = self.check_registry(&key) {
-            return Ok((key, design));
+            return Ok(design);
         }
 
-        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-        let design = yosys_module
-            .import_design_yosys(module_config, &self.yosys_path)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+        let absolute_path = self.resolve_path(key.path());
+        let yosys_module =
+            YosysModule::new(&absolute_path.display().to_string(), key.module_name())
+                .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+        let design = match module_config.load_raw {
+            true => {
+                if !yosys_module.path().ends_with(".json") {
+                    return Err(DriverError::DesignLoading(
+                        "Raw loading is only supported for JSON netlists.".to_string(),
+                    ));
+                }
+                yosys_module
+                    .import_design_raw()
+                    .map_err(|e| DriverError::DesignLoading(e.to_string()))?
+            }
+            false => yosys_module
+                .import_design(module_config)
+                .map_err(|e| DriverError::DesignLoading(e.to_string()))?,
+        };
 
-        let design_arc = Arc::new(DesignContainer::build(design));
+        let design_container = Arc::new(DesignContainer::build(design));
+
         self.registry
             .write()
             .unwrap()
-            .insert(key.clone(), design_arc.clone());
+            .insert(key.clone(), design_container.clone());
 
-        Ok((key, design_arc))
-    }
-
-    /// Retrieves a design from the registry or loads it without Yosys preprocessing.
-    #[contracts::debug_requires(!module_name.is_empty())]
-    pub fn get_or_load_design_raw(
-        &self,
-        design_path: &str,
-        module_name: &str,
-    ) -> Result<(DriverKey, Arc<DesignContainer>), DriverError> {
-        let absolute_path = self.resolve_path(Path::new(design_path));
-        let key = DriverKey::new(&absolute_path, module_name.to_string());
-
-        if let Some(design) = self.check_registry(&key) {
-            return Ok((key, design));
-        }
-
-        let yosys_module = YosysModule::new(&absolute_path.display().to_string(), module_name)
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-        let design = yosys_module
-            .import_design_raw()
-            .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-
-        let design_arc = Arc::new(DesignContainer::build(design));
-        self.registry
-            .write()
-            .unwrap()
-            .insert(key.clone(), design_arc.clone());
-
-        Ok((key, design_arc))
-    }
-
-    /// Retrieves a design from the registry if it exists.
-    pub fn get_design(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
-        self.check_registry(key)
-    }
-
-    /// Retrieves a design by path and module name if it exists.
-    pub fn get_design_by_path<P: AsRef<Path>>(
-        &self,
-        path: P,
-        module_name: &str,
-    ) -> Option<Arc<DesignContainer>> {
-        let key = DriverKey::new(path, module_name.to_string());
-        self.get_design(&key)
-    }
-
-    /// Creates an execution context containing the specified designs.
-    #[contracts::debug_requires(!keys.is_empty(), "Must request at least one design")]
-    pub fn create_context(&self, keys: &[DriverKey]) -> Result<Context, DriverError> {
-        let mut context = Context::new();
-        let registry = self.registry.read().unwrap();
-
-        for key in keys {
-            let design = registry.get(key).ok_or_else(|| {
-                DriverError::DesignLoading(format!("Design not found for key: {:?}", key))
-            })?;
-            context.insert(key.clone(), design.clone());
-        }
-
-        Ok(context)
-    }
-
-    /// Creates an execution context containing a single design.
-    pub fn create_context_single(&self, key: &DriverKey) -> Result<Context, DriverError> {
-        self.create_context(&[key.clone()])
+        Ok(design_container)
     }
 
     /// Returns a copy of all currently loaded designs.

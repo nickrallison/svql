@@ -35,7 +35,7 @@ mod variant_ref;
 pub use cell_id::CellId;
 pub use column::{ColumnDef, ColumnKind};
 pub use error::QueryError;
-pub use execution::{Config, ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
+pub use execution::{ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
