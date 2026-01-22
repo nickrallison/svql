@@ -161,13 +161,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
             (Memory(_p_memory_cell), Memory(_d_memory_cell)) => {
                 todo!("Implement memory cell comparison")
             }
-
-            (Input(_p_name, _p_width), Input(_d_name, _d_width)) => {
-                true
-            }
-            (Input(_p_name, _p_width), _d_cell) => {
-                true
-            }
+            (Input(_p_name, _p_width), _d_cell) => true,
             (_needle_cell, Cell::Other(_haystack_instance)) => {
                 todo!("Implement other cell fan-in matching")
             }
