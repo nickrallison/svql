@@ -1,6 +1,6 @@
 use svql_query::{
     prelude::*,
-    security::primitives::locked_register::{AsyncDffMuxEnable, LockedRegister},
+    security::primitives::locked_register::LockedRegister,
 };
 use tracing::{Level, info};
 
@@ -58,15 +58,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== DataFrame API Results ===");
     println!("{}", store);
 
-    if let Some(table) = store.get::<LockedRegister<Search>>() {
-        println!("\n=== LockedRegister Table Details ===");
+    for (_, table) in store.tables() {
+        println!("\n=== Table Details ===");
         println!("{}", table);
     }
 
-    if let Some(table) = store.get::<AsyncDffMuxEnable<Search>>() {
-        println!("\n=== AsyncDffMuxEnable Table Details ===");
-        println!("{}", table);
-    }
+    // if let Some(table) = store.get::<LockedRegister<Search>>() {
+    //     println!("\n=== LockedRegister Table Details ===");
+    //     println!("{}", table);
+    // }
+
+    // if let Some(table) = store.get::<AsyncDffMuxEnable<Search>>() {
+    //     println!("\n=== AsyncDffMuxEnable Table Details ===");
+    //     println!("{}", table);
+    // }
 
     Ok(())
 }

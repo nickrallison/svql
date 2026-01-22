@@ -197,13 +197,12 @@ impl<'a, V: VariantPattern> VariantIter<'a, V> {
     fn advance_to_next_table(&mut self) {
         while self.sub_type_idx < V::SUB_TYPES.len() {
             let type_id = V::SUB_TYPES[self.sub_type_idx];
-            if let Some(table) = self.store.get_any(type_id) {
-                if table.len() > 0 {
+            if let Some(table) = self.store.get_any(type_id)
+                && !table.is_empty() {
                     self.current_len = table.len();
                     self.row_idx = 0;
                     return;
                 }
-            }
             self.sub_type_idx += 1;
         }
         // No more tables

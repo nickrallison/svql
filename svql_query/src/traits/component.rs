@@ -8,8 +8,8 @@ use std::any::TypeId;
 
 use crate::prelude::*;
 use crate::session::{
-    AnyTable, ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, SearchFn,
-    SearchRegistry, Store, Table,
+    AnyTable, ColumnDef, ExecutionContext, PatternRegistry, QueryError, Row, SearchRegistry, Store,
+    Table,
 };
 
 /// Marker types for component kinds.
@@ -42,28 +42,15 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
     /// The corresponding matched result type.
     type Match: MatchedComponent<Search = Self>;
 
-    /// Creates a new search instance rooted at the given hierarchical path.
-    // fn create_at(base_path: Instance) -> Self;
-
     // =========================================================================
     // New DataFrame API (Phase 4)
     // =========================================================================
 
     /// Column schema for DataFrame storage.
-    ///
-    /// # Default Implementation
-    /// Returns an empty slice.
-    fn df_columns() -> &'static [ColumnDef] {
-        &[]
-    }
+    fn df_columns() -> &'static [ColumnDef];
 
     /// Dependencies as TypeIds.
-    ///
-    /// # Default Implementation
-    /// Returns an empty slice.
-    fn df_dependencies() -> &'static [TypeId] {
-        &[]
-    }
+    fn df_dependencies() -> &'static [TypeId];
 
     /// Register this component and all dependencies into the registry.
     ///
@@ -80,6 +67,14 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         );
     }
 
+    fn search_function(ctx: &ExecutionContext<'_>) -> Result<Box<dyn AnyTable>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        let table = Self::df_search(ctx)?.deduplicate()?;
+        Ok(Box::new(table) as Box<dyn AnyTable>)
+    }
+
     /// Register this component and all dependencies with search functions.
     ///
     /// This is the preferred registration method for `ExecutionPlan::for_pattern`.
@@ -92,40 +87,28 @@ pub trait SearchableComponent: Hardware<State = Search> + Sized + Clone {
         Self: Send + Sync + 'static,
     {
         // Default: create a search function that calls df_search
-        let search_fn: SearchFn = |ctx| {
-            let table = Self::df_search(ctx)?;
-            Ok(Box::new(table) as Box<dyn AnyTable>)
-        };
+        // let search_fn: SearchFn = |ctx| {
+        //     let table = Self::df_search(ctx)?;
+        //     Ok(Box::new(table) as Box<dyn AnyTable>)
+        // };
 
         registry.register(
             TypeId::of::<Self>(),
             std::any::type_name::<Self>(),
             Self::df_dependencies(),
-            search_fn,
+            Self::search_function,
         );
     }
 
     /// Execute the search and return results as a Table.
-    ///
-    /// # Default Implementation
-    /// Returns an empty table.
     fn df_search(_ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
     where
-        Self: Send + Sync + 'static,
-    {
-        Table::empty(Self::df_columns())
-    }
+        Self: Send + Sync + 'static;
 
     /// Rehydrate a Row back to the Match type-state.
-    ///
-    /// # Default Implementation
-    /// Returns `None`.
     fn df_rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self::Match>
     where
-        Self: 'static,
-    {
-        None
-    }
+        Self: 'static;
 }
 
 /// Core trait for all matched result components.

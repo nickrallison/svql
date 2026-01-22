@@ -107,7 +107,7 @@ impl PatternRegistry {
         for (type_id, entry) in &self.entries {
             for dep in entry.dependencies {
                 if !self.entries.contains_key(dep) {
-                    return Err(QueryError::missing_dep(&format!(
+                    return Err(QueryError::missing_dep(format!(
                         "Pattern {} depends on unregistered type {:?}",
                         entry.type_name, dep
                     )));
@@ -115,7 +115,7 @@ impl PatternRegistry {
             }
             // Also check for self-dependency (would cause infinite loop)
             if entry.dependencies.contains(type_id) {
-                return Err(QueryError::missing_dep(&format!(
+                return Err(QueryError::missing_dep(format!(
                     "Pattern {} has self-dependency (use recursive patterns instead)",
                     entry.type_name
                 )));
@@ -155,7 +155,7 @@ impl PatternRegistry {
         }
         if temp_marks.get(&type_id).copied().unwrap_or(false) {
             let entry = self.entries.get(&type_id).unwrap();
-            return Err(QueryError::missing_dep(&format!(
+            return Err(QueryError::missing_dep(format!(
                 "Cycle detected involving {}",
                 entry.type_name
             )));
@@ -294,7 +294,7 @@ impl SearchRegistry {
         for (type_id, entry) in &self.entries {
             for dep in entry.dependencies {
                 if !self.entries.contains_key(dep) {
-                    return Err(QueryError::missing_dep(&format!(
+                    return Err(QueryError::missing_dep(format!(
                         "Pattern {} depends on unregistered type {:?}",
                         entry.type_name, dep
                     )));
@@ -302,7 +302,7 @@ impl SearchRegistry {
             }
             // Also check for self-dependency (would cause infinite loop)
             if entry.dependencies.contains(type_id) {
-                return Err(QueryError::missing_dep(&format!(
+                return Err(QueryError::missing_dep(format!(
                     "Pattern {} has self-dependency (use recursive patterns instead)",
                     entry.type_name
                 )));
@@ -342,7 +342,7 @@ impl SearchRegistry {
         }
         if temp_marks.get(&type_id).copied().unwrap_or(false) {
             let entry = self.entries.get(&type_id).unwrap();
-            return Err(QueryError::missing_dep(&format!(
+            return Err(QueryError::missing_dep(format!(
                 "Cycle detected involving {}",
                 entry.type_name
             )));

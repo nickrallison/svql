@@ -227,6 +227,6 @@ fn validate_connection_inner<'ctx>(
     let f_wrapper = haystack_index.get_cell_by_id(from_id)?;
     let t_wrapper = haystack_index.get_cell_by_id(to_id)?;
 
-    let fanout = haystack_index.fanout_set(&f_wrapper)?;
-    Some(fanout.contains(&t_wrapper))
+    let fanout = haystack_index.fanout_set(f_wrapper)?;
+    Some(fanout.contains(t_wrapper))
 }

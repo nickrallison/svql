@@ -7,8 +7,9 @@
 //! This module provides the infrastructure. The actual `search` function
 //! pointers are provided by the `Pattern` trait implementations.
 
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock};
 
 use svql_driver::{Driver, DriverKey};
@@ -65,8 +66,36 @@ pub struct ExecutionNode {
     pub type_name: &'static str,
     /// The search function to execute.
     pub search_fn: SearchFn,
+    /// Atomic flag to ensure single execution in parallel mode.
+    pub cas_runner: AtomicBool,
     /// Dependencies that must complete before this node.
     pub deps: Vec<Arc<ExecutionNode>>,
+}
+
+impl ExecutionNode {
+    /// Check if this node has already been executed.
+    pub fn is_executed(&self) -> bool {
+        self.cas_runner.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn is_done(&self, ctx: &ExecutionContext<'_>) -> bool {
+        if let Some(slot) = ctx.slots.get(&self.type_id)
+            && slot.get().is_some()
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn try_execute(&self) -> bool {
+        let cas_result = self.cas_runner.compare_exchange(
+            false,
+            true,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        );
+        cas_result.is_ok()
+    }
 }
 
 impl std::fmt::Debug for ExecutionNode {
@@ -120,11 +149,11 @@ impl ExecutionPlan {
         // Build nodes in topological order (deps first)
         for type_id in &topo_order {
             let entry = registry.get(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing registry entry for {:?}", type_id))
+                QueryError::missing_dep(format!("Missing registry entry for {:?}", type_id))
             })?;
 
             let (type_name, search_fn) = search_fns.get(type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing search function for {}", entry.type_name))
+                QueryError::missing_dep(format!("Missing search function for {}", entry.type_name))
             })?;
 
             // Collect dep nodes (already built due to topo order)
@@ -138,6 +167,7 @@ impl ExecutionPlan {
                 type_id: *type_id,
                 type_name,
                 search_fn: *search_fn,
+                cas_runner: AtomicBool::new(false),
                 deps,
             });
 
@@ -202,11 +232,11 @@ impl ExecutionPlan {
         // Build nodes in topological order (deps first)
         for type_id in &topo_order {
             let entry = registry.get(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing registry entry for {:?}", type_id))
+                QueryError::missing_dep(format!("Missing registry entry for {:?}", type_id))
             })?;
 
             let search_fn = registry.get_search_fn(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing search function for {}", entry.type_name))
+                QueryError::missing_dep(format!("Missing search function for {}", entry.type_name))
             })?;
 
             // Collect dep nodes (already built due to topo order)
@@ -220,6 +250,7 @@ impl ExecutionPlan {
                 type_id: *type_id,
                 type_name: entry.type_name,
                 search_fn,
+                cas_runner: AtomicBool::new(false),
                 deps,
             });
 
@@ -248,9 +279,9 @@ impl ExecutionPlan {
     /// * `driver` - The driver for design access
     /// * `key` - The driver key for the design to search
     /// * `config` - Execution configuration
-    pub fn execute<'d>(
+    pub fn execute(
         &self,
-        driver: &'d Driver,
+        driver: &Driver,
         key: DriverKey,
         config: Config,
     ) -> Result<Store, QueryError> {
@@ -314,20 +345,20 @@ impl ExecutionPlan {
         ctx: &ExecutionContext<'_>,
     ) -> Result<(), QueryError> {
         // Check if already executed
-        if let Some(slot) = ctx.slots.get(&node.type_id) {
-            if slot.get().is_some() {
-                return Ok(()); // Already done
+
+        if !node.try_execute() {
+            // Another thread is running this dep; wait for it to complete
+            if let Some(slot) = ctx.slots.get(&node.type_id()) {
+                // Wait for the slot to be filled
+                let _ = slot.wait();
             }
+            return Ok(());
         }
 
-        // Wait for dependencies (spin-wait on OnceLock)
+        // await all dependencies
         for dep in &node.deps {
-            if let Some(dep_slot) = ctx.slots.get(&dep.type_id) {
-                // Spin-wait for dep to complete
-                while dep_slot.get().is_none() {
-                    std::hint::spin_loop();
-                }
-            }
+            // will not re-execute due to cas_runner, and will just block until done
+            self.execute_node(dep, ctx)?;
         }
 
         // Execute search

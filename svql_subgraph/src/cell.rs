@@ -192,8 +192,9 @@ pub struct CellWrapper<'a> {
 impl Debug for CellWrapper<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CellWrapper")
-            .field("cell_type", &self.cell_type())
+            .field("cell", &self.get())
             .field("metadata", &self.metadata)
+            .field("debug_index", &self.debug_index)
             .finish()
     }
 }

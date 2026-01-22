@@ -94,6 +94,28 @@ impl<T> Table<T> {
         Ok(Self::new(df, columns))
     }
 
+    /// Deduplicate rows in the table.
+    pub fn deduplicate(&self) -> Result<Self, QueryError> {
+        // Only use structural columns for uniqueness checks, ignoring "path"
+        let subset: Vec<String> = self.columns.iter().map(|c| c.name.to_string()).collect();
+
+        let df = if subset.is_empty() {
+            // If no columns defined, check all columns (including path)
+            self.df
+                .clone()
+                .unique::<Vec<String>, String>(None, UniqueKeepStrategy::First, None)?
+        } else {
+            // Check only structural columns
+            self.df.clone().unique::<Vec<String>, String>(
+                Some(&subset),
+                UniqueKeepStrategy::First,
+                None,
+            )?
+        };
+
+        Ok(Self::new(df, self.columns))
+    }
+
     /// Get the number of rows (matches) in this table.
     #[inline]
     pub fn len(&self) -> usize {
@@ -149,30 +171,26 @@ impl<T> Table<T> {
         for col in self.columns {
             match col.kind {
                 ColumnKind::Wire => {
-                    if let Ok(series) = self.df.column(col.name) {
-                        if let Ok(ca) = series.i64() {
+                    if let Ok(series) = self.df.column(col.name)
+                        && let Ok(ca) = series.i64() {
                             let cell_id = ca.get(idx_usize).map(|raw| CellId::from_raw(raw as u64));
                             row.wires.insert(col.name, cell_id);
                         }
-                    }
                 }
                 ColumnKind::Sub(_) => {
-                    if let Ok(series) = self.df.column(col.name) {
-                        if let Ok(ca) = series.u32() {
+                    if let Ok(series) = self.df.column(col.name)
+                        && let Ok(ca) = series.u32() {
                             let sub_idx = ca.get(idx_usize).unwrap_or(u32::MAX);
                             row.subs.insert(col.name, sub_idx);
                         }
-                    }
                 }
                 ColumnKind::Metadata => {
                     // Handle depth specially
-                    if col.name == "depth" {
-                        if let Ok(series) = self.df.column("depth") {
-                            if let Ok(ca) = series.u32() {
+                    if col.name == "depth"
+                        && let Ok(series) = self.df.column("depth")
+                            && let Ok(ca) = series.u32() {
                                 row.depth = ca.get(idx_usize);
                             }
-                        }
-                    }
                 }
             }
         }
@@ -231,7 +249,7 @@ impl<T> std::fmt::Display for Table<T> {
 }
 
 /// Type-erased table trait for storing in `Store`.
-pub trait AnyTable: Send + Sync + 'static {
+pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Downcast to concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
@@ -245,6 +263,9 @@ pub trait AnyTable: Send + Sync + 'static {
 
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
+
+    /// Deduplicate the table.
+    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError>;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T> {
@@ -258,6 +279,11 @@ impl<T: Send + Sync + 'static> AnyTable for Table<T> {
 
     fn type_name(&self) -> &str {
         std::any::type_name::<T>()
+    }
+
+    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError> {
+        let deduped = self.deduplicate()?;
+        Ok(Box::new(deduped))
     }
 }
 
