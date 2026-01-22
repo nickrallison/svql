@@ -11,9 +11,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
-use prjunnamed_netlist::Cell;
 use svql_driver::{Driver, DriverKey};
-use svql_subgraph::GraphIndex;
 
 use super::error::QueryError;
 use super::registry::PatternRegistry;
@@ -122,11 +120,11 @@ impl ExecutionPlan {
         // Build nodes in topological order (deps first)
         for type_id in &topo_order {
             let entry = registry.get(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing registry entry for {:?}", type_id))
+                QueryError::missing_dep(format!("Missing registry entry for {:?}", type_id))
             })?;
 
             let (type_name, search_fn) = search_fns.get(type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing search function for {}", entry.type_name))
+                QueryError::missing_dep(format!("Missing search function for {}", entry.type_name))
             })?;
 
             // Collect dep nodes (already built due to topo order)
@@ -204,11 +202,11 @@ impl ExecutionPlan {
         // Build nodes in topological order (deps first)
         for type_id in &topo_order {
             let entry = registry.get(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing registry entry for {:?}", type_id))
+                QueryError::missing_dep(format!("Missing registry entry for {:?}", type_id))
             })?;
 
             let search_fn = registry.get_search_fn(*type_id).ok_or_else(|| {
-                QueryError::missing_dep(&format!("Missing search function for {}", entry.type_name))
+                QueryError::missing_dep(format!("Missing search function for {}", entry.type_name))
             })?;
 
             // Collect dep nodes (already built due to topo order)
@@ -250,9 +248,9 @@ impl ExecutionPlan {
     /// * `driver` - The driver for design access
     /// * `key` - The driver key for the design to search
     /// * `config` - Execution configuration
-    pub fn execute<'d>(
+    pub fn execute(
         &self,
-        driver: &'d Driver,
+        driver: &Driver,
         key: DriverKey,
         config: Config,
     ) -> Result<Store, QueryError> {
@@ -316,11 +314,10 @@ impl ExecutionPlan {
         ctx: &ExecutionContext<'_>,
     ) -> Result<(), QueryError> {
         // Check if already executed
-        if let Some(slot) = ctx.slots.get(&node.type_id) {
-            if slot.get().is_some() {
+        if let Some(slot) = ctx.slots.get(&node.type_id)
+            && slot.get().is_some() {
                 return Ok(()); // Already done
             }
-        }
 
         // Wait for dependencies (spin-wait on OnceLock)
         for dep in &node.deps {

@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use polars::prelude::*;
-use svql_subgraph::cell::CellWrapper;
 
 use super::cell_id::CellId;
 use super::column::{ColumnDef, ColumnKind};
@@ -172,30 +171,26 @@ impl<T> Table<T> {
         for col in self.columns {
             match col.kind {
                 ColumnKind::Wire => {
-                    if let Ok(series) = self.df.column(col.name) {
-                        if let Ok(ca) = series.i64() {
+                    if let Ok(series) = self.df.column(col.name)
+                        && let Ok(ca) = series.i64() {
                             let cell_id = ca.get(idx_usize).map(|raw| CellId::from_raw(raw as u64));
                             row.wires.insert(col.name, cell_id);
                         }
-                    }
                 }
                 ColumnKind::Sub(_) => {
-                    if let Ok(series) = self.df.column(col.name) {
-                        if let Ok(ca) = series.u32() {
+                    if let Ok(series) = self.df.column(col.name)
+                        && let Ok(ca) = series.u32() {
                             let sub_idx = ca.get(idx_usize).unwrap_or(u32::MAX);
                             row.subs.insert(col.name, sub_idx);
                         }
-                    }
                 }
                 ColumnKind::Metadata => {
                     // Handle depth specially
-                    if col.name == "depth" {
-                        if let Ok(series) = self.df.column("depth") {
-                            if let Ok(ca) = series.u32() {
+                    if col.name == "depth"
+                        && let Ok(series) = self.df.column("depth")
+                            && let Ok(ca) = series.u32() {
                                 row.depth = ca.get(idx_usize);
                             }
-                        }
-                    }
                 }
             }
         }

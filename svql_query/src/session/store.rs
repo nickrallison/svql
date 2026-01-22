@@ -4,12 +4,9 @@
 //! to access their dependencies' results during search and rehydration.
 
 use std::any::TypeId;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use prjunnamed_netlist::Cell;
-use svql_subgraph::GraphIndex;
 
 use super::ref_type::Ref;
 use super::row::Row;

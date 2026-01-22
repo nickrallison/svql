@@ -1,6 +1,6 @@
 use svql_query::{
     prelude::*,
-    security::primitives::locked_register::{AsyncDffMuxEnable, LockedRegister},
+    security::primitives::locked_register::LockedRegister,
 };
 use tracing::{Level, info};
 
