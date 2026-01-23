@@ -93,6 +93,88 @@ pub trait Pattern: Sized + Send + Sync {
         Self: 'static;
 }
 
+pub mod kind {
+    pub struct Netlist;
+    pub struct Composite;
+    pub struct Variant;
+}
+
+trait Component {
+    type Kind;
+}
+
+impl Component for kind::Netlist {
+    type Kind = kind::Netlist;
+}
+
+impl Component for kind::Composite {
+    type Kind = kind::Composite;
+}
+
+impl Component for kind::Variant {
+    type Kind = kind::Variant;
+}
+
+pub(crate) trait PatternInternal<K>: Sized {
+    const SCHEMA_SIZE: usize;
+
+    const SCHEMA: &'static [ColumnDef];
+
+    const EXEC_INFO: &'static crate::session::ExecInfo;
+
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
+    where
+        Self: Send + Sync + 'static;
+
+    fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
+    where
+        Self: 'static;
+}
+
+impl<T> Pattern for T
+where
+    T: Component,                // It has a Kind
+    T: PatternInternal<T::Kind>, // It implements the logic for that Kind
+    T: Send + Sync + 'static,
+{
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+
+    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+
+    const EXEC_INFO: &'static crate::session::ExecInfo = T::EXEC_INFO;
+
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        Self: Sized,
+    {
+        T::preload_driver(driver, design_key, config)
+    }
+
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        T::search_table(ctx)
+    }
+
+    fn rehydrate(row: &Row<Self>, store: &Store) -> Option<Self>
+    where
+        Self: 'static,
+    {
+        T::rehydrate(row, store)
+    }
+}
+
 // /// Validates that a physical connection exists between two matched wires in the haystack.
 // pub fn validate_connection<'ctx>(
 //     from: &CellId,

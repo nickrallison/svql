@@ -5,6 +5,7 @@
 use crate::{
     prelude::*,
     session::{ColumnEntry, EntryArray, ExecutionContext, Row, Store},
+    traits::{PatternInternal, kind},
 };
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
@@ -66,7 +67,7 @@ pub trait Netlist: Sized + Send + Sync + 'static {
     }
 }
 
-impl<T> Pattern for T
+impl<T> PatternInternal<kind::Netlist> for T
 where
     T: Netlist + Send + Sync + 'static,
 {
