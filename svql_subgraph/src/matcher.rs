@@ -291,7 +291,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let mapped_haystack_fanin: Vec<_> = needle_fanin
             .iter()
-            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred.clone()))
+            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred))
             .collect();
 
         if mapped_haystack_fanin.is_empty() {
@@ -301,7 +301,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 .cells_topo()
                 .iter()
                 .filter(|cell| cell.cell_type().is_logic_gate())
-                .filter(|candidate| assignment.get_needle_cell((*candidate).clone()).is_none())
+                .filter(|candidate| assignment.get_needle_cell(*candidate).is_none())
                 .cloned()
                 .collect();
         }
@@ -313,7 +313,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         intersect_sets(fanout_sets)
             .into_iter()
-            .filter(|candidate| assignment.get_needle_cell(candidate.clone()).is_none())
+            .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
             .collect()
     }
 
@@ -354,7 +354,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let mapped_haystack_fanin: Vec<_> = needle_fanin
             .iter()
-            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred.clone()))
+            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred))
             .collect();
 
         let unfiltered: Vec<CellWrapper<'haystack>> = if mapped_haystack_fanin.is_empty() {
@@ -373,7 +373,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         unfiltered
             .into_iter()
             .filter(|candidate| candidate.cell_type() == kind)
-            .filter(|candidate| assignment.get_needle_cell(candidate.clone()).is_none())
+            .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
             .filter(|candidate| {
                 self.check_fanin_constraints(needle_cell.clone(), candidate.clone(), assignment)
             })
@@ -393,7 +393,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         let mapped_haystack_fanout: Vec<_> = needle_fanout
             .iter()
-            .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(needle_succ.clone()))
+            .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(needle_succ))
             .collect();
 
         let fanin_sets: Vec<_> = mapped_haystack_fanout
@@ -411,15 +411,15 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                     .fanout_set(candidate)
                     .is_some_and(|fanout| {
                         fanout.iter().all(|haystack_succ| {
-                            next_assignment
-                                .get_needle_cell(haystack_succ.clone())
-                                .is_none_or(|needle_succ| {
+                            next_assignment.get_needle_cell(haystack_succ).is_none_or(
+                                |needle_succ| {
                                     self.check_fanin_constraints(
-                                        needle_succ,
+                                        needle_succ.clone(),
                                         haystack_succ.clone(),
                                         &next_assignment,
                                     )
-                                })
+                                },
+                            )
                         })
                     })
             })

@@ -1,6 +1,7 @@
 use std::sync::Once;
 
-use svql_common::ConfigBuilder;
+use svql_common::{Config, ConfigBuilder};
+use svql_driver::{Driver, DriverKey};
 
 static INIT: Once = Once::new();
 
@@ -50,9 +51,8 @@ pub fn run_query_test(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>> 
     }
     let config = config_builder.build();
 
-    let haystack_key: DriverKey =
-        DriverKey::from_module_path(spec.haystack_path, spec.haystack_module);
-    let needle_key: DriverKey = DriverKey::from_module_path(spec.needle_path, spec.needle_module);
+    let haystack_key: DriverKey = DriverKey::new(spec.haystack_path, spec.haystack_module);
+    let needle_key: DriverKey = DriverKey::new(spec.needle_path, spec.needle_module);
 
     let design = driver.get_design(&haystack_key, &config.haystack_options)?;
 

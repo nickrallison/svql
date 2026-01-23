@@ -21,29 +21,26 @@
 
 // --- New modules (Phase 1-3) ---
 mod cell_id;
-mod column;
 mod error;
 mod execution;
 mod ref_type;
 mod registry;
 mod row;
+mod schema;
 mod store;
 mod table;
-mod tree;
 mod variant_ref;
 
 pub use cell_id::CellId;
-pub use column::{ColumnDef, ColumnKind};
 pub use error::QueryError;
 pub use execution::{ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
+pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray};
 pub use store::Store;
-pub use table::{AnyTable, Table, TableBuilder};
-pub use tree::{
-    TempRef, TreePostOrderIter, TreePreOrderIter, TreeRowBuilder, TreeRowExt, TreeTableBuilder,
-};
+pub use table::{AnyTable, Table};
+
 pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
 
 use polars::prelude::*;

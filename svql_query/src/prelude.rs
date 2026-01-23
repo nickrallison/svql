@@ -6,7 +6,7 @@ pub use tracing;
 
 pub use crate::{
     Connection,
-    binding::PortResolver,
+    // binding::PortResolver,
     // primitives::dff::*,
     // primitives::gates::*,
     report::ReportNode,
@@ -17,23 +17,20 @@ pub use crate::{
 // Trait re-exports
 pub use crate::traits::{
     // Composite traits
-    CompositeComponent,
-    CompositeMatched,
-    ConnectionBuilder,
-    MatchedComponent,
-    // Netlist traits
-    NetlistComponent,
-    NetlistMatched,
+    // CompositeComponent,
+    // CompositeMatched,
+    // ConnectionBuilder,
+    // MatchedComponent,
     Pattern,
     // Component traits
-    SearchableComponent,
-    Topology,
-    // Variant traits
-    VariantComponent,
-    VariantMatched,
-    execute_netlist_query,
-    kind,
-    validate_composite,
+    // SearchableComponent,
+    // Topology,
+    // // Variant traits
+    // VariantComponent,
+    // VariantMatched,
+    // execute_netlist_query,
+    // kind,
+    // validate_composite,
     validate_connection,
 };
 
@@ -44,26 +41,26 @@ pub use crate::session::{
     ColumnDef,
     ColumnKind,
     // Execution
-    Config as ExecConfig,
-    ExecutionContext,
-    ExecutionPlan,
-    PatternRegistry,
+    // Config as ExecConfig,
+    // ExecutionContext,
+    // ExecutionPlan,
+    // PatternRegistry,
     QueryError,
     Ref,
-    Row,
-    SearchRegistry,
-    Store,
+    // Row,
+    // SearchRegistry,
+    // Store,
     // Variants
     StoreVariantExt,
     Table,
-    TableBuilder,
-    // Trees
-    TempRef,
-    TreePostOrderIter,
-    TreePreOrderIter,
-    TreeRowBuilder,
-    TreeRowExt,
-    TreeTableBuilder,
+    // TableBuilder,
+    // // Trees
+    // TempRef,
+    // TreePostOrderIter,
+    // TreePreOrderIter,
+    // TreeRowBuilder,
+    // TreeRowExt,
+    // TreeTableBuilder,
     VariantIter,
     VariantPattern,
     VariantRef,
@@ -77,6 +74,6 @@ pub use subgraph::{
     graph_index::GraphIndex,
 };
 
-pub use driver::{Driver, DriverKey, context::Context};
+pub use driver::{Driver, DriverKey};
 
 // pub use svql_macros::{composite, netlist, variant};

@@ -39,6 +39,7 @@ tracing-subscriber.workspace = true
 unstringify.workspace = true
 walkdir.workspace = true
 argparse.workspace = true
+# polars-core.workspace = true
 
 [build-dependencies]
 ###############

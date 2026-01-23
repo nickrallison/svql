@@ -2,29 +2,29 @@
 //!
 //! Provides traits for components defined via external HDL files.
 
-use crate::prelude::*;
-use svql_subgraph::{SubgraphMatcher, graph_index::IoMapping};
+use crate::{
+    prelude::*,
+    session::{ColumnEntry, EntryArray, ExecutionContext, Row, Store},
+};
+use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
 /// Trait for netlist-based pattern components.
 ///
 /// Implemented by types generated with `#[netlist]`. Provides access to
 /// the source file path and module name.
-pub trait Netlist {
+pub trait Netlist: Sized {
     /// The module name within the source file.
     const MODULE_NAME: &'static str;
 
     /// Path to the netlist source file (.v, .il, or .json).
     const FILE_PATH: &'static str;
 
-    /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize;
-
     /// Schema definition for DataFrame storage.
-    const SCHEMA: [ColumnDef; Self::SCHEMA_SIZE];
+    const SCHEMA: &'static [ColumnDef];
 
-    /// The matched instance type.
-    type RowMatch = [CellId; Self::SCHEMA_SIZE];
+    /// Size of the schema (number of columns).
+    const SCHEMA_SIZE: usize = Self::SCHEMA.len();
 
     /// Returns the driver key for this netlist.
     fn driver_key() -> DriverKey {
@@ -36,22 +36,33 @@ pub trait Netlist {
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 
-    /// Binds a subgraph assignment to produce a matched instance.
-    // fn bind_match(&self, resolver: &PortResolver, assignment: &SingleAssignment) -> Self::Match;
-
-    fn resolve(assignment: &SingleAssignment<'_, '_>, io_mapping: &IoMapping) -> Self::RowMatch {
-        let mut row_match: Self::RowMatch = Default::default();
-        for (name, cell_ids) in io_mapping.input_fanout_by_name_map() {
-            let 
-            let cell = needle_cell.get();
-            match cell {
-                prjunnamed_netlist::Cell::Input(name, size) => todo!(),
-                prjunnamed_netlist::Cell::Output(name, value) => todo!(),
+    fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
+        let mut row_match: Vec<Option<u64>> = vec![None; Self::SCHEMA_SIZE];
+        for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
+            let needle_cell = needle_cell_wrapper.get();
+            match needle_cell {
+                prjunnamed_netlist::Cell::Input(name, _)
+                | prjunnamed_netlist::Cell::Output(name, _) => {
+                    let col_idx = <Self as Pattern>::schema_lut(name)
+                        .expect("Needle Cell name should exist in schema");
+                    row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u64);
+                }
                 _ => continue,
             }
         }
 
-        todo!()
+        for idx in 0..Self::SCHEMA_SIZE {
+            if row_match[idx] == None {
+                let col_name = &Self::SCHEMA[idx].name;
+                panic!("Unmapped column in match: {}", col_name);
+            }
+        }
+
+        let final_row_match: Vec<ColumnEntry> = row_match
+            .into_iter()
+            .map(|opt| ColumnEntry::Cell { id: opt })
+            .collect();
+        EntryArray::new(final_row_match)
     }
 }
 
@@ -59,9 +70,9 @@ impl<T> Pattern for T
 where
     T: Netlist,
 {
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+
+    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
 
     fn preload_driver(
         driver: &Driver,
@@ -76,10 +87,6 @@ where
         Ok(())
     }
 
-    fn columns() -> &'static [ColumnDef] {
-        T::columns()
-    }
-
     fn dependencies() -> &'static [std::any::TypeId] {
         &[]
     }
@@ -89,7 +96,7 @@ where
         Self: Send + Sync + 'static,
     {
         let needle_key = Self::driver_key();
-        let haystack_key = ctx.driver_key();
+        let haystack_key = ctx.design_key();
 
         let needle_container = ctx
             .driver()
@@ -110,27 +117,16 @@ where
             ctx.config(),
         );
 
-        todo!("Finish building table from assignments");
+        // todo!();
 
-        // // execute_netlist_query(ctx.driver(), ctx.driver_key(), ctx.config());
+        let row_matches: Vec<EntryArray> = assignments
+            .items
+            .iter()
+            .map(|assignment| Self::resolve(assignment))
+            .collect();
 
-        //     // Early return for empty results
-        //     if assignments.items.is_empty() {
-        //         return ::svql_query::session::Table::empty(Self::df_columns());
-        //     }
-
-        //     let needle_container = full_context.get(&needle_key)
-        //         .ok_or_else(|| QueryError::missing_dep(stringify!(#struct_name).to_string()))?;
-        //     let resolver = PortResolver::new(needle_container.index());
-
-        //     let mut builder = TableBuilder::<Self>::new(Self::df_columns());
-        //     for assignment in &assignments.items {
-        //         let row = Row::<Self>::new(0, search_instance.path.to_string())
-        //             #(#row_wire_fields)*;
-        //         builder.push(row);
-        //     }
-
-        //     builder.build()
+        let table = Table::<Self>::new(row_matches)?;
+        Ok(table)
     }
 
     fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>

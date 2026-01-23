@@ -4,16 +4,18 @@
 //! access to rows as `Row<T>` and references as `Ref<T>`.
 
 use std::any::TypeId;
-use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use polars::prelude::*;
 
+use crate::session::{EntryArray, Row};
+use crate::traits::Pattern;
+
 use super::cell_id::CellId;
-use super::column::{ColumnDef, ColumnKind};
 use super::error::QueryError;
 use super::ref_type::Ref;
-use super::row::Row;
+// use super::row::Row;
+use super::schema::{ColumnDef, ColumnKind};
 
 /// A typed wrapper around a DataFrame storing pattern match results.
 ///
@@ -39,81 +41,71 @@ use super::row::Row;
 pub struct Table<T> {
     /// The underlying Polars DataFrame.
     df: DataFrame,
-    /// Column schema for this pattern type.
-    columns: &'static [ColumnDef],
-    /// Mapping from submodule column names to their target TypeId.
-    /// Used for runtime type checking when accessing sub columns.
-    sub_types: HashMap<&'static str, TypeId>,
+    // /// Column schema for this pattern type.
+    // columns: &'static [ColumnDef],
+    // /// Mapping from submodule column names to their target TypeId.
+    // /// Used for runtime type checking when accessing sub columns.
+    // sub_types: HashMap<&'static str, TypeId>,
     /// Type marker.
     _marker: PhantomData<T>,
 }
 
-impl<T> Table<T> {
-    /// Create a new table wrapping a DataFrame.
+impl<T> Table<T>
+where
+    T: Pattern,
+{
+    /// Create a table from a pre-collected set of row matches.
     ///
-    /// # Arguments
-    ///
-    /// * `df` - The DataFrame containing match data
-    /// * `columns` - The column schema (from `Pattern::COLUMNS`)
-    pub fn new(df: DataFrame, columns: &'static [ColumnDef]) -> Self {
-        let mut sub_types = HashMap::new();
-        for col in columns {
-            if let ColumnKind::Sub(tid) = col.kind {
-                sub_types.insert(col.name, tid);
-            }
+    /// This is efficient as it performs a single allocation per column.
+    pub fn new(rows: Vec<EntryArray>) -> Result<Self, QueryError>
+    where
+        T: Pattern,
+    {
+        if rows.is_empty() {
+            let cols: Vec<Column> = T::SCHEMA
+                .iter()
+                .map(|col_def| col_def.into_polars_column())
+                .collect();
+            let df = DataFrame::new(cols)?;
+            return Ok(Self {
+                df,
+                _marker: PhantomData,
+            });
         }
-        Self {
+
+        let mut columns = Vec::with_capacity(T::SCHEMA_SIZE + 1);
+
+        // 1. Handle structural columns from the RowMatch array
+        for i in 0..T::SCHEMA_SIZE {
+            let col_def = &T::SCHEMA[i];
+            let series_data: Vec<u64> = rows.iter().map(|r| r.entries[i].as_u64()).collect();
+            columns.push(Column::new(
+                PlSmallStr::from_static(col_def.name),
+                series_data,
+            ));
+        }
+
+        let df = DataFrame::new(columns)?;
+        Ok(Self {
             df,
-            columns,
-            sub_types,
             _marker: PhantomData,
-        }
-    }
-
-    /// Create an empty table with the given schema.
-    pub fn empty(columns: &'static [ColumnDef]) -> Result<Self, QueryError> {
-        // Build empty columns based on schema
-        let mut col_vec: Vec<Column> = Vec::with_capacity(columns.len() + 1);
-
-        // Always include path column
-        col_vec.push(Column::new_empty(
-            PlSmallStr::from_static("path"),
-            &DataType::String,
-        ));
-
-        for col in columns {
-            let dtype = match col.kind {
-                ColumnKind::Wire => DataType::Int64,      // CellId raw
-                ColumnKind::Sub(_) => DataType::UInt32,   // Row index
-                ColumnKind::Metadata => DataType::UInt32, // Generic metadata
-            };
-            col_vec.push(Column::new_empty(PlSmallStr::from_static(col.name), &dtype));
-        }
-
-        let df = DataFrame::new(col_vec)?;
-        Ok(Self::new(df, columns))
+        })
     }
 
     /// Deduplicate rows in the table.
     pub fn deduplicate(&self) -> Result<Self, QueryError> {
-        // Only use structural columns for uniqueness checks, ignoring "path"
-        let subset: Vec<String> = self.columns.iter().map(|c| c.name.to_string()).collect();
+        let subset: Vec<String> = T::SCHEMA.iter().map(|c| c.name.to_string()).collect();
 
-        let df = if subset.is_empty() {
-            // If no columns defined, check all columns (including path)
-            self.df
-                .clone()
-                .unique::<Vec<String>, String>(None, UniqueKeepStrategy::First, None)?
-        } else {
-            // Check only structural columns
-            self.df.clone().unique::<Vec<String>, String>(
-                Some(&subset),
-                UniqueKeepStrategy::First,
-                None,
-            )?
-        };
+        let df = self.df.clone().unique::<Vec<String>, String>(
+            Some(&subset),
+            UniqueKeepStrategy::First,
+            None,
+        )?;
 
-        Ok(Self::new(df, self.columns))
+        Ok(Self {
+            df,
+            _marker: PhantomData,
+        })
     }
 
     /// Get the number of rows (matches) in this table.
@@ -140,12 +132,6 @@ impl<T> Table<T> {
         &mut self.df
     }
 
-    /// Get the column schema.
-    #[inline]
-    pub fn columns(&self) -> &'static [ColumnDef] {
-        self.columns
-    }
-
     /// Get a single row by index.
     ///
     /// Returns `None` if the index is out of bounds.
@@ -168,29 +154,32 @@ impl<T> Table<T> {
         let mut row = Row::new(idx, path);
 
         // Extract wire and sub columns
-        for col in self.columns {
+        for col in T::columns() {
             match col.kind {
-                ColumnKind::Wire => {
+                ColumnKind::Cell => {
                     if let Ok(series) = self.df.column(col.name)
-                        && let Ok(ca) = series.i64() {
-                            let cell_id = ca.get(idx_usize).map(|raw| CellId::from_raw(raw as u64));
-                            row.wires.insert(col.name, cell_id);
-                        }
+                        && let Ok(ca) = series.i64()
+                    {
+                        let cell_id = ca.get(idx_usize).map(|raw| CellId::from_raw(raw as u64));
+                        row.wires.insert(col.name, cell_id);
+                    }
                 }
                 ColumnKind::Sub(_) => {
                     if let Ok(series) = self.df.column(col.name)
-                        && let Ok(ca) = series.u32() {
-                            let sub_idx = ca.get(idx_usize).unwrap_or(u32::MAX);
-                            row.subs.insert(col.name, sub_idx);
-                        }
+                        && let Ok(ca) = series.u32()
+                    {
+                        let sub_idx = ca.get(idx_usize).unwrap_or(u32::MAX);
+                        row.subs.insert(col.name, sub_idx);
+                    }
                 }
                 ColumnKind::Metadata => {
                     // Handle depth specially
                     if col.name == "depth"
                         && let Ok(series) = self.df.column("depth")
-                            && let Ok(ca) = series.u32() {
-                                row.depth = ca.get(idx_usize);
-                            }
+                        && let Ok(ca) = series.u32()
+                    {
+                        row.depth = ca.get(idx_usize);
+                    }
                 }
             }
         }
@@ -263,9 +252,6 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
 
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
-
-    /// Deduplicate the table.
-    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError>;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T> {
@@ -280,200 +266,195 @@ impl<T: Send + Sync + 'static> AnyTable for Table<T> {
     fn type_name(&self) -> &str {
         std::any::type_name::<T>()
     }
-
-    fn deduplicate_any(self) -> Result<Box<dyn AnyTable>, QueryError> {
-        let deduped = self.deduplicate()?;
-        Ok(Box::new(deduped))
-    }
 }
 
-/// Builder for constructing a Table from rows.
-pub struct TableBuilder<T> {
-    /// Column schema.
-    columns: &'static [ColumnDef],
-    /// Accumulated paths.
-    paths: Vec<String>,
-    /// Accumulated wire values: column_name → values per row.
-    wires: HashMap<&'static str, Vec<Option<i64>>>,
-    /// Accumulated sub values: column_name → values per row.
-    subs: HashMap<&'static str, Vec<Option<u32>>>,
-    /// Accumulated depth values (for tree types).
-    depths: Vec<Option<u32>>,
-    /// Type marker.
-    _marker: PhantomData<T>,
-}
+// /// Builder for constructing a Table from rows.
+// pub struct TableBuilder<T> {
+//     /// Column schema.
+//     columns: &'static [ColumnDef],
+//     /// Accumulated paths.
+//     paths: Vec<String>,
+//     /// Accumulated wire values: column_name → values per row.
+//     wires: HashMap<&'static str, Vec<Option<i64>>>,
+//     /// Accumulated sub values: column_name → values per row.
+//     subs: HashMap<&'static str, Vec<Option<u32>>>,
+//     /// Accumulated depth values (for tree types).
+//     depths: Vec<Option<u32>>,
+//     /// Type marker.
+//     _marker: PhantomData<T>,
+// }
 
-impl<T> TableBuilder<T> {
-    /// Create a new builder with the given schema.
-    pub fn new(columns: &'static [ColumnDef]) -> Self {
-        let mut wires = HashMap::new();
-        let mut subs = HashMap::new();
+// impl<T> TableBuilder<T> {
+//     /// Create a new builder with the given schema.
+//     pub fn new(columns: &'static [ColumnDef]) -> Self {
+//         let mut wires = HashMap::new();
+//         let mut subs = HashMap::new();
 
-        for col in columns {
-            match col.kind {
-                ColumnKind::Wire => {
-                    wires.insert(col.name, Vec::new());
-                }
-                ColumnKind::Sub(_) => {
-                    subs.insert(col.name, Vec::new());
-                }
-                ColumnKind::Metadata => {} // Handle specially
-            }
-        }
+//         for col in columns {
+//             match col.kind {
+//                 ColumnKind::Wire => {
+//                     wires.insert(col.name, Vec::new());
+//                 }
+//                 ColumnKind::Sub(_) => {
+//                     subs.insert(col.name, Vec::new());
+//                 }
+//                 ColumnKind::Metadata => {} // Handle specially
+//             }
+//         }
 
-        Self {
-            columns,
-            paths: Vec::new(),
-            wires,
-            subs,
-            depths: Vec::new(),
-            _marker: PhantomData,
-        }
-    }
+//         Self {
+//             columns,
+//             paths: Vec::new(),
+//             wires,
+//             subs,
+//             depths: Vec::new(),
+//             _marker: PhantomData,
+//         }
+//     }
 
-    /// Add a row to the builder.
-    pub fn push(&mut self, row: Row<T>) {
-        self.paths.push(row.path);
+//     /// Add a row to the builder.
+//     pub fn push(&mut self, row: Row<T>) {
+//         self.paths.push(row.path);
 
-        for col in self.columns {
-            match col.kind {
-                ColumnKind::Wire => {
-                    let val = row
-                        .wires
-                        .get(col.name)
-                        .copied()
-                        .flatten()
-                        .map(|c| c.raw() as i64);
-                    if let Some(vec) = self.wires.get_mut(col.name) {
-                        vec.push(val);
-                    }
-                }
-                ColumnKind::Sub(_) => {
-                    let val = row.subs.get(col.name).copied().filter(|&v| v != u32::MAX);
-                    if let Some(vec) = self.subs.get_mut(col.name) {
-                        vec.push(val);
-                    }
-                }
-                ColumnKind::Metadata if col.name == "depth" => {
-                    self.depths.push(row.depth);
-                }
-                _ => {}
-            }
-        }
-    }
+//         for col in self.columns {
+//             match col.kind {
+//                 ColumnKind::Wire => {
+//                     let val = row
+//                         .wires
+//                         .get(col.name)
+//                         .copied()
+//                         .flatten()
+//                         .map(|c| c.raw() as i64);
+//                     if let Some(vec) = self.wires.get_mut(col.name) {
+//                         vec.push(val);
+//                     }
+//                 }
+//                 ColumnKind::Sub(_) => {
+//                     let val = row.subs.get(col.name).copied().filter(|&v| v != u32::MAX);
+//                     if let Some(vec) = self.subs.get_mut(col.name) {
+//                         vec.push(val);
+//                     }
+//                 }
+//                 ColumnKind::Metadata if col.name == "depth" => {
+//                     self.depths.push(row.depth);
+//                 }
+//                 _ => {}
+//             }
+//         }
+//     }
 
-    /// Get the current number of rows.
-    pub fn len(&self) -> usize {
-        self.paths.len()
-    }
+//     /// Get the current number of rows.
+//     pub fn len(&self) -> usize {
+//         self.paths.len()
+//     }
 
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.paths.is_empty()
-    }
+//     /// Check if empty.
+//     pub fn is_empty(&self) -> bool {
+//         self.paths.is_empty()
+//     }
 
-    /// Build the final Table.
-    pub fn build(self) -> Result<Table<T>, QueryError> {
-        let mut col_vec: Vec<Column> = Vec::with_capacity(self.columns.len() + 2);
+//     /// Build the final Table.
+//     pub fn build(self) -> Result<Table<T>, QueryError> {
+//         let mut col_vec: Vec<Column> = Vec::with_capacity(self.columns.len() + 2);
 
-        // Path column
-        col_vec.push(Column::new(PlSmallStr::from_static("path"), self.paths));
+//         // Path column
+//         col_vec.push(Column::new(PlSmallStr::from_static("path"), self.paths));
 
-        // Data columns
-        for col in self.columns {
-            match col.kind {
-                ColumnKind::Wire => {
-                    if let Some(values) = self.wires.get(col.name) {
-                        col_vec.push(Column::new(
-                            PlSmallStr::from_static(col.name),
-                            values.clone(),
-                        ));
-                    }
-                }
-                ColumnKind::Sub(_) => {
-                    if let Some(values) = self.subs.get(col.name) {
-                        col_vec.push(Column::new(
-                            PlSmallStr::from_static(col.name),
-                            values.clone(),
-                        ));
-                    }
-                }
-                ColumnKind::Metadata if col.name == "depth" => {
-                    col_vec.push(Column::new(
-                        PlSmallStr::from_static("depth"),
-                        self.depths.clone(),
-                    ));
-                }
-                _ => {}
-            }
-        }
+//         // Data columns
+//         for col in self.columns {
+//             match col.kind {
+//                 ColumnKind::Wire => {
+//                     if let Some(values) = self.wires.get(col.name) {
+//                         col_vec.push(Column::new(
+//                             PlSmallStr::from_static(col.name),
+//                             values.clone(),
+//                         ));
+//                     }
+//                 }
+//                 ColumnKind::Sub(_) => {
+//                     if let Some(values) = self.subs.get(col.name) {
+//                         col_vec.push(Column::new(
+//                             PlSmallStr::from_static(col.name),
+//                             values.clone(),
+//                         ));
+//                     }
+//                 }
+//                 ColumnKind::Metadata if col.name == "depth" => {
+//                     col_vec.push(Column::new(
+//                         PlSmallStr::from_static("depth"),
+//                         self.depths.clone(),
+//                     ));
+//                 }
+//                 _ => {}
+//             }
+//         }
 
-        let df = DataFrame::new(col_vec)?;
-        Ok(Table::new(df, self.columns))
-    }
-}
+//         let df = DataFrame::new(col_vec)?;
+//         Ok(Table::new(df, self.columns))
+//     }
+// }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    struct TestPattern;
+//     struct TestPattern;
 
-    static TEST_COLUMNS: &[ColumnDef] = &[ColumnDef::wire("clk"), ColumnDef::wire_nullable("rst")];
+//     static TEST_COLUMNS: &[ColumnDef] = &[ColumnDef::wire("clk"), ColumnDef::wire_nullable("rst")];
 
-    #[test]
-    fn test_empty_table() {
-        let table: Table<TestPattern> = Table::empty(TEST_COLUMNS).unwrap();
-        assert!(table.is_empty());
-        assert_eq!(table.len(), 0);
-    }
+//     #[test]
+//     fn test_empty_table() {
+//         let table: Table<TestPattern> = Table::empty(TEST_COLUMNS).unwrap();
+//         assert!(table.is_empty());
+//         assert_eq!(table.len(), 0);
+//     }
 
-    #[test]
-    fn test_table_builder() {
-        let mut builder: TableBuilder<TestPattern> = TableBuilder::new(TEST_COLUMNS);
+//     #[test]
+//     fn test_table_builder() {
+//         let mut builder: TableBuilder<TestPattern> = TableBuilder::new(TEST_COLUMNS);
 
-        let row1 = Row::<TestPattern>::new(0, "top.a".to_string())
-            .with_wire("clk", Some(CellId::new(100)))
-            .with_wire("rst", Some(CellId::new(200)));
+//         let row1 = Row::<TestPattern>::new(0, "top.a".to_string())
+//             .with_wire("clk", Some(CellId::new(100)))
+//             .with_wire("rst", Some(CellId::new(200)));
 
-        let row2 = Row::<TestPattern>::new(1, "top.b".to_string())
-            .with_wire("clk", Some(CellId::new(101)))
-            .with_wire("rst", None);
+//         let row2 = Row::<TestPattern>::new(1, "top.b".to_string())
+//             .with_wire("clk", Some(CellId::new(101)))
+//             .with_wire("rst", None);
 
-        builder.push(row1);
-        builder.push(row2);
+//         builder.push(row1);
+//         builder.push(row2);
 
-        let table = builder.build().unwrap();
-        assert_eq!(table.len(), 2);
+//         let table = builder.build().unwrap();
+//         assert_eq!(table.len(), 2);
 
-        let r0 = table.row(0).unwrap();
-        assert_eq!(r0.path(), "top.a");
-        assert_eq!(r0.wire("clk"), Some(CellId::new(100)));
+//         let r0 = table.row(0).unwrap();
+//         assert_eq!(r0.path(), "top.a");
+//         assert_eq!(r0.wire("clk"), Some(CellId::new(100)));
 
-        let r1 = table.row(1).unwrap();
-        assert_eq!(r1.path(), "top.b");
-        assert_eq!(r1.wire("rst"), None);
-    }
+//         let r1 = table.row(1).unwrap();
+//         assert_eq!(r1.path(), "top.b");
+//         assert_eq!(r1.wire("rst"), None);
+//     }
 
-    #[test]
-    fn test_table_iteration() {
-        let mut builder: TableBuilder<TestPattern> = TableBuilder::new(TEST_COLUMNS);
-        for i in 0..5 {
-            builder.push(
-                Row::<TestPattern>::new(i, format!("path_{}", i))
-                    .with_wire("clk", Some(CellId::new(i))),
-            );
-        }
+//     #[test]
+//     fn test_table_iteration() {
+//         let mut builder: TableBuilder<TestPattern> = TableBuilder::new(TEST_COLUMNS);
+//         for i in 0..5 {
+//             builder.push(
+//                 Row::<TestPattern>::new(i, format!("path_{}", i))
+//                     .with_wire("clk", Some(CellId::new(i))),
+//             );
+//         }
 
-        let table = builder.build().unwrap();
-        let paths: Vec<_> = table.rows().map(|r| r.path().to_string()).collect();
-        assert_eq!(
-            paths,
-            vec!["path_0", "path_1", "path_2", "path_3", "path_4"]
-        );
+//         let table = builder.build().unwrap();
+//         let paths: Vec<_> = table.rows().map(|r| r.path().to_string()).collect();
+//         assert_eq!(
+//             paths,
+//             vec!["path_0", "path_1", "path_2", "path_3", "path_4"]
+//         );
 
-        let refs: Vec<_> = table.refs().collect();
-        assert_eq!(refs.len(), 5);
-        assert_eq!(refs[2].index(), 2);
-    }
-}
+//         let refs: Vec<_> = table.refs().collect();
+//         assert_eq!(refs.len(), 5);
+//         assert_eq!(refs[2].index(), 2);
+//     }
+// }

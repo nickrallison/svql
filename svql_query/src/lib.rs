@@ -3,8 +3,8 @@
 //! This module defines the fundamental types used to represent query states,
 //! hardware wires, and the relationships between pattern components and
 //! matched design elements.
-#![feature(generic_const_exprs)]
-#![feature(associated_type_defaults)]
+// #![feature(generic_const_exprs)]
+// #![feature(associated_type_defaults)]
 
 extern crate self as svql_query;
 
@@ -48,7 +48,7 @@ pub fn run_query<P>(
     config: svql_common::Config,
 ) -> Result<session::Store, Box<dyn std::error::Error>>
 where
-    P: traits::SearchableComponent + Send + Sync + 'static,
+    P: Pattern + Send + Sync + 'static,
 {
     let plan = session::ExecutionPlan::for_pattern::<P>()?;
     let store = plan.execute(driver, key.clone(), &config)?;

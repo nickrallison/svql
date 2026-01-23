@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 /// and only exists for compile-time type checking.
 #[repr(transparent)]
 pub struct Ref<T> {
-    index: u32,
+    index: u64,
     _marker: PhantomData<fn() -> T>,
 }
 
@@ -68,7 +68,7 @@ impl<T> Hash for Ref<T> {
 impl<T> Ref<T> {
     /// Create a new reference from a row index.
     #[inline]
-    pub const fn new(index: u32) -> Self {
+    pub const fn new(index: u64) -> Self {
         Self {
             index,
             _marker: PhantomData,
@@ -77,7 +77,7 @@ impl<T> Ref<T> {
 
     /// Get the raw row index.
     #[inline]
-    pub const fn index(self) -> u32 {
+    pub const fn index(self) -> u64 {
         self.index
     }
 
@@ -90,8 +90,8 @@ impl<T> Ref<T> {
     /// Create from a usize index (panics if > u32::MAX in debug).
     #[inline]
     pub fn from_usize(index: usize) -> Self {
-        debug_assert!(index <= u32::MAX as usize, "Ref index overflow");
-        Self::new(index as u32)
+        debug_assert!(index <= u64::MAX as usize, "Ref index overflow");
+        Self::new(index as u64)
     }
 
     /// Cast this reference to a different pattern type.
@@ -125,11 +125,18 @@ impl<T> fmt::Display for Ref<T> {
 impl<T> From<u32> for Ref<T> {
     #[inline]
     fn from(index: u32) -> Self {
+        Self::new(index as u64)
+    }
+}
+
+impl<T> From<u64> for Ref<T> {
+    #[inline]
+    fn from(index: u64) -> Self {
         Self::new(index)
     }
 }
 
-impl<T> From<Ref<T>> for u32 {
+impl<T> From<Ref<T>> for u64 {
     #[inline]
     fn from(r: Ref<T>) -> Self {
         r.index
@@ -205,8 +212,8 @@ mod tests {
 
     #[test]
     fn test_ref_conversions() {
-        let r: Ref<PatternA> = 10u32.into();
-        let back: u32 = r.into();
+        let r: Ref<PatternA> = 10u64.into();
+        let back: u64 = r.into();
         assert_eq!(back, 10);
     }
 

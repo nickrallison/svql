@@ -17,10 +17,14 @@ pub struct DriverKey {
 
 impl DriverKey {
     /// Creates a new key from a path and module name.
-    pub fn new<P: AsRef<Path>>(path: P, module_name: String) -> Self {
+    pub fn new<P, S>(path: P, module_name: S) -> Self
+    where
+        P: AsRef<Path>,
+        S: Into<Arc<str>>,
+    {
         Self {
             path: path.as_ref().to_path_buf(),
-            module_name: Arc::from(module_name),
+            module_name: module_name.into(),
         }
     }
 

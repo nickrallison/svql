@@ -74,16 +74,16 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
 
     pub fn get_haystack_cell(
         &self,
-        needle: CellWrapper<'needle>,
-    ) -> Option<CellWrapper<'haystack>> {
-        self.needle_to_haystack.get(&needle).cloned()
+        needle: &CellWrapper<'needle>,
+    ) -> Option<&CellWrapper<'haystack>> {
+        self.needle_to_haystack.get(&needle)
     }
 
     pub fn get_needle_cell(
         &self,
-        haystack: CellWrapper<'haystack>,
-    ) -> Option<CellWrapper<'needle>> {
-        self.haystack_to_needle.get(&haystack).cloned()
+        haystack: &CellWrapper<'haystack>,
+    ) -> Option<&CellWrapper<'needle>> {
+        self.haystack_to_needle.get(&haystack)
     }
 
     pub fn len(&self) -> usize {

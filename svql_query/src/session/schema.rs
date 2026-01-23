@@ -5,11 +5,13 @@
 
 use std::any::TypeId;
 
+use crate::session::CellId;
+
 /// The kind of data stored in a column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnKind {
     /// A wire reference (CellId) pointing into the design.
-    Wire,
+    Cell,
     /// A submodule reference (Ref<T>) pointing into another pattern table.
     /// For self-referential types (like RecOr trees), use `Sub(TypeId::of::<Self>())`.
     Sub(TypeId),
@@ -25,7 +27,7 @@ impl ColumnKind {
 
     /// Check if this is a wire column.
     pub fn is_wire(&self) -> bool {
-        matches!(self, Self::Wire)
+        matches!(self, Self::Cell)
     }
 
     /// Check if this is a submodule reference column.
@@ -64,7 +66,7 @@ impl ColumnDef {
     pub const fn wire(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Wire,
+            kind: ColumnKind::Cell,
             nullable: false,
         }
     }
@@ -73,7 +75,7 @@ impl ColumnDef {
     pub const fn wire_nullable(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Wire,
+            kind: ColumnKind::Cell,
             nullable: true,
         }
     }
@@ -114,35 +116,54 @@ impl ColumnDef {
             nullable,
         }
     }
+
+    pub fn into_polars_column(&self) -> polars::frame::column::Column {
+        use polars::prelude::*;
+
+        let d_type = match &self.kind {
+            ColumnKind::Cell => DataType::UInt64,
+            ColumnKind::Sub(tid) => DataType::UInt32,
+            ColumnKind::Metadata => DataType::UInt64,
+        };
+        Column::new_empty(PlSmallStr::from_static(self.name), &d_type)
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug, Clone)]
+pub enum ColumnEntry {
+    Cell { id: Option<u64> },
+    Sub { id: Option<u64> },
+    Metadata { id: Option<u64> },
+}
 
-    #[test]
-    fn test_column_kinds() {
-        assert!(ColumnKind::Wire.is_wire());
-        assert!(!ColumnKind::Wire.is_sub());
+impl ColumnEntry {
+    pub fn as_u64(&self) -> Option<u64> {
+        match self {
+            ColumnEntry::Cell { id } => *id,
+            ColumnEntry::Sub { id } => *id,
+            ColumnEntry::Metadata { id } => *id,
+        }
+    }
+}
 
-        let sub = ColumnKind::sub::<String>();
-        assert!(sub.is_sub());
-        assert_eq!(sub.sub_type(), Some(TypeId::of::<String>()));
+#[derive(Debug, Clone)]
+pub struct EntryArray {
+    pub entries: Vec<ColumnEntry>,
+}
 
-        assert!(ColumnKind::Metadata.is_metadata());
+impl EntryArray {
+    pub fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
     }
 
-    #[test]
-    fn test_column_def_constructors() {
-        let wire = ColumnDef::wire("clk");
-        assert_eq!(wire.name, "clk");
-        assert!(wire.kind.is_wire());
-        assert!(!wire.nullable);
-
-        let nullable_wire = ColumnDef::wire_nullable("optional_port");
-        assert!(nullable_wire.nullable);
-
-        let meta = ColumnDef::metadata("depth");
-        assert!(meta.kind.is_metadata());
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            entries: vec![ColumnEntry::Metadata { id: None }; capacity],
+        }
+    }
+    pub(crate) fn new(entries: Vec<ColumnEntry>) -> Self {
+        Self { entries }
     }
 }

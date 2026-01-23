@@ -230,8 +230,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
         match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
             (Ok((d_fan_in_cell_ref, _d_fan_in_idx)), Ok((p_fan_in_cell_ref, _p_fan_in_idx))) => {
+                let p_fan_in_cell_wrapper: CellWrapper<'needle> = From::from(p_fan_in_cell_ref);
+                let d_fan_in_cell_wrapper: CellWrapper<'haystack> = From::from(d_fan_in_cell_ref);
+
                 let expected_fan_in_haystack_cell_opt =
-                    mapping.get_haystack_cell(p_fan_in_cell_ref.into());
+                    mapping.get_haystack_cell(&p_fan_in_cell_wrapper);
 
                 if expected_fan_in_haystack_cell_opt.is_none() {
                     return true;
@@ -239,7 +242,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
                 let expected_fan_in_haystack_cell_wrapper =
                     expected_fan_in_haystack_cell_opt.unwrap();
-                expected_fan_in_haystack_cell_wrapper == d_fan_in_cell_ref.into()
+                expected_fan_in_haystack_cell_wrapper == &d_fan_in_cell_wrapper
             }
             (Err(haystack_trit), Err(needle_trit)) => haystack_trit == needle_trit,
             (Err(_haystack_const), Ok((needle_cell_ref, _))) => {

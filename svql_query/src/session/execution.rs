@@ -14,6 +14,8 @@ use std::sync::{Arc, OnceLock};
 
 use svql_driver::{Driver, DriverKey};
 
+use crate::traits::Pattern;
+
 use super::error::QueryError;
 use super::registry::PatternRegistry;
 use super::store::Store;
@@ -176,7 +178,7 @@ impl ExecutionPlan {
     /// * `P` - A pattern type that implements `SearchableComponent`
     pub fn for_pattern<P>() -> Result<Self, QueryError>
     where
-        P: crate::traits::SearchableComponent + Send + Sync + 'static,
+        P: Pattern + Send + Sync + 'static,
     {
         use super::registry::SearchRegistry;
 

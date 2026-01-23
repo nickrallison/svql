@@ -29,6 +29,10 @@ pub enum QueryError {
     #[error("Schema mismatch: expected {expected}, got {actual}")]
     SchemaMismatch { expected: String, actual: String },
 
+    /// Schema mismatch between expected and actual column types.
+    #[error("Schema didn't have: {0}")]
+    SchemaLut(String),
+
     /// Pattern type was not registered before execution.
     #[error("Pattern type not registered: {0:?}")]
     MissingRegistration(TypeId),
