@@ -8,7 +8,6 @@ use std::marker::PhantomData;
 use crate::session::{EntryArray, QueryError};
 use crate::traits::Pattern;
 
-use super::cell_id::CellId;
 use super::ref_type::Ref;
 
 /// An owned snapshot of a single row from a `Table<T>`.

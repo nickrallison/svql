@@ -5,8 +5,6 @@
 
 use std::any::TypeId;
 
-use crate::session::CellId;
-
 /// The kind of data stored in a column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnKind {
