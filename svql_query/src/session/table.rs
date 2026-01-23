@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use polars::prelude::*;
 
-use crate::session::{EntryArray, Row};
+use crate::session::{ColumnEntry, EntryArray, Row};
 use crate::traits::Pattern;
 
 use super::cell_id::CellId;
@@ -78,7 +78,8 @@ where
         // 1. Handle structural columns from the RowMatch array
         for i in 0..T::SCHEMA_SIZE {
             let col_def = &T::SCHEMA[i];
-            let series_data: Vec<u64> = rows.iter().map(|r| r.entries[i].as_u64()).collect();
+            let series_data: Vec<Option<u64>> =
+                rows.iter().map(|r| r.entries[i].as_u64()).collect();
             columns.push(Column::new(
                 PlSmallStr::from_static(col_def.name),
                 series_data,
@@ -132,56 +133,41 @@ where
         &mut self.df
     }
 
+    pub fn get_entry(&self, row_idx: usize, col_name: &str) -> Option<ColumnEntry> {
+        let col = self.df.column(col_name).ok()?;
+        match T::SCHEMA.iter().find(|c| c.name == col_name)?.kind {
+            ColumnKind::Cell => {
+                let ca = col.i64().ok()?;
+                let val = ca.get(row_idx).map(|raw| raw as u64);
+                Some(ColumnEntry::Cell { id: val })
+            }
+            ColumnKind::Sub(_) => {
+                let ca = col.u32().ok()?;
+                let val = ca.get(row_idx).map(|raw| raw as u64);
+                Some(ColumnEntry::Sub { id: val })
+            }
+            ColumnKind::Metadata => {
+                let ca = col.i64().ok()?;
+                let val = ca.get(row_idx).map(|raw| raw as u64);
+                Some(ColumnEntry::Metadata { id: val })
+            }
+        }
+    }
+
     /// Get a single row by index.
     ///
     /// Returns `None` if the index is out of bounds.
-    pub fn row(&self, idx: u32) -> Option<Row<T>> {
-        let idx_usize = idx as usize;
-        if idx_usize >= self.df.height() {
+    pub fn row(&self, row_idx: u64) -> Option<Row<T>> {
+        let row_idx_usize = row_idx as usize;
+        if row_idx_usize >= self.df.height() {
             return None;
         }
 
-        // Extract path
-        let path = self
-            .df
-            .column("path")
-            .ok()
-            .and_then(|s| s.str().ok())
-            .and_then(|ca| ca.get(idx_usize))
-            .unwrap_or("")
-            .to_string();
-
-        let mut row = Row::new(idx, path);
+        let mut row = Row::new(row_idx);
 
         // Extract wire and sub columns
-        for col in T::columns() {
-            match col.kind {
-                ColumnKind::Cell => {
-                    if let Ok(series) = self.df.column(col.name)
-                        && let Ok(ca) = series.i64()
-                    {
-                        let cell_id = ca.get(idx_usize).map(|raw| CellId::from_raw(raw as u64));
-                        row.wires.insert(col.name, cell_id);
-                    }
-                }
-                ColumnKind::Sub(_) => {
-                    if let Ok(series) = self.df.column(col.name)
-                        && let Ok(ca) = series.u32()
-                    {
-                        let sub_idx = ca.get(idx_usize).unwrap_or(u32::MAX);
-                        row.subs.insert(col.name, sub_idx);
-                    }
-                }
-                ColumnKind::Metadata => {
-                    // Handle depth specially
-                    if col.name == "depth"
-                        && let Ok(series) = self.df.column("depth")
-                        && let Ok(ca) = series.u32()
-                    {
-                        row.depth = ca.get(idx_usize);
-                    }
-                }
-            }
+        for (idx, col) in T::SCHEMA.iter().enumerate() {
+            row.entry_array.entries[idx] = self.get_entry(row_idx_usize, col.name)?;
         }
 
         Some(row)
@@ -189,25 +175,30 @@ where
 
     /// Iterate over all rows in the table.
     pub fn rows(&self) -> impl Iterator<Item = Row<T>> + '_ {
-        (0..self.len() as u32).filter_map(|idx| self.row(idx))
+        (0..self.len() as u64).filter_map(|idx| self.row(idx))
     }
 
     /// Iterate over references to all rows.
     pub fn refs(&self) -> impl Iterator<Item = Ref<T>> {
-        (0..self.len() as u32).map(Ref::new)
+        (0..self.len() as u64).map(Ref::new)
     }
 
-    /// Get the TypeId for a submodule column.
-    pub fn sub_type(&self, name: &str) -> Option<TypeId> {
-        self.sub_types.get(name).copied()
-    }
+    // /// Get the TypeId for a submodule column.
+    // pub fn sub_type(&self, name: &str) -> Option<TypeId> {
+    //     self.sub_types.get(name).copied()
+    // }
 }
 
-impl<T> std::fmt::Debug for Table<T> {
+impl<T> std::fmt::Debug for Table<T>
+where
+    T: Pattern,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Table")
+            .field("type", &std::any::type_name::<T>())
             .field("len", &self.len())
-            .field("columns", &self.columns.len())
+            .field("columns", &T::SCHEMA)
+            .field("df", &self.df)
             .finish()
     }
 }
@@ -220,18 +211,14 @@ impl<T> std::fmt::Display for Table<T> {
             "\n╔══════════════════════════════════════════════════════════════════════════════"
         )?;
         writeln!(f, "║ Table: {}  ", type_name)?;
-        writeln!(f, "║ Rows: {}", self.len())?;
+        writeln!(f, "║ Rows: {}", self.df.height())?;
         writeln!(
             f,
             "╚══════════════════════════════════════════════════════════════════════════════"
         )?;
 
-        if self.is_empty() {
-            writeln!(f, "(empty table)")?;
-        } else {
-            // Use Polars' built-in DataFrame display which handles formatting beautifully
-            write!(f, "{}", self.df)?;
-        }
+        // Use Polars' built-in DataFrame display which handles formatting beautifully
+        write!(f, "{}", self.df)?;
 
         Ok(())
     }
