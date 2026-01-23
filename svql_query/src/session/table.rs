@@ -11,7 +11,6 @@ use polars::prelude::*;
 use crate::session::{ColumnEntry, EntryArray, Row};
 use crate::traits::Pattern;
 
-use super::cell_id::CellId;
 use super::error::QueryError;
 use super::ref_type::Ref;
 // use super::row::Row;

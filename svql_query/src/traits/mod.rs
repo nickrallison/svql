@@ -20,15 +20,20 @@ pub use netlist::Netlist;
 // pub use variant::{VariantComponent, VariantMatched};
 
 use crate::prelude::*;
-use crate::session::{ColumnDef, QueryError, Table};
+use crate::session::{
+    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, QueryError, Row, Store, Table,
+};
 
 /// The central abstraction for query components.
-pub trait Pattern: Sized {
+pub trait Pattern: Sized + Send + Sync {
     /// Size of the schema (number of columns).
     const SCHEMA_SIZE: usize;
 
     /// Schema definition for DataFrame storage.
     const SCHEMA: &'static [ColumnDef];
+
+    /// Info needed to execute this pattern. Used to build the ExecutionPlan DAG.
+    const EXEC_INFO: &'static ExecInfo;
 
     /// Returns the static type name of the component.
     fn type_name(&self) -> &'static str {
@@ -53,39 +58,31 @@ pub trait Pattern: Sized {
     where
         Self: Sized;
 
-    /// Dependencies as TypeIds.
-    ///
-    /// Returns the TypeIds of all submodule patterns that must be searched
-    /// before this pattern. Generated from `#[submodule]` fields.
-    fn dependencies() -> &'static [TypeId];
-
-    /// Register this pattern and all dependencies into the registry.
-    ///
-    /// Called during `ExecutionPlan::for_pattern::<P>()` to build the DAG.
-    /// Implementations should:
-    /// 1. Call `register_all()` on each dependency
-    /// 2. Call `registry.register()` for self
-    fn register_all(registry: &mut PatternRegistry)
-    where
-        Self: 'static,
-    {
-        registry.register(
-            TypeId::of::<Self>(),
-            std::any::type_name::<Self>(),
-            Self::dependencies(),
-        );
-    }
-
     /// Execute the search and return results as a Table.
-    ///
-    /// This is the new DataFrame-based search API. The `ExecutionContext`
-    /// provides access to:
-    /// - `ctx.driver()` - For design/needle operations
-    /// - `ctx.driver_key()` - The design being searched
-    /// - `ctx.get::<Dep>()` - Tables of completed dependencies
-    fn search(_ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
         Self: Send + Sync + 'static;
+
+    /// Execute the search and return results as a boxed AnyTable.
+    fn search_table_any(ctx: &ExecutionContext) -> Result<Box<dyn AnyTable>, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        let table = Self::search_table(ctx)?;
+        Ok(Box::new(table))
+    }
+
+    fn search(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<Store, QueryError>
+    where
+        Self: Send + Sync + 'static,
+    {
+        let plan = ExecutionPlan::build(Self::EXEC_INFO);
+        plan.execute(&driver, &design_key, &config)
+    }
 
     /// Rehydrate a Row back to the Match type-state.
     ///
@@ -96,28 +93,28 @@ pub trait Pattern: Sized {
         Self: 'static;
 }
 
-/// Validates that a physical connection exists between two matched wires in the haystack.
-pub fn validate_connection<'ctx>(
-    from: &CellId,
-    to: &CellId,
-    haystack_index: &GraphIndex<'ctx>,
-) -> bool {
-    // validate_connection_inner(from, to, haystack_index).unwrap_or(false)
-    todo!();
-}
+// /// Validates that a physical connection exists between two matched wires in the haystack.
+// pub fn validate_connection<'ctx>(
+//     from: &CellId,
+//     to: &CellId,
+//     haystack_index: &GraphIndex<'ctx>,
+// ) -> bool {
+//     // validate_connection_inner(from, to, haystack_index).unwrap_or(false)
+//     todo!();
+// }
 
-/// Internal helper to resolve CellInfo to CellWrappers and check connectivity.
-fn validate_connection_inner<'ctx>(
-    from: &CellId,
-    to: &CellId,
-    haystack_index: &GraphIndex<'ctx>,
-) -> Option<bool> {
-    let from_id = from.cell_idx();
-    let to_id = to.cell_idx();
+// /// Internal helper to resolve CellInfo to CellWrappers and check connectivity.
+// fn validate_connection_inner<'ctx>(
+//     from: &CellId,
+//     to: &CellId,
+//     haystack_index: &GraphIndex<'ctx>,
+// ) -> Option<bool> {
+//     let from_id = from.cell_idx();
+//     let to_id = to.cell_idx();
 
-    let f_wrapper = haystack_index.get_cell_by_id(from_id as usize)?;
-    let t_wrapper = haystack_index.get_cell_by_id(to_id as usize)?;
+//     let f_wrapper = haystack_index.get_cell_by_id(from_id as usize)?;
+//     let t_wrapper = haystack_index.get_cell_by_id(to_id as usize)?;
 
-    let fanout = haystack_index.fanout_set(f_wrapper)?;
-    Some(fanout.contains(t_wrapper))
-}
+//     let fanout = haystack_index.fanout_set(f_wrapper)?;
+//     Some(fanout.contains(t_wrapper))
+// }

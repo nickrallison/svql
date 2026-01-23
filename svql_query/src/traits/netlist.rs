@@ -13,7 +13,7 @@ use tracing::debug;
 ///
 /// Implemented by types generated with `#[netlist]`. Provides access to
 /// the source file path and module name.
-pub trait Netlist: Sized {
+pub trait Netlist: Sized + Send + Sync + 'static {
     /// The module name within the source file.
     const MODULE_NAME: &'static str;
 
@@ -68,11 +68,18 @@ pub trait Netlist: Sized {
 
 impl<T> Pattern for T
 where
-    T: Netlist,
+    T: Netlist + Send + Sync + 'static,
 {
     const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
 
     const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+
+    const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
+        type_id: std::any::TypeId::of::<T>(),
+        type_name: std::any::type_name::<T>(),
+        search_function: <T as Pattern>::search_table_any,
+        nested_dependancies: &[],
+    };
 
     fn preload_driver(
         driver: &Driver,
@@ -87,11 +94,7 @@ where
         Ok(())
     }
 
-    fn dependencies() -> &'static [std::any::TypeId] {
-        &[]
-    }
-
-    fn search(ctx: &ExecutionContext<'_>) -> Result<Table<Self>, QueryError>
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
         Self: Send + Sync + 'static,
     {

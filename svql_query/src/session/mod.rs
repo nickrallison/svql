@@ -20,27 +20,26 @@
 //! - [`ExecutionPlan`], [`ExecutionContext`] - Parallel execution
 
 // --- New modules (Phase 1-3) ---
-mod cell_id;
+// mod cell_id;
 mod error;
 mod execution;
 mod ref_type;
-mod registry;
+// mod registry;
 mod row;
 mod schema;
 mod store;
 mod table;
 mod variant_ref;
 
-pub use cell_id::CellId;
+// pub use cell_id::CellId;
 pub use error::QueryError;
-pub use execution::{ExecutionContext, ExecutionNode, ExecutionPlan, SearchFn};
+pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
-pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
+// pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
 pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray};
 pub use store::Store;
 pub use table::{AnyTable, Table};
-
 pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
 
 use polars::prelude::*;

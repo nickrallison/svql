@@ -49,6 +49,9 @@ pub enum QueryError {
     /// Subgraph matching failed.
     #[error("Subgraph matching failed: {0}")]
     SubgraphMatch(String),
+
+    #[error("Execution error: {0}")]
+    ExecutionError(String),
 }
 
 impl QueryError {

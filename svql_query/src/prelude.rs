@@ -31,13 +31,12 @@ pub use crate::traits::{
     // execute_netlist_query,
     // kind,
     // validate_composite,
-    validate_connection,
+    // validate_connection,
 };
 
 // New API types (Phase 1-6)
 pub use crate::session::{
     // Core types
-    CellId,
     ColumnDef,
     ColumnKind,
     // Execution

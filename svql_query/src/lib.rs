@@ -3,8 +3,7 @@
 //! This module defines the fundamental types used to represent query states,
 //! hardware wires, and the relationships between pattern components and
 //! matched design elements.
-// #![feature(generic_const_exprs)]
-// #![feature(associated_type_defaults)]
+#![feature(const_type_name)]
 
 extern crate self as svql_query;
 
@@ -45,20 +44,17 @@ use prelude::*;
 pub fn run_query<P>(
     driver: &Driver,
     key: &DriverKey,
-    config: svql_common::Config,
+    config: &svql_common::Config,
 ) -> Result<session::Store, Box<dyn std::error::Error>>
 where
     P: Pattern + Send + Sync + 'static,
 {
-    let plan = session::ExecutionPlan::for_pattern::<P>()?;
-    let store = plan.execute(driver, key.clone(), &config)?;
-
-    Ok(store)
+    P::search(driver, key, config).map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
 }
 
 /// Represents a connection between two wires.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Connection {
-    pub from: CellId,
-    pub to: CellId,
+    pub from: u64,
+    pub to: u64,
 }
