@@ -3,19 +3,12 @@
 //! Defines the interfaces that all netlists, composites, and variants must
 //! implement to participate in the SVQL query system.
 
-// pub mod component;
-// pub mod composite;
+pub mod composite;
 pub mod netlist;
-// pub mod variant;
+pub mod variant;
 
 // Re-export key traits
-// pub use component::{MatchedComponent, SearchableComponent, kind};
-// pub use composite::{
-//     CompositeComponent, CompositeMatched, ConnectionBuilder, Connections, Topology,
-//     validate_composite,
-// };
 pub use netlist::Netlist;
-// pub use variant::{VariantComponent, VariantMatched};
 
 use crate::prelude::*;
 use crate::session::{
