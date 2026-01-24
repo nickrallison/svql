@@ -170,4 +170,29 @@ impl<'a> GraphIndex<'a> {
             .get(&id)
             .map(|idx| self.cell_registry.get_cell_by_index(*idx))
     }
+
+    /// Checks if the cell with `from_id` physically drives the cell with `to_id`.
+    ///
+    /// This is used by the query engine to validate structural constraints between
+    /// matched components.
+    pub fn is_connected(&self, from_id: u64, to_id: u64) -> bool {
+        // 1. Map external ID (u64) to internal CellIndex
+        let from_idx = match self.cell_registry.cell_id_map().get(&(from_id as usize)) {
+            Some(idx) => *idx,
+            None => return false, // Source cell not found in graph
+        };
+
+        let to_idx = match self.cell_registry.cell_id_map().get(&(to_id as usize)) {
+            Some(idx) => *idx,
+            None => return false, // Target cell not found in graph
+        };
+
+        // 2. Check adjacency list in ConnectivityGraph
+        // We iterate the fanout of 'from' to see if 'to' is present.
+        if let Some(fanout) = self.connectivity.fanout_indices(from_idx) {
+            return fanout.iter().any(|(target, _)| *target == to_idx);
+        }
+
+        false
+    }
 }

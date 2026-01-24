@@ -31,7 +31,7 @@ pub fn search_table_any<T>(
     search_table: fn(&ExecutionContext) -> Result<Table<T>, QueryError>,
 ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + Pattern + Component + 'static,
 {
     let table = search_table(ctx)?;
     Ok(Box::new(table))
@@ -98,14 +98,14 @@ pub trait Pattern: Sized + Send + Sync {
     /// Execute the search and return results as a Table.
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
-        Self: Send + Sync + 'static;
+        Self: Send + Sync + Component + 'static;
 
     /// Execute the search and return results as a boxed AnyTable.
     fn search_table_any(
         ctx: &ExecutionContext,
     ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
     where
-        Self: Send + Sync + 'static,
+        Self: Send + Sync + Component + 'static,
     {
         let table = Self::search_table(ctx)?;
         Ok(Box::new(table))

@@ -7,6 +7,8 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::traits::{Component, Pattern};
+
 use super::ref_type::Ref;
 use super::row::Row;
 use super::table::{AnyTable, Table};
@@ -76,7 +78,7 @@ impl Store {
     /// Insert a table for pattern type `T`.
     ///
     /// Overwrites any existing table for this type.
-    pub fn insert<T: Send + Sync + 'static>(&mut self, table: Table<T>) {
+    pub fn insert<T: Send + Sync + Pattern + Component + 'static>(&mut self, table: Table<T>) {
         self.tables.insert(TypeId::of::<T>(), Arc::new(table));
     }
 
@@ -102,6 +104,10 @@ impl Store {
     /// Check if the store is empty.
     pub fn is_empty(&self) -> bool {
         self.tables.is_empty()
+    }
+
+    pub fn get_from_tid(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
+        self.tables.get(&type_id).map(|arc| arc.as_ref())
     }
 
     /// Resolve a reference to a row.

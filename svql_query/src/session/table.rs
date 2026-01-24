@@ -238,9 +238,15 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
 
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
+
+    /// Get the CellId at the given row index and column name.
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64>;
 }
 
-impl<T: Send + Sync + 'static> AnyTable for Table<T> {
+impl<T: Send + Sync + 'static> AnyTable for Table<T>
+where
+    T: Pattern + Component,
+{
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -251,5 +257,16 @@ impl<T: Send + Sync + 'static> AnyTable for Table<T> {
 
     fn type_name(&self) -> &str {
         std::any::type_name::<T>()
+    }
+
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64> {
+        let col = self.df.column(col_name).ok()?;
+        match T::SCHEMA.iter().find(|c| c.name == col_name)?.kind {
+            ColumnKind::Cell => {
+                let ca = col.u64().ok()?;
+                ca.get(row_idx).map(|raw| raw as u64)
+            }
+            _ => None,
+        }
     }
 }
