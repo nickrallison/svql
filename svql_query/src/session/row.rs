@@ -129,7 +129,7 @@ where
 
             let value_str = match entry {
                 Some(crate::session::ColumnEntry::Cell { id: Some(id) }) => {
-                    format!("cell({}_", id)
+                    format!("cell({})", id)
                 }
                 Some(crate::session::ColumnEntry::Cell { id: None }) => "cell=NULL".to_string(),
                 Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {

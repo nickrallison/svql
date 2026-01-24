@@ -136,17 +136,17 @@ where
         let col = self.df.column(col_name).ok()?;
         match T::SCHEMA.iter().find(|c| c.name == col_name)?.kind {
             ColumnKind::Cell => {
-                let ca = col.i64().ok()?;
+                let ca = col.u64().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw as u64);
                 Some(ColumnEntry::Cell { id: val })
             }
             ColumnKind::Sub(_) => {
-                let ca = col.u32().ok()?;
+                let ca = col.u64().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw as u64);
                 Some(ColumnEntry::Sub { id: val })
             }
             ColumnKind::Metadata => {
-                let ca = col.i64().ok()?;
+                let ca = col.u64().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw as u64);
                 Some(ColumnEntry::Metadata { id: val })
             }

@@ -7,7 +7,6 @@ use crate::{
     session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
-use prjunnamed_netlist::Design;
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
@@ -166,15 +165,16 @@ where
     }
 }
 
+#[allow(unused)]
 mod test {
 
     use crate::session::CellId;
 
-    #[allow(unused)]
     use super::*;
 
     use svql_query::query_test;
 
+    #[derive(Debug, Clone)]
     struct AndGate {
         a: CellId,
         b: CellId,
@@ -218,10 +218,19 @@ mod test {
     }
 
     query_test!(
-        name: test_and_mixed_and_tree,
+        name: test_and_mixed_and_tree_dedupe_none,
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-        expect: 3
+        expect: 6,
+        config: |config_builder| config_builder.dedupe(Dedupe::None)
+    );
+
+    query_test!(
+        name: test_and_mixed_and_tree_dedupe_all,
+        query: AndGate,
+        haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
+        expect: 3,
+        config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
 }
 

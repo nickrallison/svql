@@ -1,4 +1,4 @@
-use prjunnamed_netlist::Design;
+use std::fmt::Debug;
 use std::sync::{Arc, Once};
 use svql_driver::design_container::DesignContainer;
 use svql_query::{prelude::*, traits::Component};
@@ -56,7 +56,7 @@ impl<'a> Default for TestSpec<'a> {
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: Pattern + Component + Send + Sync + 'static,
+    P: Pattern + Component + Send + Sync + Debug + 'static,
 {
     setup_test_logging();
 
@@ -74,10 +74,22 @@ where
     let store = svql_query::run_query::<P>(&driver, &spec.get_key(), &config)?;
 
     // Get the result count from the store
-    let stored_count = store.get::<P>().map(|table| table.len()).unwrap_or(0);
+    let results_table = store.get::<P>().expect("Table should be present");
+    let rows = results_table.rows().collect::<Vec<_>>();
+    let stored_count = rows.len();
 
     if stored_count != spec.expected_count {
-        let cells = container.index().cells_topo();
+        let mut rehydrated: Vec<P> = Vec::new();
+        for row in rows.iter() {
+            let item = P::rehydrate(row, &store, &driver, &spec.get_key());
+            if let None = item {
+                tracing::error!("Failed to rehydrate row: {}", row);
+                continue;
+            }
+            rehydrated.push(item.unwrap());
+        }
+
+        // let cells = container.index().cells_topo();
         tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
@@ -88,18 +100,22 @@ where
             store
         );
 
+        for (i, result) in rehydrated.iter().enumerate() {
+            tracing::error!("Result #{}: {:#?}", i, result);
+        }
+
         tracing::error!("Tables:");
         for (_, table) in store.tables() {
             tracing::error!("{}", table);
         }
 
-        let cells_str = cells
-            .iter()
-            .map(|c| format!(" - {:#?}", c))
-            .collect::<Vec<String>>()
-            .join("\n");
+        // let cells_str = cells
+        //     .iter()
+        //     .map(|c| format!(" - {:#?}", c))
+        //     .collect::<Vec<String>>()
+        //     .join("\n");
 
-        tracing::error!("Cell List: {}", cells_str);
+        // tracing::error!("Cell List: {}", cells_str);
         // Log match details if available
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {
