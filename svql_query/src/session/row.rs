@@ -114,5 +114,39 @@ impl<T> Display for Row<T>
 where
     T: Pattern + svql_query::traits::Component,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {}
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Get the type name for the header
+        let type_name = std::any::type_name::<T>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("Row");
+
+        writeln!(f, "{}[{}]:", type_name, self.idx)?;
+
+        // Iterate through the schema and print each column
+        for (idx, col_def) in T::SCHEMA.iter().enumerate() {
+            let entry = self.entry_array.entries.get(idx);
+
+            let value_str = match entry {
+                Some(crate::session::ColumnEntry::Cell { id: Some(id) }) => {
+                    format!("cell({}_", id)
+                }
+                Some(crate::session::ColumnEntry::Cell { id: None }) => "cell=NULL".to_string(),
+                Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {
+                    format!("ref({})", id)
+                }
+                Some(crate::session::ColumnEntry::Sub { id: None }) => "ref=NULL".to_string(),
+                Some(crate::session::ColumnEntry::Metadata { id: Some(id) }) => {
+                    format!("meta({})", id)
+                }
+                Some(crate::session::ColumnEntry::Metadata { id: None }) => "meta=NULL".to_string(),
+                None => "MISSING".to_string(),
+            };
+
+            let nullable_marker = if col_def.nullable { "?" } else { "" };
+            writeln!(f, "  {}{}: {}", col_def.name, nullable_marker, value_str)?;
+        }
+
+        Ok(())
+    }
 }

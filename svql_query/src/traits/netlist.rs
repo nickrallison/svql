@@ -167,13 +167,13 @@ where
 }
 
 mod test {
-    use prjunnamed_netlist::Cell;
-    use svql_driver::design_container;
 
-    use crate::{cell_id_to_wrapper, session::CellId};
+    use crate::session::CellId;
 
     #[allow(unused)]
     use super::*;
+
+    use svql_query::query_test;
 
     struct AndGate {
         a: CellId,
@@ -216,6 +216,14 @@ mod test {
     impl Component for AndGate {
         type Kind = kind::Netlist;
     }
+
+    query_test!(
+        name: test_and_mixed_and_tree
+        query: AndGate,
+        haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
+        expect: 6,
+        config: grant_access_config
+    );
 }
 
 // /// Generates a report node by aggregating source information from all ports.

@@ -19,6 +19,9 @@ pub mod driver {
     pub use svql_driver::*;
 }
 
+#[macro_use]
+pub mod test_harness;
+
 pub use svql_common as common;
 use svql_driver::{Design, design_container, design_container::DesignContainer};
 pub use svql_subgraph as subgraph;

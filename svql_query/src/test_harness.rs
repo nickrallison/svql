@@ -121,11 +121,11 @@ where
 #[macro_export]
 macro_rules! query_test {
     (
-	        name: $test_name:ident,
-	        query: $query_type:ty,
-	        haystack: ($path:expr, $mod:expr),
-	        expect: $count:expr
-	    ) => {
+        name: $test_name:ident,
+        query: $query_type:ty,
+        haystack: ($path:expr, $mod:expr),
+        expect: $count:expr
+    ) => {
         #[test]
         fn $test_name() -> Result<(), Box<dyn std::error::Error>> {
             $crate::test_harness::run_query_test::<$query_type>($crate::test_harness::TestSpec {
@@ -138,12 +138,12 @@ macro_rules! query_test {
     };
 
     (
-	        name: $test_name:ident,
-	        query: $query_type:ty,
-	        haystack: ($path:expr, $mod:expr),
-	        expect: $count:expr,
-	        config: $cfg_closure:expr
-	    ) => {
+        name: $test_name:ident,
+        query: $query_type:ty,
+        haystack: ($path:expr, $mod:expr),
+        expect: $count:expr,
+        config: $cfg_closure:expr
+    ) => {
         #[test]
         fn $test_name() -> Result<(), Box<dyn std::error::Error>> {
             $crate::test_harness::run_query_test::<$query_type>($crate::test_harness::TestSpec {
