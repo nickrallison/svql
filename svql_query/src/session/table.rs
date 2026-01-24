@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use polars::prelude::*;
 
 use crate::session::{ColumnEntry, EntryArray, Row};
-use crate::traits::Pattern;
+use crate::traits::{Component, Pattern};
 
 use super::error::QueryError;
 use super::ref_type::Ref;
@@ -51,7 +51,7 @@ pub struct Table<T> {
 
 impl<T> Table<T>
 where
-    T: Pattern,
+    T: Pattern + Component,
 {
     /// Create a table from a pre-collected set of row matches.
     ///
@@ -190,7 +190,7 @@ where
 
 impl<T> std::fmt::Debug for Table<T>
 where
-    T: Pattern,
+    T: Pattern + Component,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Table")

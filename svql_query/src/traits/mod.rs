@@ -3,8 +3,6 @@
 //! Defines the interfaces that all netlists, composites, and variants must
 //! implement to participate in the SVQL query system.
 
-use std::any::TypeId;
-
 // pub mod component;
 // pub mod composite;
 pub mod netlist;
