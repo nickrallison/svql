@@ -145,6 +145,14 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         true
     }
 
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        Self: Sized;
+
     // the rest is tbd
     fn rehydrate<'a>(
         row: &Row<Self>,
@@ -189,7 +197,7 @@ where
     where
         Self: Sized,
     {
-        todo!();
+        <T as Composite>::preload_driver(driver, design_key, config)
     }
 
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
@@ -401,6 +409,17 @@ mod test {
             ]];
             Connections { connections: conns }
         };
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>>
+        where
+            Self: Sized,
+        {
+            AndGate::preload_driver(driver, design_key, config)
+        }
     }
 
     impl Component for And2Gates {
