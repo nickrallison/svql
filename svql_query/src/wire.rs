@@ -32,7 +32,7 @@ impl Wire {
             Wire::Unknown(id) => *id,
         }
     }
-    
+
     /// Get the direction.
     pub fn direction(&self) -> PortDirection {
         match self {

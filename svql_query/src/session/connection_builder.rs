@@ -33,13 +33,17 @@ impl<'a, S> ConnectionBuilder<'a, S> {
         // - Submodule Output (Direction::Output)
         // - Parent Input (Direction::Input)
 
-        let valid_source = matches!(from.direction(), PortDirection::Output | PortDirection::Input);
+        let valid_source = matches!(
+            from.direction(),
+            PortDirection::Output | PortDirection::Input
+        );
         if !valid_source {
             // Inout is also valid source?
             if from.direction() != PortDirection::Inout {
                 panic!(
                     "Source wire (id {}) has invalid direction {:?} for source",
-                    from.id(), from.direction()
+                    from.id(),
+                    from.direction()
                 );
             }
         }
@@ -54,7 +58,8 @@ impl<'a, S> ConnectionBuilder<'a, S> {
             if to.direction() != PortDirection::Inout {
                 panic!(
                     "Target wire (id {}) has invalid direction {:?} for target",
-                    to.id(), to.direction()
+                    to.id(),
+                    to.direction()
                 );
             }
         }
@@ -109,10 +114,10 @@ impl<'a, S> ConnectionBuilder<'a, S> {
 
         // For now, I will allow the connection if directions are vaguely compatible (not None).
 
-if from.direction() == PortDirection::None {
-             panic!("Source wire has no direction");
+        if from.direction() == PortDirection::None {
+            panic!("Source wire has no direction");
         }
-         if to.direction() == PortDirection::None {
+        if to.direction() == PortDirection::None {
             panic!("Target wire has no direction");
         }
 
