@@ -329,4 +329,15 @@ impl ExecutionContext {
     pub fn config(&self) -> &svql_common::Config {
         &self.config
     }
+
+    /// Retrieve a completed dependency table by TypeId.
+    ///
+    /// Returns `None` if the table was not found or is not yet computed
+    /// (though DAG ordering guarantees it should be computed).
+    pub fn get_any_table(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
+        self.slots
+            .get(&type_id)
+            .and_then(|slot| slot.get())
+            .map(|arc| arc.as_ref())
+    }
 }

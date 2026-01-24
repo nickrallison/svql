@@ -17,13 +17,33 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     const CONNECTIONS: Connections;
 
+    /// Core logic to compose sub-matches into a result table.
+    ///
+    /// # Arguments
+    /// * `ctx` - The execution context (access to driver, config, etc).
+    /// * `dep_tables` - A slice aligned 1:1 with `Self::SCHEMA`.
+    ///   - If `SCHEMA[i]` is a `Sub`, `dep_tables[i]` contains `Some(table)`.
+    ///   - If `SCHEMA[i]` is a `Cell` (Wire), `dep_tables[i]` is `None`.
+    fn compose(
+        ctx: &ExecutionContext,
+        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+    ) -> Result<Table<Self>, QueryError> {
+        todo!();
+    }
+
     /// Validates a row against connectivity constraints.
     ///
-    /// This handles connections between:
-    /// - Two different submodules (Table A <-> Table B)
-    /// - A submodule and the Composite's own IO (Table A <-> Self)
-    fn validate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> bool {
+    /// Refactored to accept `dep_tables` directly, allowing validation during
+    /// the `compose` phase before the final Table is fully built.
+    fn validate(
+        row: &Row<Self>,
+        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> bool {
         // 1. Access Graph
+        // Note: In a hot loop, you might want to hoist this graph lookup out of validate
+        // and pass the `GraphIndex` directly, but this signature matches the trait.
         let design_handle =
             match driver.get_design(key, &svql_common::Config::default().haystack_options) {
                 Ok(d) => d,
@@ -31,30 +51,15 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             };
         let graph = design_handle.index();
 
-        // 2. PRE-FETCH DEPENDENCY TABLES
-        // We map each column index in Self::SCHEMA to its corresponding Table in the Store.
-        // If the column is a Cell (not a submodule), we store None.
-        // This prevents looking up the Store inside the inner loop.
-        let dep_tables: Vec<Option<&dyn AnyTable>> = Self::SCHEMA
-            .iter()
-            .map(|col| {
-                if let ColumnKind::Sub(type_id) = col.kind {
-                    store.get_any(type_id).map(|t| t as &dyn AnyTable)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // 3. Iterate CNF Constraints
+        // 2. Iterate CNF Constraints
         for group in Self::CONNECTIONS.connections {
             let mut group_satisfied = false;
             let mut group_has_unresolvable = false;
 
             for connection in *group {
                 // Pass the pre-fetched tables to resolve_endpoint
-                let src_wire = connection.from.resolve_endpoint(row, &dep_tables);
-                let dst_wire = connection.to.resolve_endpoint(row, &dep_tables);
+                let src_wire = connection.from.resolve_endpoint(row, dep_tables);
+                let dst_wire = connection.to.resolve_endpoint(row, dep_tables);
 
                 match (src_wire, dst_wire) {
                     (Some(s), Some(d)) => {
@@ -75,6 +80,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             if group_satisfied {
                 continue;
             }
+            // If the group is not satisfied and we have no "maybe" wires, the row is invalid.
             if !group_has_unresolvable {
                 return false;
             }
@@ -134,7 +140,27 @@ where
     where
         Self: Send + Sync + 'static,
     {
-        todo!();
+        // 1. Prepare the container for dependent tables
+        let mut dep_tables = Vec::with_capacity(T::SCHEMA_SIZE);
+
+        // 2. Iterate over the schema to fetch dependencies
+        for col in T::SCHEMA {
+            match col.kind {
+                ColumnKind::Sub(type_id) => {
+                    // Fetch the pre-computed table from the ExecutionContext
+                    let table = ctx
+                        .get_any_table(type_id)
+                        .ok_or_else(|| QueryError::MissingDependency(col.name.to_string()))?;
+
+                    dep_tables.push(Some(table));
+                }
+                // Wires and Metadata columns don't have external tables
+                _ => dep_tables.push(None),
+            }
+        }
+
+        // 3. Hand off to the specific implementation to do the join/filter
+        T::compose(ctx, &dep_tables)
     }
 
     fn rehydrate<'a>(
@@ -164,24 +190,23 @@ pub struct Endpoint {
 
 impl Endpoint {
     /// Resolves an endpoint to a physical Cell ID.
-    ///
-    /// Handles the logic of:
-    /// 1. "Is this endpoint on Me (Self) or a Submodule?"
-    /// 2. "If Submodule, which row in that table?"
-    /// 3. "Get the specific port from that row."
-    fn resolve_endpoint<T>(&self, row: &Row<T>, dep_tables: &[Option<&dyn AnyTable>]) -> Option<u64>
+    fn resolve_endpoint<T>(
+        &self,
+        row: &Row<T>,
+        // This signature must match exactly what is passed in validate
+        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+    ) -> Option<u64>
     where
         T: Composite + Component,
     {
         // 1. Get the value from the current Composite Row
         let entry = row.entry_array.entries.get(self.column_idx)?;
 
-        // 2. Check the column definition to know how to handle the entry
+        // 2. Check the column definition
         let col_def = &T::SCHEMA[self.column_idx];
 
         match (entry, &col_def.kind) {
             // === CASE 1: Endpoint is on a Submodule ===
-            // The row contains a Reference (Index) to another table.
             (ColumnEntry::Sub { id: Some(ref_idx) }, ColumnKind::Sub(_)) => {
                 // Retrieve the pre-fetched table for this column
                 let table = dep_tables.get(self.column_idx)?.as_ref()?;
@@ -191,11 +216,9 @@ impl Endpoint {
             }
 
             // === CASE 2: Endpoint is on Self ===
-            // The row contains the physical Cell ID directly.
             (ColumnEntry::Cell { id: Some(cell_id) }, ColumnKind::Cell) => Some(*cell_id),
 
             // === CASE 3: Missing Data ===
-            // Nullable column or metadata
             _ => None,
         }
     }
