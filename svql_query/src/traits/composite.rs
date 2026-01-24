@@ -370,7 +370,19 @@ mod test {
     }
 
     impl Composite for And2Gates {
-        const SCHEMA: &'static [ColumnDef] = &[];
+        const SCHEMA: &'static [ColumnDef] = &[
+            // 0: Submodule and1
+            ColumnDef::sub::<AndGate>("and1"),
+            // 1: Submodule and2
+            ColumnDef::sub::<AndGate>("and2"),
+            // 2-7: Wires (Exposed ports for the composite)
+            ColumnDef::wire("and1_a"),
+            ColumnDef::wire("and1_b"),
+            ColumnDef::wire("and1_y"),
+            ColumnDef::wire("and2_a"),
+            ColumnDef::wire("and2_b"),
+            ColumnDef::wire("and2_y"),
+        ];
 
         fn rehydrate<'a>(
             row: &Row<Self>,

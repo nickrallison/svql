@@ -127,7 +127,7 @@ impl ColumnDef {
 
     /// Create a submodule reference column.
     /// Note: Cannot be `const` because `TypeId::of::<T>()` is not const-stable.
-    pub fn sub<T: 'static>(name: &'static str) -> Self {
+    pub const fn sub<T: 'static>(name: &'static str) -> Self {
         Self {
             name,
             kind: ColumnKind::Sub(TypeId::of::<T>()),
