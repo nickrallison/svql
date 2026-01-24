@@ -4,6 +4,8 @@
 //! hardware wires, and the relationships between pattern components and
 //! matched design elements.
 #![feature(const_type_name)]
+#![feature(const_cmp)]
+#![feature(const_trait_impl)]
 
 extern crate self as svql_query;
 

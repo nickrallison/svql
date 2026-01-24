@@ -39,7 +39,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             .iter()
             .map(|col| {
                 if let ColumnKind::Sub(type_id) = col.kind {
-                    store.get_any(type_id)
+                    store.get_any(type_id).map(|t| t as &dyn AnyTable)
                 } else {
                     None
                 }
@@ -202,13 +202,13 @@ impl Endpoint {
 }
 
 pub struct Connection {
-    from: Endpoint,
-    to: Endpoint,
+    pub from: Endpoint,
+    pub to: Endpoint,
 }
 
 pub struct Connections {
     // in CNF form (helpful for some patterns like either (y -> a or y -> b) and (z -> c or z -> d))
-    connections: &'static [&'static [Connection]],
+    pub connections: &'static [&'static [Connection]],
 }
 
 #[allow(unused)]
@@ -218,6 +218,7 @@ mod test {
 
     use super::*;
 
+    use svql_common::Dedupe;
     use svql_query::query_test;
 
     #[derive(Debug, Clone)]
@@ -263,6 +264,7 @@ mod test {
         type Kind = kind::Netlist;
     }
 
+    #[derive(Debug, Clone)]
     pub struct And2Gates {
         and1: AndGate,
         and2: AndGate,
@@ -295,22 +297,26 @@ mod test {
             let conns: &'static [&'static [Connection]] = &[&[
                 Connection {
                     from: Endpoint {
-                        module: TypeId::of::<AndGate>(),
-                        port: "b",
+                        column_idx: schema_lut("b", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "b",
                     },
                     to: Endpoint {
-                        module: TypeId::of::<AndGate>(),
-                        port: "y",
+                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "y",
                     },
                 },
                 Connection {
                     from: Endpoint {
-                        module: TypeId::of::<AndGate>(),
-                        port: "a",
+                        column_idx: schema_lut("a", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "a",
                     },
                     to: Endpoint {
-                        module: TypeId::of::<AndGate>(),
-                        port: "y",
+                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "y",
                     },
                 },
             ]];
@@ -322,19 +328,19 @@ mod test {
         type Kind = kind::Composite;
     }
 
-    // query_test!(
-    //     name: test_and_mixed_and_tree_dedupe_none,
-    //     query: AndGate,
-    //     haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-    //     expect: 6,
-    //     config: |config_builder| config_builder.dedupe(Dedupe::None)
-    // );
+    query_test!(
+        name: test_and2gates_small_and_tree_dedupe_none,
+        query: And2Gates,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 6,
+        config: |config_builder| config_builder.dedupe(Dedupe::None)
+    );
 
-    // query_test!(
-    //     name: test_and_mixed_and_tree_dedupe_all,
-    //     query: AndGate,
-    //     haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-    //     expect: 3,
-    //     config: |config_builder| config_builder.dedupe(Dedupe::All)
-    // );
+    query_test!(
+        name: test_and2gates_small_and_tree_dedupe_all,
+        query: And2Gates,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 3,
+        config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
 }

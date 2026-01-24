@@ -17,11 +17,13 @@ use crate::session::{
 };
 
 /// Returns the column index for a given column name in the schema.
-pub fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
-    for (idx, col) in schema.iter().enumerate() {
-        if col.name == name {
-            return Some(idx);
+pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
+    let mut i = 0;
+    while i < schema.len() {
+        if schema[i].name == name {
+            return Some(i);
         }
+        i += 1;
     }
     None
 }

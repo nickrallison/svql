@@ -84,9 +84,13 @@ where
 mod test {
 
     use crate::{
-        prelude::ColumnKind,
         Wire,
-        traits::{Netlist, composite::Composite},
+        prelude::ColumnKind,
+        traits::{
+            Netlist,
+            composite::{Composite, Connection, Connections, Endpoint},
+            schema_lut,
+        },
     };
 
     use super::*;
@@ -139,6 +143,14 @@ mod test {
     pub struct And2Gates {
         and1: AndGate,
         and2: AndGate,
+
+        and1_a: Wire,
+        and1_b: Wire,
+        and1_y: Wire,
+
+        and2_a: Wire,
+        and2_b: Wire,
+        and2_y: Wire,
     }
 
     impl Composite for And2Gates {
@@ -155,6 +167,36 @@ mod test {
         {
             todo!()
         }
+
+        const CONNECTIONS: Connections = {
+            let conns: &'static [&'static [Connection]] = &[&[
+                Connection {
+                    from: Endpoint {
+                        column_idx: schema_lut("b", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "b",
+                    },
+                    to: Endpoint {
+                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "y",
+                    },
+                },
+                Connection {
+                    from: Endpoint {
+                        column_idx: schema_lut("a", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "a",
+                    },
+                    to: Endpoint {
+                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                            .expect("Should have successfully looked up col"),
+                        port_name: "y",
+                    },
+                },
+            ]];
+            Connections { connections: conns }
+        };
     }
 
     impl Component for And2Gates {
