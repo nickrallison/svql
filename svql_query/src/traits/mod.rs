@@ -99,7 +99,12 @@ pub trait Pattern: Sized + Send + Sync {
     ///
     /// Reconstructs a full `Self::Match` object from the row data and
     /// any referenced submodule rows in the store.
-    fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
+    fn rehydrate(
+        _row: &Row<Self>,
+        _store: &Store,
+        _driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<Self>
     where
         Self: Component + Send + Sync + 'static;
 }
@@ -126,7 +131,7 @@ impl Component for kind::Variant {
     type Kind = kind::Variant;
 }
 
-pub(crate) trait PatternInternal<K>: Sized {
+pub trait PatternInternal<K>: Sized {
     const SCHEMA_SIZE: usize;
 
     const SCHEMA: &'static [ColumnDef];
@@ -143,7 +148,12 @@ pub(crate) trait PatternInternal<K>: Sized {
     where
         Self: Send + Sync + 'static;
 
-    fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
+    fn rehydrate(
+        _row: &Row<Self>,
+        _store: &Store,
+        _driver: &Driver,
+        _key: &DriverKey,
+    ) -> Option<Self>
     where
         Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
 }
@@ -178,11 +188,11 @@ where
         T::search_table(ctx)
     }
 
-    fn rehydrate(row: &Row<Self>, store: &Store) -> Option<Self>
+    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
     where
         Self: 'static,
     {
-        T::rehydrate(row, store)
+        T::rehydrate(row, store, driver, key)
     }
 }
 

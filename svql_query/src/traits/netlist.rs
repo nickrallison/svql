@@ -7,6 +7,7 @@ use crate::{
     session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
+use prjunnamed_netlist::Design;
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
@@ -65,6 +66,15 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             .collect();
         EntryArray::new(final_row_match)
     }
+
+    fn rehydrate<'a>(
+        _row: &Row<Self>,
+        _store: &Store,
+        _driver: &Driver,
+        _key: &DriverKey,
+    ) -> Option<Self>
+    where
+        Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static;
 }
 
 /// Wrapper to adapt the two-argument `search_table_any` to the single-argument `SearchFn` signature.
@@ -143,11 +153,16 @@ where
         Ok(table)
     }
 
-    fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
+    fn rehydrate<'a>(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
-        todo!()
+        <T as Netlist>::rehydrate(row, store, driver, key)
     }
 }
 
