@@ -1,10 +1,9 @@
-use std::any::TypeId;
-
+use itertools::Itertools;
 use svql_driver::{Driver, DriverKey};
 
 use crate::{
     prelude::{ColumnDef, ColumnKind, QueryError, Table},
-    session::{AnyTable, ColumnEntry, ExecutionContext, Row, Store},
+    session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, Row, Store},
     traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
 
@@ -28,7 +27,64 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         ctx: &ExecutionContext,
         dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
     ) -> Result<Table<Self>, QueryError> {
-        todo!();
+        // 1. Dynamically identify which columns are submodules
+        // We store the schema index for each submodule found.
+        let sub_indices: Vec<usize> = Self::SCHEMA
+            .iter()
+            .enumerate()
+            .filter(|(_, col)| col.kind.is_sub())
+            .map(|(i, _)| i)
+            .collect();
+
+        // 2. Prepare Iterators for the Cartesian Product
+        let mut ranges = Vec::with_capacity(sub_indices.len());
+
+        for &col_idx in &sub_indices {
+            let table = dep_tables[col_idx]
+                .expect("Schema defines a Sub column but no table was provided in dep_tables");
+
+            if table.is_empty() {
+                // If a required submodule has no matches, the composite has no matches.
+                // (Assumes non-nullable for now)
+                if !Self::SCHEMA[col_idx].nullable {
+                    return Ok(Table::new(vec![])?);
+                }
+            }
+            ranges.push(0..table.len() as u64);
+        }
+
+        // 3. Perform Cartesian Product
+        // This creates an iterator of Vec<u64> (row indices), one for each submodule.
+        let product_iter = ranges.into_iter().multi_cartesian_product();
+
+        // 4. Build and Validate Rows
+        let mut valid_rows = Vec::new();
+
+        // Pre-allocate a template row with Metadata/None to avoid re-allocating per iteration
+        let row_template = vec![ColumnEntry::Metadata { id: None }; Self::SCHEMA_SIZE];
+
+        for indices in product_iter {
+            let mut entries = row_template.clone();
+
+            // Map the Cartesian product indices back to their specific column positions
+            for (i, &row_idx) in indices.iter().enumerate() {
+                let schema_col_idx = sub_indices[i];
+                entries[schema_col_idx] = ColumnEntry::Sub { id: Some(row_idx) };
+            }
+
+            let row = Row::<Self> {
+                idx: 0, // Placeholder
+                entry_array: EntryArray::new(entries),
+                _marker: std::marker::PhantomData,
+            };
+
+            // 5. Validate
+            if Self::validate(&row, dep_tables, ctx.driver(), &ctx.design_key()) {
+                valid_rows.push(row.entry_array);
+            }
+        }
+
+        Table::new(valid_rows)
     }
 
     /// Validates a row against connectivity constraints.
