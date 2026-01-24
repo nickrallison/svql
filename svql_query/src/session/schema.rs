@@ -48,7 +48,7 @@ impl ColumnKind {
 }
 
 /// Defines the direction of a port column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PortDirection {
     /// Not a port (internal wire, submodule reference, or metadata).
     None,

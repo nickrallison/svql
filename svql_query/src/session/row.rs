@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 
 use crate::session::{EntryArray, QueryError};
 use crate::traits::{Pattern, schema_lut};
+use crate::Wire;
 
 use super::ref_type::Ref;
 
@@ -57,8 +58,9 @@ where
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
     #[inline]
-    pub fn wire(&self, name: &str) -> Option<u64> {
+    pub fn wire(&self, name: &str) -> Option<Wire> {
         let idx = schema_lut(name, T::SCHEMA)?;
+        let direction = T::SCHEMA[idx].direction;
 
         self.entry_array
             .entries
@@ -67,6 +69,7 @@ where
                 crate::session::ColumnEntry::Cell { id, .. } => *id,
                 _ => None,
             })
+            .map(|id| Wire::new(id, direction))
     }
 
     /// Get a submodule reference by column name.

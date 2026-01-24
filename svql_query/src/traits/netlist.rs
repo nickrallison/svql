@@ -168,7 +168,7 @@ where
 #[allow(unused)]
 mod test {
 
-    use crate::session::CellId;
+    use crate::Wire;
 
     use super::*;
 
@@ -176,9 +176,9 @@ mod test {
 
     #[derive(Debug, Clone)]
     struct AndGate {
-        a: CellId,
-        b: CellId,
-        y: CellId,
+        a: Wire,
+        b: Wire,
+        y: Wire,
     }
 
     impl Netlist for AndGate {
@@ -199,9 +199,9 @@ mod test {
         where
             Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
         {
-            let a_id = CellId::new(row.wire("a")?);
-            let b_id = CellId::new(row.wire("b")?);
-            let y_id = CellId::new(row.wire("y")?);
+            let a_id = row.wire("a")?;
+            let b_id = row.wire("b")?;
+            let y_id = row.wire("y")?;
 
             let and_gate = AndGate {
                 a: a_id,

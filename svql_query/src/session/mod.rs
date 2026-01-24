@@ -5,39 +5,21 @@
 //! - Foreign-key style references between result tables
 //! - Lazy rehydration of match results
 //! - Efficient columnar storage of dehydrated matches
-//!
-//! ## New API (Phase 1-3)
-//!
-//! The following types are part of the new DataFrame-based API:
-//! - [`CellId`] - 64-bit cell identifier with multi-design support
-//! - [`Ref<T>`](ref_type::Ref) - Typed reference to a row in another pattern's table
-//! - [`Row<T>`] - Owned snapshot of a single row
-//! - [`Table<T>`] - Typed DataFrame wrapper
-//! - [`Store`] - Central storage for all pattern result tables
-//! - [`ColumnDef`], [`ColumnKind`] - Schema definitions
-//! - [`QueryError`] - Error types
-//! - [`PatternRegistry`] - Type registration for DAG construction
-//! - [`ExecutionPlan`], [`ExecutionContext`] - Parallel execution
 
-// --- New modules (Phase 1-3) ---
-mod cell_id;
+pub mod connection_builder;
 mod error;
 mod execution;
 mod ref_type;
-// mod registry;
 mod row;
 mod schema;
 mod store;
 mod table;
 mod variant_ref;
-pub mod connection_builder;
 
-pub use cell_id::CellId;
 pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
-// pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
 pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray, PortDirection};
 pub use store::Store;

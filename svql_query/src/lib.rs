@@ -16,8 +16,6 @@ pub mod traits;
 pub mod wire;
 
 pub use wire::Wire;
-
-/// Re-export of driver crate with Context flattened for macro compatibility
 pub mod driver {
     pub use svql_driver::*;
 }
