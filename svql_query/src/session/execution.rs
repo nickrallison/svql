@@ -59,8 +59,8 @@ impl ExecutionNode {
         self.cas_runner.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    fn is_done(&self, plan: &ExecutionPlan) -> bool {
-        if let Some(slot) = plan.slots.get(&self.type_id)
+    fn is_done(&self, ctx: &ExecutionContext) -> bool {
+        if let Some(slot) = ctx.slots.get(&self.type_id)
             && slot.get().is_some()
         {
             return true;
@@ -126,8 +126,6 @@ pub struct ExecutionPlan {
     root: Arc<ExecutionNode>,
     /// All nodes in topological order (deps before dependents).
     nodes: Vec<Arc<ExecutionNode>>,
-    /// Slots to hold results during execution.
-    slots: HashMap<TypeId, TableSlot>,
 }
 
 impl std::fmt::Debug for ExecutionPlan {
@@ -140,7 +138,7 @@ impl std::fmt::Debug for ExecutionPlan {
 }
 
 impl ExecutionPlan {
-    pub fn build(root: &super::ExecInfo) -> Self {
+    pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
         all_deps.push(Arc::clone(&root_node));
@@ -148,11 +146,13 @@ impl ExecutionPlan {
             .iter()
             .map(|node| (node.type_id, OnceLock::new()))
             .collect();
-        Self {
-            root: root_node,
-            nodes: all_deps,
+        (
+            Self {
+                root: root_node,
+                nodes: all_deps,
+            },
             slots,
-        }
+        )
     }
 
     /// Execute the plan and return a Store with all results.
@@ -167,9 +167,10 @@ impl ExecutionPlan {
         driver: &Driver,
         key: &DriverKey,
         config: &svql_common::Config,
+        slots: HashMap<TypeId, TableSlot>,
     ) -> Result<Store, QueryError> {
         // Create shared context
-        let ctx = ExecutionContext::new(driver.clone(), key.clone(), config.clone());
+        let ctx = ExecutionContext::new(driver.clone(), key.clone(), config.clone(), slots);
 
         if config.parallel {
             self.execute_parallel(&ctx)?;
@@ -178,7 +179,7 @@ impl ExecutionPlan {
         }
 
         // Collect results into Store
-        Ok(self.try_into_store()?)
+        Ok(self.try_into_store(&ctx)?)
     }
 
     /// Execute nodes sequentially in topological order.
@@ -216,7 +217,7 @@ impl ExecutionPlan {
 
         if !node.try_execute() {
             // Another thread is running this dep; wait for it to complete
-            if let Some(slot) = self.slots.get(&node.type_id()) {
+            if let Some(slot) = ctx.slots.get(&node.type_id()) {
                 // Wait for the slot to be filled
                 let _ = slot.wait();
             }
@@ -233,7 +234,7 @@ impl ExecutionPlan {
         let result = (node.search_fn)(ctx)?;
 
         // Store result wrapped in Arc (OnceLock ensures single write)
-        if let Some(slot) = self.slots.get(&node.type_id) {
+        if let Some(slot) = ctx.slots.get(&node.type_id) {
             let _ = slot.set(Arc::from(result)); // Ignore if already set (race condition)
         }
 
@@ -248,21 +249,24 @@ impl ExecutionPlan {
     ///
     /// This should only be called for declared dependencies. If DAG ordering
     /// is correct, the dependency will always be available.
-    pub fn get_table<T: 'static>(&self) -> Option<&super::table::Table<T>> {
-        self.slots
+    pub fn get_table<'a, T: 'static>(
+        &self,
+        ctx: &'a ExecutionContext,
+    ) -> Option<&'a super::table::Table<T>> {
+        ctx.slots
             .get(&TypeId::of::<T>())
             .and_then(|lock| lock.get())
             .and_then(|arc| arc.as_any().downcast_ref())
     }
 
     /// Convert the context into a Store after execution completes.
-    pub fn try_into_store(self) -> Result<Store, QueryError> {
-        let mut store = Store::with_capacity(self.slots.len());
+    pub fn try_into_store(self, ctx: &ExecutionContext) -> Result<Store, QueryError> {
+        let mut store = Store::with_capacity(ctx.slots.len());
 
         // Clone tables from slots into the store
         // Since we use Arc<dyn AnyTable>, we can clone the Arc and then
         // use Arc::try_unwrap or just clone the inner table
-        for (&type_id, slot) in self.slots.iter() {
+        for (&type_id, slot) in ctx.slots.iter() {
             if let Some(arc_table) = slot.get() {
                 // Clone the Arc and then box it for the store
                 // This is a cheap reference count bump
@@ -292,14 +296,22 @@ pub struct ExecutionContext {
     design_key: DriverKey,
     /// Execution configuration.
     config: svql_common::Config,
+    /// Slots to hold results during execution.
+    slots: HashMap<TypeId, TableSlot>,
 }
 
 impl ExecutionContext {
-    pub fn new(driver: Driver, design_key: DriverKey, config: svql_common::Config) -> Self {
+    pub fn new(
+        driver: Driver,
+        design_key: DriverKey,
+        config: svql_common::Config,
+        slots: HashMap<TypeId, TableSlot>,
+    ) -> Self {
         Self {
             driver,
             design_key,
             config,
+            slots,
         }
     }
 

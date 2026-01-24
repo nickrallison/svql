@@ -121,8 +121,8 @@ pub trait Pattern: Sized + Send + Sync {
     where
         Self: Send + Sync + 'static,
     {
-        let plan = ExecutionPlan::build(Self::EXEC_INFO);
-        plan.execute(&driver, &design_key, &config)
+        let (plan, slots) = ExecutionPlan::build(Self::EXEC_INFO);
+        plan.execute(&driver, &design_key, &config, slots)
     }
 
     /// Rehydrate a Row back to the Match type-state.
