@@ -8,11 +8,14 @@
 extern crate self as svql_query;
 
 // pub mod binding;
-pub mod instance;
+// pub mod instance;
 pub mod prelude;
-pub mod report;
+// pub mod report;
 pub mod session;
 pub mod traits;
+pub mod wire;
+
+pub use wire::Wire;
 
 /// Re-export of driver crate with Context flattened for macro compatibility
 pub mod driver {
@@ -23,7 +26,7 @@ pub mod driver {
 pub mod test_harness;
 
 pub use svql_common as common;
-use svql_driver::{Design, design_container, design_container::DesignContainer};
+use svql_driver::design_container::DesignContainer;
 pub use svql_subgraph as subgraph;
 
 use prelude::*;

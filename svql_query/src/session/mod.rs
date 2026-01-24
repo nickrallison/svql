@@ -30,14 +30,16 @@ mod schema;
 mod store;
 mod table;
 mod variant_ref;
+pub mod connection_builder;
 
 pub use cell_id::CellId;
+pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 // pub use registry::{PatternEntry, PatternRegistry, SearchRegistry};
 pub use row::Row;
-pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray};
+pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray, PortDirection};
 pub use store::Store;
 pub use table::{AnyTable, Table};
 pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};

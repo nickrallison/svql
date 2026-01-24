@@ -12,7 +12,8 @@ pub use netlist::Netlist;
 
 use crate::prelude::*;
 use crate::session::{
-    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, QueryError, Row, Store, Table,
+    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, PortDirection, QueryError, Row,
+    Store, Table,
 };
 
 /// Returns the column index for a given column name in the schema.
@@ -46,6 +47,40 @@ pub trait Pattern: Sized + Send + Sync {
 
     /// Info needed to execute this pattern. Used to build the ExecutionPlan DAG.
     const EXEC_INFO: &'static ExecInfo;
+
+    /// Get the indices of all Input columns in the Schema.
+    fn input_indices() -> Vec<usize> {
+        Self::SCHEMA
+            .iter()
+            .enumerate()
+            .filter(|(_, col)| col.direction == PortDirection::Input)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Get the indices of all Output columns in the Schema.
+    fn output_indices() -> Vec<usize> {
+        Self::SCHEMA
+            .iter()
+            .enumerate()
+            .filter(|(_, col)| col.direction == PortDirection::Output)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Check if a specific column name is an Output.
+    fn is_output(name: &str) -> bool {
+        Self::SCHEMA
+            .iter()
+            .any(|col| col.name == name && col.direction == PortDirection::Output)
+    }
+
+    /// Check if a specific column name is an Input.
+    fn is_input(name: &str) -> bool {
+        Self::SCHEMA
+            .iter()
+            .any(|col| col.name == name && col.direction == PortDirection::Input)
+    }
 
     /// Returns the static type name of the component.
     fn type_name(&self) -> &'static str {

@@ -47,6 +47,19 @@ impl ColumnKind {
     }
 }
 
+/// Defines the direction of a port column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortDirection {
+    /// Not a port (internal wire, submodule reference, or metadata).
+    None,
+    /// Input port (receives signal).
+    Input,
+    /// Output port (drives signal).
+    Output,
+    /// Bidirectional port.
+    Inout,
+}
+
 /// Definition of a single column in a pattern's result table.
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
@@ -57,15 +70,38 @@ pub struct ColumnDef {
     /// Whether this column can contain NULL values.
     /// Used for optional submodules and tree children (left_child, right_child).
     pub nullable: bool,
+    /// The directionality of this column (if it is a port).
+    pub direction: PortDirection,
 }
 
 impl ColumnDef {
+    /// Create a wire column that acts as an Input port.
+    pub const fn input(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: ColumnKind::Cell,
+            nullable: false,
+            direction: PortDirection::Input,
+        }
+    }
+
+    /// Create a wire column that acts as an Output port.
+    pub const fn output(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: ColumnKind::Cell,
+            nullable: false,
+            direction: PortDirection::Output,
+        }
+    }
+
     /// Create a wire column (non-nullable by default).
     pub const fn wire(name: &'static str) -> Self {
         Self {
             name,
             kind: ColumnKind::Cell,
             nullable: false,
+            direction: PortDirection::None,
         }
     }
 
@@ -75,6 +111,7 @@ impl ColumnDef {
             name,
             kind: ColumnKind::Cell,
             nullable: true,
+            direction: PortDirection::None,
         }
     }
 
@@ -84,6 +121,7 @@ impl ColumnDef {
             name,
             kind: ColumnKind::Metadata,
             nullable: false,
+            direction: PortDirection::None,
         }
     }
 
@@ -94,6 +132,7 @@ impl ColumnDef {
             name,
             kind: ColumnKind::Sub(TypeId::of::<T>()),
             nullable: false,
+            direction: PortDirection::None,
         }
     }
 
@@ -103,6 +142,7 @@ impl ColumnDef {
             name,
             kind: ColumnKind::Sub(TypeId::of::<T>()),
             nullable: true,
+            direction: PortDirection::None,
         }
     }
 
@@ -112,6 +152,7 @@ impl ColumnDef {
             name,
             kind,
             nullable,
+            direction: PortDirection::None,
         }
     }
 

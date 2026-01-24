@@ -9,10 +9,13 @@ pub use crate::{
     // binding::PortResolver,
     // primitives::dff::*,
     // primitives::gates::*,
-    report::ReportNode,
+    // report::ReportNode,
     // DataFrame API
     run_query,
 };
+
+// Session re-exports
+pub use crate::session::ConnectionBuilder;
 
 // Trait re-exports
 pub use crate::traits::{

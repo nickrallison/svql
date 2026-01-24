@@ -13,7 +13,7 @@ use std::hash::Hash;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock};
 
-use svql_driver::{Driver, DriverKey, driver};
+use svql_driver::{Driver, DriverKey};
 
 use super::error::QueryError;
 use super::store::Store;
