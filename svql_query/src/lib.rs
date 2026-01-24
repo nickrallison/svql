@@ -20,6 +20,7 @@ pub mod driver {
 }
 
 pub use svql_common as common;
+use svql_driver::{Design, design_container, design_container::DesignContainer};
 pub use svql_subgraph as subgraph;
 
 use prelude::*;
@@ -50,6 +51,15 @@ where
     P: Pattern + Send + Sync + 'static,
 {
     P::search(driver, key, config).map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
+}
+
+pub fn cell_id_to_wrapper<'a>(
+    cell_id: u64,
+    design_container: &'a DesignContainer,
+) -> Option<CellWrapper<'a>> {
+    let index = design_container.index();
+    let cell_wrapper = index.get_cell_by_id(cell_id as usize)?.clone();
+    Some(cell_wrapper)
 }
 
 /// Represents a connection between two wires.

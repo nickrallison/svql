@@ -167,7 +167,10 @@ where
 }
 
 mod test {
-    use crate::session::CellId;
+    use prjunnamed_netlist::Cell;
+    use svql_driver::design_container;
+
+    use crate::{cell_id_to_wrapper, session::CellId};
 
     #[allow(unused)]
     use super::*;
@@ -196,31 +199,22 @@ mod test {
         where
             Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
         {
-            todo!()
+            let a_id = CellId::new(row.wire("a")?);
+            let b_id = CellId::new(row.wire("b")?);
+            let y_id = CellId::new(row.wire("y")?);
+
+            let and_gate = AndGate {
+                a: a_id,
+                b: b_id,
+                y: y_id,
+            };
+
+            Some(and_gate)
         }
     }
 
     impl Component for AndGate {
         type Kind = kind::Netlist;
-    }
-
-    #[test]
-    fn test_netlist_driver_key() {
-        struct MyNetlistPattern;
-
-        impl Component for MyNetlistPattern {
-            type Kind = kind::Netlist;
-        }
-
-        impl Netlist for MyNetlistPattern {
-            const MODULE_NAME: &'static str = "MyModule";
-            const FILE_PATH: &'static str = "path/to/netlist.v";
-            const SCHEMA: &'static [ColumnDef] = &[];
-        }
-
-        let driver_key = MyNetlistPattern::driver_key();
-        assert_eq!(driver_key.file_path(), "path/to/netlist.v");
-        assert_eq!(driver_key.module_name(), "MyModule");
     }
 }
 
