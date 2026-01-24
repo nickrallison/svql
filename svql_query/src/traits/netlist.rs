@@ -5,7 +5,7 @@
 use crate::{
     prelude::*,
     session::{ColumnEntry, EntryArray, ExecutionContext, Row, Store},
-    traits::{PatternInternal, kind},
+    traits::{PatternInternal, kind, schema_lut},
 };
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
@@ -44,7 +44,7 @@ pub trait Netlist: Sized + Send + Sync + 'static {
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _)
                 | prjunnamed_netlist::Cell::Output(name, _) => {
-                    let col_idx = <Self as Pattern>::schema_lut(name)
+                    let col_idx = schema_lut(name, Self::SCHEMA)
                         .expect("Needle Cell name should exist in schema");
                     row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u64);
                 }

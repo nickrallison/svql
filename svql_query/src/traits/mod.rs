@@ -24,6 +24,27 @@ use crate::session::{
     AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, QueryError, Row, Store, Table,
 };
 
+/// Returns the column index for a given column name in the schema.
+pub fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
+    for (idx, col) in schema.iter().enumerate() {
+        if col.name == name {
+            return Some(idx);
+        }
+    }
+    None
+}
+
+pub fn search_table_any<T>(
+    ctx: &ExecutionContext,
+    search_table: fn(&ExecutionContext) -> Result<Table<T>, QueryError>,
+) -> Result<Box<dyn AnyTable>, QueryError>
+where
+    T: Send + Sync + 'static,
+{
+    let table = search_table(ctx)?;
+    Ok(Box::new(table))
+}
+
 /// The central abstraction for query components.
 pub trait Pattern: Sized + Send + Sync {
     /// Size of the schema (number of columns).
@@ -38,16 +59,6 @@ pub trait Pattern: Sized + Send + Sync {
     /// Returns the static type name of the component.
     fn type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
-    }
-
-    /// Returns the column index for a given column name in the schema.
-    fn schema_lut(name: &str) -> Option<usize> {
-        for (idx, col) in Self::SCHEMA.iter().enumerate() {
-            if col.name == name {
-                return Some(idx);
-            }
-        }
-        None
     }
 
     fn preload_driver(
@@ -99,7 +110,7 @@ pub mod kind {
     pub struct Variant;
 }
 
-trait Component {
+pub trait Component {
     type Kind;
 }
 
@@ -134,7 +145,7 @@ pub(crate) trait PatternInternal<K>: Sized {
 
     fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
     where
-        Self: 'static;
+        Self: Component + 'static;
 }
 
 impl<T> Pattern for T

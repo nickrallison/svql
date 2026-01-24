@@ -29,14 +29,14 @@ pub struct VariantRef<V> {
     /// The TypeId of the sub-type this reference points to.
     sub_type: TypeId,
     /// The row index in the sub-type's table.
-    idx: u32,
+    idx: u64,
     /// Phantom data for the variant type.
     _marker: PhantomData<fn() -> V>,
 }
 
 impl<V> VariantRef<V> {
     /// Create a new variant reference.
-    pub fn new(sub_type: TypeId, idx: u32) -> Self {
+    pub fn new(sub_type: TypeId, idx: u64) -> Self {
         Self {
             sub_type,
             idx,
@@ -50,7 +50,7 @@ impl<V> VariantRef<V> {
     }
 
     /// Get the row index in the sub-type's table.
-    pub fn index(&self) -> u32 {
+    pub fn index(&self) -> u64 {
         self.idx
     }
 
@@ -122,7 +122,7 @@ impl<V> std::hash::Hash for VariantRef<V> {
 ///         TypeId::of::<Adff<Search>>(),
 ///     ];
 ///
-///     fn resolve_variant(sub_type: TypeId, idx: u32, store: &Store) -> Option<Self::Match> {
+///     fn resolve_variant(sub_type: TypeId, idx: u64, store: &Store) -> Option<Self::Match> {
 ///         if sub_type == TypeId::of::<Sdffe<Search>>() {
 ///             let row = store.get::<Sdffe<Search>>()?.row(idx)?;
 ///             Some(DffVariant::Sdffe(Sdffe::rehydrate(&row, store)?))
@@ -144,13 +144,13 @@ pub trait VariantPattern: Sized + 'static {
     ///
     /// Given the sub-type's TypeId and row index, rehydrate the appropriate
     /// sub-type from the store and wrap it in the variant's Match type.
-    fn resolve_variant(sub_type: TypeId, idx: u32, store: &Store) -> Option<Self::Match>;
+    fn resolve_variant(sub_type: TypeId, idx: u64, store: &Store) -> Option<Self::Match>;
 
-    /// Register all sub-types into the registry.
-    ///
-    /// Variants don't have their own search—they just ensure all sub-types
-    /// are registered.
-    fn register_sub_types(registry: &mut super::registry::PatternRegistry);
+    //     /// Register all sub-types into the registry.
+    //     ///
+    //     /// Variants don't have their own search—they just ensure all sub-types
+    //     /// are registered.
+    //     fn register_sub_types(registry: &mut super::registry::PatternRegistry);
 }
 
 /// Extension trait for Store to enable variant iteration.
@@ -173,7 +173,7 @@ pub struct VariantIter<'a, V> {
     /// Index into SUB_TYPES
     sub_type_idx: usize,
     /// Current row index in current sub-type's table
-    row_idx: u32,
+    row_idx: u64,
     /// Length of current sub-type's table
     current_len: usize,
     _marker: PhantomData<V>,
@@ -198,11 +198,12 @@ impl<'a, V: VariantPattern> VariantIter<'a, V> {
         while self.sub_type_idx < V::SUB_TYPES.len() {
             let type_id = V::SUB_TYPES[self.sub_type_idx];
             if let Some(table) = self.store.get_any(type_id)
-                && !table.is_empty() {
-                    self.current_len = table.len();
-                    self.row_idx = 0;
-                    return;
-                }
+                && !table.is_empty()
+            {
+                self.current_len = table.len();
+                self.row_idx = 0;
+                return;
+            }
             self.sub_type_idx += 1;
         }
         // No more tables
@@ -261,12 +262,12 @@ mod tests {
     #[test]
     fn test_variant_ref_as_ref() {
         let vref: VariantRef<()> = VariantRef::new(TypeId::of::<SubTypeA>(), 10);
-        
+
         // Correct type
         let r: Option<Ref<SubTypeA>> = vref.as_ref();
         assert!(r.is_some());
         assert_eq!(r.unwrap().index(), 10);
-        
+
         // Wrong type
         let r: Option<Ref<SubTypeB>> = vref.as_ref();
         assert!(r.is_none());
@@ -278,7 +279,7 @@ mod tests {
         let b: VariantRef<()> = VariantRef::new(TypeId::of::<SubTypeA>(), 1);
         let c: VariantRef<()> = VariantRef::new(TypeId::of::<SubTypeA>(), 2);
         let d: VariantRef<()> = VariantRef::new(TypeId::of::<SubTypeB>(), 1);
-        
+
         assert_eq!(a, b);
         assert_ne!(a, c);
         assert_ne!(a, d);

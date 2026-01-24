@@ -6,7 +6,7 @@
 use std::marker::PhantomData;
 
 use crate::session::{EntryArray, QueryError};
-use crate::traits::Pattern;
+use crate::traits::{Pattern, schema_lut};
 
 use super::ref_type::Ref;
 
@@ -17,7 +17,7 @@ use super::ref_type::Ref;
 #[derive(Debug, Clone)]
 pub struct Row<T>
 where
-    T: Pattern,
+    T: Pattern + svql_query::traits::Component,
 {
     /// Row index in the source table.
     pub(crate) idx: u64,
@@ -29,7 +29,7 @@ where
 
 impl<T> Row<T>
 where
-    T: Pattern,
+    T: Pattern + svql_query::traits::Component,
 {
     /// Create a new row (typically called by Table).
     pub fn new(idx: u64) -> Self {
@@ -57,7 +57,7 @@ where
     /// Returns `None` if the column doesn't exist or the value is NULL.
     #[inline]
     pub fn wire(&self, name: &str) -> Option<u64> {
-        let idx = T::schema_lut(name)?;
+        let idx = schema_lut(name, T::SCHEMA)?;
 
         self.entry_array
             .entries
@@ -72,7 +72,7 @@ where
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
     pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
-        let idx = T::schema_lut(name)?;
+        let idx = schema_lut(name, T::SCHEMA)?;
         self.entry_array
             .entries
             .get(idx)
@@ -86,14 +86,15 @@ where
 
     /// Set a wire column value.
     pub fn with_wire(mut self, name: &'static str, cell_id: u64) -> Result<Self, QueryError> {
-        let id = T::schema_lut(name).ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
+        let id =
+            schema_lut(name, T::SCHEMA).ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
         self.entry_array.entries[id] = crate::session::ColumnEntry::Cell { id: Some(cell_id) };
         Ok(self)
     }
 
     /// Set a submodule column value (with optional index).
     pub fn with_sub(mut self, name: &'static str, idx: Option<u64>) -> Self {
-        let id = T::schema_lut(name).expect("Schema LUT missing sub column");
+        let id = schema_lut(name, T::SCHEMA).expect("Schema LUT missing sub column");
         self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx };
         self
     }
@@ -101,7 +102,7 @@ where
 
 impl<T> Default for Row<T>
 where
-    T: Pattern,
+    T: Pattern + svql_query::traits::Component,
 {
     fn default() -> Self {
         Self::new(0)
