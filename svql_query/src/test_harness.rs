@@ -103,7 +103,7 @@ where
         // Log match details if available
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {
-                tracing::error!("Match #{}: {}", i, row.);
+                tracing::error!("Match #{}: {}", i, row);
             }
         }
     }

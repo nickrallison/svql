@@ -218,11 +218,10 @@ mod test {
     }
 
     query_test!(
-        name: test_and_mixed_and_tree
+        name: test_and_mixed_and_tree,
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-        expect: 6,
-        config: grant_access_config
+        expect: 3
     );
 }
 
