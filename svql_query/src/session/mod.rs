@@ -20,7 +20,7 @@
 //! - [`ExecutionPlan`], [`ExecutionContext`] - Parallel execution
 
 // --- New modules (Phase 1-3) ---
-// mod cell_id;
+mod cell_id;
 mod error;
 mod execution;
 mod ref_type;
@@ -31,7 +31,7 @@ mod store;
 mod table;
 mod variant_ref;
 
-// pub use cell_id::CellId;
+pub use cell_id::CellId;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;

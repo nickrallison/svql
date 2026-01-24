@@ -166,6 +166,64 @@ where
     }
 }
 
+mod test {
+    use crate::session::CellId;
+
+    #[allow(unused)]
+    use super::*;
+
+    struct AndGate {
+        a: CellId,
+        b: CellId,
+        y: CellId,
+    }
+
+    impl Netlist for AndGate {
+        const MODULE_NAME: &'static str = "and_gate";
+        const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
+        const SCHEMA: &'static [ColumnDef] = &[
+            ColumnDef::new("a", ColumnKind::Cell, false),
+            ColumnDef::new("b", ColumnKind::Cell, false),
+            ColumnDef::new("y", ColumnKind::Cell, false),
+        ];
+
+        fn rehydrate<'a>(
+            row: &Row<Self>,
+            store: &Store,
+            driver: &Driver,
+            key: &DriverKey,
+        ) -> Option<Self>
+        where
+            Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
+        {
+            todo!()
+        }
+    }
+
+    impl Component for AndGate {
+        type Kind = kind::Netlist;
+    }
+
+    #[test]
+    fn test_netlist_driver_key() {
+        struct MyNetlistPattern;
+
+        impl Component for MyNetlistPattern {
+            type Kind = kind::Netlist;
+        }
+
+        impl Netlist for MyNetlistPattern {
+            const MODULE_NAME: &'static str = "MyModule";
+            const FILE_PATH: &'static str = "path/to/netlist.v";
+            const SCHEMA: &'static [ColumnDef] = &[];
+        }
+
+        let driver_key = MyNetlistPattern::driver_key();
+        assert_eq!(driver_key.file_path(), "path/to/netlist.v");
+        assert_eq!(driver_key.module_name(), "MyModule");
+    }
+}
+
 // /// Generates a report node by aggregating source information from all ports.
 // pub fn report_netlist(
 //     path: &Instance,
