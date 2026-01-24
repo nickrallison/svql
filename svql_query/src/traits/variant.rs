@@ -22,6 +22,14 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static;
+
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        Self: Sized;
 }
 
 /// Wrapper to adapt the two-argument `search_table_any` to the single-argument `SearchFn` signature.
@@ -57,10 +65,10 @@ where
     where
         Self: Sized,
     {
-        todo!();
+        <T as Variant>::preload_driver(driver, design_key, config)
     }
 
-    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
+    fn search_table(_ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
         Self: Send + Sync + 'static,
     {
@@ -87,7 +95,7 @@ mod test {
         Wire,
         prelude::ColumnKind,
         traits::{
-            Netlist,
+            Netlist, Pattern,
             composite::{Composite, Connection, Connections, Endpoint},
             schema_lut,
         },
@@ -197,6 +205,17 @@ mod test {
             ]];
             Connections { connections: conns }
         };
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>>
+        where
+            Self: Sized,
+        {
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)
+        }
     }
 
     impl Component for And2Gates {
@@ -221,6 +240,19 @@ mod test {
             Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static,
         {
             todo!()
+        }
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>>
+        where
+            Self: Sized,
+        {
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)?;
+            <And2Gates as Pattern>::preload_driver(driver, design_key, config)?;
+            Ok(())
         }
     }
 

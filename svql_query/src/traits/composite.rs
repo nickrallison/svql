@@ -301,7 +301,11 @@ pub struct Connections {
 #[allow(unused)]
 mod test {
 
-    use crate::{Wire, prelude::ColumnKind, traits::Netlist};
+    use crate::{
+        Wire,
+        prelude::ColumnKind,
+        traits::{Netlist, Pattern},
+    };
 
     use super::*;
 
@@ -418,7 +422,7 @@ mod test {
         where
             Self: Sized,
         {
-            AndGate::preload_driver(driver, design_key, config)
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)
         }
     }
 

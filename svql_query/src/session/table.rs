@@ -3,7 +3,6 @@
 //! `Table<T>` wraps a Polars DataFrame while providing type-safe
 //! access to rows as `Row<T>` and references as `Ref<T>`.
 
-use std::any::TypeId;
 use std::marker::PhantomData;
 
 use polars::prelude::*;
@@ -14,7 +13,7 @@ use crate::traits::{Component, Pattern};
 use super::error::QueryError;
 use super::ref_type::Ref;
 // use super::row::Row;
-use super::schema::{ColumnDef, ColumnKind};
+use super::schema::ColumnKind;
 
 /// A typed wrapper around a DataFrame storing pattern match results.
 ///
