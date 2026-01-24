@@ -3,6 +3,7 @@
 //! `Row<T>` provides an owned copy of a single row's data, avoiding
 //! lifetime complexity when iterating or passing rows around.
 
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::session::{EntryArray, QueryError};
@@ -107,4 +108,11 @@ where
     fn default() -> Self {
         Self::new(0)
     }
+}
+
+impl<T> Display for Row<T>
+where
+    T: Pattern + svql_query::traits::Component,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {}
 }
