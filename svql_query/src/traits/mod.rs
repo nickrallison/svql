@@ -35,7 +35,7 @@ pub fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
 pub fn search_table_any<T>(
     ctx: &ExecutionContext,
     search_table: fn(&ExecutionContext) -> Result<Table<T>, QueryError>,
-) -> Result<Box<dyn AnyTable>, QueryError>
+) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
 where
     T: Send + Sync + 'static,
 {
@@ -73,7 +73,9 @@ pub trait Pattern: Sized + Send + Sync {
         Self: Send + Sync + 'static;
 
     /// Execute the search and return results as a boxed AnyTable.
-    fn search_table_any(ctx: &ExecutionContext) -> Result<Box<dyn AnyTable>, QueryError>
+    fn search_table_any(
+        ctx: &ExecutionContext,
+    ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
     where
         Self: Send + Sync + 'static,
     {
@@ -99,7 +101,7 @@ pub trait Pattern: Sized + Send + Sync {
     /// any referenced submodule rows in the store.
     fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
     where
-        Self: 'static;
+        Self: Component + Send + Sync + 'static;
 }
 
 pub mod kind {
@@ -143,7 +145,7 @@ pub(crate) trait PatternInternal<K>: Sized {
 
     fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
     where
-        Self: Component + 'static;
+        Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
 }
 
 impl<T> Pattern for T

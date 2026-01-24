@@ -67,10 +67,10 @@ impl Store {
     // }
 
     /// Return an iterator over all tables in the store.
-    pub fn tables(&self) -> impl Iterator<Item = (&TypeId, &dyn AnyTable)> {
+    pub fn tables(&self) -> impl Iterator<Item = (&TypeId, &(dyn AnyTable + Send + Sync))> {
         self.tables
             .iter()
-            .map(|(type_id, arc)| (type_id, arc.as_ref()))
+            .map(|(type_id, arc)| (type_id, arc.as_ref() as &(dyn AnyTable + Send + Sync)))
     }
 
     /// Insert a table for pattern type `T`.
@@ -107,7 +107,10 @@ impl Store {
     /// Resolve a reference to a row.
     ///
     /// This is a convenience method that combines `get()` and `Table::row()`.
-    pub fn resolve<T: 'static>(&self, r: Ref<T>) -> Option<Row<T>> {
+    pub fn resolve<T>(&self, r: Ref<T>) -> Option<Row<T>>
+    where
+        T: crate::traits::Pattern + crate::traits::Component + 'static,
+    {
         self.get::<T>().and_then(|table| table.row(r.index()))
     }
 
@@ -119,21 +122,21 @@ impl Store {
     /// Get a type-erased table by TypeId.
     ///
     /// This is useful for generic code that doesn't know the concrete type.
-    pub fn get_any(&self, type_id: TypeId) -> Option<&dyn AnyTable> {
+    pub fn get_any(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.tables.get(&type_id).map(|arc| arc.as_ref())
     }
 
     /// Insert a type-erased table from a Box.
     ///
     /// This is used by the execution engine.
-    pub fn insert_any(&mut self, type_id: TypeId, table: Box<dyn AnyTable>) {
+    pub fn insert_any(&mut self, type_id: TypeId, table: Box<dyn AnyTable + Send + Sync>) {
         self.tables.insert(type_id, Arc::from(table));
     }
 
     /// Insert a type-erased table from an Arc.
     ///
     /// This is used by the execution engine when transferring from OnceLock slots.
-    pub fn insert_arc(&mut self, type_id: TypeId, table: Arc<dyn AnyTable>) {
+    pub fn insert_arc(&mut self, type_id: TypeId, table: Arc<dyn AnyTable + Send + Sync>) {
         self.tables.insert(type_id, table);
     }
 }

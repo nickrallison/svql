@@ -23,7 +23,7 @@ use super::table::AnyTable;
 ///
 /// Search functions take an `ExecutionContext` and return a type-erased table.
 /// They are provided by `Pattern::search()` implementations.
-pub type SearchFn = fn(&ExecutionContext) -> Result<Box<dyn AnyTable>, QueryError>;
+pub type SearchFn = fn(&ExecutionContext) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>;
 
 pub struct ExecInfo {
     pub type_id: std::any::TypeId,
@@ -36,7 +36,7 @@ pub struct ExecInfo {
 ///
 /// Uses `OnceLock<Arc<dyn AnyTable>>` so tables can be shared during execution
 /// and then cloned into the final Store.
-type TableSlot = OnceLock<Arc<dyn AnyTable>>;
+type TableSlot = OnceLock<Arc<dyn AnyTable + Send + Sync>>;
 
 /// A node in the execution DAG.
 #[derive(Debug)]

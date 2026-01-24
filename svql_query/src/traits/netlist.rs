@@ -4,8 +4,8 @@
 
 use crate::{
     prelude::*,
-    session::{ColumnEntry, EntryArray, ExecutionContext, Row, Store},
-    traits::{PatternInternal, kind, schema_lut},
+    session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
+    traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
@@ -14,7 +14,7 @@ use tracing::debug;
 ///
 /// Implemented by types generated with `#[netlist]`. Provides access to
 /// the source file path and module name.
-pub trait Netlist: Sized + Send + Sync + 'static {
+pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'static {
     /// The module name within the source file.
     const MODULE_NAME: &'static str;
 
@@ -67,9 +67,19 @@ pub trait Netlist: Sized + Send + Sync + 'static {
     }
 }
 
+/// Wrapper to adapt the two-argument `search_table_any` to the single-argument `SearchFn` signature.
+fn netlist_search_table_any<T>(
+    ctx: &ExecutionContext,
+) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
+where
+    T: Netlist + Component<Kind = kind::Netlist> + Send + Sync + 'static,
+{
+    search_table_any::<T>(ctx, <T as PatternInternal<kind::Netlist>>::search_table)
+}
+
 impl<T> PatternInternal<kind::Netlist> for T
 where
-    T: Netlist + Send + Sync + 'static,
+    T: Netlist + Component<Kind = kind::Netlist> + Send + Sync + 'static,
 {
     const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
 
@@ -78,7 +88,7 @@ where
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
         type_name: std::any::type_name::<T>(),
-        search_function: <T as Pattern>::search_table_any,
+        search_function: netlist_search_table_any::<T>,
         nested_dependancies: &[],
     };
 
@@ -135,7 +145,7 @@ where
 
     fn rehydrate(_row: &Row<Self>, _store: &Store) -> Option<Self>
     where
-        Self: 'static,
+        Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
         todo!()
     }
