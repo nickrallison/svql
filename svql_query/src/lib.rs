@@ -12,6 +12,7 @@ extern crate self as svql_query;
 // pub mod binding;
 // pub mod instance;
 pub mod prelude;
+pub mod selector;
 // pub mod report;
 pub mod session;
 pub mod traits;

@@ -244,7 +244,12 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
 
-    /// Get the CellId at the given row index and column name.
+    /// Get the TypeId of the pattern stored in this table.
+    fn pattern_type_id(&self) -> std::any::TypeId;
+
+    /// Get a submodule reference (Row Index + TypeId) for a given column.
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u64, std::any::TypeId)>;
+
     fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64>;
 }
 
@@ -276,5 +281,21 @@ where
         let col = self.df.column(col_name).ok()?;
         let ca = col.u64().ok()?;
         ca.get(row_idx).map(|raw| raw as u64)
+    }
+
+    fn pattern_type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<T>()
+    }
+
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u64, std::any::TypeId)> {
+        let col_idx = T::schema().index_of(col_name)?;
+        let col_def = T::schema().column(col_idx);
+        let target_type = col_def.as_submodule()?;
+
+        let col = self.df.column(col_name).ok()?;
+        let ca = col.u64().ok()?;
+        let val = ca.get(row_idx)?;
+
+        Some((val as u64, target_type))
     }
 }

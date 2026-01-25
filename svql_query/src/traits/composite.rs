@@ -1,8 +1,8 @@
-use itertools::Itertools;
 use svql_driver::{Driver, DriverKey};
 
 use crate::{
     prelude::{ColumnDef, ColumnKind, QueryError, Table},
+    selector::Selector,
     session::{AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store},
     traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
@@ -16,6 +16,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     const CONNECTIONS: Connections;
 
+    const ALIASES: &'static [(&'static str, Endpoint)];
+
     const DEPENDANCIES: &'static [&'static ExecInfo];
 
     /// Access the smart Schema wrapper.
@@ -23,71 +25,117 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     /// Core logic to compose sub-matches into a result table.
     ///
+    /// Performs incremental joins: each submodule is joined one at a time, with
+    /// invalid matches filtered out after each step. The join order is currently
+    /// determined by the order of submodule indices, but the implementation is
+    /// designed to support arbitrary ordering for future optimization.
+    ///
     /// # Arguments
     /// * `ctx` - The execution context (access to driver, config, etc).
-    /// * `dep_tables` - A slice aligned 1:1 with `Self::DEFS`.
-    ///   - If `DEFS[i]` is a `Sub`, `dep_tables[i]` contains `Some(table)`.
-    ///   - If `DEFS[i]` is a `Cell` (Wire), `dep_tables[i]` is `None`.
+    /// * `dep_tables` - A slice aligned 1:1 with `schema.submodules`.
     fn compose(
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
-        // 1. Use pre-computed submodule indices from the smart Schema
         let schema = Self::schema();
         let sub_indices = &schema.submodules;
 
-        for idx in sub_indices.iter() {
-            println!("Submodule column at index: {}", idx);
-        }
-
-        // 2. Prepare Iterators (Same logic, but using sub_indices)
-        let mut ranges = Vec::with_capacity(sub_indices.len());
-
+        // Early exit: any required (non-nullable) empty table means no results
         for (i, &col_idx) in sub_indices.iter().enumerate() {
-            let table = dep_tables[i];
+            if dep_tables[i].is_empty() && !schema.column(col_idx).nullable {
+                return Table::new(vec![]);
+            }
+        }
 
-            if table.is_empty() {
-                // If a required submodule has no matches, the composite has no matches.
-                // (Assumes non-nullable for now)
-                if !schema.column(col_idx).nullable {
-                    return Ok(Table::new(vec![])?);
+        // Build join order - currently sequential, but decoupled for future optimization
+        let join_order: Vec<usize> = (0..sub_indices.len()).collect();
+
+        // Seed with partial entries from the first submodule
+        let first_idx = join_order[0];
+        let first_table = dep_tables[first_idx];
+        let mut entries: Vec<EntryArray> = (0..first_table.len() as u64)
+            .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
+            .collect();
+
+        // Incrementally join each remaining submodule, filtering after each
+        for &join_idx in &join_order[1..] {
+            let table = dep_tables[join_idx];
+            entries = Self::join_and_filter(entries, join_idx, table, sub_indices, dep_tables, ctx);
+
+            if entries.is_empty() {
+                return Table::new(vec![]);
+            }
+        }
+
+        let final_entries: Vec<EntryArray> = entries
+            .into_iter()
+            .map(|mut entry| {
+                // Create temp row for resolution
+                let row = Row::<Self> {
+                    idx: 0,
+                    entry_array: entry.clone(),
+                    _marker: std::marker::PhantomData,
+                };
+
+                for (alias_col_name, endpoint) in Self::ALIASES {
+                    // Resolve the deep path
+                    let val =
+                        if let Some(cell_id) = endpoint.resolve_endpoint(&row, dep_tables, ctx) {
+                            ColumnEntry::Cell { id: Some(cell_id) }
+                        } else {
+                            ColumnEntry::Cell { id: None }
+                        };
+
+                    // Write to local column (requires looking up index, but this is done once per result row, not per candidate pair)
+                    if let Some(idx) = Self::schema().index_of(alias_col_name) {
+                        entry.entries[idx] = val;
+                    }
                 }
-            }
-            ranges.push(0..table.len() as u64);
-        }
+                entry
+            })
+            .collect();
 
-        // 3. Perform Cartesian Product
-        // This creates an iterator of Vec<u64> (row indices), one for each submodule.
-        let product_iter = ranges.into_iter().multi_cartesian_product();
+        Table::new(final_entries)
+    }
 
-        // 4. Build and Validate Rows
-        let mut valid_rows = Vec::new();
+    /// Create a partial entry array with a single submodule slot populated.
+    fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u64) -> EntryArray {
+        let mut entries = vec![ColumnEntry::Metadata { id: None }; Self::SCHEMA_SIZE];
+        entries[sub_indices[join_idx]] = ColumnEntry::Sub { id: Some(row_idx) };
+        EntryArray::new(entries)
+    }
 
-        // Pre-allocate a template row with Metadata/None to avoid re-allocating per iteration
-        let row_template = vec![ColumnEntry::Metadata { id: None }; Self::SCHEMA_SIZE];
+    /// Join existing partial entries with a new submodule table, filtering invalid combinations.
+    fn join_and_filter(
+        entries: Vec<EntryArray>,
+        join_idx: usize,
+        table: &(dyn AnyTable + Send + Sync),
+        sub_indices: &[usize],
+        dep_tables: &[&(dyn AnyTable + Send + Sync)],
+        ctx: &ExecutionContext,
+    ) -> Vec<EntryArray> {
+        let col_idx = sub_indices[join_idx];
 
-        for indices in product_iter {
-            let mut entries = row_template.clone();
+        entries
+            .into_iter()
+            .flat_map(|entry| {
+                (0..table.len() as u64).filter_map(move |new_row_idx| {
+                    let mut candidate = entry.clone();
+                    candidate.entries[col_idx] = ColumnEntry::Sub {
+                        id: Some(new_row_idx),
+                    };
 
-            // Map the Cartesian product indices back to their specific column positions
-            for (i, &row_idx) in indices.iter().enumerate() {
-                let schema_col_idx = sub_indices[i];
-                entries[schema_col_idx] = ColumnEntry::Sub { id: Some(row_idx) };
-            }
+                    let row = Row::<Self> {
+                        idx: 0,
+                        entry_array: candidate.clone(),
+                        _marker: std::marker::PhantomData,
+                    };
 
-            let row = Row::<Self> {
-                idx: 0, // Placeholder
-                entry_array: EntryArray::new(entries),
-                _marker: std::marker::PhantomData,
-            };
-
-            // 5. Validate
-            if Self::validate(&row, dep_tables, ctx.driver(), &ctx.design_key()) {
-                valid_rows.push(row.entry_array);
-            }
-        }
-
-        Table::new(valid_rows)
+                    // FIX: Pass ctx to validate
+                    Self::validate(&row, dep_tables, ctx).then_some(candidate)
+                })
+            })
+            .collect()
     }
 
     /// Validates a row against connectivity constraints.
@@ -97,9 +145,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     fn validate(
         row: &Row<Self>,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
-        driver: &Driver,
-        key: &DriverKey,
+        ctx: &ExecutionContext,
     ) -> bool {
+        let driver = ctx.driver();
+        let key = &ctx.design_key();
+
         // 1. Access Graph
         // Note: In a hot loop, you might want to hoist this graph lookup out of validate
         // and pass the `GraphIndex` directly, but this signature matches the trait.
@@ -117,13 +167,17 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
             for connection in *group {
                 // Pass the pre-fetched tables to resolve_endpoint
-                let src_wire = connection.from.resolve_endpoint(row, dep_tables);
-                let dst_wire = connection.to.resolve_endpoint(row, dep_tables);
+                let src_wire = connection.from.resolve_endpoint(row, dep_tables, ctx);
+                let dst_wire = connection.to.resolve_endpoint(row, dep_tables, ctx);
 
                 match (src_wire, dst_wire) {
                     (Some(s), Some(d)) => {
                         // Check physical connectivity in the netlist graph
-                        if graph.is_connected(s, d) {
+                        // if graph.is_connected(s, d) {
+                        //     group_satisfied = true;
+                        //     break;
+                        // }
+                        if s == d {
                             group_satisfied = true;
                             break;
                         }
@@ -247,53 +301,80 @@ where
 
 #[derive(Debug, Clone, Copy)]
 pub struct Endpoint {
-    /// The index of the column in Self::SCHEMA.
-    /// - If SCHEMA[idx] is a `Sub`, this refers to a port on that submodule.
-    /// - If SCHEMA[idx] is a `Cell` (Input/Output), this refers to the composite's own wire.
-    pub column_idx: usize,
-    /// The name of the port.
-    /// - If target is a Submodule, this is the port name on that submodule (e.g., "y").
-    /// - If target is Self (Cell), this is ignored (or should match the column name).
-    pub port_name: &'static str,
+    pub selector: Selector,
 }
 
 impl Endpoint {
     /// Resolves an endpoint to a physical Cell ID.
-    fn resolve_endpoint<T>(
+    pub fn resolve_endpoint<T>(
         &self,
         row: &Row<T>,
-        // This signature must match exactly what is passed in validate
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
+        ctx: &ExecutionContext,
     ) -> Option<u64>
     where
         T: Composite + Component,
     {
-        // 1. Get the value from the current Composite Row
-        let entry = row.entry_array.entries.get(self.column_idx)?;
-
-        // 2. Check the column definition
-        let col_def = T::schema().column(self.column_idx);
-
-        match (entry, &col_def.kind) {
-            // === CASE 1: Endpoint is on a Submodule ===
-            (ColumnEntry::Sub { id: Some(ref_idx) }, ColumnKind::Sub(_)) => {
-                // Retrieve the pre-fetched table for this column
-                let sub_idx = T::schema()
-                    .submodules
-                    .iter()
-                    .position(|&idx| idx == self.column_idx)?;
-                let table = dep_tables.get(sub_idx)?;
-
-                // Ask that table for the cell ID at the specific row and port name
-                table.get_cell_id(*ref_idx as usize, self.port_name)
-            }
-
-            // === CASE 2: Endpoint is on Self ===
-            (ColumnEntry::Cell { id: Some(cell_id) }, ColumnKind::Cell) => Some(*cell_id),
-
-            // === CASE 3: Missing Data ===
-            _ => None,
+        let path = self.selector.path;
+        if path.is_empty() {
+            return None;
         }
+
+        // 1. Resolve Head (Local Schema Lookup)
+        let head_name = path[0];
+
+        // Note: This string lookup happens per-row.
+        // See "Aliases" section below for how to optimize this.
+        let col_idx = T::schema().index_of(head_name)?;
+        let col_def = T::schema().column(col_idx);
+        let entry = row.entry_array.entries.get(col_idx)?;
+
+        // 2. Check if we are done (Path length 1)
+        if path.len() == 1 {
+            return match entry {
+                ColumnEntry::Cell { id } => *id,
+                _ => None, // Path ended but it wasn't a cell
+            };
+        }
+
+        // 3. Prepare for Traversal (Head must be a Submodule)
+        let (mut current_row_idx, mut current_type_id) = match (entry, &col_def.kind) {
+            (ColumnEntry::Sub { id: Some(id) }, ColumnKind::Sub(tid)) => (*id, *tid),
+            _ => return None,
+        };
+
+        // Optimization: Check if the head is in dep_tables (immediate child)
+        let mut next_table: Option<&(dyn AnyTable + Send + Sync)> = None;
+
+        // Map column index to dependency index
+        if let Some(dep_idx) = T::schema().submodules.iter().position(|&i| i == col_idx) {
+            next_table = Some(dep_tables[dep_idx]);
+        }
+
+        // 4. Traverse Tail
+        let mut path_iter = path[1..].iter().peekable();
+
+        while let Some(segment_name) = path_iter.next() {
+            // Fetch table (from optimization or global context)
+            let table = match next_table {
+                Some(t) => t,
+                None => ctx.get_any_table(current_type_id)?,
+            };
+
+            if path_iter.peek().is_none() {
+                // Final segment: Must be a Cell
+                return table.get_cell_id(current_row_idx as usize, segment_name);
+            } else {
+                // Intermediate segment: Must be a Submodule
+                let (next_idx, next_tid) =
+                    table.get_sub_ref(current_row_idx as usize, segment_name)?;
+                current_row_idx = next_idx;
+                current_type_id = next_tid;
+                next_table = None; // Reset optimization
+            }
+        }
+
+        None
     }
 }
 
@@ -374,30 +455,15 @@ mod test {
     pub struct And2Gates {
         and1: AndGate,
         and2: AndGate,
-
-        and1_a: Wire,
-        and1_b: Wire,
-        and1_y: Wire,
-
-        and2_a: Wire,
-        and2_b: Wire,
-        and2_y: Wire,
     }
 
     impl Composite for And2Gates {
         const DEFS: &'static [ColumnDef] = &[
-            // 0: Submodule and1
             ColumnDef::sub::<AndGate>("and1"),
-            // 1: Submodule and2
             ColumnDef::sub::<AndGate>("and2"),
-            // 2-7: Wires (Exposed ports for the composite)
-            ColumnDef::wire("and1_a"),
-            ColumnDef::wire("and1_b"),
-            ColumnDef::wire("and1_y"),
-            ColumnDef::wire("and2_a"),
-            ColumnDef::wire("and2_b"),
-            ColumnDef::wire("and2_y"),
         ];
+
+        const ALIASES: &'static [(&'static str, Endpoint)] = &[];
 
         fn schema() -> &'static crate::session::PatternSchema {
             static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
@@ -419,28 +485,21 @@ mod test {
 
         const CONNECTIONS: Connections = {
             let conns: &'static [&'static [Connection]] = &[&[
+                // Connect and1.y -> and2.a
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("b", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "b",
+                        selector: Selector::new(&["and1", "y"]),
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "y",
+                        selector: Selector::new(&["and2", "a"]),
                     },
                 },
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("a", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "a",
+                        selector: Selector::new(&["and1", "y"]),
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "y",
+                        selector: Selector::new(&["and2", "b"]),
                     },
                 },
             ]];
@@ -469,7 +528,7 @@ mod test {
         name: test_and2gates_small_and_tree_dedupe_none,
         query: And2Gates,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 6,
+        expect: 4,
         config: |config_builder| config_builder.dedupe(Dedupe::None)
     );
 
@@ -477,7 +536,7 @@ mod test {
         name: test_and2gates_small_and_tree_dedupe_all,
         query: And2Gates,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 3,
+        expect: 2,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
 }

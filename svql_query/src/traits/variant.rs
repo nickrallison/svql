@@ -101,6 +101,7 @@ mod test {
     use crate::{
         Wire,
         prelude::ColumnKind,
+        selector::Selector,
         session::ExecInfo,
         traits::{
             Netlist, Pattern,
@@ -166,30 +167,15 @@ mod test {
     pub struct And2Gates {
         and1: AndGate,
         and2: AndGate,
-
-        and1_a: Wire,
-        and1_b: Wire,
-        and1_y: Wire,
-
-        and2_a: Wire,
-        and2_b: Wire,
-        and2_y: Wire,
     }
 
     impl Composite for And2Gates {
         const DEFS: &'static [ColumnDef] = &[
-            // 0: Submodule and1
             ColumnDef::sub::<AndGate>("and1"),
-            // 1: Submodule and2
             ColumnDef::sub::<AndGate>("and2"),
-            // 2-7: Wires (Exposed ports for the composite)
-            ColumnDef::wire("and1_a"),
-            ColumnDef::wire("and1_b"),
-            ColumnDef::wire("and1_y"),
-            ColumnDef::wire("and2_a"),
-            ColumnDef::wire("and2_b"),
-            ColumnDef::wire("and2_y"),
         ];
+
+        const ALIASES: &'static [(&'static str, Endpoint)] = &[];
 
         fn schema() -> &'static crate::session::PatternSchema {
             static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
@@ -211,28 +197,21 @@ mod test {
 
         const CONNECTIONS: Connections = {
             let conns: &'static [&'static [Connection]] = &[&[
+                // Connect and1.y -> and2.a
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("b", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "b",
+                        selector: Selector::new(&["and1", "y"]),
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "y",
+                        selector: Selector::new(&["and2", "a"]),
                     },
                 },
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("a", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "a",
+                        selector: Selector::new(&["and1", "y"]),
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
-                            .expect("Should have successfully looked up col"),
-                        port_name: "y",
+                        selector: Selector::new(&["and2", "b"]),
                     },
                 },
             ]];

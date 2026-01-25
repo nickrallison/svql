@@ -70,6 +70,10 @@ where
 
     let container = spec.get_design(&driver, &config)?;
 
+    // for cell in container.index().cells_topo() {
+    //     tracing::error!("Cell: {:#?}", cell);
+    // }
+
     // Execute query using the new DataFrame API
     let store = svql_query::run_query::<P>(&driver, &spec.get_key(), &config)?;
 
@@ -79,6 +83,12 @@ where
     let stored_count = rows.len();
 
     if stored_count != spec.expected_count {
+        tracing::error!(
+            "Expected {} matches, found {} for pattern {}",
+            spec.expected_count,
+            stored_count,
+            std::any::type_name::<P>()
+        );
         let mut rehydrated: Vec<P> = Vec::new();
         for row in rows.iter() {
             let item = P::rehydrate(row, &store, &driver, &spec.get_key());

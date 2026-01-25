@@ -7,8 +7,16 @@ use crate::{
     session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
-use svql_subgraph::SubgraphMatcher;
+use prjunnamed_netlist::Value;
+use svql_subgraph::{SubgraphMatcher, graph_index};
 use tracing::debug;
+
+fn value_to_cell_id(value: &Value) -> Option<u64> {
+    match value.as_net() {
+        Some(net) => net.as_cell_index().map(|idx| idx as u64).ok(),
+        None => None,
+    }
+}
 
 /// Trait for netlist-based pattern components.
 ///
@@ -45,12 +53,28 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
             let needle_cell = needle_cell_wrapper.get();
             match needle_cell {
-                prjunnamed_netlist::Cell::Input(name, _)
-                | prjunnamed_netlist::Cell::Output(name, _) => {
+                prjunnamed_netlist::Cell::Input(name, _) => {
                     let col_idx = Self::schema()
                         .index_of(name)
                         .expect("Needle Cell name should exist in schema");
                     row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u64);
+                }
+                prjunnamed_netlist::Cell::Output(name, output_value) => {
+                    let col_idx = Self::schema()
+                        .index_of(name)
+                        .expect("Needle Cell name should exist in schema");
+                    let needle_output_driver_id: u64 =
+                        value_to_cell_id(output_value).expect("Output should have driver");
+                    let haystack_output_driver_wrapper = assignment
+                        .needle_mapping()
+                        .iter()
+                        .find(|(needle_cell_wrapper, _haystack_cell_wrapper)| {
+                            needle_cell_wrapper.debug_index() as u64 == needle_output_driver_id
+                        })
+                        .map(|(_needle_cell_wrapper, haystack_cell_wrapper)| haystack_cell_wrapper)
+                        .expect("Should find haystack driver for output");
+
+                    row_match[col_idx] = Some(haystack_output_driver_wrapper.debug_index() as u64);
                 }
                 _ => continue,
             }
