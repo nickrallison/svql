@@ -221,8 +221,13 @@ impl<T> std::fmt::Display for Table<T> {
             "╚══════════════════════════════════════════════════════════════════════════════"
         )?;
 
-        // Use Polars' built-in DataFrame display which handles formatting beautifully
-        write!(f, "{}", self.df)?;
+        // Use Polars' built-in DataFrame display with row index for easier reference
+        let df_with_row = self
+            .df
+            .clone()
+            .with_row_index("row".into(), None)
+            .unwrap_or(self.df.clone());
+        write!(f, "{}", df_with_row)?;
 
         Ok(())
     }

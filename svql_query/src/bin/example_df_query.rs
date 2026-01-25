@@ -160,14 +160,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let container = spec.get_design(&driver, &config)?;
 
-    // for cell in container.index().cells_topo() {
-    //     tracing::error!("Cell: {:#?}", cell);
-    // }
+    for cell in container.index().cells_topo() {
+        println!("Cell: {:#?}", cell);
+    }
 
     // Execute query using the new DataFrame API
     let store = svql_query::run_query::<And2Gates>(&driver, &spec.get_key(), &config)?;
 
-    for (tid, table) in store.tables() {
+    for (_, table) in store.tables() {
         println!("Table: {}", table);
     }
 
