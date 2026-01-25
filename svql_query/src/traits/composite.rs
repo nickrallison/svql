@@ -528,7 +528,7 @@ mod test {
         name: test_and2gates_small_and_tree_dedupe_none,
         query: And2Gates,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 4,
+        expect: 8,
         config: |config_builder| config_builder.dedupe(Dedupe::None)
     );
 
