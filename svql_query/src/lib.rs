@@ -68,10 +68,3 @@ pub fn cell_id_to_wrapper<'a>(
     let cell_wrapper = index.get_cell_by_id(cell_id as usize)?.clone();
     Some(cell_wrapper)
 }
-
-/// Represents a connection between two wires.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Connection {
-    pub from: u64,
-    pub to: u64,
-}

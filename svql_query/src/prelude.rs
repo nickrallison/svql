@@ -5,7 +5,6 @@ pub use svql_subgraph as subgraph;
 pub use tracing;
 
 pub use crate::{
-    Connection,
     // binding::PortResolver,
     // primitives::dff::*,
     // primitives::gates::*,
