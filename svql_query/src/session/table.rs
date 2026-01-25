@@ -60,7 +60,8 @@ where
         T: Pattern,
     {
         if rows.is_empty() {
-            let cols: Vec<Column> = T::SCHEMA
+            let cols: Vec<Column> = T::schema()
+                .columns()
                 .iter()
                 .map(|col_def| col_def.into_polars_column())
                 .collect();
@@ -75,7 +76,7 @@ where
 
         // 1. Handle structural columns from the RowMatch array
         for i in 0..T::SCHEMA_SIZE {
-            let col_def = &T::SCHEMA[i];
+            let col_def = T::schema().column(i);
             let series_data: Vec<Option<u64>> =
                 rows.iter().map(|r| r.entries[i].as_u64()).collect();
             columns.push(Column::new(
@@ -93,7 +94,8 @@ where
 
     /// Deduplicate rows in the table.
     pub fn deduplicate(&self) -> Result<Self, QueryError> {
-        let subset: Vec<String> = T::SCHEMA.iter().map(|c| c.name.to_string()).collect();
+        let subset: Vec<String> =
+            T::schema().columns().iter().map(|c| c.name.to_string()).collect();
 
         let df = self.df.clone().unique::<Vec<String>, String>(
             Some(&subset),
@@ -133,7 +135,8 @@ where
 
     pub fn get_entry(&self, row_idx: usize, col_name: &str) -> Option<ColumnEntry> {
         let col = self.df.column(col_name).ok()?;
-        match T::SCHEMA.iter().find(|c| c.name == col_name)?.kind {
+        let idx = T::schema().index_of(col_name)?;
+        match T::schema().column(idx).kind {
             ColumnKind::Cell => {
                 let ca = col.u64().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw as u64);
@@ -164,7 +167,7 @@ where
         let mut row = Row::new(row_idx);
 
         // Extract wire and sub columns
-        for (idx, col) in T::SCHEMA.iter().enumerate() {
+        for (idx, col) in T::schema().columns().iter().enumerate() {
             row.entry_array.entries[idx] = self.get_entry(row_idx_usize, col.name)?;
         }
 
@@ -195,7 +198,7 @@ where
         f.debug_struct("Table")
             .field("type", &std::any::type_name::<T>())
             .field("len", &self.len())
-            .field("columns", &T::SCHEMA)
+            .field("columns", &T::schema().columns())
             .field("df", &self.df)
             .finish()
     }
@@ -259,13 +262,16 @@ where
     }
 
     fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64> {
-        let col = self.df.column(col_name).ok()?;
-        match T::SCHEMA.iter().find(|c| c.name == col_name)?.kind {
-            ColumnKind::Cell => {
-                let ca = col.u64().ok()?;
-                ca.get(row_idx).map(|raw| raw as u64)
-            }
-            _ => None,
+        // O(1) lookup
+        let col_idx = T::schema().index_of(col_name)?;
+
+        // Check if it is actually a cell column
+        if !T::schema().column(col_idx).kind.is_wire() {
+            return None;
         }
+
+        let col = self.df.column(col_name).ok()?;
+        let ca = col.u64().ok()?;
+        ca.get(row_idx).map(|raw| raw as u64)
     }
 }

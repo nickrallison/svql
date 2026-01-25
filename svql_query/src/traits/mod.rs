@@ -12,8 +12,8 @@ pub use netlist::Netlist;
 
 use crate::prelude::*;
 use crate::session::{
-    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, PortDirection, QueryError, Row,
-    Store, Table,
+    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, PatternSchema, PortDirection,
+    QueryError, Row, Store, Table,
 };
 
 /// Returns the column index for a given column name in the schema.
@@ -41,47 +41,45 @@ where
 
 /// The central abstraction for query components.
 pub trait Pattern: Sized + Send + Sync {
-    /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize;
+    /// The raw column definitions.
+    const DEFS: &'static [ColumnDef];
 
-    /// Schema definition for DataFrame storage.
-    const SCHEMA: &'static [ColumnDef];
+    /// Size of the schema (number of columns).
+    const SCHEMA_SIZE: usize = Self::DEFS.len();
 
     /// Info needed to execute this pattern. Used to build the ExecutionPlan DAG.
     const EXEC_INFO: &'static ExecInfo;
 
+    /// Access the smart Schema wrapper.
+    ///
+    /// Implementation should use a `static OnceLock<Schema>` to ensure
+    /// the schema is built only once.
+    fn schema() -> &'static PatternSchema;
+
     /// Get the indices of all Input columns in the Schema.
     fn input_indices() -> Vec<usize> {
-        Self::SCHEMA
-            .iter()
-            .enumerate()
-            .filter(|(_, col)| col.direction == PortDirection::Input)
-            .map(|(i, _)| i)
-            .collect()
+        Self::schema().inputs.clone()
     }
 
     /// Get the indices of all Output columns in the Schema.
     fn output_indices() -> Vec<usize> {
-        Self::SCHEMA
-            .iter()
-            .enumerate()
-            .filter(|(_, col)| col.direction == PortDirection::Output)
-            .map(|(i, _)| i)
-            .collect()
+        Self::schema().outputs.clone()
     }
 
     /// Check if a specific column name is an Output.
     fn is_output(name: &str) -> bool {
-        Self::SCHEMA
-            .iter()
-            .any(|col| col.name == name && col.direction == PortDirection::Output)
+        Self::schema()
+            .get(name)
+            .map(|col| col.direction == PortDirection::Output)
+            .unwrap_or(false)
     }
 
     /// Check if a specific column name is an Input.
     fn is_input(name: &str) -> bool {
-        Self::SCHEMA
-            .iter()
-            .any(|col| col.name == name && col.direction == PortDirection::Input)
+        Self::schema()
+            .get(name)
+            .map(|col| col.direction == PortDirection::Input)
+            .unwrap_or(false)
     }
 
     /// Returns the static type name of the component.
@@ -162,11 +160,13 @@ impl Component for kind::Variant {
 }
 
 pub trait PatternInternal<K>: Sized {
-    const SCHEMA_SIZE: usize;
+    const DEFS: &'static [ColumnDef];
 
-    const SCHEMA: &'static [ColumnDef];
+    const SCHEMA_SIZE: usize = Self::DEFS.len();
 
     const EXEC_INFO: &'static crate::session::ExecInfo;
+
+    fn schema() -> &'static crate::session::PatternSchema;
 
     fn preload_driver(
         driver: &Driver,
@@ -190,15 +190,17 @@ pub trait PatternInternal<K>: Sized {
 
 impl<T> Pattern for T
 where
-    T: Component,                // It has a Kind
-    T: PatternInternal<T::Kind>, // It implements the logic for that Kind
+    T: Component,
+    T: PatternInternal<T::Kind>,
     T: Send + Sync + 'static,
 {
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
-
-    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+    const DEFS: &'static [ColumnDef] = T::DEFS;
 
     const EXEC_INFO: &'static crate::session::ExecInfo = T::EXEC_INFO;
+
+    fn schema() -> &'static PatternSchema {
+        T::schema()
+    }
 
     fn preload_driver(
         driver: &Driver,

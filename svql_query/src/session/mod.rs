@@ -21,7 +21,7 @@ pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 pub use row::Row;
-pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray, PortDirection};
+pub use schema::{ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, PortDirection};
 pub use store::Store;
 pub use table::{AnyTable, Table};
 pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};

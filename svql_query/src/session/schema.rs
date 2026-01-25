@@ -3,7 +3,96 @@
 //! These types define the schema for pattern result tables, including
 //! wire references, submodule references, and metadata columns.
 
+use ahash::AHashMap;
 use std::any::TypeId;
+use std::collections::HashMap;
+use std::sync::OnceLock; // Assuming ahash is available, otherwise std HashMap
+
+/// A smart wrapper around the raw column definitions.
+///
+/// This struct is initialized once per Pattern type and provides O(1) lookups
+/// and pre-computed index lists to avoid repeated linear scans during execution.
+#[derive(Debug)]
+pub struct PatternSchema {
+    /// The raw column definitions (source of truth).
+    pub defs: &'static [ColumnDef],
+
+    /// Fast lookup from column name to index.
+    pub name_map: AHashMap<&'static str, usize>,
+
+    /// Indices of all columns that are Submodules.
+    pub submodules: Vec<usize>,
+
+    /// Indices of all columns that are Inputs.
+    pub inputs: Vec<usize>,
+
+    /// Indices of all columns that are Outputs.
+    pub outputs: Vec<usize>,
+}
+
+impl PatternSchema {
+    /// Get a column definition by index.
+    #[inline]
+    pub fn column(&self, index: usize) -> &ColumnDef {
+        &self.defs[index]
+    }
+
+    /// Get all column definitions.
+    #[inline]
+    pub fn columns(&self) -> &[ColumnDef] {
+        self.defs
+    }
+
+    /// Construct a new PatternSchema from raw definitions.
+    /// This is typically called inside a `OnceLock::get_or_init`.
+    pub fn new(defs: &'static [ColumnDef]) -> Self {
+        let mut name_map = AHashMap::new();
+        let mut submodules = Vec::new();
+        let mut inputs = Vec::new();
+        let mut outputs = Vec::new();
+
+        for (i, col) in defs.iter().enumerate() {
+            name_map.insert(col.name, i);
+
+            if col.kind.is_sub() {
+                submodules.push(i);
+            }
+
+            match col.direction {
+                PortDirection::Input => inputs.push(i),
+                PortDirection::Output => outputs.push(i),
+                _ => {}
+            }
+        }
+
+        Self {
+            defs,
+            name_map,
+            submodules,
+            inputs,
+            outputs,
+        }
+    }
+
+    /// Get the index of a column by name in O(1).
+    #[inline]
+    pub fn index_of(&self, name: &str) -> Option<usize> {
+        self.name_map.get(name).copied()
+    }
+
+    /// Get the definition of a column by name in O(1).
+    #[inline]
+    pub fn get(&self, name: &str) -> Option<&ColumnDef> {
+        let idx = self.index_of(name)?;
+        Some(&self.defs[idx])
+    }
+
+    /// Get the definition by index (bounds checked).
+    #[inline]
+    pub fn get_by_index(&self, index: usize) -> Option<&ColumnDef> {
+        self.defs.get(index)
+    }
+}
 
 /// The kind of data stored in a column.
 #[derive(Debug, Clone, PartialEq, Eq)]

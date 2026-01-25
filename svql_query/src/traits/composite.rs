@@ -4,49 +4,47 @@ use svql_driver::{Driver, DriverKey};
 use crate::{
     prelude::{ColumnDef, ColumnKind, QueryError, Table},
     session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, Row, Store},
-    traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
+    traits::{Component, Pattern, PatternInternal, kind, schema_lut, search_table_any},
 };
 
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
     /// Schema definition for DataFrame storage.
-    const SCHEMA: &'static [ColumnDef];
+    const DEFS: &'static [ColumnDef];
 
     /// Size of the schema (number of columns).w
-    const SCHEMA_SIZE: usize = Self::SCHEMA.len();
+    const SCHEMA_SIZE: usize = Self::DEFS.len();
 
     const CONNECTIONS: Connections;
+
+    /// Access the smart Schema wrapper.
+    fn schema() -> &'static crate::session::PatternSchema;
 
     /// Core logic to compose sub-matches into a result table.
     ///
     /// # Arguments
     /// * `ctx` - The execution context (access to driver, config, etc).
-    /// * `dep_tables` - A slice aligned 1:1 with `Self::SCHEMA`.
-    ///   - If `SCHEMA[i]` is a `Sub`, `dep_tables[i]` contains `Some(table)`.
-    ///   - If `SCHEMA[i]` is a `Cell` (Wire), `dep_tables[i]` is `None`.
+    /// * `dep_tables` - A slice aligned 1:1 with `Self::DEFS`.
+    ///   - If `DEFS[i]` is a `Sub`, `dep_tables[i]` contains `Some(table)`.
+    ///   - If `DEFS[i]` is a `Cell` (Wire), `dep_tables[i]` is `None`.
     fn compose(
         ctx: &ExecutionContext,
         dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
     ) -> Result<Table<Self>, QueryError> {
-        // 1. Dynamically identify which columns are submodules
-        // We store the schema index for each submodule found.
-        let sub_indices: Vec<usize> = Self::SCHEMA
-            .iter()
-            .enumerate()
-            .filter(|(_, col)| col.kind.is_sub())
-            .map(|(i, _)| i)
-            .collect();
+        // 1. Use pre-computed submodule indices from the smart Schema
+        let schema = Self::schema();
+        let sub_indices = &schema.submodules;
 
-        // 2. Prepare Iterators for the Cartesian Product
+        // 2. Prepare Iterators (Same logic, but using sub_indices)
         let mut ranges = Vec::with_capacity(sub_indices.len());
 
-        for &col_idx in &sub_indices {
+        for &col_idx in sub_indices {
             let table = dep_tables[col_idx]
                 .expect("Schema defines a Sub column but no table was provided in dep_tables");
 
             if table.is_empty() {
                 // If a required submodule has no matches, the composite has no matches.
                 // (Assumes non-nullable for now)
-                if !Self::SCHEMA[col_idx].nullable {
+                if !schema.column(col_idx).nullable {
                     return Ok(Table::new(vec![])?);
                 }
             }
@@ -178,9 +176,9 @@ impl<T> PatternInternal<kind::Composite> for T
 where
     T: Composite + Component<Kind = kind::Composite> + Send + Sync + 'static,
 {
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+    const DEFS: &'static [ColumnDef] = T::DEFS;
 
-    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
 
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
@@ -188,6 +186,10 @@ where
         search_function: composite_search_table_any::<T>,
         nested_dependancies: &[],
     };
+
+    fn schema() -> &'static crate::session::PatternSchema {
+        T::schema()
+    }
 
     fn preload_driver(
         driver: &Driver,
@@ -208,7 +210,7 @@ where
         let mut dep_tables = Vec::with_capacity(T::SCHEMA_SIZE);
 
         // 2. Iterate over the schema to fetch dependencies
-        for col in T::SCHEMA {
+        for col in T::schema().columns() {
             match col.kind {
                 ColumnKind::Sub(type_id) => {
                     // Fetch the pre-computed table from the ExecutionContext
@@ -267,7 +269,7 @@ impl Endpoint {
         let entry = row.entry_array.entries.get(self.column_idx)?;
 
         // 2. Check the column definition
-        let col_def = &T::SCHEMA[self.column_idx];
+        let col_def = T::schema().column(self.column_idx);
 
         match (entry, &col_def.kind) {
             // === CASE 1: Endpoint is on a Submodule ===
@@ -322,11 +324,17 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        const SCHEMA: &'static [ColumnDef] = &[
+        const DEFS: &'static [ColumnDef] = &[
             ColumnDef::new("a", ColumnKind::Cell, false),
             ColumnDef::new("b", ColumnKind::Cell, false),
             ColumnDef::new("y", ColumnKind::Cell, false),
         ];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
@@ -370,7 +378,7 @@ mod test {
     }
 
     impl Composite for And2Gates {
-        const SCHEMA: &'static [ColumnDef] = &[
+        const DEFS: &'static [ColumnDef] = &[
             // 0: Submodule and1
             ColumnDef::sub::<AndGate>("and1"),
             // 1: Submodule and2
@@ -383,6 +391,12 @@ mod test {
             ColumnDef::wire("and2_b"),
             ColumnDef::wire("and2_y"),
         ];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Composite>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
@@ -400,24 +414,24 @@ mod test {
             let conns: &'static [&'static [Connection]] = &[&[
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("b", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("b", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "b",
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "y",
                     },
                 },
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("a", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("a", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "a",
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "y",
                     },

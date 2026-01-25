@@ -22,10 +22,13 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     const FILE_PATH: &'static str;
 
     /// Schema definition for DataFrame storage.
-    const SCHEMA: &'static [ColumnDef];
+    const DEFS: &'static [ColumnDef];
 
     /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize = Self::SCHEMA.len();
+    const SCHEMA_SIZE: usize = Self::DEFS.len();
+
+    /// Access the smart Schema wrapper.
+    fn schema() -> &'static crate::session::PatternSchema;
 
     /// Returns the driver key for this netlist.
     fn driver_key() -> DriverKey {
@@ -44,7 +47,8 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _)
                 | prjunnamed_netlist::Cell::Output(name, _) => {
-                    let col_idx = schema_lut(name, Self::SCHEMA)
+                    let col_idx = Self::schema()
+                        .index_of(name)
                         .expect("Needle Cell name should exist in schema");
                     row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u64);
                 }
@@ -54,7 +58,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         for idx in 0..Self::SCHEMA_SIZE {
             if row_match[idx] == None {
-                let col_name = &Self::SCHEMA[idx].name;
+                let col_name = Self::schema().column(idx).name;
                 panic!("Unmapped column in match: {}", col_name);
             }
         }
@@ -90,9 +94,9 @@ impl<T> PatternInternal<kind::Netlist> for T
 where
     T: Netlist + Component<Kind = kind::Netlist> + Send + Sync + 'static,
 {
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+    const DEFS: &'static [ColumnDef] = T::DEFS;
 
-    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
 
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
@@ -100,6 +104,10 @@ where
         search_function: netlist_search_table_any::<T>,
         nested_dependancies: &[],
     };
+
+    fn schema() -> &'static crate::session::PatternSchema {
+        T::schema()
+    }
 
     fn preload_driver(
         driver: &Driver,
@@ -184,11 +192,16 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        const SCHEMA: &'static [ColumnDef] = &[
+        const DEFS: &'static [ColumnDef] = &[
             ColumnDef::new("a", ColumnKind::Cell, false),
             ColumnDef::new("b", ColumnKind::Cell, false),
             ColumnDef::new("y", ColumnKind::Cell, false),
         ];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,

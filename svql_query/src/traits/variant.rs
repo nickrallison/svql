@@ -8,10 +8,13 @@ use crate::{
 
 pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'static {
     /// Schema definition for DataFrame storage.
-    const SCHEMA: &'static [ColumnDef];
+    const DEFS: &'static [ColumnDef];
 
     /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize = Self::SCHEMA.len();
+    const SCHEMA_SIZE: usize = Self::DEFS.len();
+
+    /// Access the smart Schema wrapper.
+    fn schema() -> &'static crate::session::PatternSchema;
 
     // the rest is tbd
     fn rehydrate<'a>(
@@ -46,9 +49,9 @@ impl<T> PatternInternal<kind::Variant> for T
 where
     T: Variant + Component<Kind = kind::Variant> + Send + Sync + 'static,
 {
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+    const DEFS: &'static [ColumnDef] = T::DEFS;
 
-    const SCHEMA: &'static [ColumnDef] = T::SCHEMA;
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
 
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
@@ -56,6 +59,10 @@ where
         search_function: variant_search_table_any::<T>,
         nested_dependancies: &[],
     };
+
+    fn schema() -> &'static crate::session::PatternSchema {
+        T::schema()
+    }
 
     fn preload_driver(
         driver: &Driver,
@@ -115,11 +122,16 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        const SCHEMA: &'static [ColumnDef] = &[
+        const DEFS: &'static [ColumnDef] = &[
             ColumnDef::new("a", ColumnKind::Cell, false),
             ColumnDef::new("b", ColumnKind::Cell, false),
             ColumnDef::new("y", ColumnKind::Cell, false),
         ];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
@@ -162,7 +174,7 @@ mod test {
     }
 
     impl Composite for And2Gates {
-        const SCHEMA: &'static [ColumnDef] = &[
+        const DEFS: &'static [ColumnDef] = &[
             // 0: Submodule and1
             ColumnDef::sub::<AndGate>("and1"),
             // 1: Submodule and2
@@ -175,6 +187,11 @@ mod test {
             ColumnDef::wire("and2_b"),
             ColumnDef::wire("and2_y"),
         ];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Composite>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
@@ -192,24 +209,24 @@ mod test {
             let conns: &'static [&'static [Connection]] = &[&[
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("b", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("b", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "b",
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "y",
                     },
                 },
                 Connection {
                     from: Endpoint {
-                        column_idx: schema_lut("a", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("a", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "a",
                     },
                     to: Endpoint {
-                        column_idx: schema_lut("y", <AndGate as Netlist>::SCHEMA)
+                        column_idx: schema_lut("y", <AndGate as Netlist>::DEFS)
                             .expect("Should have successfully looked up col"),
                         port_name: "y",
                     },
@@ -240,7 +257,12 @@ mod test {
     }
 
     impl Variant for AndOrAnd2 {
-        const SCHEMA: &'static [ColumnDef] = &[];
+        const DEFS: &'static [ColumnDef] = &[];
+
+        fn schema() -> &'static crate::session::PatternSchema {
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Variant>::DEFS))
+        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,

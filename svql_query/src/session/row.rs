@@ -6,9 +6,9 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+use crate::Wire;
 use crate::session::{EntryArray, QueryError};
 use crate::traits::{Pattern, schema_lut};
-use crate::Wire;
 
 use super::ref_type::Ref;
 
@@ -59,8 +59,8 @@ where
     /// Returns `None` if the column doesn't exist or the value is NULL.
     #[inline]
     pub fn wire(&self, name: &str) -> Option<Wire> {
-        let idx = schema_lut(name, T::SCHEMA)?;
-        let direction = T::SCHEMA[idx].direction;
+        let idx = T::schema().index_of(name)?;
+        let col_def = T::schema().column(idx);
 
         self.entry_array
             .entries
@@ -69,14 +69,14 @@ where
                 crate::session::ColumnEntry::Cell { id, .. } => *id,
                 _ => None,
             })
-            .map(|id| Wire::new(id, direction))
+            .map(|id| Wire::new(id, col_def.direction))
     }
 
     /// Get a submodule reference by column name.
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
     pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
-        let idx = schema_lut(name, T::SCHEMA)?;
+        let idx = T::schema().index_of(name)?;
         self.entry_array
             .entries
             .get(idx)
@@ -90,15 +90,18 @@ where
 
     /// Set a wire column value.
     pub fn with_wire(mut self, name: &'static str, cell_id: u64) -> Result<Self, QueryError> {
-        let id =
-            schema_lut(name, T::SCHEMA).ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
+        let id = T::schema()
+            .index_of(name)
+            .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
         self.entry_array.entries[id] = crate::session::ColumnEntry::Cell { id: Some(cell_id) };
         Ok(self)
     }
 
     /// Set a submodule column value (with optional index).
     pub fn with_sub(mut self, name: &'static str, idx: Option<u64>) -> Self {
-        let id = schema_lut(name, T::SCHEMA).expect("Schema LUT missing sub column");
+        let id = T::schema()
+            .index_of(name)
+            .expect("Schema LUT missing sub column");
         self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx };
         self
     }
@@ -127,7 +130,7 @@ where
         writeln!(f, "{}[{}]:", type_name, self.idx)?;
 
         // Iterate through the schema and print each column
-        for (idx, col_def) in T::SCHEMA.iter().enumerate() {
+        for (idx, col_def) in T::schema().columns().iter().enumerate() {
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
