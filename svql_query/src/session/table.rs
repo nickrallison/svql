@@ -94,8 +94,11 @@ where
 
     /// Deduplicate rows in the table.
     pub fn deduplicate(&self) -> Result<Self, QueryError> {
-        let subset: Vec<String> =
-            T::schema().columns().iter().map(|c| c.name.to_string()).collect();
+        let subset: Vec<String> = T::schema()
+            .columns()
+            .iter()
+            .map(|c| c.name.to_string())
+            .collect();
 
         let df = self.df.clone().unique::<Vec<String>, String>(
             Some(&subset),

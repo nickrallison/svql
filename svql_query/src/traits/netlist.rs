@@ -199,7 +199,8 @@ mod test {
         ];
 
         fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
             INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
         }
 
