@@ -3,8 +3,8 @@ use svql_driver::{Driver, DriverKey};
 
 use crate::{
     prelude::{ColumnDef, ColumnKind, QueryError, Table},
-    session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, Row, Store},
-    traits::{Component, Pattern, PatternInternal, kind, schema_lut, search_table_any},
+    session::{AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store},
+    traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
 };
 
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
@@ -15,6 +15,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     const SCHEMA_SIZE: usize = Self::DEFS.len();
 
     const CONNECTIONS: Connections;
+
+    const DEPENDANCIES: &'static [&'static ExecInfo];
 
     /// Access the smart Schema wrapper.
     fn schema() -> &'static crate::session::PatternSchema;
@@ -28,18 +30,21 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     ///   - If `DEFS[i]` is a `Cell` (Wire), `dep_tables[i]` is `None`.
     fn compose(
         ctx: &ExecutionContext,
-        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+        dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
         // 1. Use pre-computed submodule indices from the smart Schema
         let schema = Self::schema();
         let sub_indices = &schema.submodules;
 
+        for idx in sub_indices.iter() {
+            println!("Submodule column at index: {}", idx);
+        }
+
         // 2. Prepare Iterators (Same logic, but using sub_indices)
         let mut ranges = Vec::with_capacity(sub_indices.len());
 
-        for &col_idx in sub_indices {
-            let table = dep_tables[col_idx]
-                .expect("Schema defines a Sub column but no table was provided in dep_tables");
+        for (i, &col_idx) in sub_indices.iter().enumerate() {
+            let table = dep_tables[i];
 
             if table.is_empty() {
                 // If a required submodule has no matches, the composite has no matches.
@@ -91,7 +96,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     /// the `compose` phase before the final Table is fully built.
     fn validate(
         row: &Row<Self>,
-        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+        dep_tables: &[&(dyn AnyTable + Send + Sync)],
         driver: &Driver,
         key: &DriverKey,
     ) -> bool {
@@ -184,7 +189,7 @@ where
         type_id: std::any::TypeId::of::<T>(),
         type_name: std::any::type_name::<T>(),
         search_function: composite_search_table_any::<T>,
-        nested_dependancies: &[],
+        nested_dependancies: T::DEPENDANCIES,
     };
 
     fn schema() -> &'static crate::session::PatternSchema {
@@ -206,23 +211,21 @@ where
     where
         Self: Send + Sync + 'static,
     {
-        // 1. Prepare the container for dependent tables
-        let mut dep_tables = Vec::with_capacity(T::SCHEMA_SIZE);
+        let mut dep_tables = Vec::new();
 
-        // 2. Iterate over the schema to fetch dependencies
-        for col in T::schema().columns() {
-            match col.kind {
-                ColumnKind::Sub(type_id) => {
-                    // Fetch the pre-computed table from the ExecutionContext
-                    let table = ctx
-                        .get_any_table(type_id)
-                        .ok_or_else(|| QueryError::MissingDependency(col.name.to_string()))?;
-
-                    dep_tables.push(Some(table));
-                }
-                // Wires and Metadata columns don't have external tables
-                _ => dep_tables.push(None),
-            }
+        for sub_idx in T::schema().submodules.iter() {
+            let tid = T::schema()
+                .column(*sub_idx)
+                .as_submodule()
+                .expect("Idx should point to submodule");
+            let table = ctx.get_any_table(tid).ok_or_else(|| {
+                QueryError::MissingDependency(format!(
+                    "TypeId {:?}, Col: {}",
+                    tid,
+                    T::schema().column(*sub_idx).name
+                ))
+            })?;
+            dep_tables.push(table);
         }
 
         // 3. Hand off to the specific implementation to do the join/filter
@@ -260,7 +263,7 @@ impl Endpoint {
         &self,
         row: &Row<T>,
         // This signature must match exactly what is passed in validate
-        dep_tables: &[Option<&(dyn AnyTable + Send + Sync)>],
+        dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Option<u64>
     where
         T: Composite + Component,
@@ -275,7 +278,11 @@ impl Endpoint {
             // === CASE 1: Endpoint is on a Submodule ===
             (ColumnEntry::Sub { id: Some(ref_idx) }, ColumnKind::Sub(_)) => {
                 // Retrieve the pre-fetched table for this column
-                let table = dep_tables.get(self.column_idx)?.as_ref()?;
+                let sub_idx = T::schema()
+                    .submodules
+                    .iter()
+                    .position(|&idx| idx == self.column_idx)?;
+                let table = dep_tables.get(sub_idx)?;
 
                 // Ask that table for the cell ID at the specific row and port name
                 table.get_cell_id(*ref_idx as usize, self.port_name)
@@ -439,6 +446,8 @@ mod test {
             ]];
             Connections { connections: conns }
         };
+
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
         fn preload_driver(
             driver: &Driver,

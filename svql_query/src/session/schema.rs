@@ -23,6 +23,9 @@ pub struct PatternSchema {
     /// Indices of all columns that are Submodules.
     pub submodules: Vec<usize>,
 
+    /// Fast lookup from submodule column name to its compose target index.
+    pub submodule_map: AHashMap<&'static str, usize>,
+
     /// Indices of all columns that are Inputs.
     pub inputs: Vec<usize>,
 
@@ -51,11 +54,16 @@ impl PatternSchema {
         let mut inputs = Vec::new();
         let mut outputs = Vec::new();
 
+        let mut submodule_map = AHashMap::new();
+        let mut compose_idx = 0;
+
         for (i, col) in defs.iter().enumerate() {
             name_map.insert(col.name, i);
 
             if col.kind.is_sub() {
+                submodule_map.insert(col.name, compose_idx);
                 submodules.push(i);
+                compose_idx += 1;
             }
 
             match col.direction {
@@ -71,6 +79,7 @@ impl PatternSchema {
             submodules,
             inputs,
             outputs,
+            submodule_map,
         }
     }
 
@@ -91,6 +100,11 @@ impl PatternSchema {
     #[inline]
     pub fn get_by_index(&self, index: usize) -> Option<&ColumnDef> {
         self.defs.get(index)
+    }
+
+    #[inline]
+    pub fn submodule_index(&self, name: &str) -> Option<usize> {
+        self.submodule_map.get(name).copied()
     }
 }
 
@@ -242,6 +256,13 @@ impl ColumnDef {
             kind,
             nullable,
             direction: PortDirection::None,
+        }
+    }
+
+    pub fn as_submodule(&self) -> Option<TypeId> {
+        match &self.kind {
+            ColumnKind::Sub(tid) => Some(*tid),
+            _ => None,
         }
     }
 

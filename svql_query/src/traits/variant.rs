@@ -101,6 +101,7 @@ mod test {
     use crate::{
         Wire,
         prelude::ColumnKind,
+        session::ExecInfo,
         traits::{
             Netlist, Pattern,
             composite::{Composite, Connection, Connections, Endpoint},
@@ -129,7 +130,8 @@ mod test {
         ];
 
         fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
             INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
         }
 
@@ -160,6 +162,7 @@ mod test {
         type Kind = kind::Netlist;
     }
 
+    #[derive(Debug, Clone)]
     pub struct And2Gates {
         and1: AndGate,
         and2: AndGate,
@@ -189,7 +192,8 @@ mod test {
         ];
 
         fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
             INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Composite>::DEFS))
         }
 
@@ -235,6 +239,8 @@ mod test {
             Connections { connections: conns }
         };
 
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
+
         fn preload_driver(
             driver: &Driver,
             design_key: &DriverKey,
@@ -260,7 +266,8 @@ mod test {
         const DEFS: &'static [ColumnDef] = &[];
 
         fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
+                std::sync::OnceLock::new();
             INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Variant>::DEFS))
         }
 

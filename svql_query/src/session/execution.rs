@@ -29,7 +29,7 @@ pub struct ExecInfo {
     pub type_id: std::any::TypeId,
     pub type_name: &'static str,
     pub search_function: SearchFn,
-    pub nested_dependancies: &'static [ExecInfo],
+    pub nested_dependancies: &'static [&'static ExecInfo],
 }
 
 /// Slot for storing a table during execution.
