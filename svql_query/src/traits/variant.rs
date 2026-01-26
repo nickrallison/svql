@@ -35,16 +35,6 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         Self: Sized;
 }
 
-/// Wrapper to adapt the two-argument `search_table_any` to the single-argument `SearchFn` signature.
-fn variant_search_table_any<T>(
-    ctx: &ExecutionContext,
-) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
-where
-    T: Variant + Component<Kind = kind::Variant> + Send + Sync + 'static,
-{
-    search_table_any::<T>(ctx, <T as PatternInternal<kind::Variant>>::search_table)
-}
-
 impl<T> PatternInternal<kind::Variant> for T
 where
     T: Variant + Component<Kind = kind::Variant> + Send + Sync + 'static,
@@ -56,7 +46,9 @@ where
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
         type_name: std::any::type_name::<T>(),
-        search_function: variant_search_table_any::<T>,
+        search_function: |ctx| {
+            search_table_any::<T>(ctx, <T as PatternInternal<kind::Variant>>::search_table)
+        },
         nested_dependancies: &[],
     };
 

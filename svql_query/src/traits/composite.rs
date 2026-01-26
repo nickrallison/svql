@@ -4,7 +4,7 @@ use crate::{
     prelude::{ColumnDef, ColumnKind, QueryError, Table},
     selector::Selector,
     session::{AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store},
-    traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
+    traits::{Component, PatternInternal, kind, search_table_any},
 };
 
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
@@ -221,16 +221,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static;
 }
 
-/// Wrapper to adapt the two-argument `search_table_any` to the single-argument `SearchFn` signature.
-fn composite_search_table_any<T>(
-    ctx: &ExecutionContext,
-) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
-where
-    T: Composite + Component<Kind = kind::Composite> + Send + Sync + 'static,
-{
-    search_table_any::<T>(ctx, <T as PatternInternal<kind::Composite>>::search_table)
-}
-
 impl<T> PatternInternal<kind::Composite> for T
 where
     T: Composite + Component<Kind = kind::Composite> + Send + Sync + 'static,
@@ -242,7 +232,9 @@ where
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
         type_name: std::any::type_name::<T>(),
-        search_function: composite_search_table_any::<T>,
+        search_function: |ctx| {
+            search_table_any::<T>(ctx, <T as PatternInternal<kind::Composite>>::search_table)
+        },
         nested_dependancies: T::DEPENDANCIES,
     };
 
