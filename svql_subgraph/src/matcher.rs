@@ -301,7 +301,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 .cells_topo()
                 .iter()
                 .filter(|cell| cell.cell_type().is_logic_gate())
-                .filter(|candidate| assignment.get_needle_cell(*candidate).is_none())
+                .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
                 .cloned()
                 .collect();
         }

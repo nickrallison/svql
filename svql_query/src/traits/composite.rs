@@ -158,7 +158,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 Ok(d) => d,
                 Err(_) => return false,
             };
-        let graph = design_handle.index();
+        let _graph = design_handle.index();
 
         // 2. Iterate CNF Constraints
         for group in Self::CONNECTIONS.connections {

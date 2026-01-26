@@ -76,14 +76,14 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         &self,
         needle: &CellWrapper<'needle>,
     ) -> Option<&CellWrapper<'haystack>> {
-        self.needle_to_haystack.get(&needle)
+        self.needle_to_haystack.get(needle)
     }
 
     pub fn get_needle_cell(
         &self,
         haystack: &CellWrapper<'haystack>,
     ) -> Option<&CellWrapper<'needle>> {
-        self.haystack_to_needle.get(&haystack)
+        self.haystack_to_needle.get(haystack)
     }
 
     pub fn len(&self) -> usize {

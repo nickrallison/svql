@@ -1,4 +1,4 @@
-use prjunnamed_netlist::{Cell, ControlNet};
+use prjunnamed_netlist::Cell;
 use std::borrow::Cow;
 use svql_common::YosysModule;
 

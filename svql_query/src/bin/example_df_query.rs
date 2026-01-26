@@ -36,9 +36,9 @@ impl Netlist for AndGate {
 
     fn rehydrate<'a>(
         row: &Row<Self>,
-        store: &Store,
-        driver: &Driver,
-        key: &DriverKey,
+        _store: &Store,
+        _driver: &Driver,
+        _key: &DriverKey,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
@@ -82,10 +82,10 @@ impl Composite for And2Gates {
     }
 
     fn rehydrate<'a>(
-        row: &Row<Self>,
-        store: &Store,
-        driver: &Driver,
-        key: &DriverKey,
+        _row: &Row<Self>,
+        _store: &Store,
+        _driver: &Driver,
+        _key: &DriverKey,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,

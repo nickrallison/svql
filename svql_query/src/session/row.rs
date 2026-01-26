@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::Wire;
 use crate::session::{EntryArray, QueryError};
-use crate::traits::{Pattern, schema_lut};
+use crate::traits::Pattern;
 
 use super::ref_type::Ref;
 

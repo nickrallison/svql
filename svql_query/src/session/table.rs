@@ -142,17 +142,17 @@ where
         match T::schema().column(idx).kind {
             ColumnKind::Cell => {
                 let ca = col.u64().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw as u64);
+                let val = ca.get(row_idx).map(|raw| raw);
                 Some(ColumnEntry::Cell { id: val })
             }
             ColumnKind::Sub(_) => {
                 let ca = col.u64().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw as u64);
+                let val = ca.get(row_idx).map(|raw| raw);
                 Some(ColumnEntry::Sub { id: val })
             }
             ColumnKind::Metadata => {
                 let ca = col.u64().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw as u64);
+                let val = ca.get(row_idx).map(|raw| raw);
                 Some(ColumnEntry::Metadata { id: val })
             }
         }
@@ -285,7 +285,7 @@ where
 
         let col = self.df.column(col_name).ok()?;
         let ca = col.u64().ok()?;
-        ca.get(row_idx).map(|raw| raw as u64)
+        ca.get(row_idx).map(|raw| raw)
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
@@ -301,6 +301,6 @@ where
         let ca = col.u64().ok()?;
         let val = ca.get(row_idx)?;
 
-        Some((val as u64, target_type))
+        Some((val, target_type))
     }
 }

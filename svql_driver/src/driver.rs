@@ -103,7 +103,7 @@ impl Driver {
         key: &DriverKey,
         module_config: &svql_common::ModuleConfig,
     ) -> Result<(), DriverError> {
-        Self::get_design(&self, key, module_config)?;
+        Self::get_design(self, key, module_config)?;
         Ok(())
     }
 
@@ -112,7 +112,7 @@ impl Driver {
         key: &DriverKey,
         module_config: &svql_common::ModuleConfig,
     ) -> Result<Arc<DesignContainer>, DriverError> {
-        if let Some(design) = self.check_registry(&key) {
+        if let Some(design) = self.check_registry(key) {
             return Ok(design);
         }
 

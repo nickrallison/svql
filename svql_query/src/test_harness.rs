@@ -14,6 +14,7 @@ pub fn setup_test_logging() {
     });
 }
 
+#[derive(Default)]
 pub struct TestSpec<'a> {
     pub haystack_path: &'a str,
     pub haystack_module: &'a str,
@@ -40,16 +41,6 @@ impl TestSpec<'_> {
     }
 }
 
-impl<'a> Default for TestSpec<'a> {
-    fn default() -> Self {
-        Self {
-            haystack_path: "",
-            haystack_module: "",
-            expected_count: 0,
-            config_fn: None,
-        }
-    }
-}
 
 /// Run a query test using the new DataFrame API (ExecutionPlan + Store).
 /// This uses the new `run_query` function which works for all pattern types.
@@ -68,7 +59,7 @@ where
     }
     let config = config_builder.build();
 
-    let container = spec.get_design(&driver, &config)?;
+    let _container = spec.get_design(&driver, &config)?;
 
     // for cell in container.index().cells_topo() {
     //     tracing::error!("Cell: {:#?}", cell);
@@ -92,7 +83,7 @@ where
         let mut rehydrated: Vec<P> = Vec::new();
         for row in rows.iter() {
             let item = P::rehydrate(row, &store, &driver, &spec.get_key());
-            if let None = item {
+            if item.is_none() {
                 tracing::error!("Failed to rehydrate row: {}", row);
                 continue;
             }

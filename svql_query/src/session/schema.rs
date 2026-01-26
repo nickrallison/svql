@@ -5,8 +5,7 @@
 
 use ahash::AHashMap;
 use std::any::TypeId;
-use std::collections::HashMap;
-use std::sync::OnceLock; // Assuming ahash is available, otherwise std HashMap
+ // Assuming ahash is available, otherwise std HashMap
 
 /// A smart wrapper around the raw column definitions.
 ///
@@ -271,7 +270,7 @@ impl ColumnDef {
 
         let d_type = match &self.kind {
             ColumnKind::Cell => DataType::UInt64,
-            ColumnKind::Sub(tid) => DataType::UInt32,
+            ColumnKind::Sub(_tid) => DataType::UInt32,
             ColumnKind::Metadata => DataType::UInt64,
         };
         Column::new_empty(PlSmallStr::from_static(self.name), &d_type)

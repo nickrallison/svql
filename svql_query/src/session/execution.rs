@@ -179,7 +179,7 @@ impl ExecutionPlan {
         }
 
         // Collect results into Store
-        Ok(self.try_into_store(&ctx)?)
+        self.try_into_store(&ctx)
     }
 
     /// Execute nodes sequentially in topological order.

@@ -4,11 +4,11 @@
 
 use crate::{
     prelude::*,
-    session::{AnyTable, ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
-    traits::{Component, PatternInternal, kind, schema_lut, search_table_any},
+    session::{ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
+    traits::{Component, PatternInternal, kind, search_table_any},
 };
 use prjunnamed_netlist::Value;
-use svql_subgraph::{SubgraphMatcher, graph_index};
+use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
 fn value_to_cell_id(value: &Value) -> Option<u64> {
@@ -81,7 +81,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         }
 
         for idx in 0..Self::SCHEMA_SIZE {
-            if row_match[idx] == None {
+            if row_match[idx].is_none() {
                 let col_name = Self::schema().column(idx).name;
                 panic!("Unmapped column in match: {}", col_name);
             }

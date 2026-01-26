@@ -6,6 +6,12 @@ pub struct ConnectionBuilder<'a, S> {
     _marker: PhantomData<&'a S>,
 }
 
+impl<'a, S> Default for ConnectionBuilder<'a, S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, S> ConnectionBuilder<'a, S> {
     pub fn new() -> Self {
         Self {
