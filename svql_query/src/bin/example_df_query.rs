@@ -12,6 +12,7 @@ use svql_query::{
     },
 };
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 struct AndGate {
     a: Wire,
@@ -61,6 +62,7 @@ impl Component for AndGate {
     type Kind = kind::Netlist;
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct And2Gates {
     and1: AndGate,
