@@ -2,7 +2,7 @@ use svql_driver::{Driver, DriverKey};
 
 use crate::{
     prelude::{ColumnDef, QueryError, Table},
-    session::{AnyTable, ExecutionContext, Row, Store},
+    session::{ExecutionContext, Row, Store},
     traits::{Component, PatternInternal, kind, search_table_any},
 };
 
