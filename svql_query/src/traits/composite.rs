@@ -1,9 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{
-    prelude::*,
-    selector::Selector,
-};
+use crate::{prelude::*, selector::Selector};
 
 /// Connection constraint (keeping existing struct, just updating signature)
 #[derive(Debug, Clone, Copy)]
