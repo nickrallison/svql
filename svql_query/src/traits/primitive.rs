@@ -64,7 +64,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     }
 
     /// Rehydrate from row.
-    fn rehydrate<'a>(
+    fn rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,

@@ -29,6 +29,10 @@ impl<'a> CellRegistry<'a> {
         self.cells_topo.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.cells_topo.is_empty()
+    }
+
     fn build_cells_topo(cell_refs_topo: &[CellRef<'a>]) -> Vec<CellWrapper<'a>> {
         cell_refs_topo
             .iter()

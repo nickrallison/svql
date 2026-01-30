@@ -117,12 +117,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     where
         Self: Sized;
 
-    fn rehydrate<'a>(
-        row: &Row<Self>,
-        store: &Store,
-        driver: &Driver,
-        key: &DriverKey,
-    ) -> Option<Self>
+    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static;
 }

@@ -2,12 +2,15 @@ use crate::cell::{CellIndex, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
 use std::collections::{HashMap, HashSet};
 
+type FaninMap = HashMap<CellIndex, Vec<(CellIndex, usize)>>;
+type FanoutMap = HashMap<CellIndex, Vec<(CellIndex, usize)>>;
+
 #[derive(Clone, Debug)]
 pub struct ConnectivityGraph {
     /// Maps each cell to its fan-in cells with port information
-    fanin_map: HashMap<CellIndex, Vec<(CellIndex, usize)>>,
+    fanin_map: FaninMap,
     /// Maps each cell to its fan-out cells with port information
-    fanout_map: HashMap<CellIndex, Vec<(CellIndex, usize)>>,
+    fanout_map: FanoutMap,
 }
 
 impl ConnectivityGraph {
@@ -29,12 +32,9 @@ impl ConnectivityGraph {
         design: &'a Design,
         cell_refs_topo: &[CellRef<'a>],
         cell_id_map: &HashMap<usize, CellIndex>,
-    ) -> (
-        HashMap<CellIndex, Vec<(CellIndex, usize)>>,
-        HashMap<CellIndex, Vec<(CellIndex, usize)>>,
-    ) {
-        let mut fanout_map: HashMap<CellIndex, Vec<(CellIndex, usize)>> = HashMap::new();
-        let mut fanin_map: HashMap<CellIndex, Vec<(CellIndex, usize)>> = HashMap::new();
+    ) -> (FaninMap, FanoutMap) {
+        let mut fanout_map: FanoutMap = HashMap::new();
+        let mut fanin_map: FaninMap = HashMap::new();
 
         for sink_ref in cell_refs_topo.iter().cloned() {
             let sink_wrapper: CellWrapper<'a> = sink_ref.into();

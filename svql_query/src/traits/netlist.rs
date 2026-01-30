@@ -105,7 +105,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         EntryArray::new(final_row_match)
     }
 
-    fn rehydrate<'a>(
+    fn rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,

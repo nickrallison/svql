@@ -96,10 +96,12 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         self.needle_to_haystack.is_empty()
     }
 
+    #[allow(clippy::mutable_key_type)]
     pub fn haystack_mapping(&self) -> &HashMap<CellWrapper<'haystack>, CellWrapper<'needle>> {
         &self.haystack_to_needle
     }
 
+    #[allow(clippy::mutable_key_type)]
     pub fn needle_mapping(&self) -> &HashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
         &self.needle_to_haystack
     }
