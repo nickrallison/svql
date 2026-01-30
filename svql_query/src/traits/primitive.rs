@@ -305,6 +305,7 @@ macro_rules! define_dff_primitive {
     };
 }
 
+#[allow(dead_code)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,13 +313,13 @@ mod tests {
     use svql_query::query_test;
 
     // Example primitive gate
-    define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
+    define_primitive!(TestAndGate, And, [(a, input), (b, input), (y, output)]);
 
     // small_and_tree has 3 AND gates total
     // Dedupe::None will warn but still return 3 matches (same as Dedupe::All)
     query_test!(
         name: test_and_gate_small_tree_dedupe_none,
-        query: AndGate,
+        query: TestAndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 3,  // Same as Dedupe::All - primitives don't have permutations
         config: |config_builder| config_builder.dedupe(Dedupe::None)
@@ -326,9 +327,40 @@ mod tests {
 
     query_test!(
         name: test_and_gate_small_tree_dedupe_all,
-        query: AndGate,
+        query: TestAndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 3,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
+
+    #[test]
+    fn test_and_gate_rehydration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::test_harness::setup_test_logging;
+
+        setup_test_logging();
+
+        let driver = Driver::new_workspace()?;
+        let config = Config::builder().dedupe(Dedupe::All).build();
+        let key = DriverKey::new(
+            "examples/fixtures/basic/and/verilog/small_and_tree.v",
+            "small_and_tree",
+        );
+
+        let store = svql_query::run_query::<TestAndGate>(&driver, &key, &config)?;
+        let table = store.get::<TestAndGate>().expect("Table should exist");
+
+        // Verify we can rehydrate and access fields
+        let first_row = table.rows().next().expect("Should have at least one match");
+        let gate = <TestAndGate as svql_query::traits::Pattern>::rehydrate(
+            &first_row, &store, &driver, &key,
+        )
+        .expect("Should rehydrate");
+
+        // Access fields to prove they work
+        assert!(gate.a.id().raw() > 0, "Input A should have valid ID");
+        assert!(gate.b.id().raw() > 0, "Input B should have valid ID");
+        assert!(gate.y.id().raw() > 0, "Output Y should have valid ID");
+
+        Ok(())
+    }
 }

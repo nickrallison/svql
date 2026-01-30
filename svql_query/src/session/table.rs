@@ -136,19 +136,19 @@ where
         match T::schema().column(idx).kind {
             ColumnKind::Cell => {
                 let ca = col.u32().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw);
+                let val = ca.get(row_idx);
                 Some(ColumnEntry::Cell {
                     id: val.map(CellId::new),
                 })
             }
             ColumnKind::Sub(_) => {
                 let ca = col.u32().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw);
+                let val = ca.get(row_idx);
                 Some(ColumnEntry::Sub { id: val })
             }
             ColumnKind::Metadata => {
                 let ca = col.u32().ok()?;
-                let val = ca.get(row_idx).map(|raw| raw);
+                let val = ca.get(row_idx);
                 Some(ColumnEntry::Metadata { id: val })
             }
         }

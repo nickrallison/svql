@@ -75,13 +75,23 @@ impl ExecutionNode {
     }
 
     fn flatten_deps(&self) -> Vec<Arc<ExecutionNode>> {
-        let mut all_deps: HashSet<Arc<ExecutionNode>> = HashSet::new();
+        let mut seen: HashSet<TypeId> = HashSet::new();
+        let mut result: Vec<Arc<ExecutionNode>> = Vec::new();
+
         for dep in &self.deps {
-            all_deps.insert(Arc::clone(dep));
-            let nested = dep.flatten_deps();
-            all_deps.extend(nested);
+            if seen.insert(dep.type_id) {
+                result.push(Arc::clone(dep));
+            }
+
+            // Recursively flatten and deduplicate
+            for nested in dep.flatten_deps() {
+                if seen.insert(nested.type_id) {
+                    result.push(nested);
+                }
+            }
         }
-        all_deps.into_iter().collect()
+
+        result
     }
 
     fn from_dep(exec_info: &ExecInfo) -> Self {
