@@ -5,10 +5,12 @@
 
 pub mod composite;
 pub mod netlist;
+pub mod primitive;
 pub mod variant;
 
 // Re-export key traits
 pub use netlist::Netlist;
+pub use primitive::Primitive;
 
 use crate::prelude::*;
 
@@ -137,6 +139,7 @@ pub mod kind {
     pub struct Netlist;
     pub struct Composite;
     pub struct Variant;
+    pub struct Primitive;
 }
 
 pub trait Component {
@@ -153,6 +156,10 @@ impl Component for kind::Composite {
 
 impl Component for kind::Variant {
     type Kind = kind::Variant;
+}
+
+impl Component for kind::Primitive {
+    type Kind = kind::Primitive;
 }
 
 pub trait PatternInternal<K>: Sized {

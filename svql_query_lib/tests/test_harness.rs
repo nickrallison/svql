@@ -1,6 +1,7 @@
-use std::sync::Once;
-use svql_query::prelude::*;
-use svql_query::traits::SearchableComponent;
+use std::fmt::Debug;
+use std::sync::{Arc, Once};
+use svql_driver::design_container::DesignContainer;
+use svql_query::{prelude::*, traits::Component};
 
 static INIT: Once = Once::new();
 
@@ -13,6 +14,7 @@ pub fn setup_test_logging() {
     });
 }
 
+#[derive(Default)]
 pub struct TestSpec<'a> {
     pub haystack_path: &'a str,
     pub haystack_module: &'a str,
@@ -21,14 +23,21 @@ pub struct TestSpec<'a> {
     pub config_fn: Option<fn(ConfigBuilder) -> ConfigBuilder>,
 }
 
-impl<'a> Default for TestSpec<'a> {
-    fn default() -> Self {
-        Self {
-            haystack_path: "",
-            haystack_module: "",
-            expected_count: 0,
-            config_fn: None,
-        }
+impl TestSpec<'_> {
+    pub fn get_design(
+        &self,
+        driver: &Driver,
+        config: &svql_common::Config,
+    ) -> Result<Arc<DesignContainer>, QueryError> {
+        let key = self.get_key();
+        let container = driver
+            .get_design(&key, &config.haystack_options)
+            .map_err(|e| QueryError::design_load(e.to_string()))?;
+        Ok(container)
+    }
+
+    pub fn get_key(&self) -> DriverKey {
+        DriverKey::new(self.haystack_path, self.haystack_module)
     }
 }
 
@@ -37,7 +46,7 @@ impl<'a> Default for TestSpec<'a> {
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: SearchableComponent + Send + Sync + 'static,
+    P: Pattern + Component + Send + Sync + Debug + 'static,
 {
     setup_test_logging();
 
@@ -49,20 +58,38 @@ where
     }
     let config = config_builder.build();
 
-    let (key, design) = driver.get_or_load_design(
-        spec.haystack_path,
-        spec.haystack_module,
-        &config.haystack_options,
-    )?;
+    let _container = spec.get_design(&driver, &config)?;
+
+    // for cell in container.index().cells_topo() {
+    //     tracing::error!("Cell: {:#?}", cell);
+    // }
 
     // Execute query using the new DataFrame API
-    let store = svql_query::run_query::<P>(&driver, &key)?;
+    let store = svql_query::run_query::<P>(&driver, &spec.get_key(), &config)?;
 
     // Get the result count from the store
-    let stored_count = store.get::<P>().map(|table| table.len()).unwrap_or(0);
+    let results_table = store.get::<P>().expect("Table should be present");
+    let rows = results_table.rows().collect::<Vec<_>>();
+    let stored_count = rows.len();
 
     if stored_count != spec.expected_count {
-        let cells = design.index().cells_topo();
+        tracing::error!(
+            "Expected {} matches, found {} for pattern {}",
+            spec.expected_count,
+            stored_count,
+            std::any::type_name::<P>()
+        );
+        let mut rehydrated: Vec<P> = Vec::new();
+        for row in rows.iter() {
+            let item = P::rehydrate(row, &store, &driver, &spec.get_key());
+            if item.is_none() {
+                tracing::error!("Failed to rehydrate row: {}", row);
+                continue;
+            }
+            rehydrated.push(item.unwrap());
+        }
+
+        // let cells = container.index().cells_topo();
         tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
@@ -73,22 +100,26 @@ where
             store
         );
 
+        for (i, result) in rehydrated.iter().enumerate() {
+            tracing::error!("Result #{}: {:#?}", i, result);
+        }
+
         tracing::error!("Tables:");
         for (_, table) in store.tables() {
             tracing::error!("{}", table);
         }
 
-        let cells_str = cells
-            .iter()
-            .map(|c| format!(" - {:#?}", c))
-            .collect::<Vec<String>>()
-            .join("\n");
+        // let cells_str = cells
+        //     .iter()
+        //     .map(|c| format!(" - {:#?}", c))
+        //     .collect::<Vec<String>>()
+        //     .join("\n");
 
-        tracing::error!("Cell List: {}", cells_str);
+        // tracing::error!("Cell List: {}", cells_str);
         // Log match details if available
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {
-                tracing::error!("Match #{}: path={}", i, row.path());
+                tracing::error!("Match #{}: {}", i, row);
             }
         }
     }
@@ -106,11 +137,11 @@ where
 #[macro_export]
 macro_rules! query_test {
     (
-	        name: $test_name:ident,
-	        query: $query_type:ty,
-	        haystack: ($path:expr, $mod:expr),
-	        expect: $count:expr
-	    ) => {
+        name: $test_name:ident,
+        query: $query_type:ty,
+        haystack: ($path:expr, $mod:expr),
+        expect: $count:expr
+    ) => {
         #[test]
         fn $test_name() -> Result<(), Box<dyn std::error::Error>> {
             $crate::test_harness::run_query_test::<$query_type>($crate::test_harness::TestSpec {
@@ -123,12 +154,12 @@ macro_rules! query_test {
     };
 
     (
-	        name: $test_name:ident,
-	        query: $query_type:ty,
-	        haystack: ($path:expr, $mod:expr),
-	        expect: $count:expr,
-	        config: $cfg_closure:expr
-	    ) => {
+        name: $test_name:ident,
+        query: $query_type:ty,
+        haystack: ($path:expr, $mod:expr),
+        expect: $count:expr,
+        config: $cfg_closure:expr
+    ) => {
         #[test]
         fn $test_name() -> Result<(), Box<dyn std::error::Error>> {
             $crate::test_harness::run_query_test::<$query_type>($crate::test_harness::TestSpec {

@@ -5,226 +5,51 @@
 
 use svql_query::prelude::*;
 
-macro_rules! define_primitive_gate {
-    (
-        $name:ident,
-        $kind:ident,
-        [$($port:ident),*]
-    ) => {
-        #[doc = concat!("A primitive ", stringify!($kind), " gate component.")]
-        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-        pub struct $name<S: State> {
-            /// The hierarchical path of this gate instance.
-            pub path: Instance,
-            $(
-                #[doc = concat!("The ", stringify!($port), " port wire.")]
-                pub $port: Wire<S>
-            ),*
-        }
+// Logic gates
+svql_query::define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
 
-        impl<S: State> $name<S> {
-            $(
-                #[doc = concat!("Returns a reference to the ", stringify!($port), " port.")]
-                pub fn $port(&self) -> Option<&Wire<S>> {
-                    Some(&self.$port)
-                }
-            )*
-        }
+svql_query::define_primitive!(OrGate, Or, [(a, input), (b, input), (y, output)]);
 
-        impl<S: State> Hardware for $name<S> {
-            type State = S;
+svql_query::define_primitive!(NotGate, Not, [(a, input), (y, output)]);
 
-            fn path(&self) -> &Instance {
-                &self.path
-            }
+svql_query::define_primitive!(BufGate, Buf, [(a, input), (y, output)]);
 
-            fn type_name(&self) -> &'static str {
-                stringify!($name)
-            }
+svql_query::define_primitive!(XorGate, Xor, [(a, input), (b, input), (y, output)]);
 
-            fn children(&self) -> Vec<&dyn Hardware<State = Self::State>> {
-                vec![ $( &self.$port ),* ]
-            }
+svql_query::define_primitive!(
+    MuxGate,
+    Mux,
+    [(a, input), (b, input), (sel, input), (y, output)]
+);
 
-            fn find_port(&self, path: &Instance) -> Option<&Wire<S>> {
-                if !path.starts_with(self.path()) {
-                    return None;
-                }
-                let rel_path = path.relative(self.path());
-                let next = rel_path.first()?.as_ref();
-                match next {
-                    $(stringify!($port) => self.$port.find_port(path),)*
-                    _ => None,
-                }
-            }
+// Arithmetic gates
+svql_query::define_primitive!(EqGate, Eq, [(a, input), (b, input), (y, output)]);
 
-            fn report(&self, name: &str) -> ReportNode {
-                let source_loc = [$(self.$port.source()),*]
-                    .into_iter()
-                    .flatten()
-                    .next();
+svql_query::define_primitive!(LtGate, ULt, [(a, input), (b, input), (y, output)]);
 
-                ReportNode {
-                    name: name.to_string(),
-                    type_name: stringify!($name).to_string(),
-                    path: self.path.clone(),
-                    details: None,
-                    source_loc,
-                    children: Vec::new(),
-                }
-            }
-        }
+svql_query::define_primitive!(AddGate, Adc, [(a, input), (b, input), (y, output)]);
 
-        impl SearchableComponent for $name<Search> {
-            type Kind = kind::Netlist;
-            type Match = $name<Match>;
+svql_query::define_primitive!(MulGate, Mul, [(a, input), (b, input), (y, output)]);
 
-            // fn create_at(base_path: Instance) -> Self {
-            //     Self {
-            //         path: base_path.clone(),
-            //         $($port: Wire::new(base_path.child(stringify!($port)), ()),)*
-            //     }
-            // }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use svql_common::Dedupe;
+    use svql_query::query_test;
 
-            // fn build_context(
-            //     _driver: &Driver,
-            //     _config: &ModuleConfig
-            // ) -> Result<Context, Box<dyn std::error::Error>> {
-            //     Ok(Context::new())
-            // }
+    query_test!(
+        name: test_and_gate,
+        query: AndGate,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 3,
+        config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
 
-            // /// Scans the design index for all cells matching the primitive type.
-            // fn execute_search(
-            //     &self,
-            //     _driver: &Driver,
-            //     context: &Context,
-            //     key: &DriverKey,
-            //     config: &Config
-            // ) -> Vec<Self::Match> {
-            //     let haystack = context.get(key).expect("Haystack missing from context");
-            //     let index = haystack.index();
-
-            //     match config.dedupe {
-            //         crate::common::Dedupe::All => {
-            //             /* All Cells Deduplicated */
-            //         }
-            //         _ => {
-            //             if config.dedupe != crate::common::Dedupe::None {
-            //                 crate::tracing::warn!(
-            //                     "{} deduplication strategy {:?} is not yet implemented for primitive cell scans. Returning all matches.",
-            //                     self.type_name(),
-            //                     config.dedupe
-            //                 );
-            //             }
-            //         }
-            //     }
-
-            //     index.cells_of_type_iter(CellKind::$kind)
-            //         .into_iter()
-            //         .flatten()
-            //         .map(|cell| {
-            //             $name {
-            //                 path: self.path.clone(),
-            //                 $($port: Wire::new(self.$port.path.clone(), Some(cell.to_info()))),*
-            //             }
-            //         })
-            //         .collect()
-
-            // }
-
-            // DataFrame API
-
-            fn df_columns() -> &'static [::svql_query::session::ColumnDef] {
-                static COLUMNS: &[::svql_query::session::ColumnDef] = &[
-                    $(::svql_query::session::ColumnDef::wire(stringify!($port))),*
-                ];
-                COLUMNS
-            }
-
-            fn df_dependencies() -> &'static [::std::any::TypeId] {
-                &[] // Primitive gates have no dependencies
-            }
-
-            fn df_register_search(registry: &mut ::svql_query::session::SearchRegistry) {
-                use ::svql_query::session::{SearchFn, AnyTable};
-
-                let search_fn: SearchFn = |ctx| {
-                    let table = Self::df_search(ctx)?;
-                    Ok(Box::new(table) as Box<dyn AnyTable>)
-                };
-
-                registry.register(
-                    ::std::any::TypeId::of::<Self>(),
-                    ::std::any::type_name::<Self>(),
-                    Self::df_dependencies(),
-                    search_fn,
-                );
-            }
-
-            fn df_search(
-                ctx: &::svql_query::session::ExecutionContext<'_>,
-            ) -> Result<::svql_query::session::Table<Self>, ::svql_query::session::QueryError> {
-                use ::svql_query::session::{TableBuilder, Row, QueryError, CellId};
-
-                let driver = ctx.driver();
-                let haystack_key = ctx.driver_key();
-
-                // Get the haystack design
-                let haystack_design = driver.get_design(&haystack_key)
-                    .ok_or_else(|| QueryError::design_load(format!("Haystack design not found: {:?}", haystack_key)))?;
-                let index = haystack_design.index();
-
-                // Find matching cells
-                let mut builder = TableBuilder::<Self>::new(Self::df_columns());
-
-                for cell in index.cells_of_type_iter(CellKind::$kind).into_iter().flatten() {
-                    let cell_id = CellId::new(cell.to_info().id as u32);
-                    let row = Row::<Self>::new(builder.len() as u32, "".to_string())
-                        $(.with_wire(stringify!($port), Some(cell_id)))*;
-                    builder.push(row);
-                }
-
-                builder.build()
-            }
-
-            fn df_rehydrate(
-                row: &::svql_query::session::Row<Self>,
-                _store: &::svql_query::session::Store,
-            ) -> Option<Self::Match> {
-                let path = Instance::from_path(row.path());
-                // For primitive gates, all ports map to the same cell
-                Some($name {
-                    path: path.clone(),
-                    $(
-                        $port: {
-                            let cell_opt = row.wire(stringify!($port)).map(|c| {
-                                ::svql_query::prelude::CellInfo {
-                                    id: c.cell_idx() as usize,
-                                    kind: CellKind::$kind,
-                                    source_loc: None,
-                                }
-                            });
-                            Wire::new(path.child(stringify!($port)), cell_opt)
-                        }
-                    ),*
-                })
-            }
-        }
-
-        impl MatchedComponent for $name<Match> {
-            type Search = $name<Search>;
-        }
-    };
+    query_test!(
+        name: test_or_gate,
+        query: OrGate,
+        haystack: ("examples/fixtures/basic/or/verilog/or_tree.v", "or_tree"),
+        expect: 2,
+        config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
 }
-
-define_primitive_gate!(AndGate, And, [a, b, y]);
-define_primitive_gate!(OrGate, Or, [a, b, y]);
-define_primitive_gate!(NotGate, Not, [a, y]);
-define_primitive_gate!(BufGate, Buf, [a, y]);
-define_primitive_gate!(XorGate, Xor, [a, b, y]);
-define_primitive_gate!(MuxGate, Mux, [a, b, sel, y]);
-
-define_primitive_gate!(EqGate, Eq, [a, b, y]);
-define_primitive_gate!(LtGate, ULt, [a, b, y]);
-define_primitive_gate!(AddGate, Adc, [a, b, y]);
-define_primitive_gate!(MulGate, Mul, [a, b, y]);

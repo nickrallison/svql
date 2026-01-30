@@ -1,7 +1,11 @@
-//! Primitive query types for basic logic gates and cells.
+//! Primitive hardware components.
 //!
-//! This module contains pre-defined query structures for common digital logic
-//! primitives like AND, OR, NOT, DFF, etc.
+//! This module provides pre-defined primitive gates and flip-flops that
+//! match directly against cell types in hardware designs.
 
 pub mod dff;
 pub mod gates;
+
+// Re-export commonly used primitives
+pub use dff::*;
+pub use gates::*;
