@@ -4,7 +4,7 @@
 //! primitives match directly against cell types in the design index.
 
 use crate::{
-    CellId, Wire,
+    CellId,
     prelude::*,
     session::{ColumnEntry, EntryArray, ExecutionContext, Port, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, search_table_any},
