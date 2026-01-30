@@ -34,19 +34,20 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
     /// Schema accessor (macro generates this with OnceLock pattern)
     fn schema() -> &'static crate::session::PatternSchema {
-        static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+        static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
+            std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
             let defs = Self::ports_to_defs();
             let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
             crate::session::PatternSchema::new(defs_static)
         })
     }
-    
+
     /// Convert port declarations to column definitions
     fn ports_to_defs() -> Vec<ColumnDef> {
-        Self::PORTS.iter()
-            .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false)
-                .with_direction(p.direction))
+        Self::PORTS
+            .iter()
+            .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction))
             .collect()
     }
 
@@ -203,7 +204,7 @@ where
 }
 
 #[allow(unused)]
-mod test {
+pub(crate) mod test {
 
     use crate::Wire;
 
@@ -212,7 +213,7 @@ mod test {
     use svql_query::query_test;
 
     #[derive(Debug, Clone)]
-    struct AndGate {
+    pub(crate) struct AndGate {
         a: Wire,
         b: Wire,
         y: Wire,
@@ -221,12 +222,8 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        
-        const PORTS: &'static [Port] = &[
-            Port::input("a"),
-            Port::input("b"),
-            Port::output("y"),
-        ];
+
+        const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
 
         fn rehydrate<'a>(
             row: &Row<Self>,

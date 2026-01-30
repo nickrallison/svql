@@ -196,6 +196,8 @@ where
 {
     const DEFS: &'static [ColumnDef] = T::DEFS;
 
+    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+
     const EXEC_INFO: &'static crate::session::ExecInfo = T::EXEC_INFO;
 
     fn schema() -> &'static PatternSchema {
