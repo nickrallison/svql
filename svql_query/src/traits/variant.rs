@@ -66,7 +66,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     /// each inner type, mapping their ports to the common interface and
     /// tracking which arm each row came from via the discriminant.
     fn concatenate(
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
         let schema = Self::schema();
@@ -100,10 +100,12 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 // 2. Set inner_ref (row index in the variant arm's table)
                 entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(row_idx) };
 
-                // 3. Map common ports from inner table
+                // 3. Map common ports from inner table using path resolution
+                // This supports both simple paths ("a") and deep paths ("and1.a")
                 for mapping in port_map.iter() {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
-                        let cell_id = table.get_cell_id(row_idx as usize, mapping.inner_port);
+                        let cell_id =
+                            table.get_cell_id_path(row_idx as usize, mapping.inner_port, ctx);
                         entry.entries[col_idx] = ColumnEntry::Cell { id: cell_id };
                     }
                 }
@@ -298,7 +300,19 @@ mod test {
         where
             Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,
         {
-            todo!()
+            // Get submodule references
+            let and1_ref: crate::session::Ref<AndGate> = row.sub("and1")?;
+            let and2_ref: crate::session::Ref<AndGate> = row.sub("and2")?;
+
+            // Fetch inner tables and rehydrate
+            let and_table = store.get::<AndGate>()?;
+            let and1_row = and_table.row(and1_ref.index())?;
+            let and2_row = and_table.row(and2_ref.index())?;
+
+            let and1 = <AndGate as Pattern>::rehydrate(&and1_row, store, driver, key)?;
+            let and2 = <AndGate as Pattern>::rehydrate(&and2_row, store, driver, key)?;
+
+            Some(And2Gates { and1, and2 })
         }
 
         const CONNECTIONS: Connections = {
@@ -473,7 +487,7 @@ mod test {
         name: test_and_mixed_and_tree_dedupe_none,
         query: AndOrAnd2,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 6,
+        expect: 14,  // 6 AndGate + 8 And2Gates
         config: |config_builder| config_builder.dedupe(Dedupe::None)
     );
 
@@ -481,7 +495,7 @@ mod test {
         name: test_and_mixed_and_tree_dedupe_all,
         query: AndOrAnd2,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 0,
+        expect: 5,  // 3 AndGate + 2 And2Gates
         config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
 }
