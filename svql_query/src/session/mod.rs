@@ -14,17 +14,20 @@ mod row;
 mod schema;
 mod store;
 mod table;
-mod variant_ref;
+// mod variant_ref;
 
 pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 pub use row::Row;
-pub use schema::{Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortDirection, PortMap, Submodule};
+pub use schema::{
+    Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortDirection,
+    PortMap, Submodule,
+};
 pub use store::Store;
 pub use table::{AnyTable, Table};
-pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
+// pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
 
 use polars::prelude::*;
 use thiserror::Error;

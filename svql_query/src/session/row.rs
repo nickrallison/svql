@@ -6,9 +6,9 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use crate::Wire;
 use crate::session::{EntryArray, QueryError};
 use crate::traits::Pattern;
+use crate::{CellId, Wire};
 
 use super::ref_type::Ref;
 
@@ -22,7 +22,7 @@ where
     T: Pattern + svql_query::traits::Component,
 {
     /// Row index in the source table.
-    pub(crate) idx: u64,
+    pub(crate) idx: u32,
     /// Wire columns: name → CellId (None if NULL).
     pub(crate) entry_array: EntryArray,
     /// Type marker.
@@ -34,7 +34,7 @@ where
     T: Pattern + svql_query::traits::Component,
 {
     /// Create a new row (typically called by Table).
-    pub fn new(idx: u64) -> Self {
+    pub fn new(idx: u32) -> Self {
         Self {
             idx,
             entry_array: EntryArray::with_capacity(T::SCHEMA_SIZE),
@@ -44,7 +44,7 @@ where
 
     /// Get the row index in the source table.
     #[inline]
-    pub fn index(&self) -> u64 {
+    pub fn index(&self) -> u32 {
         self.idx
     }
 
@@ -71,34 +71,38 @@ where
             })
             .map(|id| Wire::new(id, col_def.direction))
     }
-    
+
     /// Resolve a path to a wire using a Selector
     ///
     /// # Examples
     /// ```ignore
     /// use svql_query::selector::Selector;
-    /// 
+    ///
     /// let sel = Selector::new(&["y"]);
     /// row.resolve(sel, ctx);  // Direct port
-    /// 
+    ///
     /// let sel = Selector::new(&["and1", "y"]);
     /// row.resolve(sel, ctx);  // Submodule port
     /// ```
-    pub fn resolve<'a>(&self, selector: crate::selector::Selector<'a>, ctx: &super::ExecutionContext) -> Option<Wire> {
+    pub fn resolve<'a>(
+        &self,
+        selector: crate::selector::Selector<'a>,
+        ctx: &super::ExecutionContext,
+    ) -> Option<Wire> {
         if selector.is_empty() {
             return None;
         }
-        
+
         // Single segment: direct lookup
         if selector.len() == 1 {
             return self.wire(selector.head()?);
         }
-        
+
         // Multi-segment: traverse through submodules
         let head = selector.head()?;
         let idx = T::schema().index_of(head)?;
         let col_def = T::schema().column(idx);
-        
+
         // Head must be a submodule reference
         let (sub_row_idx, sub_type_id) = match &col_def.kind {
             crate::session::ColumnKind::Sub(tid) => {
@@ -110,11 +114,11 @@ where
             }
             _ => return None,
         };
-        
+
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
         let cell_id = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
-        
+
         // Direction is lost through traversal
         Some(Wire::new(cell_id, crate::session::PortDirection::None))
     }
@@ -136,7 +140,7 @@ where
     // --- Builder methods (used by Table when constructing rows) ---
 
     /// Set a wire column value.
-    pub fn with_wire(mut self, name: &'static str, cell_id: u64) -> Result<Self, QueryError> {
+    pub fn with_wire(mut self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
@@ -145,7 +149,7 @@ where
     }
 
     /// Set a submodule column value (with optional index).
-    pub fn with_sub(mut self, name: &'static str, idx: Option<u64>) -> Self {
+    pub fn with_sub(mut self, name: &'static str, idx: Option<u32>) -> Self {
         let id = T::schema()
             .index_of(name)
             .expect("Schema LUT missing sub column");

@@ -5,6 +5,9 @@ pub use svql_subgraph as subgraph;
 pub use tracing;
 
 pub use crate::{
+    // Core types
+    CellId,
+    Wire,
     // binding::PortResolver,
     // primitives::dff::*,
     // primitives::gates::*,
@@ -44,7 +47,6 @@ pub use crate::session::{
     ColumnKind,
     Port,
     PortMap,
-    Submodule,
     // Execution
     // Config as ExecConfig,
     // ExecutionContext,
@@ -52,23 +54,7 @@ pub use crate::session::{
     // PatternRegistry,
     QueryError,
     Ref,
-    // Row,
-    // SearchRegistry,
-    // Store,
-    // Variants
-    StoreVariantExt,
-    Table,
-    // TableBuilder,
-    // // Trees
-    // TempRef,
-    // TreePostOrderIter,
-    // TreePreOrderIter,
-    // TreeRowBuilder,
-    // TreeRowExt,
-    // TreeTableBuilder,
-    VariantIter,
-    VariantPattern,
-    VariantRef,
+    Submodule,
 };
 
 pub use crate::selector::Selector;

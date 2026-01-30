@@ -11,6 +11,7 @@ extern crate self as svql_query;
 
 // pub mod binding;
 // pub mod instance;
+pub mod cell_id;
 pub mod prelude;
 pub mod selector;
 // pub mod report;
@@ -18,6 +19,7 @@ pub mod session;
 pub mod traits;
 pub mod wire;
 
+pub use cell_id::CellId;
 pub use wire::Wire;
 pub mod driver {
     pub use svql_driver::*;
@@ -61,10 +63,10 @@ where
 }
 
 pub fn cell_id_to_wrapper<'a>(
-    cell_id: u64,
+    cell_id: CellId,
     design_container: &'a DesignContainer,
 ) -> Option<CellWrapper<'a>> {
     let index = design_container.index();
-    let cell_wrapper = index.get_cell_by_id(cell_id as usize)?.clone();
+    let cell_wrapper = index.get_cell_by_id(cell_id.as_usize())?.clone();
     Some(cell_wrapper)
 }

@@ -2,10 +2,11 @@ use std::marker::PhantomData;
 use svql_driver::{Driver, DriverKey};
 
 use crate::{
-    prelude::{ColumnDef, ColumnKind, QueryError, Table},
+    prelude::{ColumnDef, ColumnKind, QueryError},
     selector::Selector,
     session::{
-        Alias, AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store, Submodule,
+        Alias, AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store,
+        Submodule, Table,
     },
     traits::{Component, PatternInternal, kind, search_table_any},
 };
@@ -105,7 +106,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
-        let mut entries: Vec<EntryArray> = (0..first_table.len() as u64)
+        let mut entries: Vec<EntryArray> = (0..first_table.len() as u32)
             .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
             .collect();
 
@@ -179,7 +180,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     // --- Helper methods (stay in trait for debuggability) ---
 
-    fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u64) -> EntryArray {
+    fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
             vec![ColumnEntry::Metadata { id: None }; Self::SUBMODULES.len() + Self::ALIASES.len()];
         entries[sub_indices[join_idx]] = ColumnEntry::Sub { id: Some(row_idx) };
@@ -199,7 +200,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         entries
             .into_iter()
             .flat_map(|entry| {
-                (0..table.len() as u64).filter_map(move |new_row_idx| {
+                (0..table.len() as u32).filter_map(move |new_row_idx| {
                     let mut candidate = entry.clone();
                     candidate.entries[col_idx] = ColumnEntry::Sub {
                         id: Some(new_row_idx),

@@ -11,9 +11,9 @@ use prjunnamed_netlist::Value;
 use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
-fn value_to_cell_id(value: &Value) -> Option<u64> {
+fn value_to_cell_id(value: &Value) -> Option<u32> {
     match value.as_net() {
-        Some(net) => net.as_cell_index().map(|idx| idx as u64).ok(),
+        Some(net) => net.as_cell_index().map(|idx| idx as u32).ok(),
         None => None,
     }
 }
@@ -63,7 +63,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
     fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
         let schema_size = Self::PORTS.len();
-        let mut row_match: Vec<Option<u64>> = vec![None; schema_size];
+        let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
         for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
             let needle_cell = needle_cell_wrapper.get();
             match needle_cell {
@@ -71,24 +71,24 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     let col_idx = Self::schema()
                         .index_of(name)
                         .expect("Needle Cell name should exist in schema");
-                    row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u64);
+                    row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u32);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
                     let col_idx = Self::schema()
                         .index_of(name)
                         .expect("Needle Cell name should exist in schema");
-                    let needle_output_driver_id: u64 =
+                    let needle_output_driver_id: u32 =
                         value_to_cell_id(output_value).expect("Output should have driver");
                     let haystack_output_driver_wrapper = assignment
                         .needle_mapping()
                         .iter()
                         .find(|(needle_cell_wrapper, _haystack_cell_wrapper)| {
-                            needle_cell_wrapper.debug_index() as u64 == needle_output_driver_id
+                            needle_cell_wrapper.debug_index() as u32 == needle_output_driver_id
                         })
                         .map(|(_needle_cell_wrapper, haystack_cell_wrapper)| haystack_cell_wrapper)
                         .expect("Should find haystack driver for output");
 
-                    row_match[col_idx] = Some(haystack_output_driver_wrapper.debug_index() as u64);
+                    row_match[col_idx] = Some(haystack_output_driver_wrapper.debug_index() as u32);
                 }
                 _ => continue,
             }
@@ -103,7 +103,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         let final_row_match: Vec<ColumnEntry> = row_match
             .into_iter()
-            .map(|opt| ColumnEntry::Cell { id: opt })
+            .map(|opt| ColumnEntry::Cell {
+                id: opt.map(CellId::new),
+            })
             .collect();
         EntryArray::new(final_row_match)
     }

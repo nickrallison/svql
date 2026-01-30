@@ -1,9 +1,10 @@
 use svql_driver::{Driver, DriverKey};
 
 use crate::{
-    prelude::{ColumnDef, ColumnKind, QueryError, Table},
+    prelude::{ColumnDef, ColumnKind, QueryError},
     session::{
         AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Port, PortMap, Row, Store,
+        Table,
     },
     traits::{Component, PatternInternal, kind, search_table_any},
 };
@@ -86,7 +87,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         for (variant_idx, table) in dep_tables.iter().enumerate() {
             let port_maps = Self::PORT_MAPPINGS[variant_idx];
 
-            for row_idx in 0..table.len() as u64 {
+            for row_idx in 0..table.len() as u32 {
                 let mut entry = EntryArray::with_capacity(2 + Self::COMMON_PORTS.len());
 
                 // Initialize all entries to None
@@ -96,7 +97,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
                 // 1. Set discriminant
                 entry.entries[discrim_idx] = ColumnEntry::Metadata {
-                    id: Some(variant_idx as u64),
+                    id: Some(variant_idx as u32),
                 };
 
                 // 2. Set inner_ref (row index in the variant arm's table)
@@ -274,11 +275,11 @@ mod test {
         {
             // 1. Get discriminant
             let discrim_idx = <Self as Variant>::schema().index_of("discriminant")?;
-            let discrim = row.entry_array.entries.get(discrim_idx)?.as_u64()?;
+            let discrim = row.entry_array.entries.get(discrim_idx)?.as_u32()?;
 
             // 2. Get inner_ref
             let inner_ref_idx = <Self as Variant>::schema().index_of("inner_ref")?;
-            let inner_row_idx = row.entry_array.entries.get(inner_ref_idx)?.as_u64()?;
+            let inner_row_idx = row.entry_array.entries.get(inner_ref_idx)?.as_u32()?;
 
             // 3. Dispatch based on discriminant
             match discrim {

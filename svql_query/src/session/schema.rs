@@ -5,6 +5,8 @@
 
 use ahash::AHashMap;
 use std::any::TypeId;
+
+use crate::CellId;
 // Assuming ahash is available, otherwise std HashMap
 
 /// A smart wrapper around the raw column definitions.
@@ -373,15 +375,18 @@ impl PortMap {
 
 #[derive(Debug, Clone)]
 pub enum ColumnEntry {
-    Cell { id: Option<u64> },
-    Sub { id: Option<u64> },
-    Metadata { id: Option<u64> },
+    /// Cell column: stores raw cell ID as u32 (converted to/from CellId)
+    Cell { id: Option<CellId> },
+    /// Submodule column: stores row index in the submodule's table
+    Sub { id: Option<u32> },
+    /// Metadata column: stores auxiliary data
+    Metadata { id: Option<u32> },
 }
 
 impl ColumnEntry {
-    pub fn as_u64(&self) -> Option<u64> {
+    pub fn as_u32(&self) -> Option<u32> {
         match self {
-            ColumnEntry::Cell { id } => *id,
+            ColumnEntry::Cell { id } => id.map(|cid| cid.raw()),
             ColumnEntry::Sub { id } => *id,
             ColumnEntry::Metadata { id } => *id,
         }

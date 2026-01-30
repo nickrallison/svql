@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 
 use polars::prelude::*;
 
+use crate::CellId;
 use crate::session::{ColumnEntry, EntryArray, Row};
 use crate::traits::{Component, Pattern};
 
@@ -77,8 +78,8 @@ where
         // 1. Handle structural columns from the RowMatch array
         for i in 0..T::SCHEMA_SIZE {
             let col_def = T::schema().column(i);
-            let series_data: Vec<Option<u64>> =
-                rows.iter().map(|r| r.entries[i].as_u64()).collect();
+            let series_data: Vec<Option<u32>> =
+                rows.iter().map(|r| r.entries[i].as_u32()).collect();
             columns.push(Column::new(
                 PlSmallStr::from_static(col_def.name),
                 series_data,
@@ -141,17 +142,19 @@ where
         let idx = T::schema().index_of(col_name)?;
         match T::schema().column(idx).kind {
             ColumnKind::Cell => {
-                let ca = col.u64().ok()?;
+                let ca = col.u32().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw);
-                Some(ColumnEntry::Cell { id: val })
+                Some(ColumnEntry::Cell {
+                    id: val.map(CellId::new),
+                })
             }
             ColumnKind::Sub(_) => {
-                let ca = col.u64().ok()?;
+                let ca = col.u32().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw);
                 Some(ColumnEntry::Sub { id: val })
             }
             ColumnKind::Metadata => {
-                let ca = col.u64().ok()?;
+                let ca = col.u32().ok()?;
                 let val = ca.get(row_idx).map(|raw| raw);
                 Some(ColumnEntry::Metadata { id: val })
             }
@@ -161,7 +164,7 @@ where
     /// Get a single row by index.
     ///
     /// Returns `None` if the index is out of bounds.
-    pub fn row(&self, row_idx: u64) -> Option<Row<T>> {
+    pub fn row(&self, row_idx: u32) -> Option<Row<T>> {
         let row_idx_usize = row_idx as usize;
         if row_idx_usize >= self.df.height() {
             return None;
@@ -179,12 +182,12 @@ where
 
     /// Iterate over all rows in the table.
     pub fn rows(&self) -> impl Iterator<Item = Row<T>> + '_ {
-        (0..self.len() as u64).filter_map(|idx| self.row(idx))
+        (0..self.len() as u32).filter_map(|idx| self.row(idx))
     }
 
     /// Iterate over references to all rows.
     pub fn refs(&self) -> impl Iterator<Item = Ref<T>> {
-        (0..self.len() as u64).map(Ref::new)
+        (0..self.len() as u32).map(Ref::new)
     }
 
     // /// Get the TypeId for a submodule column.
@@ -253,18 +256,18 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn pattern_type_id(&self) -> std::any::TypeId;
 
     /// Get a submodule reference (Row Index + TypeId) for a given column.
-    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u64, std::any::TypeId)>;
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)>;
 
     /// Get a cell ID by single column name (no path traversal).
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64>;
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<crate::CellId>;
 
     /// Resolve a selector path within a specific row to a cell ID
     fn resolve_path<'a>(
-        &self, 
-        row_idx: usize, 
-        selector: crate::selector::Selector<'a>, 
-        ctx: &super::ExecutionContext
-    ) -> Option<u64>;
+        &self,
+        row_idx: usize,
+        selector: crate::selector::Selector<'a>,
+        ctx: &super::ExecutionContext,
+    ) -> Option<crate::CellId>;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T>
@@ -283,7 +286,7 @@ where
         std::any::type_name::<T>()
     }
 
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64> {
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<crate::CellId> {
         // O(1) lookup
         let col_idx = T::schema().index_of(col_name)?;
 
@@ -293,21 +296,21 @@ where
         }
 
         let col = self.df.column(col_name).ok()?;
-        let ca = col.u64().ok()?;
-        ca.get(row_idx).map(|raw| raw)
+        let ca = col.u32().ok()?;
+        ca.get(row_idx).map(crate::CellId::new)
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<T>()
     }
 
-    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u64, std::any::TypeId)> {
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)> {
         let col_idx = T::schema().index_of(col_name)?;
         let col_def = T::schema().column(col_idx);
         let target_type = col_def.as_submodule()?;
 
         let col = self.df.column(col_name).ok()?;
-        let ca = col.u64().ok()?;
+        let ca = col.u32().ok()?;
         let val = ca.get(row_idx)?;
 
         Some((val, target_type))
@@ -318,8 +321,8 @@ where
         row_idx: usize,
         selector: crate::selector::Selector<'a>,
         ctx: &super::ExecutionContext,
-    ) -> Option<u64> {
-        let row = self.row(row_idx as u64)?;
+    ) -> Option<crate::CellId> {
+        let row = self.row(row_idx as u32)?;
         row.resolve(selector, ctx).map(|wire| wire.id())
     }
 }

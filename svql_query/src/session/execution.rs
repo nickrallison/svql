@@ -54,19 +54,19 @@ struct ExecutionNode {
 }
 
 impl ExecutionNode {
-    /// Check if this node has already been executed.
-    fn is_executed(&self) -> bool {
-        self.cas_runner.load(std::sync::atomic::Ordering::SeqCst)
-    }
+    // /// Check if this node has already been executed.
+    // fn is_executed(&self) -> bool {
+    //     self.cas_runner.load(std::sync::atomic::Ordering::SeqCst)
+    // }
 
-    fn is_done(&self, ctx: &ExecutionContext) -> bool {
-        if let Some(slot) = ctx.slots.get(&self.type_id)
-            && slot.get().is_some()
-        {
-            return true;
-        }
-        false
-    }
+    // fn is_done(&self, ctx: &ExecutionContext) -> bool {
+    //     if let Some(slot) = ctx.slots.get(&self.type_id)
+    //         && slot.get().is_some()
+    //     {
+    //         return true;
+    //     }
+    //     false
+    // }
 
     fn try_execute(&self) -> bool {
         let cas_result = self.cas_runner.compare_exchange(
