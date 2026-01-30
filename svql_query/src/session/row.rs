@@ -6,11 +6,7 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use crate::session::{EntryArray, QueryError};
-use crate::traits::Pattern;
-use crate::{CellId, Wire};
-
-use super::ref_type::Ref;
+use crate::prelude::*;
 
 /// An owned snapshot of a single row from a `Table<T>`.
 ///

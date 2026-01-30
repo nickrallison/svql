@@ -1,6 +1,6 @@
-use crate::session::PortDirection;
-use crate::wire::Wire;
 use std::marker::PhantomData;
+
+use crate::prelude::*;
 
 pub struct ConnectionBuilder<'a, S> {
     _marker: PhantomData<&'a S>,

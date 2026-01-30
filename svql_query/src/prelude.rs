@@ -17,44 +17,36 @@ pub use crate::{
 };
 
 // Session re-exports
-pub use crate::session::ConnectionBuilder;
-
-// Trait re-exports
-pub use crate::traits::{
-    // Composite traits
-    // CompositeComponent,
-    // CompositeMatched,
-    // ConnectionBuilder,
-    // MatchedComponent,
-    Pattern,
-    // Component traits
-    // SearchableComponent,
-    // Topology,
-    // // Variant traits
-    // VariantComponent,
-    // VariantMatched,
-    // execute_netlist_query,
-    // kind,
-    // validate_composite,
-    // validate_connection,
-};
-
-// New API types (Phase 1-6)
 pub use crate::session::{
     // Core types
     Alias,
+    AnyTable,
     ColumnDef,
+    ColumnEntry,
     ColumnKind,
-    Port,
-    PortMap,
+    ConnectionBuilder,
+    EntryArray,
     // Execution
-    // Config as ExecConfig,
-    // ExecutionContext,
-    // ExecutionPlan,
-    // PatternRegistry,
+    ExecInfo,
+    ExecutionContext,
+    ExecutionPlan,
+    PatternSchema,
+    Port,
+    PortDirection,
+    PortMap,
     QueryError,
     Ref,
+    Row,
+    SearchFn,
+    Store,
     Submodule,
+    Table,
+};
+
+// Trait re-exports
+pub use crate::traits::{
+    Component, Netlist, Pattern, PatternInternal, composite::Composite, composite::Connection,
+    composite::Connections, kind, search_table_any, variant::Variant,
 };
 
 pub use crate::selector::Selector;

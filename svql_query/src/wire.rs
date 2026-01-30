@@ -1,5 +1,4 @@
-use crate::cell_id::CellId;
-use crate::session::PortDirection;
+use crate::prelude::*;
 
 /// A wire reference containing a cell ID and port direction.
 ///

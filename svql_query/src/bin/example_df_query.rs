@@ -1,16 +1,4 @@
-use svql_common::Dedupe;
-use svql_query::{
-    Wire,
-    prelude::*,
-    selector::Selector,
-    session::{ExecInfo, Port, Row, Store},
-    test_harness::TestSpec,
-    traits::{
-        Component, Netlist, PatternInternal,
-        composite::{Composite, Connection, Connections},
-        kind,
-    },
-};
+use svql_query::prelude::*;
 
 #[allow(unused)]
 #[derive(Debug, Clone)]
@@ -129,29 +117,23 @@ impl Component for And2Gates {
 // );
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let spec = TestSpec {
-        haystack_path: "examples/fixtures/basic/and/verilog/small_and_tree.v",
-        haystack_module: "small_and_tree",
-        expected_count: 4,
-        config_fn: Some(|config_builder| config_builder.dedupe(Dedupe::None)),
-    };
+    let haystack_path = "examples/fixtures/basic/and/verilog/small_and_tree.v";
+    let haystack_module = "small_and_tree";
+    let config = Config::builder().dedupe(Dedupe::None).build();
 
     let driver = Driver::new_workspace()?;
 
-    let mut config_builder = Config::builder();
-    if let Some(f) = spec.config_fn {
-        config_builder = f(config_builder);
-    }
-    let config = config_builder.build();
-
-    let container = spec.get_design(&driver, &config)?;
+    let key = DriverKey::new(haystack_path, haystack_module);
+    let container = driver
+        .get_design(&key, &config.haystack_options)
+        .map_err(|e| QueryError::design_load(e.to_string()))?;
 
     for cell in container.index().cells_topo() {
         println!("Cell: {:#?}", cell);
     }
 
     // Execute query using the new DataFrame API
-    let store = svql_query::run_query::<And2Gates>(&driver, &spec.get_key(), &config)?;
+    let store = svql_query::run_query::<And2Gates>(&driver, &key, &config)?;
 
     for (_, table) in store.tables() {
         println!("Table: {}", table);

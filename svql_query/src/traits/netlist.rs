@@ -2,13 +2,8 @@
 //!
 //! Provides traits for components defined via external HDL files.
 
-use crate::{
-    prelude::*,
-    session::{ColumnEntry, EntryArray, ExecutionContext, Port, QueryError, Row, Store, Table},
-    traits::{Component, PatternInternal, kind, search_table_any},
-};
+use crate::prelude::*;
 use prjunnamed_netlist::Value;
-use svql_subgraph::SubgraphMatcher;
 use tracing::debug;
 
 fn value_to_cell_id(value: &Value) -> Option<u32> {
@@ -170,7 +165,7 @@ where
             .get_design(&haystack_key, &ctx.config().haystack_options)
             .map_err(|e| QueryError::design_load(e.to_string()))?;
 
-        let assignments = SubgraphMatcher::enumerate_with_indices(
+        let assignments = subgraph::SubgraphMatcher::enumerate_with_indices(
             needle_container.design(),
             haystack_container.design(),
             needle_container.index(),

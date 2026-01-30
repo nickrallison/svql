@@ -11,10 +11,6 @@ pub mod variant;
 pub use netlist::Netlist;
 
 use crate::prelude::*;
-use crate::session::{
-    AnyTable, ColumnDef, ExecInfo, ExecutionContext, ExecutionPlan, PatternSchema, PortDirection,
-    QueryError, Row, Store, Table,
-};
 
 /// Returns the column index for a given column name in the schema.
 pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {

@@ -7,14 +7,7 @@ use std::marker::PhantomData;
 
 use polars::prelude::*;
 
-use crate::CellId;
-use crate::session::{ColumnEntry, EntryArray, Row};
-use crate::traits::{Component, Pattern};
-
-use super::error::QueryError;
-use super::ref_type::Ref;
-// use super::row::Row;
-use super::schema::ColumnKind;
+use crate::prelude::*;
 
 /// A typed wrapper around a DataFrame storing pattern match results.
 ///

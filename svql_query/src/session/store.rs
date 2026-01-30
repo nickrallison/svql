@@ -7,11 +7,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::traits::{Component, Pattern};
-
-use super::ref_type::Ref;
-use super::row::Row;
-use super::table::{AnyTable, Table};
+use crate::prelude::*;
 
 /// Central storage for all pattern result tables.
 ///

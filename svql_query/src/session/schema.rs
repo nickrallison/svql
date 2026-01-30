@@ -6,7 +6,7 @@
 use ahash::AHashMap;
 use std::any::TypeId;
 
-use crate::CellId;
+use crate::prelude::*;
 // Assuming ahash is available, otherwise std HashMap
 
 /// A smart wrapper around the raw column definitions.

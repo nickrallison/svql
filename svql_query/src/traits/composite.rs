@@ -1,14 +1,8 @@
 use std::marker::PhantomData;
-use svql_driver::{Driver, DriverKey};
 
 use crate::{
-    prelude::{ColumnDef, ColumnKind, QueryError},
+    prelude::*,
     selector::Selector,
-    session::{
-        Alias, AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store,
-        Submodule, Table,
-    },
-    traits::{Component, PatternInternal, kind, search_table_any},
 };
 
 /// Connection constraint (keeping existing struct, just updating signature)
