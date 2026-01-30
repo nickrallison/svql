@@ -5,7 +5,7 @@
 
 use ahash::AHashMap;
 use std::any::TypeId;
- // Assuming ahash is available, otherwise std HashMap
+// Assuming ahash is available, otherwise std HashMap
 
 /// A smart wrapper around the raw column definitions.
 ///
@@ -258,6 +258,12 @@ impl ColumnDef {
         }
     }
 
+    /// Set the direction of this column (builder pattern)
+    pub const fn with_direction(mut self, direction: PortDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+
     pub fn as_submodule(&self) -> Option<TypeId> {
         match &self.kind {
             ColumnKind::Sub(tid) => Some(*tid),
@@ -274,6 +280,94 @@ impl ColumnDef {
             ColumnKind::Metadata => DataType::UInt64,
         };
         Column::new_empty(PlSmallStr::from_static(self.name), &d_type)
+    }
+}
+
+/// Port declaration for netlist and variant schemas
+#[derive(Debug, Clone, Copy)]
+pub struct Port {
+    pub name: &'static str,
+    pub direction: PortDirection,
+}
+
+impl Port {
+    pub const fn input(name: &'static str) -> Self {
+        Self {
+            name,
+            direction: PortDirection::Input,
+        }
+    }
+
+    pub const fn output(name: &'static str) -> Self {
+        Self {
+            name,
+            direction: PortDirection::Output,
+        }
+    }
+
+    pub const fn inout(name: &'static str) -> Self {
+        Self {
+            name,
+            direction: PortDirection::Inout,
+        }
+    }
+}
+
+/// Submodule declaration for composites
+#[derive(Debug, Clone, Copy)]
+pub struct Submodule {
+    pub name: &'static str,
+    pub type_id: TypeId,
+}
+
+impl Submodule {
+    pub const fn of<T: 'static>(name: &'static str) -> Self {
+        Self {
+            name,
+            type_id: TypeId::of::<T>(),
+        }
+    }
+}
+
+/// Alias: exposes a submodule's port as this composite's port
+#[derive(Debug, Clone, Copy)]
+pub struct Alias {
+    pub port_name: &'static str,
+    pub target: crate::selector::Selector<'static>,
+    pub direction: PortDirection,
+}
+
+impl Alias {
+    pub const fn input(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
+        Self {
+            port_name: name,
+            target,
+            direction: PortDirection::Input,
+        }
+    }
+
+    pub const fn output(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
+        Self {
+            port_name: name,
+            target,
+            direction: PortDirection::Output,
+        }
+    }
+}
+
+/// Port mapping for variants
+#[derive(Debug, Clone, Copy)]
+pub struct PortMap {
+    pub common_port: &'static str,
+    pub inner: crate::selector::Selector<'static>,
+}
+
+impl PortMap {
+    pub const fn new(common: &'static str, inner: crate::selector::Selector<'static>) -> Self {
+        Self {
+            common_port: common,
+            inner,
+        }
     }
 }
 

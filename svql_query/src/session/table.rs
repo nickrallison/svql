@@ -258,20 +258,12 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Get a cell ID by single column name (no path traversal).
     fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<u64>;
 
-    /// Resolve a path (e.g., "and1.y" or just "y") to a cell ID.
-    ///
-    /// This method traverses through submodule references to resolve deep paths.
-    /// For single-segment paths, it's equivalent to `get_cell_id`.
-    ///
-    /// # Arguments
-    /// * `row_idx` - The row index in this table
-    /// * `path` - A dot-separated path like "submod.port" or just "port"
-    /// * `ctx` - The execution context (needed to fetch submodule tables)
-    fn get_cell_id_path(
-        &self,
-        row_idx: usize,
-        path: &str,
-        ctx: &super::ExecutionContext,
+    /// Resolve a selector path within a specific row to a cell ID
+    fn resolve_path<'a>(
+        &self, 
+        row_idx: usize, 
+        selector: crate::selector::Selector<'a>, 
+        ctx: &super::ExecutionContext
     ) -> Option<u64>;
 }
 
@@ -321,44 +313,13 @@ where
         Some((val, target_type))
     }
 
-    fn get_cell_id_path(
+    fn resolve_path<'a>(
         &self,
         row_idx: usize,
-        path: &str,
+        selector: crate::selector::Selector<'a>,
         ctx: &super::ExecutionContext,
     ) -> Option<u64> {
-        let segments: Vec<&str> = path.split('.').collect();
-
-        if segments.is_empty() {
-            return None;
-        }
-
-        // Single segment: just do a direct cell lookup
-        if segments.len() == 1 {
-            return self.get_cell_id(row_idx, segments[0]);
-        }
-
-        // Multi-segment path: traverse through submodules
-        let head = segments[0];
-
-        // Get the submodule reference for the head
-        let (mut current_row_idx, mut current_type_id) = self.get_sub_ref(row_idx, head)?;
-
-        // Traverse intermediate segments
-        for (i, segment) in segments[1..].iter().enumerate() {
-            let table = ctx.get_any_table(current_type_id)?;
-
-            if i == segments.len() - 2 {
-                // Last segment: must be a Cell
-                return table.get_cell_id(current_row_idx as usize, segment);
-            } else {
-                // Intermediate segment: must be a Submodule
-                let (next_idx, next_tid) = table.get_sub_ref(current_row_idx as usize, segment)?;
-                current_row_idx = next_idx;
-                current_type_id = next_tid;
-            }
-        }
-
-        None
+        let row = self.row(row_idx as u64)?;
+        row.resolve(selector, ctx).map(|wire| wire.id())
     }
 }

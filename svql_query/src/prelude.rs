@@ -39,8 +39,12 @@ pub use crate::traits::{
 // New API types (Phase 1-6)
 pub use crate::session::{
     // Core types
+    Alias,
     ColumnDef,
     ColumnKind,
+    Port,
+    PortMap,
+    Submodule,
     // Execution
     // Config as ExecConfig,
     // ExecutionContext,
@@ -66,6 +70,8 @@ pub use crate::session::{
     VariantPattern,
     VariantRef,
 };
+
+pub use crate::selector::Selector;
 
 pub use common::{Config, ConfigBuilder, Dedupe, MatchLength, ModuleConfig, YosysModule};
 

@@ -71,6 +71,53 @@ where
             })
             .map(|id| Wire::new(id, col_def.direction))
     }
+    
+    /// Resolve a path to a wire using a Selector
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use svql_query::selector::Selector;
+    /// 
+    /// let sel = Selector::new(&["y"]);
+    /// row.resolve(sel, ctx);  // Direct port
+    /// 
+    /// let sel = Selector::new(&["and1", "y"]);
+    /// row.resolve(sel, ctx);  // Submodule port
+    /// ```
+    pub fn resolve<'a>(&self, selector: crate::selector::Selector<'a>, ctx: &super::ExecutionContext) -> Option<Wire> {
+        if selector.is_empty() {
+            return None;
+        }
+        
+        // Single segment: direct lookup
+        if selector.len() == 1 {
+            return self.wire(selector.head()?);
+        }
+        
+        // Multi-segment: traverse through submodules
+        let head = selector.head()?;
+        let idx = T::schema().index_of(head)?;
+        let col_def = T::schema().column(idx);
+        
+        // Head must be a submodule reference
+        let (sub_row_idx, sub_type_id) = match &col_def.kind {
+            crate::session::ColumnKind::Sub(tid) => {
+                let entry = self.entry_array.entries.get(idx)?;
+                match entry {
+                    crate::session::ColumnEntry::Sub { id: Some(id) } => (*id, *tid),
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        };
+        
+        // Get the submodule's table and continue resolution
+        let sub_table = ctx.get_any_table(sub_type_id)?;
+        let cell_id = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
+        
+        // Direction is lost through traversal
+        Some(Wire::new(cell_id, crate::session::PortDirection::None))
+    }
 
     /// Get a submodule reference by column name.
     ///

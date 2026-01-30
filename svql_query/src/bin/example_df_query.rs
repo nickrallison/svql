@@ -3,11 +3,11 @@ use svql_query::{
     Wire,
     prelude::*,
     selector::Selector,
-    session::{ExecInfo, Row, Store},
+    session::{ExecInfo, Port, Row, Store},
     test_harness::TestSpec,
     traits::{
         Component, Netlist, PatternInternal,
-        composite::{Composite, Connection, Connections, Endpoint},
+        composite::{Composite, Connection},
         kind,
     },
 };
@@ -23,17 +23,12 @@ struct AndGate {
 impl Netlist for AndGate {
     const MODULE_NAME: &'static str = "and_gate";
     const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-    const DEFS: &'static [ColumnDef] = &[
-        ColumnDef::new("a", ColumnKind::Cell, false),
-        ColumnDef::new("b", ColumnKind::Cell, false),
-        ColumnDef::new("y", ColumnKind::Cell, false),
+    
+    const PORTS: &'static [Port] = &[
+        Port::input("a"),
+        Port::input("b"),
+        Port::output("y"),
     ];
-
-    fn schema() -> &'static svql_query::session::PatternSchema {
-        static INSTANCE: std::sync::OnceLock<svql_query::session::PatternSchema> =
-            std::sync::OnceLock::new();
-        INSTANCE.get_or_init(|| svql_query::session::PatternSchema::new(<Self as Netlist>::DEFS))
-    }
 
     fn rehydrate<'a>(
         row: &Row<Self>,
@@ -70,18 +65,25 @@ pub struct And2Gates {
 }
 
 impl Composite for And2Gates {
-    const DEFS: &'static [ColumnDef] = &[
-        ColumnDef::sub::<AndGate>("and1"),
-        ColumnDef::sub::<AndGate>("and2"),
+    const SUBMODULES: &'static [Submodule] = &[
+        Submodule::of::<AndGate>("and1"),
+        Submodule::of::<AndGate>("and2"),
     ];
-
-    const ALIASES: &'static [(&'static str, Endpoint)] = &[];
-
-    fn schema() -> &'static svql_query::session::PatternSchema {
-        static INSTANCE: std::sync::OnceLock<svql_query::session::PatternSchema> =
-            std::sync::OnceLock::new();
-        INSTANCE.get_or_init(|| svql_query::session::PatternSchema::new(<Self as Composite>::DEFS))
-    }
+    
+    const ALIASES: &'static [Alias] = &[
+        Alias::input("a", Selector::static_path(&["and1", "a"])),
+        Alias::input("b", Selector::static_path(&["and1", "b"])),
+        Alias::output("y", Selector::static_path(&["and2", "y"])),
+    ];
+    
+    const CONNECTIONS: &'static [Connection] = &[
+        Connection::new(
+            Selector::static_path(&["and1", "y"]),
+            Selector::static_path(&["and2", "a"])
+        ),
+    ];
+    
+    const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
     fn rehydrate<'a>(
         _row: &Row<Self>,
@@ -94,31 +96,6 @@ impl Composite for And2Gates {
     {
         todo!()
     }
-
-    const CONNECTIONS: Connections = {
-        let conns: &'static [&'static [Connection]] = &[&[
-            // Connect and1.y -> and2.a
-            Connection {
-                from: Endpoint {
-                    selector: Selector::new(&["and1", "y"]),
-                },
-                to: Endpoint {
-                    selector: Selector::new(&["and2", "a"]),
-                },
-            },
-            Connection {
-                from: Endpoint {
-                    selector: Selector::new(&["and1", "y"]),
-                },
-                to: Endpoint {
-                    selector: Selector::new(&["and2", "b"]),
-                },
-            },
-        ]];
-        Connections { connections: conns }
-    };
-
-    const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
     fn preload_driver(
         driver: &Driver,

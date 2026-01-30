@@ -1,22 +1,10 @@
 use svql_driver::{Driver, DriverKey};
 
 use crate::{
-    prelude::{ColumnDef, QueryError, Table},
-    session::{AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Row, Store},
+    prelude::{ColumnDef, ColumnKind, QueryError, Table},
+    session::{AnyTable, ColumnEntry, EntryArray, ExecInfo, ExecutionContext, Port, PortMap, Row, Store},
     traits::{Component, PatternInternal, kind, search_table_any},
 };
-
-/// Maps a common port name to an inner type's port name.
-///
-/// Used by Variant types to unify different port names from inner types
-/// into a single common interface.
-#[derive(Debug, Clone, Copy)]
-pub struct PortMapping {
-    /// The port name exposed by the variant (unified interface).
-    pub common_port: &'static str,
-    /// The port name in the inner type that maps to this common port.
-    pub inner_port: &'static str,
-}
 
 /// Describes one variant arm for lookup during rehydration.
 ///
@@ -31,35 +19,48 @@ pub struct VariantArm {
 }
 
 pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'static {
-    /// Schema definition for DataFrame storage.
-    ///
-    /// Must include:
-    /// - `discriminant` (Metadata): which variant arm matched (0, 1, 2, ...)
-    /// - `inner_ref` (Sub<Self>): row index into variant arm's table
-    /// - Common ports (Cell): mapped from inner types
-    const DEFS: &'static [ColumnDef];
-
-    /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize = Self::DEFS.len();
-
-    /// Number of variant arms.
+    /// Number of variant arms
     const NUM_VARIANTS: usize;
-
-    /// Port mappings for each variant arm.
-    ///
-    /// Index corresponds to discriminant value.
-    /// `PORT_MAPS[variant_idx]` gives the mappings for that arm.
-    const PORT_MAPS: &'static [&'static [PortMapping]];
-
-    /// Variant arm metadata (TypeId + name for each arm).
+    
+    /// Common interface ports (macro-generated)
+    const COMMON_PORTS: &'static [Port];
+    
+    /// Port mappings for each variant arm (macro-generated)
+    const PORT_MAPPINGS: &'static [&'static [PortMap]];
+    
+    /// Variant arm metadata (macro-generated)
     const VARIANT_ARMS: &'static [VariantArm];
-
-    /// Dependencies: ExecInfo for each variant arm (in discriminant order).
+    
+    /// Dependencies (macro-generated)
     const DEPENDANCIES: &'static [&'static ExecInfo];
+    
+    /// Schema accessor (macro generates this with OnceLock pattern)
+    fn schema() -> &'static crate::session::PatternSchema {
+        static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+        SCHEMA.get_or_init(|| {
+            let defs = Self::variant_to_defs();
+            let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
+            crate::session::PatternSchema::new(defs_static)
+        })
+    }
+    
+    /// Convert declarations to column definitions
+    fn variant_to_defs() -> Vec<ColumnDef> {
+        let mut defs = vec![
+            ColumnDef::metadata("discriminant"),
+            ColumnDef::sub::<()>("inner_ref"),
+        ];
+        
+        defs.extend(
+            Self::COMMON_PORTS.iter()
+                .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false)
+                    .with_direction(p.direction))
+        );
+        
+        defs
+    }
 
-    /// Access the smart Schema wrapper.
-    fn schema() -> &'static crate::session::PatternSchema;
-
+    
     /// Concatenate results from all variant arms into a unified table.
     ///
     /// This is the core operation for variants - it unions the results from
@@ -81,14 +82,13 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             .ok_or_else(|| QueryError::SchemaLut("inner_ref".to_string()))?;
 
         for (variant_idx, table) in dep_tables.iter().enumerate() {
-            let port_map = Self::PORT_MAPS[variant_idx];
+            let port_maps = Self::PORT_MAPPINGS[variant_idx];
 
             for row_idx in 0..table.len() as u64 {
-                let mut entry = EntryArray::with_capacity(Self::SCHEMA_SIZE);
+                let mut entry = EntryArray::with_capacity(2 + Self::COMMON_PORTS.len());
 
-                // Initialize all entries to None (already done by with_capacity for Metadata)
-                // Re-initialize cells explicitly
-                for i in 0..Self::SCHEMA_SIZE {
+                // Initialize all entries to None
+                for i in 0..(2 + Self::COMMON_PORTS.len()) {
                     entry.entries[i] = ColumnEntry::Cell { id: None };
                 }
 
@@ -101,11 +101,9 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(row_idx) };
 
                 // 3. Map common ports from inner table using path resolution
-                // This supports both simple paths ("a") and deep paths ("and1.a")
-                for mapping in port_map.iter() {
+                for mapping in port_maps.iter() {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
-                        let cell_id =
-                            table.get_cell_id_path(row_idx as usize, mapping.inner_port, ctx);
+                        let cell_id = table.resolve_path(row_idx as usize, mapping.inner, ctx);
                         entry.entries[col_idx] = ColumnEntry::Cell { id: cell_id };
                     }
                 }
@@ -139,9 +137,9 @@ impl<T> PatternInternal<kind::Variant> for T
 where
     T: Variant + Component<Kind = kind::Variant> + Send + Sync + 'static,
 {
-    const DEFS: &'static [ColumnDef] = T::DEFS;
-
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+    const DEFS: &'static [ColumnDef] = &[]; // Placeholder
+    
+    const SCHEMA_SIZE: usize = 2 + T::COMMON_PORTS.len(); // discriminant + inner_ref + common ports
 
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
@@ -207,13 +205,11 @@ mod test {
 
     use crate::{
         Wire,
-        prelude::ColumnKind,
         selector::Selector,
         session::ExecInfo,
         traits::{
             Netlist, Pattern,
-            composite::{Composite, Connection, Connections, Endpoint},
-            schema_lut,
+            composite::Composite,
         },
     };
 
@@ -232,23 +228,18 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        const DEFS: &'static [ColumnDef] = &[
-            ColumnDef::new("a", ColumnKind::Cell, false),
-            ColumnDef::new("b", ColumnKind::Cell, false),
-            ColumnDef::new("y", ColumnKind::Cell, false),
+        
+        const PORTS: &'static [Port] = &[
+            Port::input("a"),
+            Port::input("b"),
+            Port::output("y"),
         ];
-
-        fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
-                std::sync::OnceLock::new();
-            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
-        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
-            store: &Store,
-            driver: &Driver,
-            key: &DriverKey,
+            _store: &Store,
+            _driver: &Driver,
+            _key: &DriverKey,
         ) -> Option<Self>
         where
             Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
@@ -278,18 +269,25 @@ mod test {
     }
 
     impl Composite for And2Gates {
-        const DEFS: &'static [ColumnDef] = &[
-            ColumnDef::sub::<AndGate>("and1"),
-            ColumnDef::sub::<AndGate>("and2"),
+        const SUBMODULES: &'static [crate::session::Submodule] = &[
+            crate::session::Submodule::of::<AndGate>("and1"),
+            crate::session::Submodule::of::<AndGate>("and2"),
         ];
-
-        const ALIASES: &'static [(&'static str, Endpoint)] = &[];
-
-        fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
-                std::sync::OnceLock::new();
-            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Composite>::DEFS))
-        }
+        
+        const ALIASES: &'static [crate::session::Alias] = &[
+            crate::session::Alias::input("a", Selector::static_path(&["and1", "a"])),
+            crate::session::Alias::input("b", Selector::static_path(&["and1", "b"])),
+            crate::session::Alias::output("y", Selector::static_path(&["and2", "y"])),
+        ];
+        
+        const CONNECTIONS: &'static [crate::traits::composite::Connection] = &[
+            crate::traits::composite::Connection::new(
+                Selector::static_path(&["and1", "y"]),
+                Selector::static_path(&["and2", "a"])
+            ),
+        ];
+        
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
         fn rehydrate<'a>(
             row: &Row<Self>,
@@ -315,31 +313,6 @@ mod test {
             Some(And2Gates { and1, and2 })
         }
 
-        const CONNECTIONS: Connections = {
-            let conns: &'static [&'static [Connection]] = &[&[
-                // Connect and1.y -> and2.a
-                Connection {
-                    from: Endpoint {
-                        selector: Selector::new(&["and1", "y"]),
-                    },
-                    to: Endpoint {
-                        selector: Selector::new(&["and2", "a"]),
-                    },
-                },
-                Connection {
-                    from: Endpoint {
-                        selector: Selector::new(&["and1", "y"]),
-                    },
-                    to: Endpoint {
-                        selector: Selector::new(&["and2", "b"]),
-                    },
-                },
-            ]];
-            Connections { connections: conns }
-        };
-
-        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
-
         fn preload_driver(
             driver: &Driver,
             design_key: &DriverKey,
@@ -363,46 +336,26 @@ mod test {
     }
 
     impl Variant for AndOrAnd2 {
-        const DEFS: &'static [ColumnDef] = &[
-            ColumnDef::metadata("discriminant"),
-            ColumnDef::sub::<Self>("inner_ref"),
-            ColumnDef::input("a"),
-            ColumnDef::input("b"),
-            ColumnDef::output("y"),
-        ];
-
         const NUM_VARIANTS: usize = 2;
-
-        const PORT_MAPS: &'static [&'static [PortMapping]] = &[
+        
+        const COMMON_PORTS: &'static [Port] = &[
+            Port::input("a"),
+            Port::input("b"),
+            Port::output("y"),
+        ];
+        
+        const PORT_MAPPINGS: &'static [&'static [PortMap]] = &[
             // Variant 0: AndGate
             &[
-                PortMapping {
-                    common_port: "a",
-                    inner_port: "a",
-                },
-                PortMapping {
-                    common_port: "b",
-                    inner_port: "b",
-                },
-                PortMapping {
-                    common_port: "y",
-                    inner_port: "y",
-                },
+                PortMap::new("a", Selector::static_path(&["a"])),
+                PortMap::new("b", Selector::static_path(&["b"])),
+                PortMap::new("y", Selector::static_path(&["y"])),
             ],
-            // Variant 1: And2Gates - maps to first and gate's inputs and second's output
+            // Variant 1: And2Gates
             &[
-                PortMapping {
-                    common_port: "a",
-                    inner_port: "and1.a",
-                },
-                PortMapping {
-                    common_port: "b",
-                    inner_port: "and1.b",
-                },
-                PortMapping {
-                    common_port: "y",
-                    inner_port: "and2.y",
-                },
+                PortMap::new("a", Selector::static_path(&["a"])),
+                PortMap::new("b", Selector::static_path(&["b"])),
+                PortMap::new("y", Selector::static_path(&["y"])),
             ],
         ];
 
@@ -421,12 +374,6 @@ mod test {
             <AndGate as Pattern>::EXEC_INFO,
             <And2Gates as Pattern>::EXEC_INFO,
         ];
-
-        fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
-                std::sync::OnceLock::new();
-            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Variant>::DEFS))
-        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,

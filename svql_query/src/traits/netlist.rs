@@ -4,7 +4,7 @@
 
 use crate::{
     prelude::*,
-    session::{ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
+    session::{ColumnEntry, EntryArray, ExecutionContext, Port, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, search_table_any},
 };
 use prjunnamed_netlist::Value;
@@ -29,14 +29,26 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     /// Path to the netlist source file (.v, .il, or .json).
     const FILE_PATH: &'static str;
 
-    /// Schema definition for DataFrame storage.
-    const DEFS: &'static [ColumnDef];
+    /// Port declarations (macro-generated)
+    const PORTS: &'static [Port];
 
-    /// Size of the schema (number of columns).
-    const SCHEMA_SIZE: usize = Self::DEFS.len();
-
-    /// Access the smart Schema wrapper.
-    fn schema() -> &'static crate::session::PatternSchema;
+    /// Schema accessor (macro generates this with OnceLock pattern)
+    fn schema() -> &'static crate::session::PatternSchema {
+        static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> = std::sync::OnceLock::new();
+        SCHEMA.get_or_init(|| {
+            let defs = Self::ports_to_defs();
+            let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
+            crate::session::PatternSchema::new(defs_static)
+        })
+    }
+    
+    /// Convert port declarations to column definitions
+    fn ports_to_defs() -> Vec<ColumnDef> {
+        Self::PORTS.iter()
+            .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false)
+                .with_direction(p.direction))
+            .collect()
+    }
 
     /// Returns the driver key for this netlist.
     fn driver_key() -> DriverKey {
@@ -49,7 +61,8 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     }
 
     fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
-        let mut row_match: Vec<Option<u64>> = vec![None; Self::SCHEMA_SIZE];
+        let schema_size = Self::PORTS.len();
+        let mut row_match: Vec<Option<u64>> = vec![None; schema_size];
         for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
             let needle_cell = needle_cell_wrapper.get();
             match needle_cell {
@@ -80,7 +93,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             }
         }
 
-        for idx in 0..Self::SCHEMA_SIZE {
+        for idx in 0..schema_size {
             if row_match[idx].is_none() {
                 let col_name = Self::schema().column(idx).name;
                 panic!("Unmapped column in match: {}", col_name);
@@ -108,9 +121,9 @@ impl<T> PatternInternal<kind::Netlist> for T
 where
     T: Netlist + Component<Kind = kind::Netlist> + Send + Sync + 'static,
 {
-    const DEFS: &'static [ColumnDef] = T::DEFS;
+    const DEFS: &'static [ColumnDef] = &[]; // Placeholder, not used anymore
 
-    const SCHEMA_SIZE: usize = T::SCHEMA_SIZE;
+    const SCHEMA_SIZE: usize = T::PORTS.len();
 
     const EXEC_INFO: &'static crate::session::ExecInfo = &crate::session::ExecInfo {
         type_id: std::any::TypeId::of::<T>(),
@@ -208,23 +221,18 @@ mod test {
     impl Netlist for AndGate {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-        const DEFS: &'static [ColumnDef] = &[
-            ColumnDef::new("a", ColumnKind::Cell, false),
-            ColumnDef::new("b", ColumnKind::Cell, false),
-            ColumnDef::new("y", ColumnKind::Cell, false),
+        
+        const PORTS: &'static [Port] = &[
+            Port::input("a"),
+            Port::input("b"),
+            Port::output("y"),
         ];
-
-        fn schema() -> &'static crate::session::PatternSchema {
-            static INSTANCE: std::sync::OnceLock<crate::session::PatternSchema> =
-                std::sync::OnceLock::new();
-            INSTANCE.get_or_init(|| crate::session::PatternSchema::new(<Self as Netlist>::DEFS))
-        }
 
         fn rehydrate<'a>(
             row: &Row<Self>,
-            store: &Store,
-            driver: &Driver,
-            key: &DriverKey,
+            _store: &Store,
+            _driver: &Driver,
+            _key: &DriverKey,
         ) -> Option<Self>
         where
             Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
