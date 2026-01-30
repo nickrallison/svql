@@ -120,6 +120,14 @@ where
             T::CELL_KIND
         );
 
+        // Warn if Dedupe::None is used with primitives
+        if matches!(ctx.config().dedupe, svql_common::Dedupe::None) {
+            tracing::warn!(
+                "Dedupe::None has no effect on primitive {} - primitives enumerate cells directly without combinatorial expansion. Use Dedupe::All instead, behavior does not change, but will match the expected behavior of netlists.",
+                std::any::type_name::<T>()
+            );
+        }
+
         let haystack_container = ctx
             .driver()
             .get_design(&haystack_key, &ctx.config().haystack_options)
@@ -306,16 +314,18 @@ mod tests {
     // Example primitive gate
     define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
 
+    // small_and_tree has 3 AND gates total
+    // Dedupe::None will warn but still return 3 matches (same as Dedupe::All)
     query_test!(
-        name: test_and2gates_small_and_tree_dedupe_none,
+        name: test_and_gate_small_tree_dedupe_none,
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 6,
+        expect: 3,  // Same as Dedupe::All - primitives don't have permutations
         config: |config_builder| config_builder.dedupe(Dedupe::None)
     );
 
     query_test!(
-        name: test_and2gates_small_and_tree_dedupe_all,
+        name: test_and_gate_small_tree_dedupe_all,
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 3,

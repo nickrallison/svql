@@ -1,4 +1,4 @@
-use svql_query::prelude::*;
+use svql_query::{define_primitive, prelude::*};
 
 #[allow(unused)]
 #[derive(Debug, Clone)]
@@ -108,15 +108,14 @@ impl Component for And2Gates {
     type Kind = kind::Composite;
 }
 
-// query_test!(
-//     name: test_and2gates_small_and_tree_dedupe_none,
-//     query: And2Gates,
-//     haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-//     expect: 4,
-//     config: |config_builder| config_builder.dedupe(Dedupe::None)
-// );
+define_primitive!(TestAndGate, And, [(a, input), (b, input), (y, output)]);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing to see warnings
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::WARN)
+        .try_init();
+
     let haystack_path = "examples/fixtures/basic/and/verilog/small_and_tree.v";
     let haystack_module = "small_and_tree";
     let config = Config::builder().dedupe(Dedupe::None).build();
@@ -133,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Execute query using the new DataFrame API
-    let store = svql_query::run_query::<And2Gates>(&driver, &key, &config)?;
+    let store = svql_query::run_query::<TestAndGate>(&driver, &key, &config)?;
 
     for (_, table) in store.tables() {
         println!("Table: {}", table);
