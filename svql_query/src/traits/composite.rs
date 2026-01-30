@@ -31,6 +31,14 @@ pub struct Endpoint {
     pub selector: Selector<'static>,
 }
 
+/// Connections wrapper with CNF structure
+#[derive(Debug, Clone, Copy)]
+pub struct Connections {
+    /// CNF form: outer array is AND (all groups must be satisfied),
+    /// inner array is OR (at least one connection in the group must hold)
+    pub connections: &'static [&'static [Connection]],
+}
+
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
     /// Submodule declarations (macro-generated)
     const SUBMODULES: &'static [Submodule];
@@ -38,8 +46,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     /// Port aliases (macro-generated)
     const ALIASES: &'static [Alias];
 
-    /// Connection constraints (macro-generated)
-    const CONNECTIONS: &'static [Connection];
+    /// Connection constraints in CNF form (macro-generated)
+    const CONNECTIONS: Connections;
 
     /// Dependencies (macro-generated)
     const DEPENDANCIES: &'static [&'static ExecInfo];
@@ -131,15 +139,27 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         };
         let _graph = design.index();
 
-        // Check each connection constraint
-        for conn in Self::CONNECTIONS {
-            let src_wire = row.resolve(conn.from.selector, ctx);
-            let dst_wire = row.resolve(conn.to.selector, ctx);
+        // Check each CNF group (conjunction of disjunctions)
+        for group in Self::CONNECTIONS.connections {
+            let mut group_satisfied = false;
 
-            match (src_wire, dst_wire) {
-                (Some(s), Some(d)) if s.id() == d.id() => continue,
-                (Some(_), Some(_)) => return false,
-                (None, _) | (_, None) => return false,
+            // Try each alternative in this group (disjunction)
+            for conn in *group {
+                let src_wire = row.resolve(conn.from.selector, ctx);
+                let dst_wire = row.resolve(conn.to.selector, ctx);
+
+                match (src_wire, dst_wire) {
+                    (Some(s), Some(d)) if s.id() == d.id() => {
+                        group_satisfied = true;
+                        break; // This alternative worked, move to next group
+                    }
+                    _ => continue, // Try next alternative
+                }
+            }
+
+            // If no alternative in this group was satisfied, validation fails
+            if !group_satisfied {
+                return false;
             }
         }
 
@@ -297,7 +317,7 @@ where
 }
 
 #[allow(unused)]
-mod test {
+pub(crate) mod test {
 
     use crate::{
         Wire,
@@ -312,7 +332,7 @@ mod test {
     use svql_query::query_test;
 
     #[derive(Debug, Clone)]
-    pub struct And2Gates {
+    pub(crate) struct And2Gates {
         and1: AndGate,
         and2: AndGate,
     }
@@ -329,10 +349,23 @@ mod test {
             Alias::output("y", Selector::static_path(&["and2", "y"])),
         ];
 
-        const CONNECTIONS: &'static [Connection] = &[Connection::new(
-            Selector::static_path(&["and1", "y"]),
-            Selector::static_path(&["and2", "a"]),
-        )];
+        const CONNECTIONS: Connections = {
+            const CONN_GROUP: &[Connection] = &[
+                // and1.y can connect to EITHER and2.a OR and2.b (commutative inputs)
+                Connection::new(
+                    Selector::static_path(&["and1", "y"]),
+                    Selector::static_path(&["and2", "a"]),
+                ),
+                Connection::new(
+                    Selector::static_path(&["and1", "y"]),
+                    Selector::static_path(&["and2", "b"]),
+                ),
+            ];
+
+            Connections {
+                connections: &[CONN_GROUP],
+            }
+        };
 
         const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 

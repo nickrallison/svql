@@ -7,7 +7,7 @@ use svql_query::{
     test_harness::TestSpec,
     traits::{
         Component, Netlist, PatternInternal,
-        composite::{Composite, Connection},
+        composite::{Composite, Connection, Connections},
         kind,
     },
 };
@@ -23,12 +23,8 @@ struct AndGate {
 impl Netlist for AndGate {
     const MODULE_NAME: &'static str = "and_gate";
     const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-    
-    const PORTS: &'static [Port] = &[
-        Port::input("a"),
-        Port::input("b"),
-        Port::output("y"),
-    ];
+
+    const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
 
     fn rehydrate<'a>(
         row: &Row<Self>,
@@ -69,20 +65,31 @@ impl Composite for And2Gates {
         Submodule::of::<AndGate>("and1"),
         Submodule::of::<AndGate>("and2"),
     ];
-    
+
     const ALIASES: &'static [Alias] = &[
         Alias::input("a", Selector::static_path(&["and1", "a"])),
         Alias::input("b", Selector::static_path(&["and1", "b"])),
         Alias::output("y", Selector::static_path(&["and2", "y"])),
     ];
-    
-    const CONNECTIONS: &'static [Connection] = &[
-        Connection::new(
-            Selector::static_path(&["and1", "y"]),
-            Selector::static_path(&["and2", "a"])
-        ),
-    ];
-    
+
+    const CONNECTIONS: Connections = {
+        const CONN_GROUP: &[Connection] = &[
+            // and1.y can connect to EITHER and2.a OR and2.b (commutative inputs)
+            Connection::new(
+                Selector::static_path(&["and1", "y"]),
+                Selector::static_path(&["and2", "a"]),
+            ),
+            Connection::new(
+                Selector::static_path(&["and1", "y"]),
+                Selector::static_path(&["and2", "b"]),
+            ),
+        ];
+
+        Connections {
+            connections: &[CONN_GROUP],
+        }
+    };
+
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
     fn rehydrate<'a>(
