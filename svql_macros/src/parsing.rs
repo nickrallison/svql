@@ -2,7 +2,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Error, Expr, ExprArray, ExprLit, Ident, Lit, MetaNameValue, Result};
+use syn::{Error, Expr, ExprArray, ExprLit, Lit, MetaNameValue, Result};
 
 /// A path selector like ["and1", "y"]
 #[derive(Debug, Clone)]
@@ -45,33 +45,12 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn to_tokens(&self) -> TokenStream {
-        match self {
-            Direction::Input => quote! { svql_query::session::PortDirection::Input },
-            Direction::Output => quote! { svql_query::session::PortDirection::Output },
-            Direction::Inout => quote! { svql_query::session::PortDirection::Inout },
-        }
-    }
-
-    pub fn to_port_constructor(&self) -> TokenStream {
+    pub fn as_port_constructor(&self) -> TokenStream {
         match self {
             Direction::Input => quote! { svql_query::session::Port::input },
             Direction::Output => quote! { svql_query::session::Port::output },
             Direction::Inout => quote! { svql_query::session::Port::inout },
         }
-    }
-}
-
-/// Parse a direction identifier (input, output, inout)
-pub fn parse_direction(ident: &Ident) -> Result<Direction> {
-    match ident.to_string().as_str() {
-        "input" => Ok(Direction::Input),
-        "output" => Ok(Direction::Output),
-        "inout" => Ok(Direction::Inout),
-        other => Err(Error::new_spanned(
-            ident,
-            format!("Expected 'input', 'output', or 'inout', got '{}'", other),
-        )),
     }
 }
 
@@ -84,15 +63,6 @@ pub fn get_string_value(nv: &MetaNameValue) -> Result<String> {
         Ok(s.value())
     } else {
         Err(Error::new_spanned(&nv.value, "Expected string literal"))
-    }
-}
-
-/// Parse an array expression from a meta name-value
-pub fn get_array_expr(nv: &MetaNameValue) -> Result<ExprArray> {
-    if let Expr::Array(arr) = &nv.value {
-        Ok(arr.clone())
-    } else {
-        Err(Error::new_spanned(&nv.value, "Expected array expression"))
     }
 }
 

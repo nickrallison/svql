@@ -2,17 +2,12 @@
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
-    Data, DeriveInput, Expr, ExprArray, ExprLit, Fields, Lit, Meta, MetaNameValue, Token,
-    parse::Parse, parse_macro_input, spanned::Spanned,
+    Data, DeriveInput, Expr, ExprArray, Fields, Meta, Token, parse::Parse, parse_macro_input,
 };
 
-use crate::parsing::{
-    Direction, PathSelector, find_all_attrs, find_attr, get_array_expr, parse_direction,
-    parse_nested_paths,
-};
+use crate::parsing::{Direction, PathSelector, find_all_attrs, find_attr, parse_nested_paths};
 
 /// A single connection constraint
 struct Connection {

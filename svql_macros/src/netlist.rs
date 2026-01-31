@@ -54,7 +54,7 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
         .map(|p| {
             let default = p.name.to_string();
             let port_name = p.rename.as_ref().unwrap_or(&default);
-            let constructor = p.direction.to_port_constructor();
+            let constructor = p.direction.as_port_constructor();
             quote! { #constructor(#port_name) }
         })
         .collect();

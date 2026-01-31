@@ -2,14 +2,10 @@
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{
-    Data, DeriveInput, Expr, ExprArray, Fields, Ident, Meta, Token, parse_macro_input,
-    spanned::Spanned,
-};
+use syn::{Data, DeriveInput, ExprArray, Fields, Ident, parse_macro_input};
 
-use crate::parsing::{Direction, PathSelector, find_attr, parse_direction};
+use crate::parsing::{Direction, PathSelector, find_attr};
 
 /// A common port declaration
 struct CommonPort {
@@ -56,7 +52,7 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
         .iter()
         .map(|p| {
             let port_name = &p.name;
-            let constructor = p.direction.to_port_constructor();
+            let constructor = p.direction.as_port_constructor();
             quote! { #constructor(#port_name) }
         })
         .collect();
