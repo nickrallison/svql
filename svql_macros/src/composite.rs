@@ -1,4 +1,5 @@
 // svql_macros/src/composite.rs
+#![allow(clippy::too_many_lines, clippy::unnecessary_wraps)]
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
@@ -80,9 +81,10 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
             let port_name = a.name.to_string();
             let target = a.target.to_selector_tokens();
             let constructor = match a.direction {
-                Direction::Input => quote! { svql_query::session::Alias::input },
                 Direction::Output => quote! { svql_query::session::Alias::output },
-                Direction::Inout => quote! { svql_query::session::Alias::input }, // Treat as input for now
+                Direction::Input | Direction::Inout => {
+                    quote! { svql_query::session::Alias::input }
+                } // Treat as input for now
             };
             quote! {
                 #constructor(#port_name, #target)
@@ -365,7 +367,7 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
                     let key = nv
                         .path
                         .get_ident()
-                        .map(|i| i.to_string())
+                        .map(std::string::ToString::to_string)
                         .unwrap_or_default();
 
                     if let Expr::Array(arr) = &nv.value {

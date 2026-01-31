@@ -144,7 +144,7 @@ impl std::fmt::Debug for ExecutionPlan {
 }
 
 impl ExecutionPlan {
-    #[must_use] 
+    #[must_use]
     pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
@@ -204,12 +204,14 @@ impl ExecutionPlan {
 
         // Execute all nodes - OnceLock ensures each runs exactly once
         #[cfg(feature = "parallel")]
-        let mut iter = self.nodes.par_iter();
+        self.nodes
+            .par_iter()
+            .try_for_each(|node| self.execute_node(node, ctx))?;
 
         #[cfg(not(feature = "parallel"))]
-        let mut iter = self.nodes.iter();
-
-        iter.try_for_each(|node| self.execute_node(node, ctx))?;
+        self.nodes
+            .iter()
+            .try_for_each(|node| self.execute_node(node, ctx))?;
 
         Ok(())
     }
@@ -256,7 +258,7 @@ impl ExecutionPlan {
     ///
     /// This should only be called for declared dependencies. If DAG ordering
     /// is correct, the dependency will always be available.
-    #[must_use] 
+    #[must_use]
     pub fn get_table<'a, T: 'static>(
         &self,
         ctx: &'a ExecutionContext,
@@ -308,7 +310,7 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
-    #[must_use] 
+    #[must_use]
     pub fn new(
         driver: Driver,
         design_key: DriverKey,
@@ -324,19 +326,19 @@ impl ExecutionContext {
     }
 
     /// Get the driver.
-    #[must_use] 
+    #[must_use]
     pub const fn driver(&self) -> &Driver {
         &self.driver
     }
 
     /// Get the driver key.
-    #[must_use] 
+    #[must_use]
     pub fn design_key(&self) -> DriverKey {
         self.design_key.clone()
     }
 
     /// Get the configuration.
-    #[must_use] 
+    #[must_use]
     pub const fn config(&self) -> &svql_common::Config {
         &self.config
     }
@@ -345,7 +347,7 @@ impl ExecutionContext {
     ///
     /// Returns `None` if the table was not found or is not yet computed
     /// (though DAG ordering guarantees it should be computed).
-    #[must_use] 
+    #[must_use]
     pub fn get_any_table(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.slots
             .get(&type_id)

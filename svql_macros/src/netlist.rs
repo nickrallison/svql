@@ -128,15 +128,15 @@ fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
             let key = nv
                 .path
                 .get_ident()
-                .map(|i| i.to_string())
+                .map(std::string::ToString::to_string)
                 .unwrap_or_default();
 
             match key.as_str() {
                 "file" => {
-                    file = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)))
+                    file = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)));
                 }
                 "module" => {
-                    module = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)))
+                    module = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)));
                 }
                 other => abort!(nv, "Unknown netlist attribute key: {}", other),
             }

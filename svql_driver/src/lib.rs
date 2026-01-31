@@ -4,6 +4,9 @@
 //! manages design loading and caching, and the creation
 //! of execution contexts.
 
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+
 // pub mod context;
 pub mod design_container;
 pub mod driver;

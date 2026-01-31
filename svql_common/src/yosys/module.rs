@@ -136,7 +136,6 @@ impl YosysModule {
 
     /// Executes the Yosys process with the provided arguments.
     fn execute_yosys(
-        &self,
         args: Vec<String>,
         yosys_binary: &Path,
     ) -> Result<(), Box<dyn core::error::Error>> {
@@ -182,7 +181,7 @@ impl YosysModule {
             .tempfile()?;
 
         let args = self.generate_yosys_args(json_temp.path(), module_config, OutputFormat::Json);
-        self.execute_yosys(args, yosys_binary)?;
+        Self::execute_yosys(args, yosys_binary)?;
 
         self.parse_json_output(json_temp.path())
     }
@@ -219,7 +218,7 @@ impl YosysModule {
         rtlil_out: &Path,
     ) -> Result<(), Box<dyn core::error::Error>> {
         let args = self.generate_yosys_args(rtlil_out, config, OutputFormat::Rtlil);
-        self.execute_yosys(args, yosys_binary)
+        Self::execute_yosys(args, yosys_binary)
     }
 
     /// Writes the processed design in RTLIL format to standard output.

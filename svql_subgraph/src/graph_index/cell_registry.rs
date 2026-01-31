@@ -80,8 +80,7 @@ impl<'a> CellRegistry<'a> {
     pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
         self.cell_type_indices
             .get(&node_type)
-            .map(std::vec::Vec::as_slice)
-            .unwrap_or(&[])
+            .map_or(&[], std::vec::Vec::as_slice)
     }
 
     #[must_use] 

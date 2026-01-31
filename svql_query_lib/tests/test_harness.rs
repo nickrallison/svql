@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+#![allow(clippy::all)]
+#![allow(clippy::pedantic)]
+
 use std::fmt::Debug;
 use std::sync::{Arc, Once};
 use svql_driver::design_container::DesignContainer;

@@ -4,14 +4,14 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Error, Expr, ExprArray, ExprLit, Lit, MetaNameValue, Result};
 
-/// A path selector like ["and1", "y"]
+/// A path selector like `["and1", "y"]`
 #[derive(Debug, Clone)]
 pub struct PathSelector {
     pub segments: Vec<String>,
 }
 
 impl PathSelector {
-    /// Parse from an array expression like ["and1", "y"]
+    /// Parse from an array expression like `["and1", "y"]`
     pub fn from_expr_array(arr: &ExprArray) -> Result<Self> {
         let mut segments = Vec::new();
         for elem in &arr.elems {
@@ -45,7 +45,7 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn as_port_constructor(&self) -> TokenStream {
+    pub fn as_port_constructor(self) -> TokenStream {
         match self {
             Direction::Input => quote! { svql_query::session::Port::input },
             Direction::Output => quote! { svql_query::session::Port::output },
@@ -66,7 +66,7 @@ pub fn get_string_value(nv: &MetaNameValue) -> Result<String> {
     }
 }
 
-/// Parse a nested array of arrays like [["a", "b"], ["c", "d"]]
+/// Parse a nested array of arrays like `[["a", "b"], ["c", "d"]]`
 pub fn parse_nested_paths(arr: &ExprArray) -> Result<Vec<PathSelector>> {
     let mut paths = Vec::new();
     for elem in &arr.elems {

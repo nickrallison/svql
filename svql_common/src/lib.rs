@@ -2,6 +2,7 @@
 //!
 //! This crate provides configuration handling, build support, and common test cases
 //! used across the SVQL project.
+#![allow(clippy::missing_errors_doc)]
 
 mod config;
 // mod test_cases;

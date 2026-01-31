@@ -1,4 +1,5 @@
 // svql_macros/src/variant.rs
+#![allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
@@ -282,7 +283,7 @@ fn parse_port_mappings(attr: &syn::Attribute) -> Vec<PortMapping> {
         let port_name = meta
             .path
             .get_ident()
-            .map(|i| i.to_string())
+            .map(std::string::ToString::to_string)
             .ok_or_else(|| meta.error("Expected port name"))?;
 
         let value: ExprArray = meta.value()?.parse()?;

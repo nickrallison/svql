@@ -32,8 +32,8 @@ impl Default for Config {
         Self {
             match_length: MatchLength::First,
             dedupe: Dedupe::None,
-            needle_options: Default::default(),
-            haystack_options: Default::default(),
+            needle_options: ModuleConfig::default(),
+            haystack_options: ModuleConfig::default(),
             pattern_vars_match_design_consts: true,
             max_recursion_depth: None,
             parallel: false,
@@ -43,7 +43,7 @@ impl Default for Config {
 
 impl Config {
     /// Creates a new configuration instance.
-    #[must_use] 
+    #[must_use]
     pub const fn new(
         match_length: MatchLength,
         dedupe: Dedupe,
@@ -65,7 +65,7 @@ impl Config {
     }
 
     /// Returns a builder for configuration.
-    #[must_use] 
+    #[must_use]
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
@@ -95,21 +95,21 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
     /// Sets the match length requirement.
-    #[must_use] 
+    #[must_use]
     pub const fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
         self
     }
 
     /// Sets the deduplication strategy.
-    #[must_use] 
+    #[must_use]
     pub const fn dedupe(mut self, value: Dedupe) -> Self {
         self.dedupe = value;
         self
     }
 
     /// Sets the Yosys configuration for the needle and forces flattening.
-    #[must_use] 
+    #[must_use]
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
@@ -117,14 +117,14 @@ impl ConfigBuilder {
     }
 
     /// Adds a custom Yosys command to the needle processing pipeline.
-    #[must_use] 
+    #[must_use]
     pub fn needle_cmd(mut self, cmd: &str) -> Self {
         self.needle_options.other_steps.push(cmd.to_owned());
         self
     }
 
     /// Sets a parameter for the needle module.
-    #[must_use] 
+    #[must_use]
     pub fn needle_param(mut self, param: &str, value: &str) -> Self {
         self.needle_options
             .params
@@ -133,21 +133,21 @@ impl ConfigBuilder {
     }
 
     /// Sets the Yosys configuration for the haystack.
-    #[must_use] 
+    #[must_use]
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
         self
     }
 
     /// Adds a custom Yosys command to the haystack processing pipeline.
-    #[must_use] 
+    #[must_use]
     pub fn haystack_cmd(mut self, cmd: &str) -> Self {
         self.haystack_options.other_steps.push(cmd.to_owned());
         self
     }
 
     /// Sets a parameter for the haystack module.
-    #[must_use] 
+    #[must_use]
     pub fn haystack_param(mut self, param: &str, value: &str) -> Self {
         self.haystack_options
             .params
@@ -156,42 +156,42 @@ impl ConfigBuilder {
     }
 
     /// Enables or disables the `opt_clean` pass for the haystack.
-    #[must_use] 
+    #[must_use]
     pub fn haystack_opt_clean(mut self, opt_clean: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt_clean(opt_clean);
         self
     }
 
     /// Enables or disables the `opt` pass for the haystack.
-    #[must_use] 
+    #[must_use]
     pub fn haystack_opt(mut self, opt: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt(opt);
         self
     }
 
     /// Configures whether pattern variables can match design constants.
-    #[must_use] 
+    #[must_use]
     pub const fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
     }
 
     /// Sets the maximum recursion depth for the search algorithm.
-    #[must_use] 
+    #[must_use]
     pub const fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
         self.max_recursion_depth = depth;
         self
     }
 
     /// Sets whether to run the search in parallel.
-    #[must_use] 
+    #[must_use]
     pub const fn parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
     }
 
     /// Finalizes the builder into a `Config` instance.
-    #[must_use] 
+    #[must_use]
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
@@ -219,17 +219,17 @@ pub enum MatchLength {
 
 impl MatchLength {
     /// Returns true if the strategy is First.
-    #[must_use] 
+    #[must_use]
     pub const fn first(&self) -> bool {
         matches!(self, Self::First)
     }
     /// Returns true if the strategy is `NeedleSubsetHaystack`.
-    #[must_use] 
+    #[must_use]
     pub const fn needle_subset_haystack(&self) -> bool {
         matches!(self, Self::NeedleSubsetHaystack)
     }
     /// Returns true if the strategy is Exact.
-    #[must_use] 
+    #[must_use]
     pub const fn exact(&self) -> bool {
         matches!(self, Self::Exact)
     }
@@ -262,17 +262,17 @@ pub enum Dedupe {
 
 impl Dedupe {
     /// Returns true if the strategy is None.
-    #[must_use] 
+    #[must_use]
     pub const fn none(&self) -> bool {
         matches!(self, Self::None)
     }
     /// Returns true if the strategy is Inner.
-    #[must_use] 
+    #[must_use]
     pub const fn inner(&self) -> bool {
         matches!(self, Self::Inner)
     }
     /// Returns true if the strategy is All.
-    #[must_use] 
+    #[must_use]
     pub const fn all(&self) -> bool {
         matches!(self, Self::All)
     }

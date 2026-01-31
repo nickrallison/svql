@@ -5,6 +5,7 @@ use core::hash::{Hash, Hasher};
 
 /// Configuration options for processing a Yosys module.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ModuleConfig {
     /// Whether to flatten the module.
     pub flatten: bool,

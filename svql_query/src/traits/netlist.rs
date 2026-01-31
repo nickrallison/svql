@@ -208,6 +208,7 @@ pub(crate) mod test {
     use crate::Wire;
 
     use super::{Netlist, Component, kind, Port, Row, Store, Driver, DriverKey};
+    use svql_common::Dedupe;
 
     use svql_query::query_test;
 

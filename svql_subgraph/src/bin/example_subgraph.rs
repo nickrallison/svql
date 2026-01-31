@@ -10,11 +10,11 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         YosysModule::new("examples/fixtures/basic/or/verilog/or_gate.v", "or_gate")?;
 
     // 2. Import the design
-    let design = design_module.import_design(&Default::default())?;
-    let needle = needle_module.import_design(&Default::default())?;
+    let design = design_module.import_design(&svql_common::ModuleConfig::default())?;
+    let needle = needle_module.import_design(&svql_common::ModuleConfig::default())?;
 
     // 3. Create the matcher
-    let config = Default::default();
+    let config = svql_common::Config::default();
     let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(
         &needle,
         &design,
