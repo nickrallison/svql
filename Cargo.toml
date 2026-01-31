@@ -8,16 +8,6 @@ members = [
     "svql_common",
     "svql_macros",
     "svql_query_lib",
-
-    # PRJUNNAMED
-    "prjunnamed/generic",
-    "prjunnamed/graphviz",
-    "prjunnamed/lut",
-    "prjunnamed/memory",
-    "prjunnamed/netlist",
-    "prjunnamed/pattern",
-    "prjunnamed/siliconblue",
-    "prjunnamed/yosys_json",
 ]
 
 default-members = [
@@ -50,14 +40,14 @@ svql_subgraph = { path = "svql_subgraph" }
 ###############
 # PRJUNNAMED
 ###############
-prjunnamed-generic.path = "prjunnamed/generic"
-prjunnamed-graphviz.path = "prjunnamed/graphviz"
-prjunnamed-lut.path = "prjunnamed/lut"
-prjunnamed-memory.path = "prjunnamed/memory"
-prjunnamed-netlist.path = "prjunnamed/netlist"
-prjunnamed-pattern.path = "prjunnamed/pattern"
-prjunnamed-siliconblue.path = "prjunnamed/siliconblue"
-prjunnamed-yosys_json.path = "prjunnamed/yosys_json"
+prjunnamed-generic = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-graphviz = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-lut = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-memory = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-netlist = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-pattern = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-siliconblue = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
 
 ###############
 # OTHER LIBRARIES
