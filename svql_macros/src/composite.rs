@@ -145,7 +145,19 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let alias_rehydrate: Vec<_> = aliases
+        .iter()
+        .map(|a| {
+            let field_name = &a.name;
+            let field_str = field_name.to_string();
+            quote! {
+                let #field_name = row.wire(#field_str)?;
+            }
+        })
+        .collect();
+
     let submodule_names: Vec<_> = submodules.iter().map(|s| &s.name).collect();
+    let alias_names: Vec<_> = aliases.iter().map(|a| &a.name).collect();
 
     // Generate preload_driver calls
     let preload_calls: Vec<_> = submodules
@@ -184,9 +196,11 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 key: &svql_query::driver::DriverKey,
             ) -> Option<Self> {
                 #(#submodule_rehydrate)*
+                #(#alias_rehydrate)*  // ADD THIS LINE
 
                 Some(Self {
-                    #(#submodule_names),*
+                    #(#submodule_names,)*
+                    #(#alias_names),*  // ADD THIS LINE
                 })
             }
 

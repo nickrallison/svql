@@ -63,8 +63,9 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
     let field_assignments: Vec<_> = ports
         .iter()
         .map(|p| {
-            let field_name = p.name.to_string();
-            let port_name = p.rename.as_ref().unwrap_or(&field_name);
+            let field_name = &p.name; // ← Use Ident directly instead of converting to String
+            let default = p.name.to_string();
+            let port_name = p.rename.as_ref().unwrap_or(&default);
             quote! {
                 #field_name: row.wire(#port_name)?
             }
