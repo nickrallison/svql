@@ -10,8 +10,8 @@ pub mod recursive;
 pub mod variant;
 
 // Re-export key traits
-// pub use netlist::Netlist;
-// pub use primitive::Primitive;
+pub use netlist::Netlist;
+pub use primitive::Primitive;
 
 use crate::prelude::*;
 

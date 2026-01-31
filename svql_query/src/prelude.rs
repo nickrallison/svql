@@ -62,4 +62,5 @@ pub use subgraph::{
 
 pub use driver::{Driver, DriverKey};
 
+// Re-export derive macros with same name (they don't conflict with traits in derives)
 pub use svql_macros::{Composite, Netlist, Variant};
