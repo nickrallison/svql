@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
             "Add custom Yosys step",
         );
 
-        ap.parse_args_or_exit();;
+        ap.parse_args_or_exit();
     }
 
     // Create the YosysModule
@@ -76,10 +76,9 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     for param_str in params {
         let parts: Vec<&str> = param_str.splitn(2, '=').collect();
         if parts.len() != 2 {
-            return Err(format!(
-                "Invalid parameter format: '{param_str}'. Expected NAME=VALUE"
-            )
-            .into());
+            return Err(
+                format!("Invalid parameter format: '{param_str}'. Expected NAME=VALUE").into(),
+            );
         }
         config = config.with_param(parts[0], parts[1]);
     }

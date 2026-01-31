@@ -27,3 +27,7 @@ which = { workspace = true }
 [[bin]]
 name = "to_rtlil"
 path = "src/bin/to_rtlil.rs"
+
+[lints]
+workspace = true
+

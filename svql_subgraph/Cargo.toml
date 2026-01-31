@@ -58,3 +58,8 @@ rayon = { workspace = true, optional = true }
 default = []
 profiling = []
 rayon = ["dep:rayon"]
+
+[lints]
+workspace = true
+
+
