@@ -12,6 +12,159 @@ use crate::{
 use svql_driver::{Driver, DriverKey};
 use tracing::debug;
 
+/// Helper to extract cell ID from a Value
+fn value_to_cell_id(value: &prjunnamed_netlist::Value) -> Option<CellId> {
+    match value.as_net() {
+        Some(net) => net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok(),
+        None => None,
+    }
+}
+
+/// Helper to extract cell ID from a Net
+fn net_to_cell_id(net: &prjunnamed_netlist::Net) -> Option<CellId> {
+    net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok()
+}
+
+/// Helper to extract cell ID from a ControlNet (for AIG gates)
+fn control_net_to_cell_id(cnet: &prjunnamed_netlist::ControlNet) -> Option<CellId> {
+    net_to_cell_id(&cnet.net())
+}
+
+/// Resolve primitive ports by extracting inputs from the cell structure.
+///
+/// For most gates, inputs are positional arguments and outputs are the cell itself.
+/// This handles common gate patterns (And, Or, Xor, Not, etc.) automatically.
+/// Resolve primitive ports by extracting inputs from the cell structure.
+///
+/// For gates, inputs come from their arguments and outputs are the cell itself.
+/// This handles all gate patterns automatically.
+pub fn resolve_primitive_ports(
+    cell: &prjunnamed_netlist::Cell,
+    cell_wrapper: &CellWrapper,
+    schema: &PatternSchema,
+) -> EntryArray {
+    use prjunnamed_netlist::Cell;
+
+    let cell_id = CellId::from_usize(cell_wrapper.debug_index());
+    let schema_size = schema.defs.len();
+    let mut entries = vec![ColumnEntry::Cell { id: None }; schema_size];
+
+    // Extract input values based on cell type
+    let input_values: Vec<Option<CellId>> = match cell {
+        // 2-input gates: And, Or, Xor, Eq, Comparisons, etc.
+        Cell::And(a, b)
+        | Cell::Or(a, b)
+        | Cell::Xor(a, b)
+        | Cell::Eq(a, b)
+        | Cell::ULt(a, b)
+        | Cell::SLt(a, b)
+        | Cell::Mul(a, b)
+        | Cell::UDiv(a, b)
+        | Cell::UMod(a, b)
+        | Cell::SDivTrunc(a, b)
+        | Cell::SDivFloor(a, b)
+        | Cell::SModTrunc(a, b)
+        | Cell::SModFloor(a, b) => {
+            vec![
+                value_to_cell_id(a),
+                value_to_cell_id(b)
+            ]
+        }
+
+        // 1-input gates: Not, Buf
+        Cell::Not(a) | Cell::Buf(a) => {
+            vec![value_to_cell_id(a)]
+        }
+
+        // Mux: (sel, a, b) - note the Net for selector
+        Cell::Mux(s, a, b) => {
+            vec![
+                net_to_cell_id(s),
+                value_to_cell_id(a),
+                value_to_cell_id(b),
+            ]
+        }
+
+        // Adc: (a, b, carry_in)
+        Cell::Adc(a, b, ci) => {
+            vec![
+                value_to_cell_id(a),
+                value_to_cell_id(b),
+                net_to_cell_id(ci),
+            ]
+        }
+
+        // Aig: (a, b) - both are ControlNets
+        Cell::Aig(a, b) => {
+            vec![
+                control_net_to_cell_id(a),
+                control_net_to_cell_id(b),
+            ]
+        }
+
+        // Shift operations: (value, shift_amount, multiplier)
+        Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
+            vec![
+                value_to_cell_id(a),
+                value_to_cell_id(b),
+            ]
+        }
+
+        // For complex cells (DFF, Memory, etc.) or I/O cells,
+        // fall back to setting all ports to the cell itself
+        _ => {
+            for col_idx in 0..schema_size {
+                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
+            }
+            return EntryArray::new(entries);
+        }
+    };
+
+    // Map extracted input values to schema ports based on direction
+    let mut input_idx = 0;
+
+    for (col_idx, col_def) in schema.defs.iter().enumerate() {
+        match col_def.direction {
+            PortDirection::Input => {
+                // Assign the next input value in order
+                if input_idx < input_values.len() {
+                    entries[col_idx] = ColumnEntry::Cell {
+                        id: input_values[input_idx],
+                    };
+                    input_idx += 1;
+                } else {
+                    // Shouldn't happen if schema matches cell structure
+                    tracing::warn!(
+                        "Schema has more input ports than cell provides for {:?}",
+                        cell
+                    );
+                    entries[col_idx] = ColumnEntry::Cell { id: None };
+                }
+            }
+            PortDirection::Output => {
+                // Output is always the gate cell itself
+                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
+            }
+            PortDirection::Inout | PortDirection::None => {
+                // For bidirectional or unspecified, use cell_id as fallback
+                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
+            }
+        }
+    }
+
+    // Validation: warn if we didn't use all extracted inputs
+    if input_idx < input_values.len() {
+        tracing::warn!(
+            "Cell {:?} provided {} inputs but schema only consumed {}",
+            cell,
+            input_values.len(),
+            input_idx
+        );
+    }
+
+    EntryArray::new(entries)
+}
+
 /// Trait for primitive hardware components that match against cell types.
 ///
 /// Primitives differ from `Netlist` components in that they match directly
@@ -54,13 +207,10 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
 
     /// Resolve a cell wrapper into a row entry.
     ///
-    /// For primitives, all ports typically point to the same underlying cell.
-    fn resolve(cell_id: CellId) -> EntryArray {
-        let schema_size = Self::PORTS.len();
-        let entries: Vec<ColumnEntry> = (0..schema_size)
-            .map(|_| ColumnEntry::Cell { id: Some(cell_id) })
-            .collect();
-        EntryArray::new(entries)
+    /// Default implementation handles common gate patterns automatically.
+    /// Override this for special cases (e.g., DFFs with named ports).
+    fn resolve(cell_wrapper: &CellWrapper<'_>) -> EntryArray {
+        resolve_primitive_ports(cell_wrapper.get(), cell_wrapper, &Self::primitive_schema())
     }
 
     /// Rehydrate from row.
@@ -140,11 +290,8 @@ where
 
         if let Some(cells) = index.cells_of_type_iter(T::CELL_KIND) {
             for cell_wrapper in cells {
-                // Apply optional filter
                 if T::cell_filter(cell_wrapper.get()) {
-                    // println!("Matched cell: {:?}", cell_wrapper.get());
-                    let cell_id = CellId::from_u64(cell_wrapper.debug_index() as u64);
-                    row_matches.push(T::resolve(cell_id));
+                    row_matches.push(T::resolve(&cell_wrapper));
                 }
             }
         }
@@ -217,10 +364,9 @@ macro_rules! define_primitive {
                       Send + Sync + 'static,
             {
                 Some($name {
-                    $(
-                        $port: row.wire(stringify!($port))?,
-                    )*
+                    $($port: row.wire(stringify!($port))?),*
                 })
+
             }
         }
 
