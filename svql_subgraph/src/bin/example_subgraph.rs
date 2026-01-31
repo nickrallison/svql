@@ -36,5 +36,5 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         }
     }
     // ...
-    return Ok(())
+    Ok(())
 }

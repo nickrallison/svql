@@ -33,7 +33,7 @@ impl Netlist for AndGate {
             y: y_id,
         };
 
-        return Some(and_gate)
+        Some(and_gate)
     }
 }
 
@@ -100,7 +100,7 @@ impl Composite for And2Gates {
     where
         Self: Sized,
     {
-        return <AndGate as Pattern>::preload_driver(driver, design_key, config)
+        <AndGate as Pattern>::preload_driver(driver, design_key, config)
     }
 }
 
@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     let key = DriverKey::new(haystack_path, haystack_module);
     let container = driver
         .get_design(&key, &config.haystack_options)
-        .map_err(|e| return QueryError::design_load(e.to_string()))?;
+        .map_err(|e| QueryError::design_load(e.to_string()))?;
 
     for cell in container.index().cells_topo() {
         println!("Cell: {cell:#?}");
@@ -142,5 +142,5 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     // let results_table = store.get::<And2Gates>().expect("Table should be present");
     // let rows = results_table.rows().collect::<Vec<_>>();
     // let stored_count = rows.len();
-    return Ok(())
+    Ok(())
 }

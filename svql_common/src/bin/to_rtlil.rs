@@ -8,8 +8,8 @@ fn write_yosys_to_rtlil(
 ) -> Result<(), Box<dyn core::error::Error>> {
     let yosys = which::which("yosys")?;
     match rtlil_out {
-        Some(path) => return yosys_module.write_rtlil_to_path(config, path, &yosys),
-        None => return yosys_module.write_rtlil_to_stdout(config, &yosys),
+        Some(path) => yosys_module.write_rtlil_to_path(config, path, &yosys),
+        None => yosys_module.write_rtlil_to_stdout(config, &yosys),
     }
 }
 
@@ -63,8 +63,8 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
             "Add custom Yosys step",
         );
 
-        ap.parse_args_or_exit()
-    };
+        ap.parse_args_or_exit();;
+    }
 
     // Create the YosysModule
     let yosys_module = YosysModule::new(&input_file, &module_name)?;
@@ -99,5 +99,5 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         eprintln!("RTLIL written to: {output_file}");
     }
 
-    return Ok(())
+    Ok(())
 }
