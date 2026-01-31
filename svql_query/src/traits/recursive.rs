@@ -32,9 +32,65 @@ use crate::prelude::*;
 
 /// Trait for recursive/tree-structured patterns.
 ///
-/// Implementors define a base pattern type and a fixpoint algorithm that
-/// builds the recursive structure by detecting when base pattern outputs
-/// feed into other base pattern inputs.
+/// # What It Finds
+///
+/// The recursive search creates **one table entry per base pattern instance**.
+/// Each entry represents the **maximal tree rooted at that instance**.
+///
+/// For example, given this circuit:
+/// ```text
+///       AND0
+///       /  \
+///    AND1  AND2
+///    / \   / \
+///   a  b  c  d
+/// ```
+///
+/// The search produces **3 `RecAnd` entries**:
+/// ```text
+/// RecAnd[0]: base=AND0, left_child=RecAnd[1], right_child=RecAnd[2], depth=1
+///            (maximal tree rooted at AND0 - includes both children)
+///
+/// RecAnd[1]: base=AND1, left_child=None, right_child=None, depth=0
+///            (maximal tree rooted at AND1 - just a leaf)
+///
+/// RecAnd[2]: base=AND2, left_child=None, right_child=None, depth=0
+///            (maximal tree rooted at AND2 - just a leaf)
+/// ```
+///
+/// # Key Properties
+///
+/// - **One entry per base instance**: Every AND gate gets exactly one `RecAnd` entry
+/// - **Maximal subtrees**: Each entry represents the largest tree rooted at that gate
+/// - **Self-referential children**: `left_child` and `right_child` point to other
+///   entries in the same table (via `Ref<Self>`)
+/// - **Leaves included**: Gates with no children (depth=0) are still in the table
+///   because they can be children of other trees
+/// - **No redundancy**: Unlike variants which union multiple tables, recursive
+///   patterns produce exactly N entries for N base pattern instances
+///
+/// # Filtering Results
+///
+/// To find only "interesting" trees (non-leaves), filter by depth:
+/// ```ignore
+/// for row in table.rows() {
+///     let rec = RecAnd::rehydrate(&row, &store, &driver, &key)?;
+///     if rec.depth > 0 {
+///         // This is a tree with children
+///     }
+/// }
+/// ```
+///
+/// Or filter during composition by overriding `build_recursive`.
+///
+/// # Algorithm
+///
+/// 1. Get all base pattern matches (e.g., all AND gates)
+/// 2. Build output→instance lookup map
+/// 3. Initialize all entries as leaves (depth=0, no children)
+/// 4. **Fixpoint iteration**: For each instance, check if its inputs come from
+///    other instances' outputs. If so, link them as children.
+/// 5. Recompute depths until convergence
 ///
 /// # Self-Reference Handling
 ///
@@ -47,6 +103,14 @@ use crate::prelude::*;
 /// EXEC_INFO.nested_dependancies = [AndGate::EXEC_INFO]
 /// Schema columns = [base: Ref<AndGate>, left_child: Ref<RecAnd>, ...]
 /// ```
+///
+/// # Implementor Responsibilities
+///
+/// Implementors define:
+/// - `Base`: The pattern type that forms nodes (e.g., `AndGate`)
+/// - `PORTS`: External interface ports (typically just output)
+/// - `build_recursive`: Fixpoint algorithm to link children
+/// - `recursive_rehydrate`: Reconstruct full structure from row
 pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + 'static {
     /// The base pattern type that forms nodes of the tree.
     ///
@@ -184,6 +248,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use std::collections::HashMap;
 
@@ -196,9 +261,28 @@ mod tests {
 
     /// A node in a recursive AND tree.
     ///
-    /// Every AND gate that participates in a tree structure gets its own `RecAnd`
-    /// entry. The `left_child` and `right_child` fields link to other `RecAnd`
-    /// entries when the corresponding input comes from another AND gate's output.
+    /// Each `RecAnd` entry represents the **maximal AND tree rooted at one AND gate**:
+    /// - If the AND gate's inputs come from other AND gates, those are linked as `left_child`/`right_child`
+    /// - If the inputs are external (not from other ANDs), the children are `None`
+    /// - `depth` indicates the maximum distance to any leaf node in the subtree
+    ///
+    /// # Example
+    ///
+    /// For circuit `y = ((a & b) & (c & d))`:
+    /// ```text
+    ///       AND0(y=12)
+    ///       /        \
+    ///   AND1(10)   AND2(11)
+    ///   /  \        /  \
+    ///  a   b       c   d
+    /// ```
+    ///
+    /// This produces 3 `RecAnd` entries:
+    /// - `RecAnd[0]`: Maximal tree rooted at AND0 (includes AND1 and AND2 as children, depth=1)
+    /// - `RecAnd[1]`: Leaf at AND1 (no AND children, depth=0)
+    /// - `RecAnd[2]`: Leaf at AND2 (no AND children, depth=0)
+    ///
+    /// **Every AND gate appears exactly once**, representing its maximal subtree.
     #[derive(Debug, Clone)]
     pub struct RecAnd {
         /// Reference to the underlying AND gate at this node.
@@ -209,7 +293,8 @@ mod tests {
         pub right_child: Option<Ref<RecAnd>>,
         /// Output wire of this node.
         pub y: Wire,
-        /// Tree depth (0 = leaf, no children from other ANDs).
+        /// Tree depth: 0 = leaf (no AND children), 1+ = has AND children.
+        /// Represents the maximum depth of any child subtree plus 1.
         pub depth: u32,
     }
 
@@ -421,7 +506,7 @@ mod tests {
         name: test_rec_and_small_tree,
         query: RecAnd,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 0
+        expect: 3
     );
 
     #[test]

@@ -9,5 +9,5 @@ input e,
 output y
 );
 
-assign y = ((a & b) & ((c & d) & e));
+assign y = ((a & b) & (c & d));
 endmodule
