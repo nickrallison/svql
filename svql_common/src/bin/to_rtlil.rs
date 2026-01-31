@@ -96,8 +96,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Write the RTLIL
     write_yosys_to_rtlil(&yosys_module, &config, output_path)?;
 
-    if output_file.is_some() {
-        eprintln!("RTLIL written to: {}", output_file.unwrap());
+    if let Some(output_file) = output_file {
+        eprintln!("RTLIL written to: {}", output_file);
     }
 
     Ok(())

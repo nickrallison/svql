@@ -30,29 +30,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|s| s.parse::<bool>().ok())
         .unwrap_or(false);
 
+    let haystack_options = ModuleConfig {
+        // default
+        load_raw: use_raw_import,
+        ..Default::default()
+    };
+
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::All)
+        .haystack_options(haystack_options)
         .max_recursion_depth(Some(max_recursion_depth))
         .build();
 
+    let design_key = DriverKey::new(design_path, design_module);
     info!("Loading design...");
-    let design_result = match use_raw_import {
-        true => driver.get_or_load_design_raw(design_path, design_module),
-        false => driver.get_or_load_design(design_path, design_module, &config.haystack_options),
-    };
 
-    let (haystack_key, _) = match design_result {
-        Ok(res) => res,
-        Err(e) => {
-            info!("Could not load design (expected if file missing): {}", e);
-            return Err(e.into());
-        }
-    };
+    let design_result = driver.get_design(&design_key, &config.haystack_options);
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<LockedRegister<Search>>(&driver, &haystack_key)?;
+    let store = svql_query::run_query::<LockedRegister>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{}", store);

@@ -19,17 +19,17 @@
     "lldb.adapterType": "classic",
     "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
     "rust-analyzer.check.command": "clippy",
-    "rust-analyzer.check.extraArgs": [
-        "--",
-        "-D",
-        "clippy::all",
-        "-D",
-        "clippy::pedantic",
-        "-D",
-        "clippy::nursery",
-        "-D",
-        "clippy::restriction"
-    ]
+    // "rust-analyzer.check.extraArgs": [
+    //     "--",
+    //     "-D",
+    //     "clippy::all",
+    //     "-D",
+    //     "clippy::pedantic",
+    //     "-D",
+    //     "clippy::nursery",
+    //     "-D",
+    //     "clippy::restriction"
+    // ]
 
 
 }
