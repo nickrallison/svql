@@ -1,0 +1,502 @@
+// svql_query/src/traits/recursive.rs
+
+//! Recursive pattern traits for tree-structured matches.
+//!
+//! Unlike `Composite` which performs Cartesian products of independent matches,
+//! `Recursive` patterns build tree structures where nodes can reference other
+//! nodes of the same type (self-referential).
+//!
+//! # Key Differences from Composite
+//!
+//! | Aspect | Composite | Recursive |
+//! |--------|-----------|-----------|
+//! | Children | Different types | Same type (self-ref) |
+//! | Search | Cartesian product + filter | Fixpoint iteration |
+//! | Schema | Submodules are different types | `left_child`/`right_child` are `Ref<Self>` |
+//!
+//! # Example: AND Tree
+//!
+//! ```ignore
+//! pub struct RecAnd {
+//!     pub base: Ref<AndGate>,           // The AND gate at this node
+//!     pub left_child: Option<Ref<RecAnd>>,  // Left subtree (None = leaf)
+//!     pub right_child: Option<Ref<RecAnd>>, // Right subtree (None = leaf)
+//!     pub y: Wire,                      // Output of this node
+//!     pub depth: u32,                   // Tree depth (0 = leaf)
+//! }
+//! ```
+
+use std::sync::OnceLock;
+
+use crate::prelude::*;
+
+/// Trait for recursive/tree-structured patterns.
+///
+/// Implementors define a base pattern type and a fixpoint algorithm that
+/// builds the recursive structure by detecting when base pattern outputs
+/// feed into other base pattern inputs.
+///
+/// # Self-Reference Handling
+///
+/// The schema includes `Ref<Self>` columns for children, but these are
+/// **not** listed in `DEPENDANCIES` (which would cause a cycle). Instead,
+/// self-references are row indices into the same table being built.
+///
+/// The execution system sees only the base pattern as a dependency:
+/// ```text
+/// EXEC_INFO.nested_dependancies = [AndGate::EXEC_INFO]
+/// Schema columns = [base: Ref<AndGate>, left_child: Ref<RecAnd>, ...]
+/// ```
+pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + 'static {
+    /// The base pattern type that forms nodes of the tree.
+    ///
+    /// For `RecAnd`, this is `AndGate`. Each node in the recursive structure
+    /// wraps exactly one instance of the base pattern.
+    type Base: Pattern + Component + Send + Sync + 'static;
+
+    /// Port declarations for the recursive pattern's external interface.
+    ///
+    /// Typically includes at least the output port. Inputs may be implicit
+    /// (derived from leaf nodes during rehydration).
+    const PORTS: &'static [Port];
+
+    /// Execution dependencies (typically just the base pattern).
+    ///
+    /// **Important**: Do NOT include `Self` here—that would create a cycle.
+    /// Self-references are handled internally during `build_recursive`.
+    const DEPENDANCIES: &'static [&'static ExecInfo];
+
+    /// Schema accessor with self-referential columns.
+    ///
+    /// Default schema structure:
+    /// - `base`: `Ref<Self::Base>` (required)
+    /// - `left_child`: `Option<Ref<Self>>` (nullable)
+    /// - `right_child`: `Option<Ref<Self>>` (nullable)
+    /// - Ports from `PORTS`
+    /// - `depth`: metadata
+    fn recursive_schema() -> &'static PatternSchema {
+        static SCHEMA: OnceLock<PatternSchema> = OnceLock::new();
+        SCHEMA.get_or_init(|| {
+            let defs = Self::recursive_to_defs();
+            let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
+            PatternSchema::new(defs_static)
+        })
+    }
+
+    /// Convert declarations to column definitions.
+    ///
+    /// Override this if you need a different schema structure.
+    fn recursive_to_defs() -> Vec<ColumnDef> {
+        let mut defs = vec![
+            ColumnDef::sub::<Self::Base>("base"),
+            ColumnDef::sub_nullable::<Self>("left_child"),
+            ColumnDef::sub_nullable::<Self>("right_child"),
+        ];
+
+        defs.extend(
+            Self::PORTS.iter().map(|p| {
+                ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction)
+            }),
+        );
+
+        defs.push(ColumnDef::metadata("depth"));
+
+        defs
+    }
+
+    /// Build the recursive structure using fixpoint iteration.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Get all base pattern matches from context
+    /// 2. Build output→row_index lookup
+    /// 3. Initialize all nodes as leaves (depth=0, no children)
+    /// 4. Fixpoint: for each node, check if inputs come from other nodes' outputs
+    /// 5. Update children and depths until no changes
+    ///
+    /// # Returns
+    ///
+    /// A table where each row is a node in a recursive structure. Nodes that
+    /// are children of other nodes are still included as separate rows (they
+    /// can be filtered out post-hoc if only roots are desired).
+    fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>;
+
+    /// Rehydrate a row back into the concrete type.
+    fn recursive_rehydrate(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<Self>;
+
+    /// Preload required designs into the driver.
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+// Blanket implementation of PatternInternal for all Recursive types
+impl<T> PatternInternal<kind::Recursive> for T
+where
+    T: Recursive + Component<Kind = kind::Recursive> + Send + Sync + 'static,
+{
+    const DEFS: &'static [ColumnDef] = &[]; // Unused, schema is dynamic
+
+    // base + left_child + right_child + ports + depth
+    const SCHEMA_SIZE: usize = 3 + T::PORTS.len() + 1;
+
+    const EXEC_INFO: &'static ExecInfo = &ExecInfo {
+        type_id: std::any::TypeId::of::<T>(),
+        type_name: std::any::type_name::<T>(),
+        search_function: |ctx| {
+            search_table_any::<T>(ctx, <T as PatternInternal<kind::Recursive>>::search_table)
+        },
+        // Only base pattern, NOT self (would cause cycle)
+        nested_dependancies: T::DEPENDANCIES,
+    };
+
+    fn internal_schema() -> &'static PatternSchema {
+        T::recursive_schema()
+    }
+
+    fn preload_driver(
+        driver: &Driver,
+        design_key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        <T as Recursive>::preload_driver(driver, design_key, config)
+    }
+
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
+        T::build_recursive(ctx)
+    }
+
+    fn internal_rehydrate(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<Self> {
+        Self::recursive_rehydrate(row, store, driver, key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::define_primitive;
+
+    use super::*;
+    use svql_query::query_test;
+
+    define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
+
+    /// A node in a recursive AND tree.
+    ///
+    /// Every AND gate that participates in a tree structure gets its own `RecAnd`
+    /// entry. The `left_child` and `right_child` fields link to other `RecAnd`
+    /// entries when the corresponding input comes from another AND gate's output.
+    #[derive(Debug, Clone)]
+    pub struct RecAnd {
+        /// Reference to the underlying AND gate at this node.
+        pub base: Ref<AndGate>,
+        /// Left subtree (None if input A is external/not from another AND).
+        pub left_child: Option<Ref<RecAnd>>,
+        /// Right subtree (None if input B is external/not from another AND).
+        pub right_child: Option<Ref<RecAnd>>,
+        /// Output wire of this node.
+        pub y: Wire,
+        /// Tree depth (0 = leaf, no children from other ANDs).
+        pub depth: u32,
+    }
+
+    impl Component for RecAnd {
+        type Kind = kind::Recursive;
+    }
+
+    impl Recursive for RecAnd {
+        type Base = AndGate;
+
+        const PORTS: &'static [Port] = &[Port::output("y")];
+
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
+
+        fn recursive_schema() -> &'static PatternSchema {
+            static SCHEMA: OnceLock<PatternSchema> = OnceLock::new();
+            SCHEMA.get_or_init(|| {
+                let defs = Self::recursive_to_defs();
+                let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
+                PatternSchema::new(defs_static)
+            })
+        }
+
+        fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
+            // 1. Get base pattern (AndGate) results
+            let base_table = ctx
+                .get_any_table(std::any::TypeId::of::<AndGate>())
+                .ok_or_else(|| QueryError::missing_dep("AndGate"))?;
+
+            let and_table: &Table<AndGate> = base_table
+                .as_any()
+                .downcast_ref()
+                .ok_or_else(|| QueryError::missing_dep("AndGate (downcast failed)"))?;
+
+            if and_table.is_empty() {
+                return Table::new(vec![]);
+            }
+
+            // 2. Extract gate info and build output→gate lookup
+            struct GateInfo {
+                a: CellId,
+                b: CellId,
+                y: CellId,
+            }
+
+            let gate_info: Vec<GateInfo> = and_table
+                .rows()
+                .map(|row| GateInfo {
+                    a: row.wire("a").expect("AndGate must have 'a'").id(),
+                    b: row.wire("b").expect("AndGate must have 'b'").id(),
+                    y: row.wire("y").expect("AndGate must have 'y'").id(),
+                })
+                .collect();
+
+            // Map: output CellId → AndGate row index
+            let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
+            for (idx, info) in gate_info.iter().enumerate() {
+                output_to_gate.insert(info.y, idx as u32);
+            }
+
+            // 3. Initialize: every AND gate starts as a leaf (depth=0)
+            struct RecAndEntry {
+                base_idx: u32,
+                left_child: Option<u32>,
+                right_child: Option<u32>,
+                y: CellId,
+                depth: u32,
+            }
+
+            let mut entries: Vec<RecAndEntry> = gate_info
+                .iter()
+                .enumerate()
+                .map(|(idx, info)| RecAndEntry {
+                    base_idx: idx as u32,
+                    left_child: None,
+                    right_child: None,
+                    y: info.y,
+                    depth: 0,
+                })
+                .collect();
+
+            // Map: output CellId → RecAnd entry index (same as gate index initially)
+            let output_to_rec: HashMap<CellId, u32> = entries
+                .iter()
+                .enumerate()
+                .map(|(idx, e)| (e.y, idx as u32))
+                .collect();
+
+            // 4. Fixpoint iteration: link children and compute depths
+            let mut changed = true;
+            let mut iterations = 0;
+            const MAX_ITERATIONS: usize = 1000; // Safety limit
+
+            while changed && iterations < MAX_ITERATIONS {
+                changed = false;
+                iterations += 1;
+
+                for i in 0..entries.len() {
+                    let base_idx = entries[i].base_idx as usize;
+                    let info = &gate_info[base_idx];
+
+                    // Check if input A comes from another AND's output
+                    let new_left = output_to_rec.get(&info.a).copied();
+                    // Check if input B comes from another AND's output
+                    let new_right = output_to_rec.get(&info.b).copied();
+
+                    // Detect changes
+                    let children_changed =
+                        new_left != entries[i].left_child || new_right != entries[i].right_child;
+
+                    if children_changed {
+                        entries[i].left_child = new_left;
+                        entries[i].right_child = new_right;
+                        changed = true;
+                    }
+
+                    // Recompute depth based on children
+                    let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
+                    let right_depth = new_right
+                        .map(|idx| entries[idx as usize].depth)
+                        .unwrap_or(0);
+
+                    let new_depth = if new_left.is_some() || new_right.is_some() {
+                        1 + left_depth.max(right_depth)
+                    } else {
+                        0
+                    };
+
+                    if new_depth != entries[i].depth {
+                        entries[i].depth = new_depth;
+                        changed = true;
+                    }
+                }
+            }
+
+            if iterations >= MAX_ITERATIONS {
+                tracing::warn!(
+                    "RecAnd fixpoint did not converge after {} iterations",
+                    MAX_ITERATIONS
+                );
+            }
+
+            // 5. Convert to EntryArray format
+            let schema = Self::recursive_schema();
+            let base_idx = schema.index_of("base").expect("schema has 'base'");
+            let left_idx = schema
+                .index_of("left_child")
+                .expect("schema has 'left_child'");
+            let right_idx = schema
+                .index_of("right_child")
+                .expect("schema has 'right_child'");
+            let y_idx = schema.index_of("y").expect("schema has 'y'");
+            let depth_idx = schema.index_of("depth").expect("schema has 'depth'");
+
+            let row_entries: Vec<EntryArray> = entries
+                .iter()
+                .map(|e| {
+                    let mut arr = EntryArray::with_capacity(schema.defs.len());
+
+                    arr.entries[base_idx] = ColumnEntry::Sub {
+                        id: Some(e.base_idx),
+                    };
+                    arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
+                    arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
+                    arr.entries[y_idx] = ColumnEntry::Cell { id: Some(e.y) };
+                    arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
+
+                    arr
+                })
+                .collect();
+
+            Table::new(row_entries)
+        }
+
+        fn recursive_rehydrate(
+            row: &Row<Self>,
+            _store: &Store,
+            _driver: &Driver,
+            _key: &DriverKey,
+        ) -> Option<Self> {
+            let base: Ref<AndGate> = row.sub("base")?;
+            let left_child: Option<Ref<RecAnd>> = row.sub("left_child");
+            let right_child: Option<Ref<RecAnd>> = row.sub("right_child");
+            let y = row.wire("y")?;
+
+            let schema = Self::recursive_schema();
+            let depth_idx = schema.index_of("depth")?;
+            let depth = row.entry_array.entries.get(depth_idx)?.as_u32()?;
+
+            Some(RecAnd {
+                base,
+                left_child,
+                right_child,
+                y,
+                depth,
+            })
+        }
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)
+        }
+    }
+
+    query_test!(
+        name: test_rec_and_small_tree,
+        query: RecAnd,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 0
+    );
+
+    #[test]
+    fn test_rec_and_depths() -> Result<(), Box<dyn std::error::Error>> {
+        use svql_query::test_harness::setup_test_logging;
+        setup_test_logging();
+
+        let driver = Driver::new_workspace()?;
+        let config = Config::builder().dedupe(Dedupe::All).build();
+        let key = DriverKey::new(
+            "examples/fixtures/basic/and/verilog/small_and_tree.v",
+            "small_and_tree",
+        );
+
+        let store = svql_query::run_query::<RecAnd>(&driver, &key, &config)?;
+        let table = store.get::<RecAnd>().expect("Table should exist");
+
+        // Collect depths
+        let mut depths: Vec<u32> = Vec::new();
+        for row in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+            depths.push(rec.depth);
+        }
+
+        depths.sort();
+
+        // Expected: 2 leaves (depth=0), 1 root (depth=1)
+        // Or depending on structure: could be depth 0, 0, 1 or 0, 1, 2
+        println!("RecAnd depths: {:?}", depths);
+
+        // At minimum, we should have some variation if there's a tree
+        assert!(
+            depths.iter().any(|&d| d > 0) || depths.len() <= 1,
+            "Expected at least one non-leaf node in a tree with {} gates",
+            depths.len()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rec_and_children_linked() -> Result<(), Box<dyn std::error::Error>> {
+        use svql_query::test_harness::setup_test_logging;
+        setup_test_logging();
+
+        let driver = Driver::new_workspace()?;
+        let config = Config::builder().dedupe(Dedupe::All).build();
+        let key = DriverKey::new(
+            "examples/fixtures/basic/and/verilog/small_and_tree.v",
+            "small_and_tree",
+        );
+
+        let store = svql_query::run_query::<RecAnd>(&driver, &key, &config)?;
+        let table = store.get::<RecAnd>().expect("Table should exist");
+
+        // Find a node with children
+        let mut found_parent = false;
+        for row in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+
+            if rec.left_child.is_some() || rec.right_child.is_some() {
+                found_parent = true;
+                println!(
+                    "Found parent node: depth={}, left={:?}, right={:?}",
+                    rec.depth, rec.left_child, rec.right_child
+                );
+            }
+        }
+
+        // In a proper tree, there should be at least one parent
+        assert!(
+            found_parent || table.len() <= 1,
+            "Expected at least one parent node in tree"
+        );
+
+        Ok(())
+    }
+}

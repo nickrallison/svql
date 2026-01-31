@@ -64,7 +64,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     }
 
     /// Rehydrate from row.
-    fn rehydrate(
+    fn primitive_rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
@@ -142,6 +142,7 @@ where
             for cell_wrapper in cells {
                 // Apply optional filter
                 if T::cell_filter(cell_wrapper.get()) {
+                    // println!("Matched cell: {:?}", cell_wrapper.get());
                     let cell_id = CellId::from_u64(cell_wrapper.debug_index() as u64);
                     row_matches.push(T::resolve(cell_id));
                 }
@@ -157,7 +158,7 @@ where
         Table::<Self>::new(row_matches)
     }
 
-    fn rehydrate<'a>(
+    fn internal_rehydrate<'a>(
         row: &Row<Self>,
         store: &Store,
         driver: &Driver,
@@ -166,7 +167,7 @@ where
     where
         Self: Component + PatternInternal<kind::Primitive> + Send + Sync + 'static,
     {
-        <T as Primitive>::rehydrate(row, store, driver, key)
+        Self::primitive_rehydrate(row, store, driver, key)
     }
 }
 
@@ -196,7 +197,7 @@ macro_rules! define_primitive {
             )*
         }
 
-        impl $crate::traits::Primitive for $name {
+        impl $crate::prelude::Primitive for $name {
             const CELL_KIND: CellKind =
                CellKind::$cell_kind;
 
@@ -204,7 +205,7 @@ macro_rules! define_primitive {
                 $($crate::session::Port::$direction(stringify!($port))),*
             ];
 
-            fn rehydrate<'a>(
+            fn primitive_rehydrate<'a>(
                 row: &$crate::session::Row<Self>,
                 _store: &$crate::session::Store,
                 _driver: &$crate::driver::Driver,
@@ -267,7 +268,7 @@ macro_rules! define_dff_primitive {
             )*
         }
 
-        impl $crate::traits::Primitive for $name {
+        impl $crate::prelude::Primitive for $name {
             const CELL_KIND: CellKind =
                 CellKind::Dff;
 
@@ -280,7 +281,7 @@ macro_rules! define_dff_primitive {
                 filter_fn(cell)
             }
 
-            fn rehydrate<'a>(
+            fn primitive_rehydrate<'a>(
                 row: &$crate::session::Row<Self>,
                 _store: &$crate::session::Store,
                 _driver: &$crate::driver::Driver,

@@ -116,7 +116,7 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
                 #idx_lit => {
                     let inner_table = store.get::<#ty>()?;
                     let inner_row = inner_table.row(inner_row_idx)?;
-                    let inner = <#ty as svql_query::traits::Pattern>::rehydrate(
+                    let inner = #ty::rehydrate(
                         &inner_row, store, driver, key
                     )?;
                     Some(Self::#variant_name(inner))
@@ -156,7 +156,7 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
                 #(#dep_entries),*
             ];
 
-            fn rehydrate(
+            fn variant_rehydrate(
                 row: &svql_query::session::Row<Self>,
                 store: &svql_query::session::Store,
                 driver: &svql_query::driver::Driver,

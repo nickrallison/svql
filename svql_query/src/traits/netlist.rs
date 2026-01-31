@@ -105,7 +105,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         EntryArray::new(final_row_match)
     }
 
-    fn rehydrate(
+    fn netlist_rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
@@ -187,7 +187,7 @@ where
         Ok(table)
     }
 
-    fn rehydrate<'a>(
+    fn internal_rehydrate<'a>(
         row: &Row<Self>,
         store: &Store,
         driver: &Driver,
@@ -196,7 +196,7 @@ where
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
-        <T as Netlist>::rehydrate(row, store, driver, key)
+        Self::netlist_rehydrate(row, store, driver, key)
     }
 }
 
@@ -258,7 +258,7 @@ pub(crate) mod test {
 
         const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
 
-        fn rehydrate(
+        fn netlist_rehydrate(
             row: &Row<Self>,
             _store: &Store,
             _driver: &Driver,

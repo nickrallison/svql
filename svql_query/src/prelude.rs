@@ -45,8 +45,9 @@ pub use crate::session::{
 
 // Trait re-exports
 pub use crate::traits::{
-    Component, Netlist, Pattern, PatternInternal, composite::Composite, composite::Connection,
-    composite::Connections, kind, search_table_any, variant::Variant,
+    Component, Pattern, PatternInternal, composite::Composite, composite::Connection,
+    composite::Connections, kind, netlist::Netlist, primitive::Primitive, search_table_any,
+    variant::Variant,
 };
 
 pub use crate::selector::Selector;

@@ -134,7 +134,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                     let sub_ref = row.sub::<#ty>(#field_str)?;
                     let sub_table = store.get::<#ty>()?;
                     let sub_row = sub_table.row(sub_ref.index())?;
-                    <#ty as svql_query::traits::Pattern>::rehydrate(&sub_row, store, driver, key)?
+                    #ty::rehydrate(&sub_row, store, driver, key)?
                 };
             }
         })
@@ -184,7 +184,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 #(#dep_entries),*
             ];
 
-            fn rehydrate(
+            fn composite_rehydrate(
                 row: &svql_query::session::Row<Self>,
                 store: &svql_query::session::Store,
                 driver: &svql_query::driver::Driver,

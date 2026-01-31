@@ -14,7 +14,7 @@ impl Netlist for AndGate {
 
     const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
 
-    fn rehydrate<'a>(
+    fn netlist_rehydrate<'a>(
         row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
@@ -80,7 +80,7 @@ impl Composite for And2Gates {
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
-    fn rehydrate<'a>(
+    fn composite_rehydrate<'a>(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,

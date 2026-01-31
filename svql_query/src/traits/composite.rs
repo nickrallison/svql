@@ -159,7 +159,12 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     }
 
     /// Rehydrate from row
-    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>;
+    fn composite_rehydrate(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<Self>;
 
     fn preload_driver(
         driver: &Driver,
@@ -293,7 +298,7 @@ where
         T::compose(ctx, &dep_tables)
     }
 
-    fn rehydrate<'a>(
+    fn internal_rehydrate<'a>(
         row: &Row<Self>,
         store: &Store,
         driver: &Driver,
@@ -302,7 +307,7 @@ where
     where
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,
     {
-        <T as Composite>::rehydrate(row, store, driver, key)
+        Self::composite_rehydrate(row, store, driver, key)
     }
 }
 
@@ -392,7 +397,7 @@ pub(crate) mod test {
 
         const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
-        fn rehydrate(
+        fn composite_rehydrate(
             row: &Row<Self>,
             store: &Store,
             driver: &Driver,

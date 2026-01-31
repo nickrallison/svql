@@ -81,7 +81,7 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
                 #(#port_entries),*
             ];
 
-            fn rehydrate(
+            fn netlist_rehydrate(
                 row: &svql_query::session::Row<Self>,
                 _store: &svql_query::session::Store,
                 _driver: &svql_query::driver::Driver,

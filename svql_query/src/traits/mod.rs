@@ -6,11 +6,12 @@
 pub mod composite;
 pub mod netlist;
 pub mod primitive;
+pub mod recursive;
 pub mod variant;
 
 // Re-export key traits
-pub use netlist::Netlist;
-pub use primitive::Primitive;
+// pub use netlist::Netlist;
+// pub use primitive::Primitive;
 
 use crate::prelude::*;
 
@@ -140,26 +141,11 @@ pub mod kind {
     pub struct Composite;
     pub struct Variant;
     pub struct Primitive;
+    pub struct Recursive;
 }
 
 pub trait Component {
     type Kind;
-}
-
-impl Component for kind::Netlist {
-    type Kind = kind::Netlist;
-}
-
-impl Component for kind::Composite {
-    type Kind = kind::Composite;
-}
-
-impl Component for kind::Variant {
-    type Kind = kind::Variant;
-}
-
-impl Component for kind::Primitive {
-    type Kind = kind::Primitive;
 }
 
 pub trait PatternInternal<K>: Sized {
@@ -181,7 +167,7 @@ pub trait PatternInternal<K>: Sized {
     where
         Self: Send + Sync + 'static;
 
-    fn rehydrate(
+    fn internal_rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
@@ -229,7 +215,7 @@ where
     where
         Self: 'static,
     {
-        T::rehydrate(row, store, driver, key)
+        T::internal_rehydrate(row, store, driver, key)
     }
 }
 
