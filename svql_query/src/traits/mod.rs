@@ -169,7 +169,7 @@ pub trait PatternInternal<K>: Sized {
 
     const EXEC_INFO: &'static crate::session::ExecInfo;
 
-    fn schema() -> &'static crate::session::PatternSchema;
+    fn internal_schema() -> &'static crate::session::PatternSchema;
 
     fn preload_driver(
         driver: &Driver,
@@ -204,7 +204,7 @@ where
     const EXEC_INFO: &'static crate::session::ExecInfo = T::EXEC_INFO;
 
     fn schema() -> &'static PatternSchema {
-        T::schema()
+        T::internal_schema()
     }
 
     fn preload_driver(

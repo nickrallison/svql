@@ -45,7 +45,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     const DEPENDANCIES: &'static [&'static ExecInfo];
 
     /// Schema accessor (macro generates this with OnceLock pattern)
-    fn schema() -> &'static crate::session::PatternSchema {
+    fn composite_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
@@ -82,7 +82,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
-        let schema = Self::schema();
+        let schema = Self::composite_schema();
         let sub_indices = &schema.submodules;
 
         // Early exit for empty required tables
@@ -224,7 +224,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 for alias in Self::ALIASES {
                     let cell_id = row.resolve(alias.target, ctx).map(|w| w.id());
 
-                    if let Some(idx) = Self::schema().index_of(alias.port_name) {
+                    if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
                         entry.entries[idx] = ColumnEntry::Cell { id: cell_id };
                     }
                 }
@@ -254,8 +254,8 @@ where
         nested_dependancies: T::DEPENDANCIES,
     };
 
-    fn schema() -> &'static crate::session::PatternSchema {
-        T::schema()
+    fn internal_schema() -> &'static crate::session::PatternSchema {
+        T::composite_schema()
     }
 
     fn preload_driver(
@@ -275,8 +275,8 @@ where
     {
         let mut dep_tables = Vec::new();
 
-        for sub_idx in T::schema().submodules.iter() {
-            let tid = T::schema()
+        for sub_idx in T::composite_schema().submodules.iter() {
+            let tid = T::composite_schema()
                 .column(*sub_idx)
                 .as_submodule()
                 .expect("Idx should point to submodule");
@@ -284,7 +284,7 @@ where
                 QueryError::MissingDependency(format!(
                     "TypeId {:?}, Col: {}",
                     tid,
-                    T::schema().column(*sub_idx).name
+                    T::composite_schema().column(*sub_idx).name
                 ))
             })?;
             dep_tables.push(table);
@@ -350,5 +350,92 @@ pub(crate) mod test {
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 2,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct ManualAnd2Gates {
+        pub and1: AndGate,
+        pub and2: AndGate,
+        pub a: Wire,
+        pub b: Wire,
+        pub y: Wire,
+    }
+
+    impl Component for ManualAnd2Gates {
+        type Kind = kind::Composite;
+    }
+
+    impl Composite for ManualAnd2Gates {
+        const SUBMODULES: &'static [Submodule] = &[
+            Submodule::of::<AndGate>("and1"),
+            Submodule::of::<AndGate>("and2"),
+        ];
+
+        const ALIASES: &'static [Alias] = &[
+            Alias::input("a", Selector::static_path(&["and1", "a"])),
+            Alias::input("b", Selector::static_path(&["and1", "b"])),
+            Alias::output("y", Selector::static_path(&["and2", "y"])),
+        ];
+
+        const CONNECTIONS: Connections = Connections {
+            connections: &[&[
+                Connection::new(
+                    Selector::static_path(&["and1", "y"]),
+                    Selector::static_path(&["and2", "a"]),
+                ),
+                Connection::new(
+                    Selector::static_path(&["and1", "y"]),
+                    Selector::static_path(&["and2", "b"]),
+                ),
+            ]],
+        };
+
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
+
+        fn rehydrate(
+            row: &Row<Self>,
+            store: &Store,
+            driver: &Driver,
+            key: &DriverKey,
+        ) -> Option<Self> {
+            let and1 = {
+                let sub_ref = row.sub::<AndGate>("and1")?;
+                let sub_table = store.get::<AndGate>()?;
+                let sub_row = sub_table.row(sub_ref.index())?;
+                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key)?
+            };
+
+            let and2 = {
+                let sub_ref = row.sub::<AndGate>("and2")?;
+                let sub_table = store.get::<AndGate>()?;
+                let sub_row = sub_table.row(sub_ref.index())?;
+                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key)?
+            };
+
+            Some(Self {
+                and1,
+                and2,
+                a: row.wire("a")?,
+                b: row.wire("b")?,
+                y: row.wire("y")?,
+            })
+        }
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)?;
+            Ok(())
+        }
+    }
+
+    query_test!(
+        name: test_manual_and2gates_small_tree,
+        query: ManualAnd2Gates,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 2,
+        config: |cb| cb.dedupe(Dedupe::All)
     );
 }

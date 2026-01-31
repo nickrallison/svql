@@ -34,7 +34,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     }
 
     /// Schema accessor (macro generates this with OnceLock pattern).
-    fn schema() -> &'static crate::session::PatternSchema {
+    fn primitive_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
@@ -91,8 +91,8 @@ where
         nested_dependancies: &[],
     };
 
-    fn schema() -> &'static crate::session::PatternSchema {
-        T::schema()
+    fn internal_schema() -> &'static crate::session::PatternSchema {
+        T::primitive_schema()
     }
 
     fn preload_driver(

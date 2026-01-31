@@ -29,7 +29,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     const DEPENDANCIES: &'static [&'static ExecInfo];
 
     /// Schema accessor (macro generates this with OnceLock pattern)
-    fn schema() -> &'static crate::session::PatternSchema {
+    fn variant_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
@@ -64,7 +64,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
-        let schema = Self::schema();
+        let schema = Self::variant_schema();
         let mut all_entries = Vec::new();
 
         // Column indices (cached once)
@@ -139,8 +139,8 @@ where
         nested_dependancies: T::DEPENDANCIES,
     };
 
-    fn schema() -> &'static crate::session::PatternSchema {
-        T::schema()
+    fn internal_schema() -> &'static crate::session::PatternSchema {
+        T::variant_schema()
     }
 
     fn preload_driver(
@@ -230,5 +230,104 @@ mod test {
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 5,  // 3 AndGate + 2 And2Gates
         config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
+
+    #[derive(Debug, Clone)]
+    pub(crate) enum ManualAndOrAnd2 {
+        AndGate(AndGate),
+        And2Gates(And2Gates),
+    }
+
+    impl Component for ManualAndOrAnd2 {
+        type Kind = kind::Variant;
+    }
+
+    impl Variant for ManualAndOrAnd2 {
+        const NUM_VARIANTS: usize = 2;
+
+        const COMMON_PORTS: &'static [Port] =
+            &[Port::input("a"), Port::input("b"), Port::output("y")];
+
+        const PORT_MAPPINGS: &'static [&'static [PortMap]] = &[
+            &[
+                PortMap::new("a", Selector::static_path(&["a"])),
+                PortMap::new("b", Selector::static_path(&["b"])),
+                PortMap::new("y", Selector::static_path(&["y"])),
+            ],
+            &[
+                PortMap::new("a", Selector::static_path(&["a"])),
+                PortMap::new("b", Selector::static_path(&["b"])),
+                PortMap::new("y", Selector::static_path(&["y"])),
+            ],
+        ];
+
+        const VARIANT_ARMS: &'static [VariantArm] = &[
+            VariantArm {
+                type_id: std::any::TypeId::of::<AndGate>(),
+                type_name: "AndGate",
+            },
+            VariantArm {
+                type_id: std::any::TypeId::of::<And2Gates>(),
+                type_name: "And2Gates",
+            },
+        ];
+
+        const DEPENDANCIES: &'static [&'static ExecInfo] = &[
+            <AndGate as Pattern>::EXEC_INFO,
+            <And2Gates as Pattern>::EXEC_INFO,
+        ];
+
+        fn rehydrate(
+            row: &Row<Self>,
+            store: &Store,
+            driver: &Driver,
+            key: &DriverKey,
+        ) -> Option<Self> {
+            let schema = Self::schema();
+            let discrim = row
+                .entry_array
+                .entries
+                .get(schema.index_of("discriminant")?)?
+                .as_u32()?;
+            let inner_row_idx = row
+                .entry_array
+                .entries
+                .get(schema.index_of("inner_ref")?)?
+                .as_u32()?;
+
+            match discrim {
+                0 => {
+                    let table = store.get::<AndGate>()?;
+                    let inner_row = table.row(inner_row_idx)?;
+                    let inner = <AndGate as Pattern>::rehydrate(&inner_row, store, driver, key)?;
+                    Some(Self::AndGate(inner))
+                }
+                1 => {
+                    let table = store.get::<And2Gates>()?;
+                    let inner_row = table.row(inner_row_idx)?;
+                    let inner = <And2Gates as Pattern>::rehydrate(&inner_row, store, driver, key)?;
+                    Some(Self::And2Gates(inner))
+                }
+                _ => None,
+            }
+        }
+
+        fn preload_driver(
+            driver: &Driver,
+            design_key: &DriverKey,
+            config: &svql_common::Config,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            <AndGate as Pattern>::preload_driver(driver, design_key, config)?;
+            <And2Gates as Pattern>::preload_driver(driver, design_key, config)?;
+            Ok(())
+        }
+    }
+
+    query_test!(
+        name: test_manual_variant_small_tree,
+        query: ManualAndOrAnd2,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 5,
+        config: |cb| cb.dedupe(Dedupe::All)
     );
 }

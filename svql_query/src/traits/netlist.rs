@@ -28,7 +28,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     const PORTS: &'static [Port];
 
     /// Schema accessor (macro generates this with OnceLock pattern)
-    fn schema() -> &'static crate::session::PatternSchema {
+    fn netlist_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
@@ -63,13 +63,13 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             let needle_cell = needle_cell_wrapper.get();
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _) => {
-                    let col_idx = Self::schema()
+                    let col_idx = Self::netlist_schema()
                         .index_of(name)
                         .expect("Needle Cell name should exist in schema");
                     row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u32);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
-                    let col_idx = Self::schema()
+                    let col_idx = Self::netlist_schema()
                         .index_of(name)
                         .expect("Needle Cell name should exist in schema");
                     let needle_output_driver_id: u32 =
@@ -91,7 +91,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         for (idx, item) in row_match.iter().enumerate().take(schema_size) {
             if item.is_none() {
-                let col_name = Self::schema().column(idx).name;
+                let col_name = Self::netlist_schema().column(idx).name;
                 panic!("Unmapped column in match: {}", col_name);
             }
         }
@@ -132,8 +132,8 @@ where
         nested_dependancies: &[],
     };
 
-    fn schema() -> &'static crate::session::PatternSchema {
-        T::schema()
+    fn internal_schema() -> &'static crate::session::PatternSchema {
+        T::netlist_schema()
     }
 
     fn preload_driver(
@@ -237,5 +237,45 @@ pub(crate) mod test {
         haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
         expect: 3,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
+    );
+
+    // --- Reference Implementation (Manual) ---
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct ManualAndGate {
+        pub a: Wire,
+        pub b: Wire,
+        pub y: Wire,
+    }
+
+    impl Component for ManualAndGate {
+        type Kind = kind::Netlist;
+    }
+
+    impl Netlist for ManualAndGate {
+        const MODULE_NAME: &'static str = "and_gate";
+        const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
+
+        const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
+
+        fn rehydrate(
+            row: &Row<Self>,
+            _store: &Store,
+            _driver: &Driver,
+            _key: &DriverKey,
+        ) -> Option<Self> {
+            Some(Self {
+                a: row.wire("a")?,
+                b: row.wire("b")?,
+                y: row.wire("y")?,
+            })
+        }
+    }
+
+    query_test!(
+        name: test_manual_and_gate_small_tree,
+        query: ManualAndGate,
+        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
+        expect: 3
     );
 }
