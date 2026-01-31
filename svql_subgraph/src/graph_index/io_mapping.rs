@@ -12,22 +12,23 @@ pub struct IoMapping {
 }
 
 impl IoMapping {
-    pub fn build<'a>(
-        cells_topo: &[CellWrapper<'a>],
+    #[must_use] 
+    pub fn build(
+        cells_topo: &[CellWrapper<'_>],
         fanin_map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
         fanout_map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
     ) -> Self {
         let input_fanout_by_name = Self::build_input_fanout_by_name(cells_topo, fanout_map);
         let output_fanin_by_name = Self::build_output_fanin_by_name(cells_topo, fanin_map);
 
-        IoMapping {
+        Self {
             input_fanout_by_name,
             output_fanin_by_name,
         }
     }
 
-    fn build_input_fanout_by_name<'a>(
-        cells_topo: &[CellWrapper<'a>],
+    fn build_input_fanout_by_name(
+        cells_topo: &[CellWrapper<'_>],
         fanout_map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
     ) -> HashMap<String, Vec<(CellIndex, usize)>> {
         fanout_map
@@ -42,8 +43,8 @@ impl IoMapping {
             .collect()
     }
 
-    fn build_output_fanin_by_name<'a>(
-        cells_topo: &[CellWrapper<'a>],
+    fn build_output_fanin_by_name(
+        cells_topo: &[CellWrapper<'_>],
         fanin_map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
     ) -> HashMap<String, Vec<(CellIndex, usize)>> {
         fanin_map
@@ -58,6 +59,7 @@ impl IoMapping {
             .collect()
     }
 
+    #[must_use] 
     pub fn get_input_fanout_by_name<'a>(
         &self,
         registry: &CellRegistry<'a>,
@@ -75,6 +77,7 @@ impl IoMapping {
             .collect()
     }
 
+    #[must_use] 
     pub fn get_output_fanin_by_name<'a>(
         &self,
         registry: &CellRegistry<'a>,
@@ -92,11 +95,13 @@ impl IoMapping {
             .collect()
     }
 
-    pub fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+    #[must_use] 
+    pub const fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
         &self.input_fanout_by_name
     }
 
-    pub fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+    #[must_use] 
+    pub const fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
         &self.output_fanin_by_name
     }
 }

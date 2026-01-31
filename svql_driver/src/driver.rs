@@ -120,21 +120,18 @@ impl Driver {
         let yosys_module =
             YosysModule::new(&absolute_path.display().to_string(), key.module_name())
                 .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
-        let design = match module_config.load_raw {
-            true => {
-                if !yosys_module.path().ends_with(".json") {
-                    return Err(DriverError::DesignLoading(
-                        "Raw loading is only supported for JSON netlists.".to_string(),
-                    ));
-                }
-                yosys_module
-                    .import_design_raw()
-                    .map_err(|e| DriverError::DesignLoading(e.to_string()))?
+        let design = if module_config.load_raw {
+            if !yosys_module.path().ends_with(".json") {
+                return Err(DriverError::DesignLoading(
+                    "Raw loading is only supported for JSON netlists.".to_string(),
+                ));
             }
-            false => yosys_module
-                .import_design(module_config)
-                .map_err(|e| DriverError::DesignLoading(e.to_string()))?,
-        };
+            yosys_module
+                .import_design_raw()
+                .map_err(|e| DriverError::DesignLoading(e.to_string()))?
+        } else { yosys_module
+        .import_design(module_config)
+        .map_err(|e| DriverError::DesignLoading(e.to_string()))? };
 
         let design_container = Arc::new(DesignContainer::build(design));
 
@@ -147,6 +144,7 @@ impl Driver {
     }
 
     /// Returns a copy of all currently loaded designs.
+    #[must_use] 
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
         self.registry.read().unwrap().clone()
     }

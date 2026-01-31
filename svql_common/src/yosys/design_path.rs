@@ -16,9 +16,9 @@ pub enum DesignPath {
 impl DesignPath {
     pub fn new(path: PathBuf) -> Result<Self, String> {
         match path.extension().and_then(|s| s.to_str()) {
-            Some("v") => return Ok(Self::Verilog(path)),
-            Some("il") => return Ok(Self::Rtlil(path)),
-            Some("json") => return Ok(Self::Json(path)),
+            Some("v") => Ok(Self::Verilog(path)),
+            Some("il") => Ok(Self::Rtlil(path)),
+            Some("json") => Ok(Self::Json(path)),
             _ => Err(format!(
                 "Unsupported design file extension: {:?}",
                 path.extension()

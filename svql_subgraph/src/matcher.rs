@@ -46,6 +46,7 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     /// Performs a complete subgraph isomorphism search. Builds indices internally.
+    #[must_use] 
     pub fn enumerate_all(
         needle: &'needle Design,
         haystack: &'haystack Design,
@@ -75,6 +76,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     }
 
     /// Performs a subgraph isomorphism search using pre-built indices.
+    #[must_use] 
     pub fn enumerate_with_indices(
         needle: &'needle Design,
         haystack: &'haystack Design,
@@ -102,7 +104,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     }
 }
 
-impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Executes the matching process and applies deduplication.
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
         tracing::info!(

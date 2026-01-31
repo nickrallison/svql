@@ -18,42 +18,47 @@ pub enum Wire {
 
 impl Wire {
     /// Create a new Wire reference from a cell ID and direction.
-    pub fn new(id: CellId, direction: PortDirection) -> Self {
+    #[must_use] 
+    pub const fn new(id: CellId, direction: PortDirection) -> Self {
         match direction {
-            PortDirection::Input => Wire::Input(id),
-            PortDirection::Output => Wire::Output(id),
-            PortDirection::Inout => Wire::Inout(id),
-            PortDirection::None => Wire::Unknown(id),
+            PortDirection::Input => Self::Input(id),
+            PortDirection::Output => Self::Output(id),
+            PortDirection::Inout => Self::Inout(id),
+            PortDirection::None => Self::Unknown(id),
         }
     }
 
     /// Create from raw u64 (for backward compatibility).
+    #[must_use] 
     pub fn from_u64(id: u64, direction: PortDirection) -> Self {
         Self::new(CellId::from_u64(id), direction)
     }
 
     /// Get the underlying cell ID.
-    pub fn id(&self) -> CellId {
+    #[must_use] 
+    pub const fn id(&self) -> CellId {
         match self {
-            Wire::Input(id) => *id,
-            Wire::Output(id) => *id,
-            Wire::Inout(id) => *id,
-            Wire::Unknown(id) => *id,
+            Self::Input(id) => *id,
+            Self::Output(id) => *id,
+            Self::Inout(id) => *id,
+            Self::Unknown(id) => *id,
         }
     }
 
     /// Get the direction.
-    pub fn direction(&self) -> PortDirection {
+    #[must_use] 
+    pub const fn direction(&self) -> PortDirection {
         match self {
-            Wire::Input(_) => PortDirection::Input,
-            Wire::Output(_) => PortDirection::Output,
-            Wire::Inout(_) => PortDirection::Inout,
-            Wire::Unknown(_) => PortDirection::None,
+            Self::Input(_) => PortDirection::Input,
+            Self::Output(_) => PortDirection::Output,
+            Self::Inout(_) => PortDirection::Inout,
+            Self::Unknown(_) => PortDirection::None,
         }
     }
 
     /// Get the raw u64 value (for backward compatibility).
-    pub fn as_u64(&self) -> u64 {
+    #[must_use] 
+    pub const fn as_u64(&self) -> u64 {
         self.id().as_u64()
     }
 }

@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// during rehydration.
 #[derive(Debug, Clone, Copy)]
 pub struct VariantArm {
-    /// The TypeId of the inner pattern type.
+    /// The `TypeId` of the inner pattern type.
     pub type_id: std::any::TypeId,
     /// Human-readable type name for debugging.
     pub type_name: &'static str,
@@ -28,7 +28,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     /// Dependencies (macro-generated)
     const DEPENDANCIES: &'static [&'static ExecInfo];
 
-    /// Schema accessor (macro generates this with OnceLock pattern)
+    /// Schema accessor (macro generates this with `OnceLock` pattern)
     fn variant_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
@@ -40,6 +40,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     }
 
     /// Convert declarations to column definitions
+    #[must_use] 
     fn variant_to_defs() -> Vec<ColumnDef> {
         let mut defs = vec![
             ColumnDef::metadata("discriminant"),
@@ -95,7 +96,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(row_idx) };
 
                 // 3. Map common ports from inner table using path resolution
-                for mapping in port_maps.iter() {
+                for mapping in port_maps {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
                         let cell_id = table.resolve_path(row_idx as usize, mapping.inner, ctx);
                         entry.entries[col_idx] = ColumnEntry::Cell { id: cell_id };
@@ -204,7 +205,7 @@ mod test {
         traits::{Netlist, Pattern, composite::Composite},
     };
 
-    use super::*;
+    use super::{Variant, Component, kind, Port, PortMap, VariantArm, Row, Store, Driver, DriverKey};
 
     use crate::traits::composite::test::And2Gates;
     use crate::traits::netlist::test::AndGate;
@@ -214,7 +215,7 @@ mod test {
 
     #[derive(Debug, Clone, Variant)]
     #[variant_ports(input(a), input(b), output(y))]
-    pub(crate) enum AndOrAnd2 {
+    pub enum AndOrAnd2 {
         #[map(a = ["a"], b = ["b"], y = ["y"])]
         AndGate(AndGate),
         #[map(a = ["a"], b = ["b"], y = ["y"])]
@@ -238,7 +239,7 @@ mod test {
     );
 
     #[derive(Debug, Clone)]
-    pub(crate) enum ManualAndOrAnd2 {
+    pub enum ManualAndOrAnd2 {
         AndGate(AndGate),
         And2Gates(And2Gates),
     }

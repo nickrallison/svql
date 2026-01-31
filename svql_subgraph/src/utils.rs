@@ -5,6 +5,7 @@ use std::hash::Hash;
 
 /// Computes the intersection of multiple sets.
 /// Returns an empty set if the input is empty.
+#[must_use] 
 pub fn intersect_sets<T, I>(mut items: Vec<I>) -> HashSet<T>
 where
     T: Eq + Hash + Clone,

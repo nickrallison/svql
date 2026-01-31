@@ -8,7 +8,7 @@ use crate::assignment::SingleAssignment;
 use crate::cell::CellWrapper;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 
-impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Validates that the haystack cell's inputs match the mapped inputs of the needle cell.
     pub(crate) fn check_fanin_constraints(
         &self,
@@ -26,7 +26,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
         haystack_cell: &Cell,
         mapping: &SingleAssignment<'needle, 'haystack>,
     ) -> bool {
-        use Cell::*;
+        use Cell::{Buf, Not, And, Or, Xor, Mux, Adc, Aig, Eq, ULt, SLt, Shl, UShr, SShr, XShr, Mul, UDiv, UMod, SDivTrunc, SDivFloor, SModTrunc, SModFloor, Match, Assign, Dff, Memory, Input};
         match (needle_cell, haystack_cell) {
             (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
             (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
@@ -190,9 +190,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
                 self.nets_match_fan_in(first_p_net, first_d_net, mapping)
             }
             svql_common::MatchLength::NeedleSubsetHaystack => {
-                for p_net in needle_nets_vec.iter() {
+                for p_net in &needle_nets_vec {
                     let mut found_match = false;
-                    for d_net in haystack_nets_vec.iter() {
+                    for d_net in &haystack_nets_vec {
                         if self.nets_match_fan_in(p_net, d_net, mapping) {
                             found_match = true;
                             break;

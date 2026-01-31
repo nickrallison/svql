@@ -37,18 +37,21 @@ pub struct PatternSchema {
 impl PatternSchema {
     /// Get a column definition by index.
     #[inline]
+    #[must_use] 
     pub fn column(&self, index: usize) -> &ColumnDef {
         &self.defs[index]
     }
 
     /// Get all column definitions.
     #[inline]
-    pub fn columns(&self) -> &[ColumnDef] {
+    #[must_use] 
+    pub const fn columns(&self) -> &[ColumnDef] {
         self.defs
     }
 
-    /// Construct a new PatternSchema from raw definitions.
+    /// Construct a new `PatternSchema` from raw definitions.
     /// This is typically called inside a `OnceLock::get_or_init`.
+    #[must_use] 
     pub fn new(defs: &'static [ColumnDef]) -> Self {
         let mut name_map = AHashMap::new();
         let mut submodules = Vec::new();
@@ -78,20 +81,22 @@ impl PatternSchema {
             defs,
             name_map,
             submodules,
+            submodule_map,
             inputs,
             outputs,
-            submodule_map,
         }
     }
 
     /// Get the index of a column by name in O(1).
     #[inline]
+    #[must_use] 
     pub fn index_of(&self, name: &str) -> Option<usize> {
         self.name_map.get(name).copied()
     }
 
     /// Get the definition of a column by name in O(1).
     #[inline]
+    #[must_use] 
     pub fn get(&self, name: &str) -> Option<&ColumnDef> {
         let idx = self.index_of(name)?;
         Some(&self.defs[idx])
@@ -99,11 +104,13 @@ impl PatternSchema {
 
     /// Get the definition by index (bounds checked).
     #[inline]
+    #[must_use] 
     pub fn get_by_index(&self, index: usize) -> Option<&ColumnDef> {
         self.defs.get(index)
     }
 
     #[inline]
+    #[must_use] 
     pub fn submodule_index(&self, name: &str) -> Option<usize> {
         self.submodule_map.get(name).copied()
     }
@@ -112,10 +119,10 @@ impl PatternSchema {
 /// The kind of data stored in a column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnKind {
-    /// A wire reference (CellId) pointing into the design.
+    /// A wire reference (`CellId`) pointing into the design.
     Cell,
     /// A submodule reference (Ref<T>) pointing into another pattern table.
-    /// For self-referential types (like RecOr trees), use `Sub(TypeId::of::<Self>())`.
+    /// For self-referential types (like `RecOr` trees), use `Sub(TypeId::of::<Self>())`.
     Sub(TypeId),
     /// Metadata column (e.g., depth, flags) - not a reference to other data.
     Metadata,
@@ -123,27 +130,32 @@ pub enum ColumnKind {
 
 impl ColumnKind {
     /// Create a `Sub` column kind for a specific pattern type.
-    pub fn sub<T: 'static>() -> Self {
+    #[must_use] 
+    pub const fn sub<T: 'static>() -> Self {
         Self::Sub(TypeId::of::<T>())
     }
 
     /// Check if this is a wire column.
-    pub fn is_wire(&self) -> bool {
+    #[must_use] 
+    pub const fn is_wire(&self) -> bool {
         matches!(self, Self::Cell)
     }
 
     /// Check if this is a submodule reference column.
-    pub fn is_sub(&self) -> bool {
+    #[must_use] 
+    pub const fn is_sub(&self) -> bool {
         matches!(self, Self::Sub(_))
     }
 
     /// Check if this is a metadata column.
-    pub fn is_metadata(&self) -> bool {
+    #[must_use] 
+    pub const fn is_metadata(&self) -> bool {
         matches!(self, Self::Metadata)
     }
 
-    /// Get the target TypeId for a Sub column, if applicable.
-    pub fn sub_type(&self) -> Option<TypeId> {
+    /// Get the target `TypeId` for a Sub column, if applicable.
+    #[must_use] 
+    pub const fn sub_type(&self) -> Option<TypeId> {
         match self {
             Self::Sub(tid) => Some(*tid),
             _ => None,
@@ -172,7 +184,7 @@ pub struct ColumnDef {
     /// The kind of data stored in this column.
     pub kind: ColumnKind,
     /// Whether this column can contain NULL values.
-    /// Used for optional submodules and tree children (left_child, right_child).
+    /// Used for optional submodules and tree children (`left_child`, `right_child`).
     pub nullable: bool,
     /// The directionality of this column (if it is a port).
     pub direction: PortDirection,
@@ -180,6 +192,7 @@ pub struct ColumnDef {
 
 impl ColumnDef {
     /// Create a wire column that acts as an Input port.
+    #[must_use] 
     pub const fn input(name: &'static str) -> Self {
         Self {
             name,
@@ -190,6 +203,7 @@ impl ColumnDef {
     }
 
     /// Create a wire column that acts as an Output port.
+    #[must_use] 
     pub const fn output(name: &'static str) -> Self {
         Self {
             name,
@@ -200,6 +214,7 @@ impl ColumnDef {
     }
 
     /// Create a wire column (non-nullable by default).
+    #[must_use] 
     pub const fn wire(name: &'static str) -> Self {
         Self {
             name,
@@ -210,6 +225,7 @@ impl ColumnDef {
     }
 
     /// Create a wire column that can be NULL.
+    #[must_use] 
     pub const fn wire_nullable(name: &'static str) -> Self {
         Self {
             name,
@@ -220,6 +236,7 @@ impl ColumnDef {
     }
 
     /// Create a metadata column (non-nullable by default).
+    #[must_use] 
     pub const fn metadata(name: &'static str) -> Self {
         Self {
             name,
@@ -231,6 +248,7 @@ impl ColumnDef {
 
     /// Create a submodule reference column.
     /// Note: Cannot be `const` because `TypeId::of::<T>()` is not const-stable.
+    #[must_use] 
     pub const fn sub<T: 'static>(name: &'static str) -> Self {
         Self {
             name,
@@ -241,7 +259,8 @@ impl ColumnDef {
     }
 
     /// Create a nullable submodule reference column (for optional children).
-    pub fn sub_nullable<T: 'static>(name: &'static str) -> Self {
+    #[must_use] 
+    pub const fn sub_nullable<T: 'static>(name: &'static str) -> Self {
         Self {
             name,
             kind: ColumnKind::Sub(TypeId::of::<T>()),
@@ -251,6 +270,7 @@ impl ColumnDef {
     }
 
     /// Create a column with explicit kind and nullability.
+    #[must_use] 
     pub const fn new(name: &'static str, kind: ColumnKind, nullable: bool) -> Self {
         Self {
             name,
@@ -261,18 +281,21 @@ impl ColumnDef {
     }
 
     /// Set the direction of this column (builder pattern)
+    #[must_use] 
     pub const fn with_direction(mut self, direction: PortDirection) -> Self {
         self.direction = direction;
         self
     }
 
-    pub fn as_submodule(&self) -> Option<TypeId> {
+    #[must_use] 
+    pub const fn as_submodule(&self) -> Option<TypeId> {
         match &self.kind {
             ColumnKind::Sub(tid) => Some(*tid),
             _ => None,
         }
     }
 
+    #[must_use] 
     pub fn into_polars_column(&self) -> polars::frame::column::Column {
         use polars::prelude::*;
 
@@ -293,6 +316,7 @@ pub struct Port {
 }
 
 impl Port {
+    #[must_use] 
     pub const fn input(name: &'static str) -> Self {
         Self {
             name,
@@ -300,6 +324,7 @@ impl Port {
         }
     }
 
+    #[must_use] 
     pub const fn output(name: &'static str) -> Self {
         Self {
             name,
@@ -307,6 +332,7 @@ impl Port {
         }
     }
 
+    #[must_use] 
     pub const fn inout(name: &'static str) -> Self {
         Self {
             name,
@@ -323,6 +349,7 @@ pub struct Submodule {
 }
 
 impl Submodule {
+    #[must_use] 
     pub const fn of<T: 'static>(name: &'static str) -> Self {
         Self {
             name,
@@ -340,6 +367,7 @@ pub struct Alias {
 }
 
 impl Alias {
+    #[must_use] 
     pub const fn input(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
         Self {
             port_name: name,
@@ -348,6 +376,7 @@ impl Alias {
         }
     }
 
+    #[must_use] 
     pub const fn output(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
         Self {
             port_name: name,
@@ -365,6 +394,7 @@ pub struct PortMap {
 }
 
 impl PortMap {
+    #[must_use] 
     pub const fn new(common: &'static str, inner: crate::selector::Selector<'static>) -> Self {
         Self {
             common_port: common,
@@ -375,7 +405,7 @@ impl PortMap {
 
 #[derive(Debug, Clone)]
 pub enum ColumnEntry {
-    /// Cell column: stores raw cell ID as u32 (converted to/from CellId)
+    /// Cell column: stores raw cell ID as u32 (converted to/from `CellId`)
     Cell { id: Option<CellId> },
     /// Submodule column: stores row index in the submodule's table
     Sub { id: Option<u32> },
@@ -384,11 +414,12 @@ pub enum ColumnEntry {
 }
 
 impl ColumnEntry {
+    #[must_use] 
     pub fn as_u32(&self) -> Option<u32> {
         match self {
-            ColumnEntry::Cell { id } => id.map(|cid| cid.raw()),
-            ColumnEntry::Sub { id } => *id,
-            ColumnEntry::Metadata { id } => *id,
+            Self::Cell { id } => id.map(super::super::cell_id::CellId::raw),
+            Self::Sub { id } => *id,
+            Self::Metadata { id } => *id,
         }
     }
 }
@@ -399,18 +430,20 @@ pub struct EntryArray {
 }
 
 impl EntryArray {
-    pub fn empty() -> Self {
+    #[must_use] 
+    pub const fn empty() -> Self {
         Self {
             entries: Vec::new(),
         }
     }
 
+    #[must_use] 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             entries: vec![ColumnEntry::Metadata { id: None }; capacity],
         }
     }
-    pub(crate) fn new(entries: Vec<ColumnEntry>) -> Self {
+    pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
         Self { entries }
     }
 }

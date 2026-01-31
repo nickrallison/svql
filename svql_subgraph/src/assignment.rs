@@ -13,7 +13,8 @@ pub struct AssignmentSet<'needle, 'haystack> {
 }
 
 impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
-    pub fn new(
+    #[must_use] 
+    pub const fn new(
         items: Vec<SingleAssignment<'needle, 'haystack>>,
         needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
         needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
@@ -25,11 +26,13 @@ impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[must_use] 
+    pub const fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 
-    pub fn len(&self) -> usize {
+    #[must_use] 
+    pub const fn len(&self) -> usize {
         self.items.len()
     }
 }
@@ -72,6 +75,7 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         None
     }
 
+    #[must_use] 
     pub fn get_haystack_cell(
         &self,
         needle: &CellWrapper<'needle>,
@@ -79,6 +83,7 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         self.needle_to_haystack.get(needle)
     }
 
+    #[must_use] 
     pub fn get_needle_cell(
         &self,
         haystack: &CellWrapper<'haystack>,
@@ -86,23 +91,27 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         self.haystack_to_needle.get(haystack)
     }
 
+    #[must_use] 
     pub fn len(&self) -> usize {
         debug_assert_eq!(self.needle_to_haystack.len(), self.haystack_to_needle.len());
         self.needle_to_haystack.len()
     }
 
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         debug_assert_eq!(self.needle_to_haystack.len(), self.haystack_to_needle.len());
         self.needle_to_haystack.is_empty()
     }
 
     #[allow(clippy::mutable_key_type)]
-    pub fn haystack_mapping(&self) -> &HashMap<CellWrapper<'haystack>, CellWrapper<'needle>> {
+    #[must_use] 
+    pub const fn haystack_mapping(&self) -> &HashMap<CellWrapper<'haystack>, CellWrapper<'needle>> {
         &self.haystack_to_needle
     }
 
     #[allow(clippy::mutable_key_type)]
-    pub fn needle_mapping(&self) -> &HashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
+    #[must_use] 
+    pub const fn needle_mapping(&self) -> &HashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
         &self.needle_to_haystack
     }
 
@@ -110,13 +119,14 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         let mut sig: Vec<usize> = self
             .needle_to_haystack
             .values()
-            .map(|d| d.debug_index())
+            .map(super::cell::CellWrapper::debug_index)
             .collect();
         sig.sort_unstable();
         sig.dedup();
         sig
     }
 
+    #[must_use] 
     pub fn internal_signature(&self) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .needle_mapping()

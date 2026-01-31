@@ -2,7 +2,7 @@
 //!
 //! The execution model has two phases:
 //! 1. **Plan construction** (single-threaded): Build a DAG from the registry
-//! 2. **Execution** (multi-threaded): Traverse DAG with OnceLock per slot
+//! 2. **Execution** (multi-threaded): Traverse DAG with `OnceLock` per slot
 //!
 //! This module provides the infrastructure. The actual `search` function
 //! pointers are provided by the `Pattern` trait implementations.
@@ -25,7 +25,7 @@ pub struct ExecInfo {
     pub type_id: std::any::TypeId,
     pub type_name: &'static str,
     pub search_function: SearchFn,
-    pub nested_dependancies: &'static [&'static ExecInfo],
+    pub nested_dependancies: &'static [&'static Self],
 }
 
 /// Slot for storing a table during execution.
@@ -46,7 +46,7 @@ struct ExecutionNode {
     /// Atomic flag to ensure single execution in parallel mode.
     cas_runner: AtomicBool,
     /// Dependencies that must complete before this node.
-    deps: Vec<Arc<ExecutionNode>>,
+    deps: Vec<Arc<Self>>,
 }
 
 impl ExecutionNode {
@@ -74,9 +74,9 @@ impl ExecutionNode {
         cas_result.is_ok()
     }
 
-    fn flatten_deps(&self) -> Vec<Arc<ExecutionNode>> {
+    fn flatten_deps(&self) -> Vec<Arc<Self>> {
         let mut seen: HashSet<TypeId> = HashSet::new();
-        let mut result: Vec<Arc<ExecutionNode>> = Vec::new();
+        let mut result: Vec<Arc<Self>> = Vec::new();
 
         for dep in &self.deps {
             if seen.insert(dep.type_id) {
@@ -97,7 +97,7 @@ impl ExecutionNode {
     fn from_dep(exec_info: &ExecInfo) -> Self {
         let mut deps = vec![];
         for nested in exec_info.nested_dependancies {
-            deps.push(Arc::new(ExecutionNode::from_dep(nested)));
+            deps.push(Arc::new(Self::from_dep(nested)));
         }
         Self {
             type_id: exec_info.type_id,
@@ -144,6 +144,7 @@ impl std::fmt::Debug for ExecutionPlan {
 }
 
 impl ExecutionPlan {
+    #[must_use] 
     pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
@@ -255,6 +256,7 @@ impl ExecutionPlan {
     ///
     /// This should only be called for declared dependencies. If DAG ordering
     /// is correct, the dependency will always be available.
+    #[must_use] 
     pub fn get_table<'a, T: 'static>(
         &self,
         ctx: &'a ExecutionContext,
@@ -272,15 +274,14 @@ impl ExecutionPlan {
         // Clone tables from slots into the store
         // Since we use Arc<dyn AnyTable>, we can clone the Arc and then
         // use Arc::try_unwrap or just clone the inner table
-        for (&type_id, slot) in ctx.slots.iter() {
+        for (&type_id, slot) in &ctx.slots {
             if let Some(arc_table) = slot.get() {
                 // Clone the Arc and then box it for the store
                 // This is a cheap reference count bump
                 store.insert_arc(type_id, Arc::clone(arc_table));
             } else {
                 return Err(QueryError::ExecutionError(format!(
-                    "Missing table for type_id: {:?}",
-                    type_id
+                    "Missing table for type_id: {type_id:?}"
                 )));
             }
         }
@@ -307,6 +308,7 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
+    #[must_use] 
     pub fn new(
         driver: Driver,
         design_key: DriverKey,
@@ -322,28 +324,32 @@ impl ExecutionContext {
     }
 
     /// Get the driver.
-    pub fn driver(&self) -> &Driver {
+    #[must_use] 
+    pub const fn driver(&self) -> &Driver {
         &self.driver
     }
 
     /// Get the driver key.
+    #[must_use] 
     pub fn design_key(&self) -> DriverKey {
         self.design_key.clone()
     }
 
     /// Get the configuration.
-    pub fn config(&self) -> &svql_common::Config {
+    #[must_use] 
+    pub const fn config(&self) -> &svql_common::Config {
         &self.config
     }
 
-    /// Retrieve a completed dependency table by TypeId.
+    /// Retrieve a completed dependency table by `TypeId`.
     ///
     /// Returns `None` if the table was not found or is not yet computed
     /// (though DAG ordering guarantees it should be computed).
+    #[must_use] 
     pub fn get_any_table(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.slots
             .get(&type_id)
             .and_then(|slot| slot.get())
-            .map(|arc| arc.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 }

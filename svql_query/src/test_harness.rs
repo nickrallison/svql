@@ -36,13 +36,14 @@ impl TestSpec<'_> {
         Ok(container)
     }
 
+    #[must_use] 
     pub fn get_key(&self) -> DriverKey {
         DriverKey::new(self.haystack_path, self.haystack_module)
     }
 }
 
 
-/// Run a query test using the new DataFrame API (ExecutionPlan + Store).
+/// Run a query test using the new `DataFrame` API (`ExecutionPlan` + Store).
 /// This uses the new `run_query` function which works for all pattern types.
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
@@ -81,7 +82,7 @@ where
             std::any::type_name::<P>()
         );
         let mut rehydrated: Vec<P> = Vec::new();
-        for row in rows.iter() {
+        for row in &rows {
             let item = P::rehydrate(row, &store, &driver, &spec.get_key());
             if item.is_none() {
                 tracing::error!("Failed to rehydrate row: {}", row);

@@ -41,6 +41,7 @@ pub struct Store {
 
 impl Store {
     /// Create an empty store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
@@ -49,6 +50,7 @@ impl Store {
     }
 
     /// Create a store with pre-allocated capacity.
+    #[must_use] 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             tables: HashMap::with_capacity(capacity),
@@ -81,6 +83,7 @@ impl Store {
     /// Get a table for pattern type `T`.
     ///
     /// Returns `None` if no table exists for this type.
+    #[must_use] 
     pub fn get<T: 'static>(&self) -> Option<&Table<T>> {
         self.tables
             .get(&TypeId::of::<T>())
@@ -88,27 +91,32 @@ impl Store {
     }
 
     /// Check if a table exists for pattern type `T`.
+    #[must_use] 
     pub fn contains<T: 'static>(&self) -> bool {
         self.tables.contains_key(&TypeId::of::<T>())
     }
 
     /// Get the number of tables in the store.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.tables.len()
     }
 
     /// Check if the store is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.tables.is_empty()
     }
 
+    #[must_use] 
     pub fn get_from_tid(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
-        self.tables.get(&type_id).map(|arc| arc.as_ref())
+        self.tables.get(&type_id).map(std::convert::AsRef::as_ref)
     }
 
     /// Resolve a reference to a row.
     ///
     /// This is a convenience method that combines `get()` and `Table::row()`.
+    #[must_use] 
     pub fn resolve<T>(&self, r: Ref<T>) -> Option<Row<T>>
     where
         T: crate::traits::Pattern + crate::traits::Component + 'static,
@@ -116,16 +124,17 @@ impl Store {
         self.get::<T>().and_then(|table| table.row(r.index()))
     }
 
-    /// Get an iterator over all TypeIds in the store.
+    /// Get an iterator over all `TypeIds` in the store.
     pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
         self.tables.keys().copied()
     }
 
-    /// Get a type-erased table by TypeId.
+    /// Get a type-erased table by `TypeId`.
     ///
     /// This is useful for generic code that doesn't know the concrete type.
+    #[must_use] 
     pub fn get_any(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
-        self.tables.get(&type_id).map(|arc| arc.as_ref())
+        self.tables.get(&type_id).map(std::convert::AsRef::as_ref)
     }
 
     /// Insert a type-erased table from a Box.
@@ -137,7 +146,7 @@ impl Store {
 
     /// Insert a type-erased table from an Arc.
     ///
-    /// This is used by the execution engine when transferring from OnceLock slots.
+    /// This is used by the execution engine when transferring from `OnceLock` slots.
     pub fn insert_arc(&mut self, type_id: TypeId, table: Arc<dyn AnyTable + Send + Sync>) {
         self.tables.insert(type_id, table);
     }
@@ -179,7 +188,7 @@ impl std::fmt::Display for Store {
             if let Some(table) = self.get_any(type_id) {
                 let type_name = table.type_name();
                 let row_count = table.len();
-                writeln!(f, "  [{:2}] {} - {} rows", idx, type_name, row_count)?;
+                writeln!(f, "  [{idx:2}] {type_name} - {row_count} rows")?;
             }
         }
 

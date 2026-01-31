@@ -1,7 +1,7 @@
 //! DataFrame-based session management for query results.
 //!
 //! This module provides a `Session` struct that replaces the traditional
-//! index lookup tables with polars DataFrames, enabling:
+//! index lookup tables with polars `DataFrames`, enabling:
 //! - Foreign-key style references between result tables
 //! - Lazy rehydration of match results
 //! - Efficient columnar storage of dehydrated matches

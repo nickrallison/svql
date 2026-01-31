@@ -1,13 +1,13 @@
 //! Type-safe wrapper for cell IDs in hardware designs.
 //!
 //! `CellId` is a wrapper around `u32` that provides type safety and
-//! compatibility with Polars DataFrame indexing.
+//! compatibility with Polars `DataFrame` indexing.
 
 use std::fmt;
 
 /// A type-safe identifier for cells in a hardware design.
 ///
-/// Internally uses `u32` to match Polars DataFrame indexing requirements.
+/// Internally uses `u32` to match Polars `DataFrame` indexing requirements.
 /// This provides compile-time guarantees that cell IDs aren't confused
 /// with other numeric values.
 ///
@@ -19,44 +19,49 @@ use std::fmt;
 pub struct CellId(u32);
 
 impl CellId {
-    /// Create a new CellId from a u32.
+    /// Create a new `CellId` from a u32.
     #[inline]
+    #[must_use] 
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
 
     /// Get the raw u32 value.
     #[inline]
+    #[must_use] 
     pub const fn raw(self) -> u32 {
         self.0
     }
 
     /// Convert to u64 for compatibility with existing code.
     #[inline]
+    #[must_use] 
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
     }
 
     /// Convert to usize for vector/slice indexing.
     #[inline]
+    #[must_use] 
     pub const fn as_usize(self) -> usize {
         self.0 as usize
     }
 
-    /// Create from u64 (panics if > u32::MAX in debug builds).
+    /// Create from u64 (panics if > `u32::MAX` in debug builds).
     #[inline]
+    #[must_use] 
     pub fn from_u64(id: u64) -> Self {
-        debug_assert!(id <= u32::MAX as u64, "CellId overflow: {} > u32::MAX", id);
+        debug_assert!(u32::try_from(id).is_ok(), "CellId overflow: {id} > u32::MAX");
         Self(id as u32)
     }
 
-    /// Create from usize (panics if > u32::MAX in debug builds).
+    /// Create from usize (panics if > `u32::MAX` in debug builds).
     #[inline]
+    #[must_use] 
     pub fn from_usize(id: usize) -> Self {
         debug_assert!(
-            id <= u32::MAX as usize,
-            "CellId overflow: {} > u32::MAX",
-            id
+            u32::try_from(id).is_ok(),
+            "CellId overflow: {id} > u32::MAX"
         );
         Self(id as u32)
     }
@@ -92,14 +97,14 @@ impl From<CellId> for u32 {
 impl From<CellId> for u64 {
     #[inline]
     fn from(id: CellId) -> Self {
-        id.0 as u64
+        Self::from(id.0)
     }
 }
 
 impl From<CellId> for usize {
     #[inline]
     fn from(id: CellId) -> Self {
-        id.0 as usize
+        id.0 as Self
     }
 }
 
@@ -107,7 +112,7 @@ impl From<CellId> for usize {
 impl From<CellId> for i64 {
     #[inline]
     fn from(id: CellId) -> Self {
-        id.0 as i64
+        Self::from(id.0)
     }
 }
 

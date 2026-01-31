@@ -14,6 +14,7 @@ pub struct ConnectivityGraph {
 }
 
 impl ConnectivityGraph {
+    #[must_use] 
     pub fn build<'a>(
         design: &'a Design,
         cell_refs_topo: &[CellRef<'a>],
@@ -22,7 +23,7 @@ impl ConnectivityGraph {
         let (fanin_map, fanout_map) =
             Self::build_fanin_fanout_maps(design, cell_refs_topo, cell_id_map);
 
-        ConnectivityGraph {
+        Self {
             fanin_map,
             fanout_map,
         }
@@ -36,7 +37,7 @@ impl ConnectivityGraph {
         let mut fanout_map: FanoutMap = HashMap::new();
         let mut fanin_map: FaninMap = HashMap::new();
 
-        for sink_ref in cell_refs_topo.iter().cloned() {
+        for sink_ref in cell_refs_topo.iter().copied() {
             let sink_wrapper: CellWrapper<'a> = sink_ref.into();
             sink_ref.visit(|net| {
                 if let Ok((source_ref, source_pin_idx)) = design.find_cell(net) {
@@ -62,14 +63,17 @@ impl ConnectivityGraph {
         (fanin_map, fanout_map)
     }
 
+    #[must_use] 
     pub fn fanout_indices(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
-        self.fanout_map.get(&cell_idx).map(|v| v.as_slice())
+        self.fanout_map.get(&cell_idx).map(std::vec::Vec::as_slice)
     }
 
+    #[must_use] 
     pub fn fanin_indices(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
-        self.fanin_map.get(&cell_idx).map(|v| v.as_slice())
+        self.fanin_map.get(&cell_idx).map(std::vec::Vec::as_slice)
     }
 
+    #[must_use] 
     pub fn fanout_indices_set(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
         self.fanout_map
             .get(&cell_idx)
@@ -77,6 +81,7 @@ impl ConnectivityGraph {
             .unwrap_or_default()
     }
 
+    #[must_use] 
     pub fn fanin_indices_set(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
         self.fanin_map
             .get(&cell_idx)
@@ -84,6 +89,7 @@ impl ConnectivityGraph {
             .unwrap_or_default()
     }
 
+    #[must_use] 
     pub fn get_intersect_fanout_of_fanin_indices(&self, cell_idx: CellIndex) -> HashSet<CellIndex> {
         let Some(fanin_indices) = self.fanin_map.get(&cell_idx) else {
             return HashSet::new();
@@ -109,11 +115,13 @@ impl ConnectivityGraph {
         result
     }
 
-    pub fn fanin_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
+    #[must_use] 
+    pub const fn fanin_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
         &self.fanin_map
     }
 
-    pub fn fanout_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
+    #[must_use] 
+    pub const fn fanout_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
         &self.fanout_map
     }
 }

@@ -29,11 +29,13 @@ impl DriverKey {
     }
 
     /// Returns a reference to the design path.
+    #[must_use] 
     pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Returns the module name.
+    #[must_use] 
     pub fn module_name(&self) -> &str {
         &self.module_name
     }

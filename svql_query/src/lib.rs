@@ -62,10 +62,11 @@ where
     P::search(driver, key, config).map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
 }
 
-pub fn cell_id_to_wrapper<'a>(
+#[must_use] 
+pub fn cell_id_to_wrapper(
     cell_id: CellId,
-    design_container: &'a DesignContainer,
-) -> Option<CellWrapper<'a>> {
+    design_container: &DesignContainer,
+) -> Option<CellWrapper<'_>> {
     let index = design_container.index();
     let cell_wrapper = index.get_cell_by_id(cell_id.as_usize())?.clone();
     Some(cell_wrapper)

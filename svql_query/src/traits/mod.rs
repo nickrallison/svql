@@ -16,6 +16,7 @@ pub use primitive::Primitive;
 use crate::prelude::*;
 
 /// Returns the column index for a given column name in the schema.
+#[must_use] 
 pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
     let mut i = 0;
     while i < schema.len() {
@@ -46,7 +47,7 @@ pub trait Pattern: Sized + Send + Sync {
     /// Size of the schema (number of columns).
     const SCHEMA_SIZE: usize = Self::DEFS.len();
 
-    /// Info needed to execute this pattern. Used to build the ExecutionPlan DAG.
+    /// Info needed to execute this pattern. Used to build the `ExecutionPlan` DAG.
     const EXEC_INFO: &'static ExecInfo;
 
     /// Access the smart Schema wrapper.
@@ -56,29 +57,31 @@ pub trait Pattern: Sized + Send + Sync {
     fn schema() -> &'static PatternSchema;
 
     /// Get the indices of all Input columns in the Schema.
+    #[must_use] 
     fn input_indices() -> Vec<usize> {
         Self::schema().inputs.clone()
     }
 
     /// Get the indices of all Output columns in the Schema.
+    #[must_use] 
     fn output_indices() -> Vec<usize> {
         Self::schema().outputs.clone()
     }
 
     /// Check if a specific column name is an Output.
+    #[must_use] 
     fn is_output(name: &str) -> bool {
         Self::schema()
             .get(name)
-            .map(|col| col.direction == PortDirection::Output)
-            .unwrap_or(false)
+            .is_some_and(|col| col.direction == PortDirection::Output)
     }
 
     /// Check if a specific column name is an Input.
+    #[must_use] 
     fn is_input(name: &str) -> bool {
         Self::schema()
             .get(name)
-            .map(|col| col.direction == PortDirection::Input)
-            .unwrap_or(false)
+            .is_some_and(|col| col.direction == PortDirection::Input)
     }
 
     /// Returns the static type name of the component.
@@ -99,7 +102,7 @@ pub trait Pattern: Sized + Send + Sync {
     where
         Self: Send + Sync + Component + 'static;
 
-    /// Execute the search and return results as a boxed AnyTable.
+    /// Execute the search and return results as a boxed `AnyTable`.
     fn search_table_any(
         ctx: &ExecutionContext,
     ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>

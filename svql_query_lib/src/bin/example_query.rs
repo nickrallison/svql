@@ -8,6 +8,7 @@ use tracing::{Level, info};
     file = "examples/fixtures/basic/and/verilog/and_gate.v",
     module = "and_gate"
 )]
+#[allow(dead_code)]
 pub(crate) struct AndGate {
     #[port(input)]
     pub a: Wire,
@@ -27,12 +28,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = std::env::args().collect::<Vec<String>>();
 
-    let design_path: &str = args
-        .get(1)
-        .map(|s| s.as_str())
-        .unwrap_or("examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json");
+    let design_path: &str = args.get(1).map_or(
+        "examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json",
+        std::string::String::as_str,
+    );
 
-    let design_module: &str = args.get(2).map(|s| s.as_str()).unwrap_or("e203_soc_top");
+    let design_module: &str = args
+        .get(2)
+        .map_or("e203_soc_top", std::string::String::as_str);
 
     let max_recursion_depth: usize = args
         .get(3)
@@ -60,18 +63,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let design_key = DriverKey::new(design_path, design_module);
     info!("Loading design...");
 
-    let design_result = driver.get_design(&design_key, &config.haystack_options);
+    let _design_result = driver.get_design(&design_key, &config.haystack_options);
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
     let store = svql_query::run_query::<AndGate>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
-    println!("{}", store);
+    println!("{store}");
 
     for (_, table) in store.tables() {
         println!("\n=== Table Details ===");
-        println!("{}", table);
+        println!("{table}");
     }
 
     // if let Some(table) = store.get::<LockedRegister<Search>>() {

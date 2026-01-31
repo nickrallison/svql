@@ -19,7 +19,7 @@ where
 {
     /// Row index in the source table.
     pub(crate) idx: u32,
-    /// Wire columns: name → CellId (None if NULL).
+    /// Wire columns: name → `CellId` (None if NULL).
     pub(crate) entry_array: EntryArray,
     /// Type marker.
     pub(crate) _marker: PhantomData<T>,
@@ -30,6 +30,7 @@ where
     T: Pattern + svql_query::traits::Component,
 {
     /// Create a new row (typically called by Table).
+    #[must_use] 
     pub fn new(idx: u32) -> Self {
         Self {
             idx,
@@ -40,13 +41,15 @@ where
 
     /// Get the row index in the source table.
     #[inline]
-    pub fn index(&self) -> u32 {
+    #[must_use] 
+    pub const fn index(&self) -> u32 {
         self.idx
     }
 
     /// Get this row as a typed reference.
     #[inline]
-    pub fn as_ref(&self) -> Ref<T> {
+    #[must_use] 
+    pub const fn as_ref(&self) -> Ref<T> {
         Ref::new(self.idx)
     }
 
@@ -54,6 +57,7 @@ where
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
     #[inline]
+    #[must_use] 
     pub fn wire(&self, name: &str) -> Option<Wire> {
         let idx = T::schema().index_of(name)?;
         let col_def = T::schema().column(idx);
@@ -80,9 +84,10 @@ where
     /// let sel = Selector::new(&["and1", "y"]);
     /// row.resolve(sel, ctx);  // Submodule port
     /// ```
-    pub fn resolve<'a>(
+    #[must_use] 
+    pub fn resolve(
         &self,
-        selector: crate::selector::Selector<'a>,
+        selector: crate::selector::Selector<'_>,
         ctx: &super::ExecutionContext,
     ) -> Option<Wire> {
         if selector.is_empty() {
@@ -122,6 +127,7 @@ where
     /// Get a submodule reference by column name.
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
+    #[must_use] 
     pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
         let idx = T::schema().index_of(name)?;
         self.entry_array
@@ -145,6 +151,7 @@ where
     }
 
     /// Set a submodule column value (with optional index).
+    #[must_use] 
     pub fn with_sub(mut self, name: &'static str, idx: Option<u32>) -> Self {
         let id = T::schema()
             .index_of(name)
@@ -182,15 +189,15 @@ where
 
             let value_str = match entry {
                 Some(crate::session::ColumnEntry::Cell { id: Some(id) }) => {
-                    format!("cell({})", id)
+                    format!("cell({id})")
                 }
                 Some(crate::session::ColumnEntry::Cell { id: None }) => "cell=NULL".to_string(),
                 Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {
-                    format!("ref({})", id)
+                    format!("ref({id})")
                 }
                 Some(crate::session::ColumnEntry::Sub { id: None }) => "ref=NULL".to_string(),
                 Some(crate::session::ColumnEntry::Metadata { id: Some(id) }) => {
-                    format!("meta({})", id)
+                    format!("meta({id})")
                 }
                 Some(crate::session::ColumnEntry::Metadata { id: None }) => "meta=NULL".to_string(),
                 None => "MISSING".to_string(),

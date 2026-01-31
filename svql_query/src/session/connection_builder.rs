@@ -6,14 +6,15 @@ pub struct ConnectionBuilder<'a, S> {
     _marker: PhantomData<&'a S>,
 }
 
-impl<'a, S> Default for ConnectionBuilder<'a, S> {
+impl<S> Default for ConnectionBuilder<'_, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, S> ConnectionBuilder<'a, S> {
-    pub fn new() -> Self {
+impl<S> ConnectionBuilder<'_, S> {
+    #[must_use] 
+    pub const fn new() -> Self {
         Self {
             _marker: PhantomData,
         }
@@ -45,13 +46,11 @@ impl<'a, S> ConnectionBuilder<'a, S> {
         );
         if !valid_source {
             // Inout is also valid source?
-            if from.direction() != PortDirection::Inout {
-                panic!(
-                    "Source wire (id {}) has invalid direction {:?} for source",
-                    from.id(),
-                    from.direction()
-                );
-            }
+            assert!(from.direction() == PortDirection::Inout, 
+                "Source wire (id {}) has invalid direction {:?} for source",
+                from.id(),
+                from.direction()
+            );
         }
 
         // Allowed `to`:
@@ -61,13 +60,11 @@ impl<'a, S> ConnectionBuilder<'a, S> {
         let valid_target = matches!(to.direction(), PortDirection::Input | PortDirection::Output);
         if !valid_target {
             // Inout is also valid target?
-            if to.direction() != PortDirection::Inout {
-                panic!(
-                    "Target wire (id {}) has invalid direction {:?} for target",
-                    to.id(),
-                    to.direction()
-                );
-            }
+            assert!(to.direction() == PortDirection::Inout, 
+                "Target wire (id {}) has invalid direction {:?} for target",
+                to.id(),
+                to.direction()
+            );
         }
 
         // Note: We can't strictly distinguish "Parent Input" from "Submodule Input" just by `PortDirection` enum
@@ -120,12 +117,8 @@ impl<'a, S> ConnectionBuilder<'a, S> {
 
         // For now, I will allow the connection if directions are vaguely compatible (not None).
 
-        if from.direction() == PortDirection::None {
-            panic!("Source wire has no direction");
-        }
-        if to.direction() == PortDirection::None {
-            panic!("Target wire has no direction");
-        }
+        assert!(from.direction() != PortDirection::None, "Source wire has no direction");
+        assert!(to.direction() != PortDirection::None, "Target wire has no direction");
 
         // 2. Record connection constraint...
         // Logic to be added for actual constraint tracking

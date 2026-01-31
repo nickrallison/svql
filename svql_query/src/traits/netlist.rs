@@ -27,7 +27,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     /// Port declarations (macro-generated)
     const PORTS: &'static [Port];
 
-    /// Schema accessor (macro generates this with OnceLock pattern)
+    /// Schema accessor (macro generates this with `OnceLock` pattern)
     fn netlist_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
@@ -39,6 +39,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     }
 
     /// Convert port declarations to column definitions
+    #[must_use] 
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
@@ -56,6 +57,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 
+    #[must_use] 
     fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
         let schema_size = Self::PORTS.len();
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
@@ -92,7 +94,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         for (idx, item) in row_match.iter().enumerate().take(schema_size) {
             if item.is_none() {
                 let col_name = Self::netlist_schema().column(idx).name;
-                panic!("Unmapped column in match: {}", col_name);
+                panic!("Unmapped column in match: {col_name}");
             }
         }
 
@@ -205,7 +207,7 @@ pub(crate) mod test {
 
     use crate::Wire;
 
-    use super::*;
+    use super::{Netlist, Component, kind, Port, Row, Store, Driver, DriverKey};
 
     use svql_query::query_test;
 
@@ -214,7 +216,7 @@ pub(crate) mod test {
         file = "examples/fixtures/basic/and/verilog/and_gate.v",
         module = "and_gate"
     )]
-    pub(crate) struct AndGate {
+    pub struct AndGate {
         #[port(input)]
         pub a: Wire,
         #[port(input)]
@@ -242,7 +244,7 @@ pub(crate) mod test {
     // --- Reference Implementation (Manual) ---
 
     #[derive(Debug, Clone)]
-    pub(crate) struct ManualAndGate {
+    pub struct ManualAndGate {
         pub a: Wire,
         pub b: Wire,
         pub y: Wire,

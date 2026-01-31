@@ -25,7 +25,7 @@ fn net_to_cell_id(net: &prjunnamed_netlist::Net) -> Option<CellId> {
     net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok()
 }
 
-/// Helper to extract cell ID from a ControlNet (for AIG gates)
+/// Helper to extract cell ID from a `ControlNet` (for AIG gates)
 fn control_net_to_cell_id(cnet: &prjunnamed_netlist::ControlNet) -> Option<CellId> {
     net_to_cell_id(&cnet.net())
 }
@@ -181,12 +181,13 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     ///
     /// If provided, only cells that pass this filter will be included.
     /// The filter receives a reference to the matched cell wrapper.
+    #[must_use] 
     fn cell_filter(cell: &prjunnamed_netlist::Cell) -> bool {
         let _ = cell;
         true // Default: accept all cells of the matching kind
     }
 
-    /// Schema accessor (macro generates this with OnceLock pattern).
+    /// Schema accessor (macro generates this with `OnceLock` pattern).
     fn primitive_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
@@ -198,6 +199,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     }
 
     /// Convert port declarations to column definitions.
+    #[must_use] 
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
@@ -209,8 +211,9 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     ///
     /// Default implementation handles common gate patterns automatically.
     /// Override this for special cases (e.g., DFFs with named ports).
+    #[must_use] 
     fn resolve(cell_wrapper: &CellWrapper<'_>) -> EntryArray {
-        resolve_primitive_ports(cell_wrapper.get(), cell_wrapper, &Self::primitive_schema())
+        resolve_primitive_ports(cell_wrapper.get(), cell_wrapper, Self::primitive_schema())
     }
 
     /// Rehydrate from row.
@@ -291,7 +294,7 @@ where
         if let Some(cells) = index.cells_of_type_iter(T::CELL_KIND) {
             for cell_wrapper in cells {
                 if T::cell_filter(cell_wrapper.get()) {
-                    row_matches.push(T::resolve(&cell_wrapper));
+                    row_matches.push(T::resolve(cell_wrapper));
                 }
             }
         }

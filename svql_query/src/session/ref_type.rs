@@ -68,6 +68,7 @@ impl<T> Hash for Ref<T> {
 impl<T> Ref<T> {
     /// Create a new reference from a row index.
     #[inline]
+    #[must_use] 
     pub const fn new(index: u32) -> Self {
         Self {
             index,
@@ -77,20 +78,23 @@ impl<T> Ref<T> {
 
     /// Get the raw row index.
     #[inline]
+    #[must_use] 
     pub const fn index(self) -> u32 {
         self.index
     }
 
     /// Get the index as usize for indexing into vectors/slices.
     #[inline]
+    #[must_use] 
     pub const fn as_usize(self) -> usize {
         self.index as usize
     }
 
-    /// Create from a usize index (panics if > u32::MAX in debug).
+    /// Create from a usize index (panics if > `u32::MAX` in debug).
     #[inline]
+    #[must_use] 
     pub fn from_usize(index: usize) -> Self {
-        debug_assert!(index <= u32::MAX as usize, "Ref index overflow");
+        debug_assert!(u32::try_from(index).is_ok(), "Ref index overflow");
         Self::new(index as u32)
     }
 
@@ -101,6 +105,7 @@ impl<T> Ref<T> {
     /// This is type-safe but semantically unsafe - only use when you know
     /// the underlying index is valid for type `U`'s table.
     #[inline]
+    #[must_use] 
     pub const fn cast<U>(self) -> Ref<U> {
         Ref::new(self.index)
     }
@@ -148,7 +153,7 @@ impl<T> Default for Ref<T> {
 impl<T> From<Ref<T>> for i64 {
     #[inline]
     fn from(r: Ref<T>) -> Self {
-        r.index as i64
+        Self::from(r.index)
     }
 }
 

@@ -24,7 +24,7 @@ pub struct GraphIndex<'a> {
 }
 
 impl<'a> GraphIndex<'a> {
-    /// Builds a new GraphIndex for the provided design.
+    /// Builds a new `GraphIndex` for the provided design.
     pub fn build(design: &'a Design) -> Self {
         let start = std::time::Instant::now();
 
@@ -52,7 +52,8 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns the total number of cells in the index.
-    pub fn num_cells(&self) -> usize {
+    #[must_use] 
+    pub const fn num_cells(&self) -> usize {
         self.cell_registry.len()
     }
 
@@ -69,6 +70,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns an iterator over cells of a specific type.
+    #[must_use] 
     pub fn cells_of_type_iter(
         &self,
         node_type: CellKind,
@@ -77,6 +79,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns a slice of all cells in topological order.
+    #[must_use] 
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
         self.cell_registry.cells_topo()
     }
@@ -88,6 +91,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the set of cells in the immediate fan-out of the specified cell.
     #[allow(clippy::mutable_key_type)]
+    #[must_use] 
     pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanout_indices_set(idx);
@@ -100,6 +104,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the set of cells in the immediate fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
+    #[must_use] 
     pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanin_indices_set(idx);
@@ -111,6 +116,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns the fan-out cells paired with their source pin indices.
+    #[must_use] 
     pub fn fanout_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -124,6 +130,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns the fan-in cells paired with their source pin indices.
+    #[must_use] 
     pub fn fanin_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -138,6 +145,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
+    #[must_use] 
     pub fn get_intersect_fanout_of_fanin(
         &self,
         cell: &CellWrapper<'a>,
@@ -155,18 +163,21 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns a map of input port names to their fan-out cells.
+    #[must_use] 
     pub fn get_input_fanout_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_input_fanout_by_name(&self.cell_registry)
     }
 
     /// Returns a map of output port names to their fan-in cells.
+    #[must_use] 
     pub fn get_output_fanin_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_output_fanin_by_name(&self.cell_registry)
     }
 
     /// Retrieves a cell wrapper by its unique debug identifier.
+    #[must_use] 
     pub fn get_cell_by_id(&self, id: usize) -> Option<&CellWrapper<'a>> {
         self.cell_registry
             .cell_id_map()
@@ -178,6 +189,7 @@ impl<'a> GraphIndex<'a> {
     ///
     /// This is used by the query engine to validate structural constraints between
     /// matched components.
+    #[must_use] 
     pub fn is_connected(&self, from_id: u64, to_id: u64) -> bool {
         // 1. Map external ID (u64) to internal CellIndex
         let from_idx = match self.cell_registry.cell_id_map().get(&(from_id as usize)) {

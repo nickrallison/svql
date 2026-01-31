@@ -6,13 +6,14 @@ use std::collections::HashMap;
 pub struct CellRegistry<'a> {
     /// Nodes in topological order (Name nodes filtered out)
     cells_topo: Vec<CellWrapper<'a>>,
-    /// Maps cell debug index to internal CellIndex
+    /// Maps cell debug index to internal `CellIndex`
     cell_id_map: HashMap<usize, CellIndex>,
     /// Maps cell types to lists of cell indices
     cell_type_indices: HashMap<CellKind, Vec<CellIndex>>,
 }
 
 impl<'a> CellRegistry<'a> {
+    #[must_use] 
     pub fn build(cell_refs_topo: &[CellRef<'a>]) -> Self {
         let cells_topo = Self::build_cells_topo(cell_refs_topo);
         let cell_id_map = Self::build_cell_id_map(&cells_topo);
@@ -25,19 +26,21 @@ impl<'a> CellRegistry<'a> {
         }
     }
 
-    pub fn len(&self) -> usize {
+    #[must_use] 
+    pub const fn len(&self) -> usize {
         self.cells_topo.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[must_use] 
+    pub const fn is_empty(&self) -> bool {
         self.cells_topo.is_empty()
     }
 
     fn build_cells_topo(cell_refs_topo: &[CellRef<'a>]) -> Vec<CellWrapper<'a>> {
         cell_refs_topo
             .iter()
-            .cloned()
-            .map(|cell_ref| cell_ref.into())
+            .copied()
+            .map(std::convert::Into::into)
             .collect()
     }
 
@@ -63,6 +66,7 @@ impl<'a> CellRegistry<'a> {
         cell_type_indices
     }
 
+    #[must_use] 
     pub fn cells_of_type_iter(
         &self,
         node_type: CellKind,
@@ -72,29 +76,35 @@ impl<'a> CellRegistry<'a> {
             .map(|indices| indices.iter().map(|idx| &self.cells_topo[idx.index()]))
     }
 
+    #[must_use] 
     pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
         self.cell_type_indices
             .get(&node_type)
-            .map(|v| v.as_slice())
+            .map(std::vec::Vec::as_slice)
             .unwrap_or(&[])
     }
 
+    #[must_use] 
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
         &self.cells_topo
     }
 
-    pub fn cell_id_map(&self) -> &HashMap<usize, CellIndex> {
+    #[must_use] 
+    pub const fn cell_id_map(&self) -> &HashMap<usize, CellIndex> {
         &self.cell_id_map
     }
 
+    #[must_use] 
     pub fn get_cell_by_index(&self, index: CellIndex) -> &CellWrapper<'a> {
         &self.cells_topo[index.index()]
     }
 
+    #[must_use] 
     pub fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
         self.cell_id_map.get(&cell.debug_index()).copied()
     }
 
+    #[must_use] 
     pub fn indices_to_cells(&self, indices: &[CellIndex]) -> Vec<CellWrapper<'a>> {
         indices
             .iter()
@@ -102,6 +112,7 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
+    #[must_use] 
     pub fn indices_with_ports_to_cells(
         &self,
         indices_with_ports: &[(CellIndex, usize)],

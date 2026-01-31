@@ -1,6 +1,6 @@
-//! Typed DataFrame wrapper for pattern results.
+//! Typed `DataFrame` wrapper for pattern results.
 //!
-//! `Table<T>` wraps a Polars DataFrame while providing type-safe
+//! `Table<T>` wraps a Polars `DataFrame` while providing type-safe
 //! access to rows as `Row<T>` and references as `Ref<T>`.
 
 use std::marker::PhantomData;
@@ -9,14 +9,14 @@ use polars::prelude::*;
 
 use crate::prelude::*;
 
-/// A typed wrapper around a DataFrame storing pattern match results.
+/// A typed wrapper around a `DataFrame` storing pattern match results.
 ///
-/// Each row in the DataFrame represents one match of pattern `T`.
+/// Each row in the `DataFrame` represents one match of pattern `T`.
 /// The schema is defined by `T::COLUMNS` on the `Pattern` trait.
 ///
 /// # Column Types
 ///
-/// - **Wire columns** (`ColumnKind::Wire`): Store as `i64` (CellId::raw())
+/// - **Wire columns** (`ColumnKind::Wire`): Store as `i64` (`CellId::raw()`)
 /// - **Sub columns** (`ColumnKind::Sub`): Store as `u32` (row index or -1 for NULL)
 /// - **Metadata columns**: Various types (depth as u32, etc.)
 /// - **path**: Always present as `Utf8` column
@@ -31,7 +31,7 @@ use crate::prelude::*;
 /// }
 /// ```
 pub struct Table<T> {
-    /// The underlying Polars DataFrame.
+    /// The underlying Polars `DataFrame`.
     df: DataFrame,
     // /// Column schema for this pattern type.
     // columns: &'static [ColumnDef],
@@ -57,7 +57,7 @@ where
             let cols: Vec<Column> = T::schema()
                 .columns()
                 .iter()
-                .map(|col_def| col_def.into_polars_column())
+                .map(super::schema::ColumnDef::into_polars_column)
                 .collect();
             let df = DataFrame::new(cols)?;
             return Ok(Self {
@@ -118,15 +118,15 @@ where
         self.df.height() == 0
     }
 
-    /// Get a reference to the underlying DataFrame for bulk operations.
+    /// Get a reference to the underlying `DataFrame` for bulk operations.
     #[inline]
-    pub fn df(&self) -> &DataFrame {
+    pub const fn df(&self) -> &DataFrame {
         &self.df
     }
 
-    /// Get a mutable reference to the underlying DataFrame.
+    /// Get a mutable reference to the underlying `DataFrame`.
     #[inline]
-    pub fn df_mut(&mut self) -> &mut DataFrame {
+    pub const fn df_mut(&mut self) -> &mut DataFrame {
         &mut self.df
     }
 
@@ -210,7 +210,7 @@ impl<T> std::fmt::Display for Table<T> {
             f,
             "\n╔══════════════════════════════════════════════════════════════════════════════"
         )?;
-        writeln!(f, "║ Table: {}  ", type_name)?;
+        writeln!(f, "║ Table: {type_name}  ")?;
         writeln!(f, "║ Rows: {}", self.df.height())?;
         writeln!(
             f,
@@ -223,7 +223,7 @@ impl<T> std::fmt::Display for Table<T> {
             .clone()
             .with_row_index("row".into(), None)
             .unwrap_or(self.df.clone());
-        write!(f, "{}", df_with_row)?;
+        write!(f, "{df_with_row}")?;
 
         Ok(())
     }
@@ -245,20 +245,20 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Get the type name of the table.
     fn type_name(&self) -> &str;
 
-    /// Get the TypeId of the pattern stored in this table.
+    /// Get the `TypeId` of the pattern stored in this table.
     fn pattern_type_id(&self) -> std::any::TypeId;
 
-    /// Get a submodule reference (Row Index + TypeId) for a given column.
+    /// Get a submodule reference (Row Index + `TypeId`) for a given column.
     fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)>;
 
     /// Get a cell ID by single column name (no path traversal).
     fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<crate::CellId>;
 
     /// Resolve a selector path within a specific row to a cell ID
-    fn resolve_path<'a>(
+    fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::selector::Selector<'a>,
+        selector: crate::selector::Selector<'_>,
         ctx: &super::ExecutionContext,
     ) -> Option<crate::CellId>;
 }
@@ -309,10 +309,10 @@ where
         Some((val, target_type))
     }
 
-    fn resolve_path<'a>(
+    fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::selector::Selector<'a>,
+        selector: crate::selector::Selector<'_>,
         ctx: &super::ExecutionContext,
     ) -> Option<crate::CellId> {
         let row = self.row(row_idx as u32)?;

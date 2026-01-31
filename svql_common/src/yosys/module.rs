@@ -35,7 +35,7 @@ impl YosysModule {
 
         let design_path = DesignPath::new(design_path)?;
 
-        return Ok(Self {
+        Ok(Self {
             path: design_path,
             module: module.to_owned(),
         })

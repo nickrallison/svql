@@ -221,17 +221,17 @@ impl MatchLength {
     /// Returns true if the strategy is First.
     #[must_use] 
     pub const fn first(&self) -> bool {
-        return matches!(self, Self::First)
+        matches!(self, Self::First)
     }
     /// Returns true if the strategy is `NeedleSubsetHaystack`.
     #[must_use] 
     pub const fn needle_subset_haystack(&self) -> bool {
-        return matches!(self, Self::NeedleSubsetHaystack)
+        matches!(self, Self::NeedleSubsetHaystack)
     }
     /// Returns true if the strategy is Exact.
     #[must_use] 
     pub const fn exact(&self) -> bool {
-        return matches!(self, Self::Exact)
+        matches!(self, Self::Exact)
     }
 }
 
@@ -240,9 +240,9 @@ impl FromStr for MatchLength {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "first" => return Ok(Self::First),
-            "needle_subset_haystack" => return Ok(Self::NeedleSubsetHaystack),
-            "exact" => return Ok(Self::Exact),
+            "first" => Ok(Self::First),
+            "needle_subset_haystack" => Ok(Self::NeedleSubsetHaystack),
+            "exact" => Ok(Self::Exact),
             _ => Err(()),
         }
     }
@@ -264,17 +264,17 @@ impl Dedupe {
     /// Returns true if the strategy is None.
     #[must_use] 
     pub const fn none(&self) -> bool {
-        return matches!(self, Self::None)
+        matches!(self, Self::None)
     }
     /// Returns true if the strategy is Inner.
     #[must_use] 
     pub const fn inner(&self) -> bool {
-        return matches!(self, Self::Inner)
+        matches!(self, Self::Inner)
     }
     /// Returns true if the strategy is All.
     #[must_use] 
     pub const fn all(&self) -> bool {
-        return matches!(self, Self::All)
+        matches!(self, Self::All)
     }
 }
 
@@ -283,9 +283,9 @@ impl FromStr for Dedupe {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "none" => return Ok(Self::None),
-            "inner" => return Ok(Self::Inner),
-            "all" => return Ok(Self::All),
+            "none" => Ok(Self::None),
+            "inner" => Ok(Self::Inner),
+            "all" => Ok(Self::All),
             _ => Err(()),
         }
     }

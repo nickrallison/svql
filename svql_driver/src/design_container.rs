@@ -24,6 +24,7 @@ impl std::fmt::Debug for DesignContainer {
 
 impl DesignContainer {
     /// Constructs a new container and builds the graph index for the provided design.
+    #[must_use] 
     pub fn build(design: Design) -> Self {
         DesignContainerBuilder {
             design,
@@ -33,11 +34,13 @@ impl DesignContainer {
     }
 
     /// Returns a reference to the underlying netlist design.
+    #[must_use] 
     pub fn design(&self) -> &Design {
         self.borrow_design()
     }
 
     /// Returns a reference to the structural graph index.
+    #[must_use] 
     pub fn index(&self) -> &GraphIndex<'_> {
         self.borrow_index()
     }

@@ -150,6 +150,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     /// Convert declarations to column definitions.
     ///
     /// Override this if you need a different schema structure.
+    #[must_use] 
     fn recursive_to_defs() -> Vec<ColumnDef> {
         let mut defs = vec![
             ColumnDef::sub::<Self::Base>("base"),
@@ -173,7 +174,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     /// # Algorithm
     ///
     /// 1. Get all base pattern matches from context
-    /// 2. Build output→row_index lookup
+    /// 2. Build `output→row_index` lookup
     /// 3. Initialize all nodes as leaves (depth=0, no children)
     /// 4. Fixpoint: for each node, check if inputs come from other nodes' outputs
     /// 5. Update children and depths until no changes

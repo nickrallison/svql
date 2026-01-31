@@ -10,6 +10,7 @@ pub struct Connection {
 }
 
 impl Connection {
+    #[must_use] 
     pub const fn new(from: Selector<'static>, to: Selector<'static>) -> Self {
         Self {
             from: Endpoint { selector: from },
@@ -44,7 +45,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     /// Dependencies (macro-generated)
     const DEPENDANCIES: &'static [&'static ExecInfo];
 
-    /// Schema accessor (macro generates this with OnceLock pattern)
+    /// Schema accessor (macro generates this with `OnceLock` pattern)
     fn composite_schema() -> &'static crate::session::PatternSchema {
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
@@ -56,6 +57,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     }
 
     /// Convert declarations to column definitions
+    #[must_use] 
     fn composite_to_defs() -> Vec<ColumnDef> {
         let mut defs = Vec::with_capacity(Self::SUBMODULES.len() + Self::ALIASES.len());
 
@@ -174,6 +176,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     where
         Self: Sized;
 
+    #[must_use] 
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
             vec![ColumnEntry::Metadata { id: None }; Self::SUBMODULES.len() + Self::ALIASES.len()];
@@ -280,7 +283,7 @@ where
     {
         let mut dep_tables = Vec::new();
 
-        for sub_idx in T::composite_schema().submodules.iter() {
+        for sub_idx in &T::composite_schema().submodules {
             let tid = T::composite_schema()
                 .column(*sub_idx)
                 .as_submodule()
@@ -319,7 +322,7 @@ pub(crate) mod test {
         traits::{Netlist, Pattern},
     };
 
-    use super::*;
+    use super::{Composite, Component, kind, Submodule, Alias, Selector, Connections, Connection, ExecInfo, Row, Store, Driver, DriverKey};
 
     use crate::traits::netlist::test::AndGate;
 
@@ -328,7 +331,7 @@ pub(crate) mod test {
 
     #[derive(Debug, Clone, Composite)]
     #[or_to(from = ["and1", "y"], to = [["and2", "a"], ["and2", "b"]])]
-    pub(crate) struct And2Gates {
+    pub struct And2Gates {
         #[submodule]
         pub and1: AndGate,
         #[submodule]
@@ -358,7 +361,7 @@ pub(crate) mod test {
     );
 
     #[derive(Debug, Clone)]
-    pub(crate) struct ManualAnd2Gates {
+    pub struct ManualAnd2Gates {
         pub and1: AndGate,
         pub and2: AndGate,
         pub a: Wire,
