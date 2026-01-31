@@ -321,84 +321,19 @@ pub(crate) mod test {
     use svql_common::Dedupe;
     use svql_query::query_test;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Composite)]
+    #[or_to(from = ["and1", "y"], to = [["and2", "a"], ["and2", "b"]])]
     pub(crate) struct And2Gates {
-        and1: AndGate,
-        and2: AndGate,
-    }
-
-    impl Composite for And2Gates {
-        const SUBMODULES: &'static [Submodule] = &[
-            Submodule::of::<AndGate>("and1"),
-            Submodule::of::<AndGate>("and2"),
-        ];
-
-        const ALIASES: &'static [Alias] = &[
-            Alias::input("a", Selector::static_path(&["and1", "a"])),
-            Alias::input("b", Selector::static_path(&["and1", "b"])),
-            Alias::output("y", Selector::static_path(&["and2", "y"])),
-        ];
-
-        const CONNECTIONS: Connections = {
-            const CONN_GROUP: &[Connection] = &[
-                // and1.y can connect to EITHER and2.a OR and2.b (commutative inputs)
-                Connection::new(
-                    Selector::static_path(&["and1", "y"]),
-                    Selector::static_path(&["and2", "a"]),
-                ),
-                Connection::new(
-                    Selector::static_path(&["and1", "y"]),
-                    Selector::static_path(&["and2", "b"]),
-                ),
-            ];
-
-            Connections {
-                connections: &[CONN_GROUP],
-            }
-        };
-
-        const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
-
-        fn rehydrate(
-            row: &Row<Self>,
-            store: &Store,
-            driver: &Driver,
-            key: &DriverKey,
-        ) -> Option<Self> {
-            let and1_ref = row.sub::<AndGate>("and1")?;
-            let and2_ref = row.sub::<AndGate>("and2")?;
-
-            let and_table = store.get::<AndGate>()?;
-            let and1 = <AndGate as Netlist>::rehydrate(
-                &and_table.row(and1_ref.index())?,
-                store,
-                driver,
-                key,
-            )?;
-            let and2 = <AndGate as Netlist>::rehydrate(
-                &and_table.row(and2_ref.index())?,
-                store,
-                driver,
-                key,
-            )?;
-
-            Some(And2Gates { and1, and2 })
-        }
-
-        fn preload_driver(
-            driver: &Driver,
-            design_key: &DriverKey,
-            config: &svql_common::Config,
-        ) -> Result<(), Box<dyn std::error::Error>>
-        where
-            Self: Sized,
-        {
-            <AndGate as Pattern>::preload_driver(driver, design_key, config)
-        }
-    }
-
-    impl Component for And2Gates {
-        type Kind = kind::Composite;
+        #[submodule]
+        pub and1: AndGate,
+        #[submodule]
+        pub and2: AndGate,
+        #[alias(input, target = ["and1", "a"])]
+        pub a: Wire,
+        #[alias(input, target = ["and1", "b"])]
+        pub b: Wire,
+        #[alias(output, target = ["and2", "y"])]
+        pub y: Wire,
     }
 
     query_test!(

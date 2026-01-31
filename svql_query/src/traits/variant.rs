@@ -207,102 +207,13 @@ mod test {
     use svql_common::Dedupe;
     use svql_query::query_test;
 
-    #[derive(Debug, Clone)]
-    enum AndOrAnd2 {
+    #[derive(Debug, Clone, Variant)]
+    #[variant_ports(input(a), input(b), output(y))]
+    pub(crate) enum AndOrAnd2 {
+        #[map(a = ["a"], b = ["b"], y = ["y"])]
         AndGate(AndGate),
+        #[map(a = ["a"], b = ["b"], y = ["y"])]
         And2Gates(And2Gates),
-    }
-
-    impl Variant for AndOrAnd2 {
-        const NUM_VARIANTS: usize = 2;
-
-        const COMMON_PORTS: &'static [Port] =
-            &[Port::input("a"), Port::input("b"), Port::output("y")];
-
-        const PORT_MAPPINGS: &'static [&'static [PortMap]] = &[
-            // Variant 0: AndGate
-            &[
-                PortMap::new("a", Selector::static_path(&["a"])),
-                PortMap::new("b", Selector::static_path(&["b"])),
-                PortMap::new("y", Selector::static_path(&["y"])),
-            ],
-            // Variant 1: And2Gates
-            &[
-                PortMap::new("a", Selector::static_path(&["a"])),
-                PortMap::new("b", Selector::static_path(&["b"])),
-                PortMap::new("y", Selector::static_path(&["y"])),
-            ],
-        ];
-
-        const VARIANT_ARMS: &'static [VariantArm] = &[
-            VariantArm {
-                type_id: std::any::TypeId::of::<AndGate>(),
-                type_name: "AndGate",
-            },
-            VariantArm {
-                type_id: std::any::TypeId::of::<And2Gates>(),
-                type_name: "And2Gates",
-            },
-        ];
-
-        const DEPENDANCIES: &'static [&'static ExecInfo] = &[
-            <AndGate as Pattern>::EXEC_INFO,
-            <And2Gates as Pattern>::EXEC_INFO,
-        ];
-
-        fn rehydrate<'a>(
-            row: &Row<Self>,
-            store: &Store,
-            driver: &Driver,
-            key: &DriverKey,
-        ) -> Option<Self>
-        where
-            Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static,
-        {
-            // 1. Get discriminant
-            let discrim_idx = <Self as Variant>::schema().index_of("discriminant")?;
-            let discrim = row.entry_array.entries.get(discrim_idx)?.as_u32()?;
-
-            // 2. Get inner_ref
-            let inner_ref_idx = <Self as Variant>::schema().index_of("inner_ref")?;
-            let inner_row_idx = row.entry_array.entries.get(inner_ref_idx)?.as_u32()?;
-
-            // 3. Dispatch based on discriminant
-            match discrim {
-                0 => {
-                    // AndGate
-                    let inner_table = store.get::<AndGate>()?;
-                    let inner_row = inner_table.row(inner_row_idx)?;
-                    let inner = <AndGate as Pattern>::rehydrate(&inner_row, store, driver, key)?;
-                    Some(AndOrAnd2::AndGate(inner))
-                }
-                1 => {
-                    // And2Gates
-                    let inner_table = store.get::<And2Gates>()?;
-                    let inner_row = inner_table.row(inner_row_idx)?;
-                    let inner = <And2Gates as Pattern>::rehydrate(&inner_row, store, driver, key)?;
-                    Some(AndOrAnd2::And2Gates(inner))
-                }
-                _ => None,
-            }
-        }
-
-        fn preload_driver(
-            driver: &Driver,
-            design_key: &DriverKey,
-            config: &svql_common::Config,
-        ) -> Result<(), Box<dyn std::error::Error>>
-        where
-            Self: Sized,
-        {
-            <AndGate as Pattern>::preload_driver(driver, design_key, config)?;
-            <And2Gates as Pattern>::preload_driver(driver, design_key, config)?;
-            Ok(())
-        }
-    }
-
-    impl Component for AndOrAnd2 {
-        type Kind = kind::Variant;
     }
 
     query_test!(

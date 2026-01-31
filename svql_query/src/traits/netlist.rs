@@ -209,44 +209,18 @@ pub(crate) mod test {
 
     use svql_query::query_test;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Netlist)]
+    #[netlist(
+        file = "examples/fixtures/basic/and/verilog/and_gate.v",
+        module = "and_gate"
+    )]
     pub(crate) struct AndGate {
-        a: Wire,
-        b: Wire,
-        y: Wire,
-    }
-
-    impl Netlist for AndGate {
-        const MODULE_NAME: &'static str = "and_gate";
-        const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
-
-        const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
-
-        fn rehydrate<'a>(
-            row: &Row<Self>,
-            _store: &Store,
-            _driver: &Driver,
-            _key: &DriverKey,
-        ) -> Option<Self>
-        where
-            Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
-        {
-            let a_id = row.wire("a")?;
-            let b_id = row.wire("b")?;
-            let y_id = row.wire("y")?;
-
-            let and_gate = AndGate {
-                a: a_id,
-                b: b_id,
-                y: y_id,
-            };
-
-            Some(and_gate)
-        }
-    }
-
-    impl Component for AndGate {
-        type Kind = kind::Netlist;
+        #[port(input)]
+        pub a: Wire,
+        #[port(input)]
+        pub b: Wire,
+        #[port(output)]
+        pub y: Wire,
     }
 
     query_test!(
