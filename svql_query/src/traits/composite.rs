@@ -158,7 +158,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         true
     }
 
-    /// Rehydrate from row (macro generates submodule lookups)
+    /// Rehydrate from row
     fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>;
 
     fn preload_driver(
@@ -168,8 +168,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     ) -> Result<(), Box<dyn std::error::Error>>
     where
         Self: Sized;
-
-    // --- Helper methods (stay in trait for debuggability) ---
 
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =

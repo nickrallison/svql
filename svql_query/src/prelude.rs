@@ -61,4 +61,4 @@ pub use subgraph::{
 
 pub use driver::{Driver, DriverKey};
 
-// pub use svql_macros::{composite, netlist, variant};
+pub use svql_macros::{Composite, Netlist, Variant};
