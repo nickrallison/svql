@@ -1,6 +1,4 @@
 #![allow(dead_code)]
-#![allow(clippy::all)]
-#![allow(clippy::pedantic)]
 
 use std::fmt::Debug;
 use std::sync::{Arc, Once};

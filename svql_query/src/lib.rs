@@ -6,21 +6,6 @@
 #![feature(const_type_name)]
 #![feature(const_cmp)]
 #![feature(const_trait_impl)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::match_same_arms)]
-#![allow(clippy::needless_pass_by_value)]
-#![allow(clippy::trivially_copy_pass_by_ref)]
-#![allow(clippy::self_only_used_in_recursion)]
-#![allow(clippy::manual_let_else)]
-#![allow(clippy::needless_continue)]
-#![allow(clippy::uninlined_format_args)]
-#![allow(clippy::items_after_statements)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::stable_sort_primitive)]
-#![allow(clippy::too_many_lines)]
-#![allow(clippy::needless_range_loop)]
 
 extern crate self as svql_query;
 
@@ -77,7 +62,7 @@ where
     P::search(driver, key, config).map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
 }
 
-#[must_use] 
+#[must_use]
 pub fn cell_id_to_wrapper(
     cell_id: CellId,
     design_container: &DesignContainer,
