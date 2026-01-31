@@ -16,9 +16,9 @@ pub enum DesignPath {
 impl DesignPath {
     pub fn new(path: PathBuf) -> Result<Self, String> {
         match path.extension().and_then(|s| s.to_str()) {
-            Some("v") => Ok(DesignPath::Verilog(path)),
-            Some("il") => Ok(DesignPath::Rtlil(path)),
-            Some("json") => Ok(DesignPath::Json(path)),
+            Some("v") => return Ok(Self::Verilog(path)),
+            Some("il") => return Ok(Self::Rtlil(path)),
+            Some("json") => return Ok(Self::Json(path)),
             _ => Err(format!(
                 "Unsupported design file extension: {:?}",
                 path.extension()
@@ -26,17 +26,19 @@ impl DesignPath {
         }
     }
 
+    #[must_use] 
     pub fn path(&self) -> &Path {
         match self {
-            DesignPath::Verilog(p) | DesignPath::Rtlil(p) | DesignPath::Json(p) => p,
+            Self::Verilog(p) | Self::Rtlil(p) | Self::Json(p) => p,
         }
     }
 
-    pub fn read_command(&self) -> &'static str {
+    #[must_use] 
+    pub const fn read_command(&self) -> &'static str {
         match self {
-            DesignPath::Verilog(_) => "read_verilog -sv",
-            DesignPath::Rtlil(_) => "read_rtlil",
-            DesignPath::Json(_) => "read_json",
+            Self::Verilog(_) => "read_verilog -sv",
+            Self::Rtlil(_) => "read_rtlil",
+            Self::Json(_) => "read_json",
         }
     }
 }

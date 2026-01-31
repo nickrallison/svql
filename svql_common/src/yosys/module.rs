@@ -22,9 +22,9 @@ enum OutputFormat {
 }
 
 impl YosysModule {
-    /// Creates a new YosysModule reference.
+    /// Creates a new `YosysModule` reference.
     /// Resolves relative paths against the workspace root.
-    pub fn new(path: &str, module: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(path: &str, module: &str) -> Result<Self, Box<dyn core::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let design_path = Path::new(path);
         let design_path = if design_path.is_absolute() {
@@ -35,23 +35,26 @@ impl YosysModule {
 
         let design_path = DesignPath::new(design_path)?;
 
-        Ok(YosysModule {
+        return Ok(Self {
             path: design_path,
-            module: module.to_string(),
+            module: module.to_owned(),
         })
     }
 
     /// Returns the categorized design path.
-    pub fn design_path(&self) -> &DesignPath {
+    #[must_use] 
+    pub const fn design_path(&self) -> &DesignPath {
         &self.path
     }
 
     /// Returns the filesystem path.
+    #[must_use] 
     pub fn path(&self) -> &Path {
         self.path.path()
     }
 
     /// Returns the top module name.
+    #[must_use] 
     pub fn module_name(&self) -> &str {
         &self.module
     }
@@ -65,22 +68,22 @@ impl YosysModule {
     ) -> Vec<String> {
         let mut args = Vec::new();
 
-        args.push("-p".to_string());
-        if !config.verific {
+        args.push("-p".to_owned());
+        if config.verific {
+            args.push(format!("verific -sv {}", self.path().display()));
+        } else {
             args.push(format!(
                 "{} {}",
                 self.design_path().read_command(),
                 self.path().display()
             ));
-        } else {
-            args.push(format!("verific -sv {}", self.path().display()));
         }
 
-        args.push("-p".to_string());
+        args.push("-p".to_owned());
         args.push(format!("hierarchy -top {}", self.module_name()));
 
         for (param, value) in &config.params {
-            args.push("-p".to_string());
+            args.push("-p".to_owned());
             args.push(format!(
                 "chparam -set {} {} {}",
                 param,
@@ -89,39 +92,39 @@ impl YosysModule {
             ));
         }
 
-        args.push("-p".to_string());
-        args.push("proc".to_string());
+        args.push("-p".to_owned());
+        args.push("proc".to_owned());
 
-        args.push("-p".to_string());
-        args.push("chformal -remove".to_string());
+        args.push("-p".to_owned());
+        args.push("chformal -remove".to_owned());
 
-        args.push("-p".to_string());
-        args.push("memory".to_string());
+        args.push("-p".to_owned());
+        args.push("memory".to_owned());
 
         if config.flatten {
-            args.push("-p".to_string());
-            args.push("flatten".to_string());
+            args.push("-p".to_owned());
+            args.push("flatten".to_owned());
         }
 
         if config.opt {
-            args.push("-p".to_string());
-            args.push("opt".to_string());
+            args.push("-p".to_owned());
+            args.push("opt".to_owned());
         }
 
         if config.opt_clean {
-            args.push("-p".to_string());
-            args.push("opt_clean".to_string());
+            args.push("-p".to_owned());
+            args.push("opt_clean".to_owned());
         }
 
         for step in &config.other_steps {
-            args.push("-p".to_string());
+            args.push("-p".to_owned());
             args.push(step.clone());
         }
 
-        args.push("-p".to_string());
-        args.push("delete t:\\$verific$*".to_string());
+        args.push("-p".to_owned());
+        args.push("delete t:\\$verific$*".to_owned());
 
-        args.push("-p".to_string());
+        args.push("-p".to_owned());
         let write_cmd = match output_format {
             OutputFormat::Json => format!("write_json {}", output_path.display()),
             OutputFormat::Rtlil => format!("write_rtlil {}", output_path.display()),
@@ -136,7 +139,7 @@ impl YosysModule {
         &self,
         args: Vec<String>,
         yosys_binary: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn core::error::Error>> {
         let output = Command::new(yosys_binary)
             .args(args)
             .stdin(Stdio::null())
@@ -162,7 +165,7 @@ impl YosysModule {
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn core::error::Error>> {
         let yosys = which::which("yosys").map_err(|_| "yosys binary not found in PATH")?;
         self.import_design_yosys(module_config, &yosys)
     }
@@ -172,7 +175,7 @@ impl YosysModule {
         &self,
         module_config: &ModuleConfig,
         yosys_binary: &Path,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn core::error::Error>> {
         let json_temp = tempfile::Builder::new()
             .prefix("svql_")
             .suffix(".json")
@@ -187,7 +190,7 @@ impl YosysModule {
     /// Imports the design without any preprocessing by Yosys.
     pub fn import_design_raw(
         &self,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn core::error::Error>> {
         self.parse_json_output(self.path())
     }
 
@@ -195,7 +198,7 @@ impl YosysModule {
     fn parse_json_output(
         &self,
         path: &Path,
-    ) -> Result<prjunnamed_netlist::Design, Box<dyn std::error::Error>> {
+    ) -> Result<prjunnamed_netlist::Design, Box<dyn core::error::Error>> {
         let mut designs = prjunnamed_yosys_json::import(None, &mut File::open(path)?)?;
 
         designs.remove(self.module_name()).ok_or_else(|| {
@@ -214,7 +217,7 @@ impl YosysModule {
         config: &ModuleConfig,
         yosys_binary: &Path,
         rtlil_out: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn core::error::Error>> {
         let args = self.generate_yosys_args(rtlil_out, config, OutputFormat::Rtlil);
         self.execute_yosys(args, yosys_binary)
     }
@@ -224,7 +227,7 @@ impl YosysModule {
         &self,
         config: &ModuleConfig,
         yosys_binary: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn core::error::Error>> {
         let rtlil_temp = tempfile::Builder::new()
             .prefix("svql_")
             .suffix(".il")
@@ -232,7 +235,7 @@ impl YosysModule {
 
         self.write_rtlil_to_path(config, yosys_binary, rtlil_temp.path())?;
         let content = std::fs::read_to_string(rtlil_temp.path())?;
-        print!("{}", content);
+        print!("{content}");
 
         Ok(())
     }

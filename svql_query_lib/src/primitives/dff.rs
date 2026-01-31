@@ -7,7 +7,7 @@
 use svql_query::prelude::*;
 
 // Match any flip-flop
-svql_query::define_dff_primitive!(DffAny, [(clk, input), (d, input), (q, output)], |_| true);
+svql_query::define_dff_primitive!(DffAny, [(clk, input), (d, input), (q, output)], |_| return true);
 
 // Flip-flop with synchronous reset and clock enable
 svql_query::define_dff_primitive!(
@@ -21,9 +21,9 @@ svql_query::define_dff_primitive!(
     ],
     |cell| {
         if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-            ff.has_reset() && ff.has_enable()
+            return ff.has_reset() && ff.has_enable()
         } else {
-            false
+            return false
         }
     }
 );
@@ -40,9 +40,9 @@ svql_query::define_dff_primitive!(
     ],
     |cell| {
         if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-            ff.has_clear() && ff.has_enable()
+            return ff.has_clear() && ff.has_enable()
         } else {
-            false
+            return false
         }
     }
 );
@@ -53,9 +53,9 @@ svql_query::define_dff_primitive!(
     [(clk, input), (d, input), (reset, input), (q, output)],
     |cell| {
         if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-            ff.has_reset() && !ff.has_enable()
+            return ff.has_reset() && !ff.has_enable()
         } else {
-            false
+            return false
         }
     }
 );
@@ -66,9 +66,9 @@ svql_query::define_dff_primitive!(
     [(clk, input), (d, input), (reset_n, input), (q, output)],
     |cell| {
         if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-            ff.has_clear() && !ff.has_enable()
+            return ff.has_clear() && !ff.has_enable()
         } else {
-            false
+            return false
         }
     }
 );
@@ -79,9 +79,9 @@ svql_query::define_dff_primitive!(
     [(clk, input), (d, input), (en, input), (q, output)],
     |cell| {
         if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-            !ff.has_reset() && !ff.has_clear() && ff.has_enable()
+            return !ff.has_reset() && !ff.has_clear() && ff.has_enable()
         } else {
-            false
+            return false
         }
     }
 );
@@ -89,9 +89,9 @@ svql_query::define_dff_primitive!(
 // Basic flip-flop with no reset or enable
 svql_query::define_dff_primitive!(Dff, [(clk, input), (d, input), (q, output)], |cell| {
     if let prjunnamed_netlist::Cell::Dff(ff) = cell {
-        !ff.has_reset() && !ff.has_clear() && !ff.has_enable()
+        return !ff.has_reset() && !ff.has_clear() && !ff.has_enable()
     } else {
-        false
+        return false
     }
 });
 

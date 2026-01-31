@@ -5,11 +5,11 @@ fn write_yosys_to_rtlil(
     yosys_module: &YosysModule,
     config: &ModuleConfig,
     rtlil_out: Option<&Path>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn core::error::Error>> {
     let yosys = which::which("yosys")?;
     match rtlil_out {
-        Some(path) => yosys_module.write_rtlil_to_path(config, path, &yosys),
-        None => yosys_module.write_rtlil_to_stdout(config, &yosys),
+        Some(path) => return yosys_module.write_rtlil_to_path(config, path, &yosys),
+        None => return yosys_module.write_rtlil_to_stdout(config, &yosys),
     }
 }
 
@@ -17,7 +17,7 @@ fn write_yosys_to_rtlil(
 // cargo run --bin to_rtlil examples/fixtures/basic/and/verilog/and_tree.v and_tree -f -p N=4
 // cargo run --bin to_rtlil examples/fixtures/basic/and/verilog/and_seq.v  and_seq  -f -p N=3
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn core::error::Error>> {
     use argparse::{ArgumentParser, Store, StoreOption, StoreTrue};
 
     let mut input_file = String::new();
@@ -63,8 +63,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "Add custom Yosys step",
         );
 
-        ap.parse_args_or_exit();
-    }
+        ap.parse_args_or_exit()
+    };
 
     // Create the YosysModule
     let yosys_module = YosysModule::new(&input_file, &module_name)?;
@@ -77,8 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let parts: Vec<&str> = param_str.splitn(2, '=').collect();
         if parts.len() != 2 {
             return Err(format!(
-                "Invalid parameter format: '{}'. Expected NAME=VALUE",
-                param_str
+                "Invalid parameter format: '{param_str}'. Expected NAME=VALUE"
             )
             .into());
         }
@@ -97,8 +96,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_yosys_to_rtlil(&yosys_module, &config, output_path)?;
 
     if let Some(output_file) = output_file {
-        eprintln!("RTLIL written to: {}", output_file);
+        eprintln!("RTLIL written to: {output_file}");
     }
 
-    Ok(())
+    return Ok(())
 }

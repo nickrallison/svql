@@ -1,6 +1,6 @@
 //! Configuration for the subgraph isomorphism search.
 
-use std::{
+use core::{
     hash::{Hash, Hasher},
     str::FromStr,
 };
@@ -43,7 +43,8 @@ impl Default for Config {
 
 impl Config {
     /// Creates a new configuration instance.
-    pub fn new(
+    #[must_use] 
+    pub const fn new(
         match_length: MatchLength,
         dedupe: Dedupe,
         needle_options: ModuleConfig,
@@ -64,6 +65,7 @@ impl Config {
     }
 
     /// Returns a builder for configuration.
+    #[must_use] 
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
@@ -93,18 +95,21 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
     /// Sets the match length requirement.
-    pub fn match_length(mut self, value: MatchLength) -> Self {
+    #[must_use] 
+    pub const fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
         self
     }
 
     /// Sets the deduplication strategy.
-    pub fn dedupe(mut self, value: Dedupe) -> Self {
+    #[must_use] 
+    pub const fn dedupe(mut self, value: Dedupe) -> Self {
         self.dedupe = value;
         self
     }
 
     /// Sets the Yosys configuration for the needle and forces flattening.
+    #[must_use] 
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
@@ -112,70 +117,81 @@ impl ConfigBuilder {
     }
 
     /// Adds a custom Yosys command to the needle processing pipeline.
+    #[must_use] 
     pub fn needle_cmd(mut self, cmd: &str) -> Self {
-        self.needle_options.other_steps.push(cmd.to_string());
+        self.needle_options.other_steps.push(cmd.to_owned());
         self
     }
 
     /// Sets a parameter for the needle module.
+    #[must_use] 
     pub fn needle_param(mut self, param: &str, value: &str) -> Self {
         self.needle_options
             .params
-            .insert(param.to_string(), value.to_string());
+            .insert(param.to_owned(), value.to_owned());
         self
     }
 
     /// Sets the Yosys configuration for the haystack.
+    #[must_use] 
     pub fn haystack_options(mut self, options: ModuleConfig) -> Self {
         self.haystack_options = options;
         self
     }
 
     /// Adds a custom Yosys command to the haystack processing pipeline.
+    #[must_use] 
     pub fn haystack_cmd(mut self, cmd: &str) -> Self {
-        self.haystack_options.other_steps.push(cmd.to_string());
+        self.haystack_options.other_steps.push(cmd.to_owned());
         self
     }
 
     /// Sets a parameter for the haystack module.
+    #[must_use] 
     pub fn haystack_param(mut self, param: &str, value: &str) -> Self {
         self.haystack_options
             .params
-            .insert(param.to_string(), value.to_string());
+            .insert(param.to_owned(), value.to_owned());
         self
     }
 
     /// Enables or disables the `opt_clean` pass for the haystack.
+    #[must_use] 
     pub fn haystack_opt_clean(mut self, opt_clean: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt_clean(opt_clean);
         self
     }
 
     /// Enables or disables the `opt` pass for the haystack.
+    #[must_use] 
     pub fn haystack_opt(mut self, opt: bool) -> Self {
         self.haystack_options = self.haystack_options.with_opt(opt);
         self
     }
 
     /// Configures whether pattern variables can match design constants.
-    pub fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
+    #[must_use] 
+    pub const fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
     }
 
     /// Sets the maximum recursion depth for the search algorithm.
-    pub fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
+    #[must_use] 
+    pub const fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
         self.max_recursion_depth = depth;
         self
     }
 
     /// Sets whether to run the search in parallel.
-    pub fn parallel(mut self, parallel: bool) -> Self {
+    #[must_use] 
+    pub const fn parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
     }
 
     /// Finalizes the builder into a `Config` instance.
+    #[must_use] 
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
@@ -203,16 +219,19 @@ pub enum MatchLength {
 
 impl MatchLength {
     /// Returns true if the strategy is First.
-    pub fn first(&self) -> bool {
-        matches!(self, MatchLength::First)
+    #[must_use] 
+    pub const fn first(&self) -> bool {
+        return matches!(self, Self::First)
     }
-    /// Returns true if the strategy is NeedleSubsetHaystack.
-    pub fn needle_subset_haystack(&self) -> bool {
-        matches!(self, MatchLength::NeedleSubsetHaystack)
+    /// Returns true if the strategy is `NeedleSubsetHaystack`.
+    #[must_use] 
+    pub const fn needle_subset_haystack(&self) -> bool {
+        return matches!(self, Self::NeedleSubsetHaystack)
     }
     /// Returns true if the strategy is Exact.
-    pub fn exact(&self) -> bool {
-        matches!(self, MatchLength::Exact)
+    #[must_use] 
+    pub const fn exact(&self) -> bool {
+        return matches!(self, Self::Exact)
     }
 }
 
@@ -221,9 +240,9 @@ impl FromStr for MatchLength {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "first" => Ok(MatchLength::First),
-            "needle_subset_haystack" => Ok(MatchLength::NeedleSubsetHaystack),
-            "exact" => Ok(MatchLength::Exact),
+            "first" => return Ok(Self::First),
+            "needle_subset_haystack" => return Ok(Self::NeedleSubsetHaystack),
+            "exact" => return Ok(Self::Exact),
             _ => Err(()),
         }
     }
@@ -243,16 +262,19 @@ pub enum Dedupe {
 
 impl Dedupe {
     /// Returns true if the strategy is None.
-    pub fn none(&self) -> bool {
-        matches!(self, Dedupe::None)
+    #[must_use] 
+    pub const fn none(&self) -> bool {
+        return matches!(self, Self::None)
     }
     /// Returns true if the strategy is Inner.
-    pub fn inner(&self) -> bool {
-        matches!(self, Dedupe::Inner)
+    #[must_use] 
+    pub const fn inner(&self) -> bool {
+        return matches!(self, Self::Inner)
     }
     /// Returns true if the strategy is All.
-    pub fn all(&self) -> bool {
-        matches!(self, Dedupe::All)
+    #[must_use] 
+    pub const fn all(&self) -> bool {
+        return matches!(self, Self::All)
     }
 }
 
@@ -261,9 +283,9 @@ impl FromStr for Dedupe {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "none" => Ok(Dedupe::None),
-            "inner" => Ok(Dedupe::Inner),
-            "all" => Ok(Dedupe::All),
+            "none" => return Ok(Self::None),
+            "inner" => return Ok(Self::Inner),
+            "all" => return Ok(Self::All),
             _ => Err(()),
         }
     }

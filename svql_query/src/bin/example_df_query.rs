@@ -1,6 +1,6 @@
 use svql_query::{define_primitive, prelude::*};
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug, Clone)]
 struct AndGate {
     a: Wire,
@@ -27,13 +27,13 @@ impl Netlist for AndGate {
         let b_id = row.wire("b")?;
         let y_id = row.wire("y")?;
 
-        let and_gate = AndGate {
+        let and_gate = Self {
             a: a_id,
             b: b_id,
             y: y_id,
         };
 
-        Some(and_gate)
+        return Some(and_gate)
     }
 }
 
@@ -41,7 +41,7 @@ impl Component for AndGate {
     type Kind = kind::Netlist;
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug, Clone)]
 pub struct And2Gates {
     and1: AndGate,
@@ -96,11 +96,11 @@ impl Composite for And2Gates {
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
-    ) -> Result<(), Box<dyn std::error::Error>>
+    ) -> Result<(), Box<dyn core::error::Error>>
     where
         Self: Sized,
     {
-        <AndGate as Pattern>::preload_driver(driver, design_key, config)
+        return <AndGate as Pattern>::preload_driver(driver, design_key, config)
     }
 }
 
@@ -110,7 +110,7 @@ impl Component for And2Gates {
 
 define_primitive!(TestAndGate, And, [(a, input), (b, input), (y, output)]);
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn core::error::Error>> {
     // Initialize tracing to see warnings
     let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::WARN)
@@ -125,22 +125,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key = DriverKey::new(haystack_path, haystack_module);
     let container = driver
         .get_design(&key, &config.haystack_options)
-        .map_err(|e| QueryError::design_load(e.to_string()))?;
+        .map_err(|e| return QueryError::design_load(e.to_string()))?;
 
     for cell in container.index().cells_topo() {
-        println!("Cell: {:#?}", cell);
+        println!("Cell: {cell:#?}");
     }
 
     // Execute query using the new DataFrame API
     let store = svql_query::run_query::<TestAndGate>(&driver, &key, &config)?;
 
     for (_, table) in store.tables() {
-        println!("Table: {}", table);
+        println!("Table: {table}");
     }
 
     // Get the result count from the store
     // let results_table = store.get::<And2Gates>().expect("Table should be present");
     // let rows = results_table.rows().collect::<Vec<_>>();
     // let stored_count = rows.len();
-    Ok(())
+    return Ok(())
 }

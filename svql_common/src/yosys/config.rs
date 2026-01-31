@@ -1,7 +1,7 @@
 //! Configuration for Yosys module processing.
 
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use core::hash::{Hash, Hasher};
 
 /// Configuration options for processing a Yosys module.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -23,39 +23,47 @@ pub struct ModuleConfig {
 }
 
 impl ModuleConfig {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_flatten(mut self, flatten: bool) -> Self {
+    #[must_use] 
+    pub const fn with_flatten(mut self, flatten: bool) -> Self {
         self.flatten = flatten;
         self
     }
 
-    pub fn with_opt_clean(mut self, opt_clean: bool) -> Self {
+    #[must_use] 
+    pub const fn with_opt_clean(mut self, opt_clean: bool) -> Self {
         self.opt_clean = opt_clean;
         self
     }
 
-    pub fn with_opt(mut self, opt: bool) -> Self {
+    #[must_use] 
+    pub const fn with_opt(mut self, opt: bool) -> Self {
         self.opt = opt;
         self
     }
 
+    #[must_use] 
     pub fn with_param(mut self, param: &str, value: &str) -> Self {
-        self.params.insert(param.to_string(), value.to_string());
+        self.params.insert(param.to_owned(), value.to_owned());
         self
     }
 
+    #[must_use] 
     pub fn with_step(mut self, step: &str) -> Self {
-        self.other_steps.push(step.to_string());
+        self.other_steps.push(step.to_owned());
         self
     }
-    pub fn with_verific(mut self, verific: bool) -> Self {
+    #[must_use] 
+    pub const fn with_verific(mut self, verific: bool) -> Self {
         self.verific = verific;
         self
     }
-    pub fn with_load_raw(mut self, load_raw: bool) -> Self {
+    #[must_use] 
+    pub const fn with_load_raw(mut self, load_raw: bool) -> Self {
         self.load_raw = load_raw;
         self
     }
