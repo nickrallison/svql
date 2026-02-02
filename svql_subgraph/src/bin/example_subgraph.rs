@@ -3,18 +3,22 @@ use svql_common::YosysModule;
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     // 1. Load the design
     let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_not_deep.v",
-        "cwe1234_not_deep",
+        "examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v",
+        "cwe1234_multi_width",
     )?;
-    let needle_module: YosysModule =
-        YosysModule::new("examples/fixtures/basic/or/verilog/or_gate.v", "or_gate")?;
+    let needle_module: YosysModule = YosysModule::new(
+        "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
+        "async_mux",
+    )?;
 
     // 2. Import the design
     let design = design_module.import_design(&svql_common::ModuleConfig::default())?;
     let needle = needle_module.import_design(&svql_common::ModuleConfig::default())?;
 
     // 3. Create the matcher
-    let config = svql_common::Config::default();
+    let config = svql_common::Config::builder()
+        .dedupe(svql_common::Dedupe::Inner)
+        .build();
     let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(
         &needle,
         &design,
