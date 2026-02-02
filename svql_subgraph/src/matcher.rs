@@ -18,6 +18,7 @@ use crate::graph_index::GraphIndex;
 use crate::utils::intersect_sets;
 
 /// Entry point for subgraph isomorphism searches.
+#[allow(dead_code)]
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
     needle: &'needle Design,
     haystack: &'haystack Design,
@@ -46,7 +47,7 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     /// Performs a complete subgraph isomorphism search. Builds indices internally.
-    #[must_use] 
+    #[must_use]
     pub fn enumerate_all(
         needle: &'needle Design,
         haystack: &'haystack Design,
@@ -76,7 +77,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     }
 
     /// Performs a subgraph isomorphism search using pre-built indices.
-    #[must_use] 
+    #[must_use]
     pub fn enumerate_with_indices(
         needle: &'needle Design,
         haystack: &'haystack Design,
