@@ -203,6 +203,17 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 #(#dep_entries),*
             ];
 
+            fn composite_schema() -> &'static svql_query::session::PatternSchema {
+                static SCHEMA: std::sync::OnceLock<svql_query::session::PatternSchema> =
+                    std::sync::OnceLock::new();
+                SCHEMA.get_or_init(|| {
+                    let defs = Self::composite_to_defs();
+                    let defs_static: &'static [svql_query::session::ColumnDef] =
+                        Box::leak(defs.into_boxed_slice());
+                    svql_query::session::PatternSchema::new(defs_static)
+                })
+            }
+
             // Include validate_custom if filters present
             #validate_custom_impl
 

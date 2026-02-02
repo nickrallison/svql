@@ -338,6 +338,17 @@ macro_rules! define_primitive {
                 $($crate::session::Port::$direction(stringify!($port))),*
             ];
 
+            fn primitive_schema() -> &'static $crate::session::PatternSchema {
+                static SCHEMA: std::sync::OnceLock<$crate::session::PatternSchema> =
+                    std::sync::OnceLock::new();
+                SCHEMA.get_or_init(|| {
+                    let defs = Self::ports_to_defs();
+                    let defs_static: &'static [$crate::session::ColumnDef] =
+                        Box::leak(defs.into_boxed_slice());
+                    $crate::session::PatternSchema::new(defs_static)
+                })
+            }
+
             fn primitive_rehydrate<'a>(
                 row: &$crate::session::Row<Self>,
                 _store: &$crate::session::Store,
@@ -411,6 +422,17 @@ macro_rules! define_dff_primitive {
             fn cell_filter(cell: &prjunnamed_netlist::Cell) -> bool {
                 let filter_fn: fn(&prjunnamed_netlist::Cell) -> bool = $filter;
                 filter_fn(cell)
+            }
+
+            fn primitive_schema() -> &'static $crate::session::PatternSchema {
+                static SCHEMA: std::sync::OnceLock<$crate::session::PatternSchema> =
+                    std::sync::OnceLock::new();
+                SCHEMA.get_or_init(|| {
+                    let defs = Self::ports_to_defs();
+                    let defs_static: &'static [$crate::session::ColumnDef] =
+                        Box::leak(defs.into_boxed_slice());
+                    $crate::session::PatternSchema::new(defs_static)
+                })
             }
 
             fn primitive_rehydrate<'a>(
