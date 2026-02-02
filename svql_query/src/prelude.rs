@@ -4,50 +4,19 @@ pub use svql_driver as driver;
 pub use svql_subgraph as subgraph;
 pub use tracing;
 
-pub use crate::{
-    // Core types
-    CellId,
-    Wire,
-    // binding::PortResolver,
-    // primitives::dff::*,
-    // primitives::gates::*,
-    // report::ReportNode,
-    // DataFrame API
-    run_query,
-};
+pub use crate::{CellId, Wire, run_query};
 
-// Session re-exports
 pub use crate::session::{
-    // Core types
-    Alias,
-    AnyTable,
-    ColumnDef,
-    ColumnEntry,
-    ColumnKind,
-    ConnectionBuilder,
-    EntryArray,
-    // Execution
-    ExecInfo,
-    ExecutionContext,
-    ExecutionPlan,
-    PatternSchema,
-    Port,
-    PortDirection,
-    PortMap,
-    QueryError,
-    Ref,
-    Row,
-    SearchFn,
-    Store,
-    Submodule,
-    Table,
+    Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, ConnectionBuilder, EntryArray, ExecInfo,
+    ExecutionContext, ExecutionPlan, PatternSchema, Port, PortDirection, PortMap, QueryError, Ref,
+    Row, SearchFn, Store, Submodule, Table,
 };
 
 // Trait re-exports
 pub use crate::traits::{
     Component, Pattern, PatternInternal, composite::Composite, composite::Connection,
-    composite::Connections, kind, netlist::Netlist, primitive::Primitive, search_table_any,
-    variant::Variant,
+    composite::Connections, kind, netlist::Netlist, primitive::Primitive, recursive::Recursive,
+    search_table_any, variant::Variant,
 };
 
 pub use crate::selector::Selector;

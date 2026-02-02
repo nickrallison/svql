@@ -5,7 +5,9 @@
 
 pub mod dff;
 pub mod gates;
+pub mod rec;
 
 // Re-export commonly used primitives
 pub use dff::*;
 pub use gates::*;
+pub use rec::*;

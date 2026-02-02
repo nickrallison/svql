@@ -1,4 +1,4 @@
-// pub mod unlock_logic;
+pub mod unlock_logic;
 
 // use crate::prelude::*;
 // use crate::traits::DehydratedTopologyValidation;

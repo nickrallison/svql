@@ -21,6 +21,12 @@ struct OrGroup {
     connections: Vec<Connection>,
 }
 
+/// A custom filter constraint
+struct Filter {
+    // figure out specific type later to deal with generic
+    filter_func: (), // Fn(&svql_query::session::Row<UnlockLogic>, &svql_query::session::ExecutionContext) -> bool,
+}
+
 /// Parsed submodule field
 struct SubmoduleField {
     name: syn::Ident,
@@ -397,6 +403,10 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     }
 
     Some(OrGroup { connections })
+}
+
+fn parse_filter(attr: &syn::Attribute) -> Option<Filter> {
+    None
 }
 
 fn parse_submodule_fields(
