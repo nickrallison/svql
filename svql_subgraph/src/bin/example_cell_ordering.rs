@@ -4,8 +4,8 @@ use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let design_module: YosysModule = YosysModule::new(
-        "examples/fixtures/cwes/cwe1234/cwe1234_combined.v",
-        "cwe1234_combined",
+        "examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v",
+        "cwe1234_multi_width",
     )?;
 
     let design = design_module.import_design(&svql_common::ModuleConfig::default())?;

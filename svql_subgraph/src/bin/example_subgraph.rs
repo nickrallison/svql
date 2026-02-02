@@ -1,6 +1,10 @@
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init();
+
     // 1. Load the design
     let design_module: YosysModule = YosysModule::new(
         "examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v",
@@ -18,6 +22,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     // 3. Create the matcher
     let config = svql_common::Config::builder()
         .dedupe(svql_common::Dedupe::Inner)
+        .match_length(svql_common::MatchLength::NeedleSubsetHaystack)
         .build();
     let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(
         &needle,
