@@ -8,6 +8,7 @@ fn recursive_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::All)
         .max_recursion_depth(Some(10))
+        .haystack_param("N", "128")
 }
 
 // --- Recursive AND Tests ---

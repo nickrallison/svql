@@ -20,8 +20,6 @@ pub struct Config {
     pub haystack_options: ModuleConfig,
     /// Whether pattern variables can match design constants.
     pub pattern_vars_match_design_consts: bool,
-    /// Maximum recursion depth for the search.
-    pub max_recursion_depth: Option<usize>,
     /// Whether to run the search in parallel.
     pub parallel: bool,
 }
@@ -35,7 +33,6 @@ impl Default for Config {
             needle_options: ModuleConfig::default(),
             haystack_options: ModuleConfig::default(),
             pattern_vars_match_design_consts: true,
-            max_recursion_depth: None,
             parallel: false,
         }
     }
@@ -50,7 +47,6 @@ impl Config {
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
         pattern_vars_match_design_consts: bool,
-        max_recursion_depth: Option<usize>,
         parallel: bool,
     ) -> Self {
         Self {
@@ -59,7 +55,6 @@ impl Config {
             needle_options,
             haystack_options,
             pattern_vars_match_design_consts,
-            max_recursion_depth,
             parallel,
         }
     }
@@ -77,7 +72,6 @@ impl Hash for Config {
         self.dedupe.hash(state);
         self.needle_options.hash(state);
         self.pattern_vars_match_design_consts.hash(state);
-        self.max_recursion_depth.hash(state);
     }
 }
 
@@ -199,7 +193,6 @@ impl ConfigBuilder {
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
             pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,
-            max_recursion_depth: self.max_recursion_depth,
             parallel: self.parallel,
         }
     }

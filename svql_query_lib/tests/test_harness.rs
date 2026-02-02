@@ -60,11 +60,11 @@ where
     }
     let config = config_builder.build();
 
-    let _container = spec.get_design(&driver, &config)?;
+    let container = spec.get_design(&driver, &config)?;
 
-    // for cell in container.index().cells_topo() {
-    //     tracing::error!("Cell: {:#?}", cell);
-    // }
+    for cell in container.index().cells_topo() {
+        tracing::trace!("Cell: {:#?}", cell);
+    }
 
     // Execute query using the new DataFrame API
     let store = svql_query::run_query::<P>(&driver, &spec.get_key(), &config)?;
@@ -91,8 +91,8 @@ where
             rehydrated.push(item.unwrap());
         }
 
-        // let cells = container.index().cells_topo();
-        tracing::error!(
+        let cells = container.index().cells_topo();
+        tracing::trace!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
             stored_count,
@@ -103,25 +103,24 @@ where
         );
 
         for (i, result) in rehydrated.iter().enumerate() {
-            tracing::error!("Result #{}: {:#?}", i, result);
+            tracing::trace!("Result #{}: {:#?}", i, result);
         }
 
-        tracing::error!("Tables:");
+        tracing::trace!("Tables:");
         for (_, table) in store.tables() {
-            tracing::error!("{}", table);
+            tracing::trace!("{}", table);
         }
 
-        // let cells_str = cells
-        //     .iter()
-        //     .map(|c| format!(" - {:#?}", c))
-        //     .collect::<Vec<String>>()
-        //     .join("\n");
+        let cells_str = cells
+            .iter()
+            .map(|c| format!(" - {:#?}", c))
+            .collect::<Vec<String>>()
+            .join("\n");
 
-        // tracing::error!("Cell List: {}", cells_str);
-        // Log match details if available
+        tracing::trace!("Cell List: {}", cells_str);
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {
-                tracing::error!("Match #{}: {}", i, row);
+                tracing::trace!("Match #{}: {}", i, row);
             }
         }
     }
