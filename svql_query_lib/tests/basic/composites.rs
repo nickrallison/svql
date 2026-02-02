@@ -1,10 +1,16 @@
+use svql_query::prelude::*;
 use svql_query_lib::primitives::rec::RecAnd;
 use svql_query_lib::primitives::rec::RecOr;
-use svql_query::prelude::*;
 
 use crate::query_test;
 
 fn recursive_config(c: ConfigBuilder) -> ConfigBuilder {
+    c.match_length(MatchLength::NeedleSubsetHaystack)
+        .dedupe(Dedupe::All)
+        .max_recursion_depth(Some(10))
+}
+
+fn recursive_parametrized_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::All)
         .max_recursion_depth(Some(10))
@@ -28,7 +34,7 @@ query_test!(
     haystack: ("examples/fixtures/basic/and/verilog/and_tree.v", "and_tree"),
     // This is a generated tree.
     expect: 127,
-    config: recursive_config
+    config: recursive_parametrized_config
 );
 
 query_test!(
