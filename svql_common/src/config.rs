@@ -76,7 +76,7 @@ impl Hash for Config {
 }
 
 /// A builder pattern implementation for the `Config` struct.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ConfigBuilder {
     match_length: MatchLength,
     dedupe: Dedupe,
@@ -85,6 +85,20 @@ pub struct ConfigBuilder {
     pub pattern_vars_match_design_consts: bool,
     max_recursion_depth: Option<usize>,
     parallel: bool,
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self {
+            match_length: MatchLength::default(),
+            dedupe: Dedupe::default(),
+            needle_options: ModuleConfig::default(),
+            haystack_options: ModuleConfig::default(),
+            pattern_vars_match_design_consts: true, // Match Config::default()
+            max_recursion_depth: None,
+            parallel: false,
+        }
+    }
 }
 
 impl ConfigBuilder {
