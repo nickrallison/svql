@@ -192,7 +192,7 @@ impl ExecutionPlan {
     /// Execute nodes sequentially in topological order.
     fn execute_sequential(&self, ctx: &ExecutionContext) -> Result<(), QueryError> {
         for node in &self.nodes {
-            self.execute_node(node, ctx)?;
+            ExecutionPlan::execute_node(node, ctx)?;
         }
         Ok(())
     }
@@ -211,17 +211,13 @@ impl ExecutionPlan {
         #[cfg(not(feature = "parallel"))]
         self.nodes
             .iter()
-            .try_for_each(|node| self.execute_node(node, ctx))?;
+            .try_for_each(|node| ExecutionPlan::execute_node(node, ctx))?;
 
         Ok(())
     }
 
     /// Execute a single node, waiting for deps first.
-    fn execute_node(
-        &self,
-        node: &Arc<ExecutionNode>,
-        ctx: &ExecutionContext,
-    ) -> Result<(), QueryError> {
+    fn execute_node(node: &Arc<ExecutionNode>, ctx: &ExecutionContext) -> Result<(), QueryError> {
         // Check if already executed
 
         if !node.try_execute() {
@@ -236,7 +232,7 @@ impl ExecutionPlan {
         // await all dependencies
         for dep in &node.deps {
             // will not re-execute due to cas_runner, and will just block until done
-            self.execute_node(dep, ctx)?;
+            ExecutionPlan::execute_node(dep, ctx)?;
         }
 
         // Execute search
