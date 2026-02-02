@@ -39,7 +39,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     }
 
     /// Convert port declarations to column definitions
-    #[must_use] 
+    #[must_use]
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
@@ -57,7 +57,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 
-    #[must_use] 
+    #[must_use]
     fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
         let schema_size = Self::PORTS.len();
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
@@ -207,7 +207,7 @@ pub(crate) mod test {
 
     use crate::Wire;
 
-    use super::{Netlist, Component, kind, Port, Row, Store, Driver, DriverKey};
+    use super::{Component, Driver, DriverKey, Netlist, Port, Row, Store, kind};
     use svql_common::Dedupe;
 
     use svql_query::query_test;

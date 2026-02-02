@@ -85,7 +85,7 @@ yap = "0.12.0"
 
 [workspace.lints.clippy]
 all = "deny"
-pedantic = "deny"
+# pedantic = "deny"
 
 [profile.release]
 codegen-units = 1

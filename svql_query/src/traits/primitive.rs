@@ -65,10 +65,7 @@ pub fn resolve_primitive_ports(
         | Cell::SDivFloor(a, b)
         | Cell::SModTrunc(a, b)
         | Cell::SModFloor(a, b) => {
-            vec![
-                value_to_cell_id(a),
-                value_to_cell_id(b)
-            ]
+            vec![value_to_cell_id(a), value_to_cell_id(b)]
         }
 
         // 1-input gates: Not, Buf
@@ -78,43 +75,29 @@ pub fn resolve_primitive_ports(
 
         // Mux: (sel, a, b) - note the Net for selector
         Cell::Mux(s, a, b) => {
-            vec![
-                net_to_cell_id(s),
-                value_to_cell_id(a),
-                value_to_cell_id(b),
-            ]
+            vec![net_to_cell_id(s), value_to_cell_id(a), value_to_cell_id(b)]
         }
 
         // Adc: (a, b, carry_in)
         Cell::Adc(a, b, ci) => {
-            vec![
-                value_to_cell_id(a),
-                value_to_cell_id(b),
-                net_to_cell_id(ci),
-            ]
+            vec![value_to_cell_id(a), value_to_cell_id(b), net_to_cell_id(ci)]
         }
 
         // Aig: (a, b) - both are ControlNets
         Cell::Aig(a, b) => {
-            vec![
-                control_net_to_cell_id(a),
-                control_net_to_cell_id(b),
-            ]
+            vec![control_net_to_cell_id(a), control_net_to_cell_id(b)]
         }
 
         // Shift operations: (value, shift_amount, multiplier)
         Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
-            vec![
-                value_to_cell_id(a),
-                value_to_cell_id(b),
-            ]
+            vec![value_to_cell_id(a), value_to_cell_id(b)]
         }
 
         // For complex cells (DFF, Memory, etc.) or I/O cells,
         // fall back to setting all ports to the cell itself
         _ => {
-            for col_idx in 0..schema_size {
-                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
+            for item in entries.iter_mut().take(schema_size) {
+                *item = ColumnEntry::Cell { id: Some(cell_id) };
             }
             return EntryArray::new(entries);
         }
@@ -181,7 +164,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     ///
     /// If provided, only cells that pass this filter will be included.
     /// The filter receives a reference to the matched cell wrapper.
-    #[must_use] 
+    #[must_use]
     fn cell_filter(cell: &prjunnamed_netlist::Cell) -> bool {
         let _ = cell;
         true // Default: accept all cells of the matching kind
@@ -199,7 +182,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     }
 
     /// Convert port declarations to column definitions.
-    #[must_use] 
+    #[must_use]
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
@@ -211,7 +194,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     ///
     /// Default implementation handles common gate patterns automatically.
     /// Override this for special cases (e.g., DFFs with named ports).
-    #[must_use] 
+    #[must_use]
     fn resolve(cell_wrapper: &CellWrapper<'_>) -> EntryArray {
         resolve_primitive_ports(cell_wrapper.get(), cell_wrapper, Self::primitive_schema())
     }

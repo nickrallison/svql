@@ -1,16 +1,2 @@
 [env]
 CARGO_WORKSPACE_DIR = { value = "", relative = true }
-
-[alias]
-clippy-svql = [
-    "clippy",
-    "--workspace",
-    "--exclude", "prjunnamed-generic",
-    "--exclude", "prjunnamed-graphviz",
-    "--exclude", "prjunnamed-lut",
-    "--exclude", "prjunnamed-memory",
-    "--exclude", "prjunnamed-netlist",
-    "--exclude", "prjunnamed-pattern",
-    "--exclude", "prjunnamed-siliconblue",
-    "--exclude", "prjunnamed-yosys_json"
-]
