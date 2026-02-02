@@ -24,10 +24,10 @@ use crate::prelude::*;
 /// # Usage
 ///
 /// ```ignore
-/// let table: &Table<MyPattern<Search>> = store.get()?;
+/// let table: &Table<MyPattern> = store.get()?;
 /// for row in table.rows() {
 ///     let wire = row.wire("clk")?;
-///     let sub: Ref<Dep<Search>> = row.sub("dep")?;
+///     let sub: Ref<Dep> = row.sub("dep")?;
 /// }
 /// ```
 pub struct Table<T> {

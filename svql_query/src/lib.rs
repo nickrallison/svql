@@ -45,11 +45,11 @@ use prelude::*;
 ///
 /// // Run in parallel with default thread count
 /// let config = ExecConfig::parallel();
-/// let store = run_query_with_config::<MyPattern<Search>>(&driver, &key, config)?;
+/// let store = run_query_with_config::<MyPattern>(&driver, &key, config)?;
 ///
 /// // Or limit threads
 /// let config = ExecConfig { parallel: true, max_threads: Some(4) };
-/// let store = run_query_with_config::<MyPattern<Search>>(&driver, &key, config)?;
+/// let store = run_query_with_config::<MyPattern>(&driver, &key, config)?;
 /// ```
 pub fn run_query<P>(
     driver: &Driver,

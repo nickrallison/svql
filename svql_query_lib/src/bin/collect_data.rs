@@ -246,7 +246,7 @@
 //     }
 
 //     fn get_filtered_runners(&self, filter: &str) -> Vec<Box<dyn QueryRunner>> {
-//         let all_runners: Vec<Box<dyn QueryRunner>> = query_list![Cwe1271<Search>, Cwe1280<Search>];
+//         let all_runners: Vec<Box<dyn QueryRunner>> = query_list![Cwe1271, Cwe1280];
 
 //         all_runners
 //             .into_iter()

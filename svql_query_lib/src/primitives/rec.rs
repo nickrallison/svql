@@ -468,8 +468,6 @@ impl Recursive for RecOr {
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-    use std::collections::HashMap;
-
     use svql_query::prelude::*;
 
     use super::*;

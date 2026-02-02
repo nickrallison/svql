@@ -1,7 +1,7 @@
 use crate::query_test;
 use svql_query::prelude::*;
-use svql_query::security::cwe1280::Cwe1280;
-use svql_query::security::cwe1280::grant_access::GrantAccess;
+use svql_query_lib::security::cwe1280::Cwe1280;
+use svql_query_lib::security::cwe1280::grant_access::GrantAccess;
 
 #[allow(dead_code)]
 /// Configuration for the full CWE-1280 structural pattern
@@ -21,27 +21,27 @@ fn grant_access_config(c: ConfigBuilder) -> ConfigBuilder {
 
 // --- Full Pattern Tests ---
 
-// query_test!(
-//     name: test_cwe1280_fixed,
-//     query: Cwe1280<Search>,
-//     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v", "cwe1280_fixed"),
-//     expect: 0,
-//     config: cwe1280_config
-// );
+query_test!(
+    name: test_cwe1280_fixed,
+    query: Cwe1280,
+    haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v", "cwe1280_fixed"),
+    expect: 0,
+    config: cwe1280_config
+);
 
-// query_test!(
-//     name: test_cwe1280_vuln,
-//     query: Cwe1280<Search>,
-//     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
-//     expect: 1,
-//     config: cwe1280_config
-// );
+query_test!(
+    name: test_cwe1280_vuln,
+    query: Cwe1280,
+    haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
+    expect: 1,
+    config: cwe1280_config
+);
 
 // --- Sub-component (GrantAccess) Tests ---
 
 query_test!(
     name: test_grant_access_fixed,
-    query: GrantAccess<Search>,
+    query: GrantAccess,
     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_fixed.v", "cwe1280_fixed"),
     expect: 1,
     config: grant_access_config
@@ -49,7 +49,7 @@ query_test!(
 
 query_test!(
     name: test_grant_access_vuln,
-    query: GrantAccess<Search>,
+    query: GrantAccess,
     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
     expect: 1,
     config: grant_access_config

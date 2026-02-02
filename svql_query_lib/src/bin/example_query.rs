@@ -77,12 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{table}");
     }
 
-    // if let Some(table) = store.get::<LockedRegister<Search>>() {
+    // if let Some(table) = store.get::<LockedRegister>() {
     //     println!("\n=== LockedRegister Table Details ===");
     //     println!("{}", table);
     // }
 
-    // if let Some(table) = store.get::<AsyncDffMuxEnable<Search>>() {
+    // if let Some(table) = store.get::<AsyncDffMuxEnable>() {
     //     println!("\n=== AsyncDffMuxEnable Table Details ===");
     //     println!("{}", table);
     // }

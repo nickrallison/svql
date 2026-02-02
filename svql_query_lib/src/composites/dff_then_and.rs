@@ -1,16 +1,12 @@
-use crate::prelude::*;
+use crate::primitives::{AndGate, Sdffe};
+use svql_query::prelude::*;
 
-#[composite]
-pub struct SdffeThenAnd<S: State> {
+#[derive(Debug, Clone, Composite)]
+#[connection(from = ["sdffe", "q"], to = ["and_gate", "a"])]
+#[connection(from = ["sdffe", "q"], to = ["and_gate", "b"])]
+pub struct SdffeThenAnd {
     #[submodule]
-    pub sdffe: Sdffe<S>,
+    pub sdffe: Sdffe,
     #[submodule]
-    pub and_gate: AndGate<S>,
-}
-
-impl<S: State> Topology<S> for SdffeThenAnd<S> {
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        ctx.connect(Some(&self.sdffe.q), Some(&self.and_gate.a));
-        ctx.connect(Some(&self.sdffe.q), Some(&self.and_gate.b));
-    }
+    pub and_gate: AndGate,
 }

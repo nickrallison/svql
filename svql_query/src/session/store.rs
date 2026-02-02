@@ -13,7 +13,7 @@ use crate::prelude::*;
 ///
 /// During execution, the `ExecutionPlan` populates the store with
 /// `Table<T>` for each pattern type. Patterns can then access their
-/// dependencies via `ctx.get::<Dep<Search>>()` during `search()`.
+/// dependencies via `ctx.get::<Dep>()` during `search()`.
 ///
 /// # Thread Safety
 ///
@@ -24,11 +24,11 @@ use crate::prelude::*;
 ///
 /// ```ignore
 /// // During Pattern::search()
-/// let dep_table = ctx.get::<Dep<Search>>().ok_or(QueryError::MissingDependency("Dep"))?;
+/// let dep_table = ctx.get::<Dep>().ok_or(QueryError::MissingDependency("Dep"))?;
 ///
 /// // After execution
 /// let store = plan.execute(&driver, key, config)?;
-/// let table = store.get::<MyPattern<Search>>().unwrap();
+/// let table = store.get::<MyPattern>().unwrap();
 /// for row in table.rows() {
 ///     let matched = MyPattern::rehydrate(&row, &store);
 /// }

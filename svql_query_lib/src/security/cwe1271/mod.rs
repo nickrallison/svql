@@ -1,17 +1,20 @@
-use crate::{State, impl_dff_primitive};
-use svql_macros::variant;
+use svql_query::prelude::*;
 
-impl_dff_primitive!(
+svql_query::define_dff_primitive!(
     DffCwe1271,
-    [clk, d, q],
-    |ff| !ff.has_reset() && !ff.has_clear(),
-    "Matches basic flip-flops with no reset logic."
+    [(clk, input), (d, input), (q, output)],
+    |cell| {
+        if let prjunnamed_netlist::Cell::Dff(ff) = cell {
+            !ff.has_reset() && !ff.has_clear()
+        } else {
+            false
+        }
+    }
 );
 
-#[variant(ports(clk, data_in, data_out))]
-pub enum Cwe1271<S: State> {
-    #[variant(map(clk = "clk", data_in = "d", data_out = "q"))]
-    Cwe1271Inst(DffCwe1271<S>),
-    // #[variant(map(clk = "clk", data_in = "d", data_out = "q"))]
-    // Basic(Dff<S>),
+#[derive(Debug, Clone, Variant)]
+#[variant_ports(input(clk), input(data_in), output(data_out))]
+pub enum Cwe1271 {
+    #[map(clk = ["clk"], data_in = ["d"], data_out = ["q"])]
+    Cwe1271Inst(DffCwe1271),
 }

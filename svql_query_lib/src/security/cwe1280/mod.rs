@@ -1,47 +1,28 @@
 pub mod grant_access;
 
-use crate::prelude::*;
-
+use svql_query::prelude::*;
+use crate::primitives::dff::DffAny;
 use crate::security::cwe1280::grant_access::GrantAccess;
 use crate::security::primitives::locked_register::LockedRegister;
 
 /// Represents the first stage of CWE-1280: Access granted and stored in a register.
-#[composite]
-pub struct DelayedGrantAccess<S: State> {
-    #[path]
-    pub path: Instance,
-
+#[derive(Debug, Clone, Composite)]
+#[connection(from = ["grant_access", "grant"], to = ["reg_any", "d"])]
+pub struct DelayedGrantAccess {
     #[submodule]
-    pub grant_access: GrantAccess<S>,
-
+    pub grant_access: GrantAccess,
     #[submodule]
-    pub reg_any: DffAny<S>,
-}
-
-impl<S: State> Topology<S> for DelayedGrantAccess<S> {
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        ctx.connect(Some(&self.grant_access.grant), self.reg_any.d());
-    }
+    pub reg_any: DffAny,
+    #[alias(output, target = ["reg_any", "q"])]
+    pub grant_reg: Wire,
 }
 
 /// Complete CWE-1280 pattern: Access Control with Stale Access Check
-#[composite]
-pub struct Cwe1280<S: State> {
-    #[path]
-    pub path: Instance,
-
+#[derive(Debug, Clone, Composite)]
+#[connection(from = ["delayed_grant_access", "grant_reg"], to = ["locked_reg", "write_en"])]
+pub struct Cwe1280 {
     #[submodule]
-    pub delayed_grant_access: DelayedGrantAccess<S>,
-
+    pub delayed_grant_access: DelayedGrantAccess,
     #[submodule]
-    pub locked_reg: LockedRegister<S>,
-}
-
-impl<S: State> Topology<S> for Cwe1280<S> {
-    fn define_connections<'a>(&'a self, ctx: &mut ConnectionBuilder<'a, S>) {
-        ctx.connect(
-            self.delayed_grant_access.reg_any.q(),
-            self.locked_reg.write_en(),
-        );
-    }
+    pub locked_reg: LockedRegister,
 }
