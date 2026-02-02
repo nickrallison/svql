@@ -1,6 +1,7 @@
+#![allow(dead_code)]
+
 use svql_query_lib::composites::dff_then_and::SdffeThenAnd;
 use svql_query_lib::primitives::dff::*;
-use svql_query::prelude::*;
 
 use crate::query_test;
 

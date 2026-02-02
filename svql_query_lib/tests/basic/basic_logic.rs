@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use svql_query::prelude::*;
 
 use crate::query_test;
