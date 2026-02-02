@@ -8,7 +8,12 @@ use crate::{AndGate, NotGate, primitives::rec::RecOr};
 /// - NOT gate somewhere in the OR tree (negated lock signal)
 ///
 #[derive(Debug, Clone, Composite)]
+// function pointer
 #[filter(check_fanin_has_not_gates)]
+// or possibly a closure
+#[filter(|_row, _ctx| { 
+    true
+})]
 pub struct UnlockLogic {
     #[submodule]
     pub top_and: AndGate,
@@ -21,8 +26,8 @@ pub struct UnlockLogic {
 }
 
 fn check_fanin_has_not_gates(
-    row: &svql_query::session::Row<UnlockLogic>,
-    ctx: &svql_query::session::ExecutionContext,
+    _row: &svql_query::session::Row<UnlockLogic>,
+    _ctx: &svql_query::session::ExecutionContext,
 ) -> bool {
     todo!("Implement Later")
 }

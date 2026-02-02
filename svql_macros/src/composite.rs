@@ -23,8 +23,8 @@ struct OrGroup {
 
 /// A custom filter constraint
 struct Filter {
-    // figure out specific type later to deal with generic
-    filter_func: (), // Fn(&svql_query::session::Row<UnlockLogic>, &svql_query::session::ExecutionContext) -> bool,
+    /// The filter expression - can be a function path or closure
+    expr: syn::Expr,
 }
 
 /// Parsed submodule field
@@ -56,7 +56,10 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     };
 
     // Parse struct-level connection attributes
-    let or_groups = parse_connection_attrs(&input);
+    let or_groups = parse_or_groups(&input);
+
+    // Parse filter attributes
+    let filters = parse_filters(&input);
 
     // Parse submodule fields
     let submodules = parse_submodule_fields(fields);
@@ -173,6 +176,14 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Generate validate_custom implementation
+    let validate_custom_impl = if !filters.is_empty() {
+        generate_validate_custom(&filters)
+    } else {
+        // No filters, use default implementation (implicit)
+        quote! {}
+    };
+
     let expanded = quote! {
         impl #impl_generics svql_query::traits::composite::Composite for #name #ty_generics #where_clause {
             const SUBMODULES: &'static [svql_query::session::Submodule] = &[
@@ -191,6 +202,9 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
             const DEPENDANCIES: &'static [&'static svql_query::session::ExecInfo] = &[
                 #(#dep_entries),*
             ];
+
+            // Include validate_custom if filters present
+            #validate_custom_impl
 
             fn composite_rehydrate(
                 row: &svql_query::session::Row<Self>,
@@ -228,7 +242,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn parse_connection_attrs(input: &DeriveInput) -> Vec<OrGroup> {
+fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     let mut groups = Vec::new();
 
     // Parse #[connection(from = [...], to = [...])] - single required connection
@@ -405,8 +419,48 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
-fn parse_filter(attr: &syn::Attribute) -> Option<Filter> {
-    None
+fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
+    let mut filters = Vec::new();
+
+    // Parse all #[filter(...)] attributes
+    for attr in find_all_attrs(&input.attrs, "filter") {
+        if let Some(filter) = parse_single_filter(attr) {
+            filters.push(filter);
+        }
+    }
+
+    filters
+}
+
+fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
+    // The attribute can be either:
+    // #[filter(check_fanin_has_not_gates)]  <- function path
+    // #[filter(|row, ctx| { ... })]         <- closure
+
+    let expr = match attr.parse_args::<syn::Expr>() {
+        Ok(expr) => expr,
+        Err(e) => {
+            abort!(
+                attr,
+                "filter attribute expects a function path or closure: {}",
+                e
+            );
+        }
+    };
+
+    // Validate that it looks like a callable (path or closure)
+    match &expr {
+        syn::Expr::Path(_) => {}    // Function name - OK
+        syn::Expr::Closure(_) => {} // Closure - OK
+        _ => {
+            abort!(
+                attr,
+                "filter must be a function path (e.g., check_filter) or closure (e.g., |row, ctx| ...)"
+            );
+        }
+    }
+
+    Some(Filter { expr })
 }
 
 fn parse_submodule_fields(
@@ -480,4 +534,30 @@ fn parse_alias_fields(
     }
 
     aliases
+}
+
+/// Generate the validate_custom implementation
+fn generate_validate_custom(filters: &[Filter]) -> proc_macro2::TokenStream {
+    let filter_calls: Vec<_> = filters
+        .iter()
+        .map(|f| {
+            let expr = &f.expr;
+            quote! {
+                if !(#expr)(row, ctx) {
+                    return false;
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        fn validate_custom(
+            row: &svql_query::session::Row<Self>,
+            ctx: &svql_query::session::ExecutionContext,
+        ) -> bool {
+            // Call each filter function/closure and AND them together
+            #(#filter_calls)*
+            true
+        }
+    }
 }

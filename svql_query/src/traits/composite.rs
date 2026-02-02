@@ -10,7 +10,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    #[must_use] 
+    #[must_use]
     pub const fn new(from: Selector<'static>, to: Selector<'static>) -> Self {
         Self {
             from: Endpoint { selector: from },
@@ -57,7 +57,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     }
 
     /// Convert declarations to column definitions
-    #[must_use] 
+    #[must_use]
     fn composite_to_defs() -> Vec<ColumnDef> {
         let mut defs = Vec::with_capacity(Self::SUBMODULES.len() + Self::ALIASES.len());
 
@@ -105,7 +105,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         for &join_idx in &join_order[1..] {
             let table = dep_tables[join_idx];
-            entries = Self::join_and_filter(entries, join_idx, table, sub_indices, dep_tables, ctx);
+            entries = Self::join_and_filter(entries, join_idx, table, sub_indices, ctx);
 
             if entries.is_empty() {
                 return Table::new(vec![]);
@@ -113,17 +113,18 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         }
 
         // Resolve aliases
-        let final_entries = Self::resolve_aliases(entries, dep_tables, ctx)?;
+        let final_entries = Self::resolve_aliases(entries, ctx)?;
 
         Table::new(final_entries)
     }
 
+    /// Custom validation hook for filters (override to add filtering logic)
+    fn validate_custom(_row: &Row<Self>, _ctx: &ExecutionContext) -> bool {
+        true // Default: no custom filtering
+    }
+
     /// Validate connectivity constraints
-    fn validate(
-        row: &Row<Self>,
-        _dep_tables: &[&(dyn AnyTable + Send + Sync)],
-        ctx: &ExecutionContext,
-    ) -> bool {
+    fn validate_connections(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
         let driver = ctx.driver();
         let key = ctx.design_key();
 
@@ -160,6 +161,17 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         true
     }
 
+    /// Validate (calls both connection and custom validation)
+    fn validate(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
+        // Connection validation
+        let connections_ok = Self::validate_connections(row, ctx);
+
+        // Custom filter validation
+        let custom_ok = Self::validate_custom(row, ctx);
+
+        connections_ok && custom_ok
+    }
+
     /// Rehydrate from row
     fn composite_rehydrate(
         row: &Row<Self>,
@@ -176,7 +188,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     where
         Self: Sized;
 
-    #[must_use] 
+    #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
             vec![ColumnEntry::Metadata { id: None }; Self::SUBMODULES.len() + Self::ALIASES.len()];
@@ -189,7 +201,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         join_idx: usize,
         table: &(dyn AnyTable + Send + Sync),
         sub_indices: &[usize],
-        dep_tables: &[&(dyn AnyTable + Send + Sync)],
         ctx: &ExecutionContext,
     ) -> Vec<EntryArray> {
         let col_idx = sub_indices[join_idx];
@@ -209,7 +220,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                         _marker: PhantomData,
                     };
 
-                    Self::validate(&row, dep_tables, ctx).then_some(candidate)
+                    Self::validate(&row, ctx).then_some(candidate)
                 })
             })
             .collect()
@@ -217,7 +228,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     fn resolve_aliases(
         entries: Vec<EntryArray>,
-        _dep_tables: &[&(dyn AnyTable + Send + Sync)],
         ctx: &ExecutionContext,
     ) -> Result<Vec<EntryArray>, QueryError> {
         let final_entries = entries
@@ -322,7 +332,10 @@ pub(crate) mod test {
         traits::{Netlist, Pattern},
     };
 
-    use super::{Composite, Component, kind, Submodule, Alias, Selector, Connections, Connection, ExecInfo, Row, Store, Driver, DriverKey};
+    use super::{
+        Alias, Component, Composite, Connection, Connections, Driver, DriverKey, ExecInfo, Row,
+        Selector, Store, Submodule, kind,
+    };
 
     use crate::traits::netlist::test::AndGate;
 
@@ -331,6 +344,9 @@ pub(crate) mod test {
 
     #[derive(Debug, Clone, Composite)]
     #[or_to(from = ["and1", "y"], to = [["and2", "a"], ["and2", "b"]])]
+    #[filter(|_row, _ctx| { 
+        true
+    })]
     pub struct And2Gates {
         #[submodule]
         pub and1: AndGate,

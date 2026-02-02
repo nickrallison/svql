@@ -47,7 +47,7 @@ pub fn netlist(item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_derive(
     Composite,
-    attributes(submodule, alias, connection, or_to, or_from, or_group)
+    attributes(submodule, alias, connection, or_to, or_from, or_group, filter)
 )]
 #[proc_macro_error]
 pub fn composite(item: TokenStream) -> TokenStream {
