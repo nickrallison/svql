@@ -8,6 +8,8 @@ mod constraints;
 mod matcher;
 mod utils;
 
+pub mod test_harness;
+
 // #[cfg(test)]
 // mod tests;
 

@@ -1,11 +1,11 @@
 use crate::query_test;
 use svql_query::prelude::*;
-use svql_query_lib::security::primitives::locked_register::LockedRegister;
+use svql_query_lib::security::primitives::locked_register::{AsyncDffMuxEnable, LockedRegister};
 
 // Common config for CWE-1234 tests
 fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::All)
+        .dedupe(svql_common::Dedupe::Inner)
 }
 
 query_test!(
@@ -133,5 +133,13 @@ query_test!(
     query: LockedRegister,
     haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_fixed.v", "cwe1234_fixed"),
     expect: 2,
+    config: cwe1234_config
+);
+
+query_test!(
+    name: test_adffe_mux_enable_multi_width,
+    query: AsyncDffMuxEnable,
+    haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_multi_width.v", "cwe1234_multi_width"),
+    expect: 5,
     config: cwe1234_config
 );

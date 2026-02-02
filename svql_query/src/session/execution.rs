@@ -206,7 +206,7 @@ impl ExecutionPlan {
         #[cfg(feature = "parallel")]
         self.nodes
             .par_iter()
-            .try_for_each(|node| self.execute_node(node, ctx))?;
+            .try_for_each(|node| ExecutionPlan::execute_node(node, ctx))?;
 
         #[cfg(not(feature = "parallel"))]
         self.nodes
