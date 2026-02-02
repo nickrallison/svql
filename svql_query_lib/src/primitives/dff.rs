@@ -104,8 +104,8 @@ mod tests {
     query_test!(
         name: test_basic_dff,
         query: Dff,
-        haystack: ("examples/fixtures/basic/dff/verilog/basic_dff.v", "basic_dff"),
-        expect: 1,
+        haystack: ("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v", "and_q_double_sdffe"),
+        expect: 2,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
 }

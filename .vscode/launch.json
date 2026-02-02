@@ -50,7 +50,7 @@
                 "args": [
                     "build",
                     "--bin=example_query",
-                    "--package=svql_common"
+                    "--package=svql_query_lib"
                 ],
                 "filter": {
                     "name": "example_query",

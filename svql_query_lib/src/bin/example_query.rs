@@ -1,22 +1,6 @@
 use svql_query::prelude::*;
+use svql_query_lib::security::primitives::locked_register::LockedRegister;
 use tracing::{Level, info};
-
-// use svql_query_lib::security::primitives::locked_register::LockedRegister;
-
-#[derive(Debug, Clone, Netlist)]
-#[netlist(
-    file = "examples/fixtures/basic/and/verilog/and_gate.v",
-    module = "and_gate"
-)]
-#[allow(dead_code)]
-pub(crate) struct AndGate {
-    #[port(input)]
-    pub a: Wire,
-    #[port(input)]
-    pub b: Wire,
-    #[port(output)]
-    pub y: Wire,
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
@@ -67,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<AndGate>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<LockedRegister>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");

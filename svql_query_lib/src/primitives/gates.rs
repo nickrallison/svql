@@ -48,8 +48,8 @@ mod tests {
     query_test!(
         name: test_or_gate,
         query: OrGate,
-        haystack: ("examples/fixtures/basic/or/verilog/or_tree.v", "or_tree"),
-        expect: 2,
+        haystack: ("examples/fixtures/basic/or/verilog/small_or_tree.v", "small_or_tree"),
+        expect: 3,
         config: |config_builder| config_builder.dedupe(Dedupe::All)
     );
 }

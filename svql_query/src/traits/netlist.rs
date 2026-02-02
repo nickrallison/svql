@@ -63,17 +63,24 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
         for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
             let needle_cell = needle_cell_wrapper.get();
+
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _) => {
-                    let col_idx = Self::netlist_schema()
-                        .index_of(name)
-                        .expect("Needle Cell name should exist in schema");
+                    let err_msg = format!(
+                        "Needle Cell name: {name} should exist in schema for: {} at {}",
+                        Self::MODULE_NAME,
+                        Self::FILE_PATH
+                    );
+                    let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
                     row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u32);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
-                    let col_idx = Self::netlist_schema()
-                        .index_of(name)
-                        .expect("Needle Cell name should exist in schema");
+                    let err_msg = format!(
+                        "Needle Cell name: {name} should exist in schema for: {} at {}",
+                        Self::MODULE_NAME,
+                        Self::FILE_PATH
+                    );
+                    let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
                     let needle_output_driver_id: u32 =
                         value_to_cell_id(output_value).expect("Output should have driver");
                     let haystack_output_driver_wrapper = assignment
