@@ -1,2 +1,2 @@
-// pub mod locked_register;
-// pub mod uninit_reg;
+pub mod locked_register;
+pub mod uninit_reg;

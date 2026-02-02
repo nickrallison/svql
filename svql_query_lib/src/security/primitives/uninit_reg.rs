@@ -1,23 +1,31 @@
-use crate::{State, Wire};
-use svql_macros::netlist;
+use svql_query::prelude::*;
 
+#[derive(Debug, Clone, Netlist)]
 #[netlist(
     file = "examples/patterns/security/access_control/uninit_reg/verilog/uninit_reg_en.v",
-    name = "uninit_reg_en"
+    module = "uninit_reg_en"
 )]
-pub struct UninitRegEn<S: State> {
-    pub clk: Wire<S>,
-    pub data_in: Wire<S>,
-    pub write_en: Wire<S>,
-    pub data_out: Wire<S>,
+pub struct UninitRegEn {
+    #[port(input)]
+    pub clk: Wire,
+    #[port(input)]
+    pub data_in: Wire,
+    #[port(input)]
+    pub write_en: Wire,
+    #[port(output)]
+    pub data_out: Wire,
 }
 
+#[derive(Debug, Clone, Netlist)]
 #[netlist(
     file = "examples/patterns/security/access_control/uninit_reg/verilog/uninit_reg.v",
-    name = "uninit_reg"
+    module = "uninit_reg"
 )]
-pub struct UninitReg<S: State> {
-    pub clk: Wire<S>,
-    pub data_in: Wire<S>,
-    pub data_out: Wire<S>,
+pub struct UninitReg {
+    #[port(input)]
+    pub clk: Wire,
+    #[port(input)]
+    pub data_in: Wire,
+    #[port(output)]
+    pub data_out: Wire,
 }

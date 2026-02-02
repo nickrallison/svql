@@ -171,12 +171,12 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
                 // Get discriminant
                 let discrim_idx = Self::schema()
                     .index_of("discriminant")?;
-                let discrim = row.entry_array.entries.get(discrim_idx)?.as_u32()?;
+                let discrim = row.entry_array().entries.get(discrim_idx)?.as_u32()?;
 
                 // Get inner_ref
                 let inner_ref_idx = Self::schema()
                     .index_of("inner_ref")?;
-                let inner_row_idx = row.entry_array.entries.get(inner_ref_idx)?.as_u32()?;
+                let inner_row_idx = row.entry_array().entries.get(inner_ref_idx)?.as_u32()?;
 
                 // Dispatch based on discriminant
                 match discrim {

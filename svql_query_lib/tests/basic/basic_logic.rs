@@ -1,4 +1,3 @@
-use svql_macros::netlist;
 use svql_query::prelude::*;
 
 use crate::query_test;
@@ -9,7 +8,7 @@ use crate::query_test;
     file = "examples/patterns/basic/and/verilog/and_2_seq.v",
     name = "and_2_seq"
 )]
-pub struct And2Seq<S: State> {
+pub struct And2Seq {
     pub a: Wire<S>,
     pub b: Wire<S>,
     pub c: Wire<S>,
