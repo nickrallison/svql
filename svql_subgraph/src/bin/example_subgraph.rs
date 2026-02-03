@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     for (match_idx, assignment) in assignment_set.items.iter().enumerate() {
         println!("--- Match {match_idx} ---");
-        for (haystack_cell, needle_cell) in assignment.haystack_mapping() {
+        for (needle_cell, haystack_cell) in assignment.needle_mapping() {
             println!(
                 "Needle Cell [id={}]: {:?} -> Haystack Cell [id={}]: {:?}",
                 needle_cell.debug_index(),
