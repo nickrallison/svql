@@ -107,8 +107,8 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         let final_row_match: Vec<ColumnEntry> = row_match
             .into_iter()
-            .map(|opt| ColumnEntry::Cell {
-                id: opt.map(CellId::new),
+            .map(|opt| ColumnEntry::Wire {
+                value: opt.map(CellId::new).map(crate::wire::WireRef::Cell),
             })
             .collect();
         EntryArray::new(final_row_match)

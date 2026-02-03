@@ -72,10 +72,10 @@ where
             .entries
             .get(idx)
             .and_then(|entry| match entry {
-                crate::session::ColumnEntry::Cell { id, .. } => *id,
+                crate::session::ColumnEntry::Wire { value } => value.clone(),
                 _ => None,
             })
-            .map(|id| Wire::new(id, col_def.direction))
+            .map(|wire_ref| Wire::from_ref(wire_ref, col_def.direction))
     }
 
     /// Resolve a path to a wire using a Selector
@@ -147,13 +147,25 @@ where
 
     // --- Builder methods (used by Table when constructing rows) ---
 
-    /// Set a wire column value.
-    pub fn with_wire(mut self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
+    /// Set a wire column value using a WireRef.
+    pub fn with_wire_ref(mut self, name: &'static str, wire_ref: crate::wire::WireRef) -> Result<Self, QueryError> {
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        self.entry_array.entries[id] = crate::session::ColumnEntry::Cell { id: Some(cell_id) };
+        self.entry_array.entries[id] = crate::session::ColumnEntry::Wire {
+            value: Some(wire_ref),
+        };
         Ok(self)
+    }
+
+    /// Set a wire column value with a cell ID (legacy method).
+    pub fn with_wire(self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
+        self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
+    }
+
+    /// Set a wire column to a cell ID.
+    pub fn with_cell(self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
+        self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
     }
 
     /// Set a submodule column value (with optional index).
@@ -248,10 +260,14 @@ where
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
-                Some(crate::session::ColumnEntry::Cell { id: Some(id) }) => {
-                    format!("cell({id})")
+                Some(crate::session::ColumnEntry::Wire { value: Some(wire_ref) }) => {
+                    match wire_ref {
+                        crate::wire::WireRef::Cell(id) => format!("cell({id})"),
+                        crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
+                        crate::wire::WireRef::Constant(val) => format!("const({})", val),
+                    }
                 }
-                Some(crate::session::ColumnEntry::Cell { id: None }) => "cell=NULL".to_string(),
+                Some(crate::session::ColumnEntry::Wire { value: None }) => "wire=NULL".to_string(),
                 Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {
                     format!("ref({id})")
                 }

@@ -98,9 +98,9 @@ impl LockedRegister {
     /// Helper to access the write enable wire regardless of the underlying variant
     pub fn write_en(&self) -> Wire {
         match self {
-            Self::En(inner) => inner.write_en,
-            Self::AsyncMux(inner) => inner.write_en,
-            Self::SyncMux(inner) => inner.write_en,
+            Self::En(inner) => inner.write_en.clone(),
+            Self::AsyncMux(inner) => inner.write_en.clone(),
+            Self::SyncMux(inner) => inner.write_en.clone(),
         }
     }
 }

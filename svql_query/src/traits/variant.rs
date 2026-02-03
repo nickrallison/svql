@@ -82,9 +82,9 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             for row_idx in 0..table.len() as u32 {
                 let mut entry = EntryArray::with_capacity(2 + Self::COMMON_PORTS.len());
 
-                // Initialize all entries to None
+                // Initialize all wire entries to None
                 for i in 0..(2 + Self::COMMON_PORTS.len()) {
-                    entry.entries[i] = ColumnEntry::Cell { id: None };
+                    entry.entries[i] = ColumnEntry::Wire { value: None };
                 }
 
                 // 1. Set discriminant
@@ -98,8 +98,10 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 // 3. Map common ports from inner table using path resolution
                 for mapping in port_maps {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
-                        let cell_id = table.resolve_path(row_idx as usize, mapping.inner, ctx);
-                        entry.entries[col_idx] = ColumnEntry::Cell { id: cell_id };
+                        let wire_ref = table
+                            .resolve_path(row_idx as usize, mapping.inner, ctx)
+                            .map(crate::wire::WireRef::Cell);
+                        entry.entries[col_idx] = ColumnEntry::Wire { value: wire_ref };
                     }
                 }
 

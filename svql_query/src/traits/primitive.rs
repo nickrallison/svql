@@ -8,32 +8,48 @@ use crate::{
     prelude::*,
     session::{ColumnEntry, EntryArray, ExecutionContext, Port, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, search_table_any},
+    wire::WireRef,
 };
+use std::sync::Arc;
 use svql_driver::{Driver, DriverKey};
 use tracing::debug;
 
 // svql_query/src/traits/primitive.rs
 
-/// Helper to extract cell ID from a Value
-fn value_to_cell_id(value: &prjunnamed_netlist::Value) -> Option<CellId> {
+/// Helper to extract wire reference from a Value
+fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
+    // Try to get the first net from the value
     match value.iter().take(1).next() {
-        Some(net) => net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok(),
-        None => None,
+        Some(net) => net_to_wire_ref(&net),
+        None => {
+            // No nets means it's likely a constant value
+            // For now, we'll treat empty values as constant false
+            // TODO: Better constant detection once prjunnamed_netlist API is clearer
+            Some(WireRef::Constant(false))
+        }
     }
 }
 
-/// Helper to extract cell ID from a Net
-fn net_to_cell_id(net: &prjunnamed_netlist::Net) -> Option<CellId> {
-    net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok()
+/// Helper to extract wire reference from a Net
+fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
+    // Try as cell first
+    if let Ok(cell_idx) = net.as_cell_index() {
+        return Some(WireRef::Cell(CellId::new(cell_idx as u32)));
+    }
+
+    // If not a cell, assume it's an input port or constant
+    // For now, we'll create a synthetic name based on the net
+    // TODO: Investigate if there's a way to get the actual input name from the net
+    Some(WireRef::PrimaryPort(Arc::from(format!("net_{:?}", net))))
 }
 
-/// Helper to extract cell ID from a `ControlNet` (for AIG gates)
-fn control_net_to_cell_id(cnet: &prjunnamed_netlist::ControlNet) -> Option<CellId> {
-    net_to_cell_id(&cnet.net())
+/// Helper to extract wire reference from a ControlNet
+fn control_net_to_wire_ref(cnet: &prjunnamed_netlist::ControlNet) -> Option<WireRef> {
+    net_to_wire_ref(&cnet.net())
 }
 
-/// Extract the cell ID for a specific input port by name from a cell.
-fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Option<CellId> {
+/// Extract the wire reference for a specific input port by name from a cell.
+fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Option<WireRef> {
     use prjunnamed_netlist::Cell;
 
     match cell {
@@ -51,64 +67,64 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
         | Cell::SDivFloor(a, b)
         | Cell::SModTrunc(a, b)
         | Cell::SModFloor(a, b) => match port_name {
-            "a" => value_to_cell_id(a),
-            "b" => value_to_cell_id(b),
+            "a" => value_to_wire_ref(a),
+            "b" => value_to_wire_ref(b),
             _ => None,
         },
 
         // 1-input gates
         Cell::Not(a) | Cell::Buf(a) => match port_name {
-            "a" => value_to_cell_id(a),
+            "a" => value_to_wire_ref(a),
             _ => None,
         },
 
         // Mux: (sel, a, b)
         Cell::Mux(s, a, b) => match port_name {
-            "sel" => net_to_cell_id(s),
-            "a" => value_to_cell_id(a),
-            "b" => value_to_cell_id(b),
+            "sel" => net_to_wire_ref(s),
+            "a" => value_to_wire_ref(a),
+            "b" => value_to_wire_ref(b),
             _ => None,
         },
 
         // Adc: (a, b, carry_in)
         Cell::Adc(a, b, ci) => match port_name {
-            "a" => value_to_cell_id(a),
-            "b" => value_to_cell_id(b),
-            "carry_in" | "cin" | "ci" => net_to_cell_id(ci),
+            "a" => value_to_wire_ref(a),
+            "b" => value_to_wire_ref(b),
+            "carry_in" | "cin" | "ci" => net_to_wire_ref(ci),
             _ => None,
         },
 
         // AIG: (a, b) - both are ControlNets
         Cell::Aig(a, b) => match port_name {
-            "a" => control_net_to_cell_id(a),
-            "b" => control_net_to_cell_id(b),
+            "a" => control_net_to_wire_ref(a),
+            "b" => control_net_to_wire_ref(b),
             _ => None,
         },
 
         // Shift operations
         Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
             match port_name {
-                "a" => value_to_cell_id(a),
-                "b" => value_to_cell_id(b),
+                "a" => value_to_wire_ref(a),
+                "b" => value_to_wire_ref(b),
                 _ => None,
             }
         }
 
         Cell::Dff(ff) => {
             match port_name {
-                "clk" => net_to_cell_id(&ff.clock.net()),
-                "d" | "data_in" => value_to_cell_id(&ff.data),
+                "clk" => net_to_wire_ref(&ff.clock.net()),
+                "d" | "data_in" => value_to_wire_ref(&ff.data),
                 // Handle various names for enable
                 "en" | "enable" | "write_en" => {
                     if ff.enable.net().is_cell() {
-                        net_to_cell_id(&ff.enable.net())
+                        net_to_wire_ref(&ff.enable.net())
                     } else {
                         None
                     }
                 }
                 "reset" | "rst" | "srst" => {
                     if ff.reset.net().is_cell() {
-                        net_to_cell_id(&ff.reset.net())
+                        net_to_wire_ref(&ff.reset.net())
                     } else {
                         None
                     }
@@ -116,7 +132,7 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
                 "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
                     if let Some(net) = ff.clear.nets().first() {
                         if net.is_cell() {
-                            net_to_cell_id(net)
+                            net_to_wire_ref(net)
                         } else {
                             None
                         }
@@ -136,7 +152,7 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
 /// Resolve primitive ports by extracting inputs from the cell structure.
 ///
 /// Creates an entry array aligned with the schema, where each port is populated
-/// only if it exists in the cell and has a valid driving cell ID.
+/// only if it exists in the cell and has a valid driving wire reference.
 pub fn resolve_primitive_ports(
     cell: &prjunnamed_netlist::Cell,
     cell_wrapper: &CellWrapper,
@@ -146,19 +162,19 @@ pub fn resolve_primitive_ports(
     let schema_size = schema.defs.len();
 
     // Initialize all entries as None
-    let mut entries = vec![ColumnEntry::Cell { id: None }; schema_size];
+    let mut entries = vec![ColumnEntry::Wire { value: None }; schema_size];
 
     // For each column in the schema, try to extract the corresponding port value
     for (idx, col_def) in schema.defs.iter().enumerate() {
         let port_name = col_def.name;
 
-        let cell_id_opt = match col_def.direction {
+        let wire_ref_opt = match col_def.direction {
             PortDirection::Output => {
                 // Output port typically maps to the cell itself
-                Some(cell_id)
+                Some(WireRef::Cell(cell_id))
             }
             PortDirection::Input | PortDirection::Inout => {
-                // Extract input value based on cell type and port name
+                // Extract input value (might be cell, port, or constant)
                 extract_input_port(cell, port_name)
             }
             PortDirection::None => {
@@ -167,7 +183,9 @@ pub fn resolve_primitive_ports(
             }
         };
 
-        entries[idx] = ColumnEntry::Cell { id: cell_id_opt };
+        entries[idx] = ColumnEntry::Wire {
+            value: wire_ref_opt,
+        };
     }
 
     EntryArray::new(entries)
@@ -537,9 +555,18 @@ mod tests {
         .expect("Should rehydrate");
 
         // Access fields to prove they work
-        assert!(gate.a.id().raw() > 0, "Input A should have valid ID");
-        assert!(gate.b.id().raw() > 0, "Input B should have valid ID");
-        assert!(gate.y.id().raw() > 0, "Output Y should have valid ID");
+        assert!(
+            gate.a.cell_id().expect("Wire must be a cell").raw() > 0,
+            "Input A should have valid ID"
+        );
+        assert!(
+            gate.b.cell_id().expect("Wire must be a cell").raw() > 0,
+            "Input B should have valid ID"
+        );
+        assert!(
+            gate.y.cell_id().expect("Wire must be a cell").raw() > 0,
+            "Output Y should have valid ID"
+        );
 
         Ok(())
     }

@@ -137,8 +137,8 @@ where
             ColumnKind::Cell => {
                 let ca = col.u32().ok()?;
                 let val = ca.get(row_idx);
-                Some(ColumnEntry::Cell {
-                    id: val.map(CellId::new),
+                Some(ColumnEntry::Wire {
+                    value: val.map(CellId::new).map(crate::wire::WireRef::Cell),
                 })
             }
             ColumnKind::Sub(_) => {
@@ -316,6 +316,6 @@ where
         ctx: &super::ExecutionContext,
     ) -> Option<crate::CellId> {
         let row = self.row(row_idx as u32)?;
-        row.resolve(selector, ctx).map(|wire| wire.id())
+        row.resolve(selector, ctx).and_then(|wire| wire.cell_id())
     }
 }

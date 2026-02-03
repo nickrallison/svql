@@ -46,7 +46,7 @@ fn check_fanin_has_not_gates(row: &Row<UnlockLogic>, ctx: &ExecutionContext) -> 
         return true;
     };
 
-    check_tree_recursive(rec_or_ref, not_out.id(), rec_or_table, or_gate_table)
+    check_tree_recursive(rec_or_ref, not_out.cell_id().expect("NOT output must be a cell"), rec_or_table, or_gate_table)
 }
 
 fn check_tree_recursive(
@@ -69,8 +69,8 @@ fn check_tree_recursive(
     };
 
     // Check if NOT feeds this OR gate
-    if or_row.wire("a").map(|w| w.id()) == Some(not_id)
-        || or_row.wire("b").map(|w| w.id()) == Some(not_id)
+    if or_row.wire("a").and_then(|w| w.cell_id()) == Some(not_id)
+        || or_row.wire("b").and_then(|w| w.cell_id()) == Some(not_id)
     {
         return true;
     }

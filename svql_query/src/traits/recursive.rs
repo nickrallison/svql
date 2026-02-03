@@ -150,7 +150,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     /// Convert declarations to column definitions.
     ///
     /// Override this if you need a different schema structure.
-    #[must_use] 
+    #[must_use]
     fn recursive_to_defs() -> Vec<ColumnDef> {
         let mut defs = vec![
             ColumnDef::sub::<Self::Base>("base"),
@@ -344,9 +344,21 @@ mod tests {
             let gate_info: Vec<GateInfo> = and_table
                 .rows()
                 .map(|row| GateInfo {
-                    a: row.wire("a").expect("AndGate must have 'a'").id(),
-                    b: row.wire("b").expect("AndGate must have 'b'").id(),
-                    y: row.wire("y").expect("AndGate must have 'y'").id(),
+                    a: row
+                        .wire("a")
+                        .expect("AndGate must have 'a'")
+                        .cell_id()
+                        .expect("Wire must be a cell"),
+                    b: row
+                        .wire("b")
+                        .expect("AndGate must have 'b'")
+                        .cell_id()
+                        .expect("Wire must be a cell"),
+                    y: row
+                        .wire("y")
+                        .expect("AndGate must have 'y'")
+                        .cell_id()
+                        .expect("Wire must be a cell"),
                 })
                 .collect();
 
@@ -460,7 +472,9 @@ mod tests {
                     };
                     arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
                     arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
-                    arr.entries[y_idx] = ColumnEntry::Cell { id: Some(e.y) };
+                    arr.entries[y_idx] = ColumnEntry::Wire {
+                        value: Some(crate::wire::WireRef::Cell(e.y)),
+                    };
                     arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
 
                     arr

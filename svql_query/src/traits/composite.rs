@@ -176,13 +176,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 let dst_wire = row.resolve(conn.to.selector, ctx);
 
                 match (src_wire, dst_wire) {
-                    (Some(s), Some(d)) if s.id() == d.id() => {
+                    (Some(s), Some(d)) if s.cell_id() == d.cell_id() => {
                         tracing::trace!(
-                            "[{}] Connection {:?} → {:?} satisfied (cell {})",
+                            "[{}] Connection {:?} → {:?} satisfied (cell {:?})",
                             std::any::type_name::<Self>(),
                             conn.from.selector.path(),
                             conn.to.selector.path(),
-                            s.id()
+                            s.cell_id()
                         );
                         group_satisfied = true;
                         break; // This alternative worked
@@ -201,12 +201,12 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                     (Some(s), Some(d)) => {
                         // Different cell IDs - not connected
                         tracing::trace!(
-                            "[{}] Connection {:?} → {:?} failed: different cells ({} != {})",
+                            "[{}] Connection {:?} → {:?} failed: different cells ({:?} != {:?})",
                             std::any::type_name::<Self>(),
                             conn.from.selector.path(),
                             conn.to.selector.path(),
-                            s.id(),
-                            d.id()
+                            s.cell_id(),
+                            d.cell_id()
                         );
                         continue; // Try next alternative
                     }
@@ -343,10 +343,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 };
 
                 for alias in Self::ALIASES {
-                    let cell_id = row.resolve(alias.target, ctx).map(|w| w.id());
+                    let wire_ref = row
+                        .resolve(alias.target, ctx)
+                        .and_then(|w| w.cell_id())
+                        .map(crate::wire::WireRef::Cell);
 
                     if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
-                        entry.entries[idx] = ColumnEntry::Cell { id: cell_id };
+                        entry.entries[idx] = ColumnEntry::Wire { value: wire_ref };
                     }
                 }
 

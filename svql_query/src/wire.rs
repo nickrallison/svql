@@ -1,64 +1,130 @@
 use crate::prelude::*;
+use std::sync::Arc;
 
-/// A wire reference containing a cell ID and port direction.
+/// Core wire reference type that can be stored in tables.
 ///
-/// Replaces the concept of a raw numeric ID with a strongly-typed handle
-/// that tracks both the cell identity and its directionality in the design.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// This enum can represent a wire driven by a cell output, a primary input/output port,
+/// or a constant value.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum WireRef {
+    /// Wire driven by a cell output
+    Cell(CellId),
+    /// Primary input/output port (module boundary)
+    PrimaryPort(Arc<str>),
+    /// Constant value (0 or 1)
+    Constant(bool),
+}
+
+impl WireRef {
+    /// Convert to a contextual Wire with direction information
+    #[must_use]
+    pub fn to_wire(self, direction: PortDirection) -> Wire {
+        match self {
+            Self::Cell(id) => Wire::Cell { id, direction },
+            Self::PrimaryPort(name) => Wire::PrimaryPort { name, direction },
+            Self::Constant(value) => Wire::Constant { value },
+        }
+    }
+
+    /// Check if this is a cell reference
+    #[must_use]
+    pub const fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell(_))
+    }
+
+    /// Get the cell ID if this is a cell reference
+    #[must_use]
+    pub const fn as_cell(&self) -> Option<CellId> {
+        match self {
+            Self::Cell(id) => Some(*id),
+            _ => None,
+        }
+    }
+}
+
+/// A wire with contextual direction information.
+///
+/// This is the wire type exposed to queries. It wraps a `WireRef` with
+/// additional direction metadata from the schema.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Wire {
-    /// Input port wire
-    Input(CellId),
-    /// Output port wire
-    Output(CellId),
-    /// Bidirectional port wire
-    Inout(CellId),
-    /// Internal wire or unknown direction
-    Unknown(CellId),
+    /// Cell-driven wire
+    Cell {
+        id: CellId,
+        direction: PortDirection,
+    },
+    /// Primary port at module boundary
+    PrimaryPort {
+        name: Arc<str>,
+        direction: PortDirection,
+    },
+    /// Constant value
+    Constant { value: bool },
 }
 
 impl Wire {
-    /// Create a new Wire reference from a cell ID and direction.
-    #[must_use] 
+    /// Create a Wire from a cell ID and direction
+    #[must_use]
     pub const fn new(id: CellId, direction: PortDirection) -> Self {
-        match direction {
-            PortDirection::Input => Self::Input(id),
-            PortDirection::Output => Self::Output(id),
-            PortDirection::Inout => Self::Inout(id),
-            PortDirection::None => Self::Unknown(id),
-        }
+        Self::Cell { id, direction }
     }
 
-    /// Create from raw u64 (for backward compatibility).
-    #[must_use] 
-    pub fn from_u64(id: u64, direction: PortDirection) -> Self {
-        Self::new(CellId::from_u64(id), direction)
+    /// Create a Wire from a `WireRef` and direction
+    #[must_use]
+    pub fn from_ref(wire_ref: WireRef, direction: PortDirection) -> Self {
+        wire_ref.to_wire(direction)
     }
 
-    /// Get the underlying cell ID.
-    #[must_use] 
-    pub const fn id(&self) -> CellId {
+    /// Get the cell ID if this is a cell-driven wire
+    #[must_use]
+    pub const fn cell_id(&self) -> Option<CellId> {
         match self {
-            Self::Input(id) => *id,
-            Self::Output(id) => *id,
-            Self::Inout(id) => *id,
-            Self::Unknown(id) => *id,
+            Self::Cell { id, .. } => Some(*id),
+            _ => None,
         }
     }
 
-    /// Get the direction.
-    #[must_use] 
-    pub const fn direction(&self) -> PortDirection {
+    /// Get the direction (None for constants)
+    #[must_use]
+    pub const fn direction(&self) -> Option<PortDirection> {
         match self {
-            Self::Input(_) => PortDirection::Input,
-            Self::Output(_) => PortDirection::Output,
-            Self::Inout(_) => PortDirection::Inout,
-            Self::Unknown(_) => PortDirection::None,
+            Self::Cell { direction, .. } | Self::PrimaryPort { direction, .. } => Some(*direction),
+            Self::Constant { .. } => None,
         }
+    }
+
+    /// Check if this is a constant
+    #[must_use]
+    pub const fn is_constant(&self) -> bool {
+        matches!(self, Self::Constant { .. })
+    }
+
+    /// Check if this is a primary port
+    #[must_use]
+    pub const fn is_primary_port(&self) -> bool {
+        matches!(self, Self::PrimaryPort { .. })
+    }
+
+    /// Check if this is a cell
+    #[must_use]
+    pub const fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell { .. })
+    }
+
+    /// Legacy compatibility: get underlying cell ID (panics if not a cell)
+    /// Use `cell_id()` for safe access.
+    #[must_use]
+    #[deprecated(note = "Use cell_id() instead")]
+    pub fn id(&self) -> CellId {
+        self.cell_id().expect("Wire is not a cell reference")
     }
 
     /// Get the raw u64 value (for backward compatibility).
-    #[must_use] 
-    pub const fn as_u64(&self) -> u64 {
+    /// Panics if not a cell reference.
+    #[must_use]
+    #[deprecated(note = "Use cell_id() instead")]
+    pub fn as_u64(&self) -> u64 {
+        #[allow(deprecated)]
         self.id().as_u64()
     }
 }
