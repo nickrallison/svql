@@ -79,24 +79,28 @@ impl Recursive for RecAnd {
 
         // 2. Extract gate info and build output→gate lookup
         struct GateInfo {
-            a: CellId,
-            b: CellId,
-            y: CellId,
+            a: Wire,
+            b: Wire,
+            y: Wire,
         }
 
         let gate_info: Vec<GateInfo> = and_table
             .rows()
-            .map(|row| GateInfo {
-                a: row.wire("a").expect("AndGate must have 'a'").cell_id().expect("Wire must be a cell"),
-                b: row.wire("b").expect("AndGate must have 'b'").cell_id().expect("Wire must be a cell"),
-                y: row.wire("y").expect("AndGate must have 'y'").cell_id().expect("Wire must be a cell"),
+            .filter_map(|row| {
+                Some(GateInfo {
+                    a: row.wire("a")?,
+                    b: row.wire("b")?,
+                    y: row.wire("y")?,
+                })
             })
             .collect();
 
-        // Map: output CellId → AndGate row index
+        // Map: output CellId → AndGate row index (only for cell outputs)
         let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
-            output_to_gate.insert(info.y, idx as u32);
+            if let Some(y_id) = info.y.cell_id() {
+                output_to_gate.insert(y_id, idx as u32);
+            }
         }
 
         // 3. Initialize: every AND gate starts as a leaf (depth=0)
@@ -104,7 +108,7 @@ impl Recursive for RecAnd {
             base_idx: u32,
             left_child: Option<u32>,
             right_child: Option<u32>,
-            y: CellId,
+            y: Wire,
             depth: u32,
         }
 
@@ -115,16 +119,16 @@ impl Recursive for RecAnd {
                 base_idx: idx as u32,
                 left_child: None,
                 right_child: None,
-                y: info.y,
+                y: info.y.clone(),
                 depth: 0,
             })
             .collect();
 
-        // Map: output CellId → RecAnd entry index (same as gate index initially)
+        // Map: output CellId → RecAnd entry index (same as gate index initially, only for cells)
         let output_to_rec: HashMap<CellId, u32> = entries
             .iter()
             .enumerate()
-            .map(|(idx, e)| (e.y, idx as u32))
+            .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
             .collect();
 
         // 4. Fixpoint iteration: link children and compute depths
@@ -140,10 +144,16 @@ impl Recursive for RecAnd {
                 let base_idx = entries[i].base_idx as usize;
                 let info = &gate_info[base_idx];
 
-                // Check if input A comes from another AND's output
-                let new_left = output_to_rec.get(&info.a).copied();
-                // Check if input B comes from another AND's output
-                let new_right = output_to_rec.get(&info.b).copied();
+                // Check if input A comes from another AND's output (only if it's a cell)
+                let new_left = info
+                    .a
+                    .cell_id()
+                    .and_then(|id| output_to_rec.get(&id).copied());
+                // Check if input B comes from another AND's output (only if it's a cell)
+                let new_right = info
+                    .b
+                    .cell_id()
+                    .and_then(|id| output_to_rec.get(&id).copied());
 
                 // Detect changes
                 let children_changed =
@@ -204,7 +214,7 @@ impl Recursive for RecAnd {
                 arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
                 arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: Some(svql_query::wire::WireRef::Cell(e.y)),
+                    value: e.y.cell_id().map(svql_query::wire::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
 
@@ -300,32 +310,36 @@ impl Recursive for RecOr {
 
         // 2. Extract gate info and build output→gate lookup
         struct GateInfo {
-            a: CellId,
-            b: CellId,
-            y: CellId,
+            a: Wire,
+            b: Wire,
+            y: Wire,
         }
 
         let gate_info: Vec<GateInfo> = or_table
             .rows()
-            .map(|row| GateInfo {
-                a: row.wire("a").expect("OrGate must have 'a'").cell_id().expect("Wire must be a cell"),
-                b: row.wire("b").expect("OrGate must have 'b'").cell_id().expect("Wire must be a cell"),
-                y: row.wire("y").expect("OrGate must have 'y'").cell_id().expect("Wire must be a cell"),
+            .filter_map(|row| {
+                Some(GateInfo {
+                    a: row.wire("a")?,
+                    b: row.wire("b")?,
+                    y: row.wire("y")?,
+                })
             })
             .collect();
 
-        // Map: output CellId → OrGate row index
+        // Map: output CellId → OrGate row index (only for cell outputs)
         let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
-            output_to_gate.insert(info.y, idx as u32);
+            if let Some(y_id) = info.y.cell_id() {
+                output_to_gate.insert(y_id, idx as u32);
+            }
         }
 
-        // 3. Initialize: every AND gate starts as a leaf (depth=0)
+        // 3. Initialize: every OR gate starts as a leaf (depth=0)
         struct RecOrEntry {
             base_idx: u32,
             left_child: Option<u32>,
             right_child: Option<u32>,
-            y: CellId,
+            y: Wire,
             depth: u32,
         }
 
@@ -336,16 +350,16 @@ impl Recursive for RecOr {
                 base_idx: idx as u32,
                 left_child: None,
                 right_child: None,
-                y: info.y,
+                y: info.y.clone(),
                 depth: 0,
             })
             .collect();
 
-        // Map: output CellId → RecOr entry index (same as gate index initially)
+        // Map: output CellId → RecOr entry index (same as gate index initially, only for cells)
         let output_to_rec: HashMap<CellId, u32> = entries
             .iter()
             .enumerate()
-            .map(|(idx, e)| (e.y, idx as u32))
+            .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
             .collect();
 
         // 4. Fixpoint iteration: link children and compute depths
@@ -361,10 +375,16 @@ impl Recursive for RecOr {
                 let base_idx = entries[i].base_idx as usize;
                 let info = &gate_info[base_idx];
 
-                // Check if input A comes from another AND's output
-                let new_left = output_to_rec.get(&info.a).copied();
-                // Check if input B comes from another AND's output
-                let new_right = output_to_rec.get(&info.b).copied();
+                // Check if input A comes from another OR's output (only if it's a cell)
+                let new_left = info
+                    .a
+                    .cell_id()
+                    .and_then(|id| output_to_rec.get(&id).copied());
+                // Check if input B comes from another OR's output (only if it's a cell)
+                let new_right = info
+                    .b
+                    .cell_id()
+                    .and_then(|id| output_to_rec.get(&id).copied());
 
                 // Detect changes
                 let children_changed =
@@ -425,7 +445,7 @@ impl Recursive for RecOr {
                 arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
                 arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: Some(svql_query::wire::WireRef::Cell(e.y)),
+                    value: e.y.cell_id().map(svql_query::wire::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
 
