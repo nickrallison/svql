@@ -304,7 +304,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .cells_topo()
                 .iter()
                 .filter(|cell| cell.cell_type().is_logic_gate())
-                .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
+                .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
                 .cloned()
                 .collect();
         }
@@ -316,7 +316,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
 
         intersect_sets(fanout_sets)
             .into_iter()
-            .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
+            .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
             .collect()
     }
 
@@ -376,7 +376,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         unfiltered
             .into_iter()
             .filter(|candidate| candidate.cell_type() == kind)
-            .filter(|candidate| assignment.get_needle_cell(candidate).is_none())
+            .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
             .filter(|candidate| {
                 self.check_fanin_constraints(needle_cell.clone(), candidate.clone(), assignment)
             })
@@ -414,15 +414,20 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                     .fanout_set(candidate)
                     .is_some_and(|fanout| {
                         fanout.iter().all(|haystack_succ| {
-                            next_assignment.get_needle_cell(haystack_succ).is_none_or(
-                                |needle_succ| {
-                                    self.check_fanin_constraints(
-                                        needle_succ.clone(),
-                                        haystack_succ.clone(),
-                                        &next_assignment,
-                                    )
-                                },
-                            )
+                            if next_assignment.get_needle_cell(haystack_succ).is_empty() {
+                                true
+                            } else {
+                                next_assignment
+                                    .get_needle_cell(haystack_succ)
+                                    .into_iter()
+                                    .all(|needle_succ| {
+                                        self.check_fanin_constraints(
+                                            needle_succ.clone(),
+                                            haystack_succ.clone(),
+                                            &next_assignment,
+                                        )
+                                    })
+                            }
                         })
                     })
             })

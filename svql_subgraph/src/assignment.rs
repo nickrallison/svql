@@ -43,7 +43,7 @@ pub struct SingleAssignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
     needle_to_haystack: HashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
     /// Design to Pattern cell mapping
-    haystack_to_needle: HashMap<CellWrapper<'haystack>, CellWrapper<'needle>>,
+    haystack_to_needle: HashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>>,
 }
 
 impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
@@ -61,7 +61,10 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     ) {
         self.needle_to_haystack
             .insert(needle.clone(), haystack.clone());
-        self.haystack_to_needle.insert(haystack, needle);
+        self.haystack_to_needle
+            .entry(haystack)
+            .or_default()
+            .push(needle);
     }
 
     #[allow(dead_code)]
@@ -85,11 +88,10 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     }
 
     #[must_use]
-    pub fn get_needle_cell(
-        &self,
-        haystack: &CellWrapper<'haystack>,
-    ) -> Option<&CellWrapper<'needle>> {
-        self.haystack_to_needle.get(haystack)
+    pub fn get_needle_cell(&self, haystack: &CellWrapper<'haystack>) -> Vec<&CellWrapper<'needle>> {
+        self.haystack_to_needle
+            .get(haystack)
+            .map_or_else(Vec::new, |v| v.iter().collect())
     }
 
     #[must_use]
@@ -106,7 +108,9 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
 
     #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub const fn haystack_mapping(&self) -> &HashMap<CellWrapper<'haystack>, CellWrapper<'needle>> {
+    pub const fn haystack_mapping(
+        &self,
+    ) -> &HashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>> {
         &self.haystack_to_needle
     }
 

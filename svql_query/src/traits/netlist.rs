@@ -61,7 +61,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
         let schema_size = Self::PORTS.len();
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
-        for (haystack_cell_wrapper, needle_cell_wrapper) in assignment.haystack_mapping() {
+        for (needle_cell_wrapper, haystack_cell_wrapper) in assignment.needle_mapping() {
             let needle_cell = needle_cell_wrapper.get();
 
             match needle_cell {
