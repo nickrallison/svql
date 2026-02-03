@@ -12,9 +12,11 @@ use crate::{
 use svql_driver::{Driver, DriverKey};
 use tracing::debug;
 
+// svql_query/src/traits/primitive.rs
+
 /// Helper to extract cell ID from a Value
 fn value_to_cell_id(value: &prjunnamed_netlist::Value) -> Option<CellId> {
-    match value.as_net() {
+    match value.iter().take(1).next() {
         Some(net) => net.as_cell_index().map(|idx| CellId::new(idx as u32)).ok(),
         None => None,
     }
@@ -30,28 +32,12 @@ fn control_net_to_cell_id(cnet: &prjunnamed_netlist::ControlNet) -> Option<CellI
     net_to_cell_id(&cnet.net())
 }
 
-/// Resolve primitive ports by extracting inputs from the cell structure.
-///
-/// For most gates, inputs are positional arguments and outputs are the cell itself.
-/// This handles common gate patterns (And, Or, Xor, Not, etc.) automatically.
-/// Resolve primitive ports by extracting inputs from the cell structure.
-///
-/// For gates, inputs come from their arguments and outputs are the cell itself.
-/// This handles all gate patterns automatically.
-pub fn resolve_primitive_ports(
-    cell: &prjunnamed_netlist::Cell,
-    cell_wrapper: &CellWrapper,
-    schema: &PatternSchema,
-) -> EntryArray {
+/// Extract the cell ID for a specific input port by name from a cell.
+fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Option<CellId> {
     use prjunnamed_netlist::Cell;
 
-    let cell_id = CellId::from_usize(cell_wrapper.debug_index());
-    let schema_size = schema.defs.len();
-    let mut entries = vec![ColumnEntry::Cell { id: None }; schema_size];
-
-    // Extract input values based on cell type
-    let input_values: Vec<Option<CellId>> = match cell {
-        // 2-input gates: And, Or, Xor, Eq, Comparisons, etc.
+    match cell {
+        // 2-input gates
         Cell::And(a, b)
         | Cell::Or(a, b)
         | Cell::Xor(a, b)
@@ -64,85 +50,127 @@ pub fn resolve_primitive_ports(
         | Cell::SDivTrunc(a, b)
         | Cell::SDivFloor(a, b)
         | Cell::SModTrunc(a, b)
-        | Cell::SModFloor(a, b) => {
-            vec![value_to_cell_id(a), value_to_cell_id(b)]
-        }
+        | Cell::SModFloor(a, b) => match port_name {
+            "a" => value_to_cell_id(a),
+            "b" => value_to_cell_id(b),
+            _ => None,
+        },
 
-        // 1-input gates: Not, Buf
-        Cell::Not(a) | Cell::Buf(a) => {
-            vec![value_to_cell_id(a)]
-        }
+        // 1-input gates
+        Cell::Not(a) | Cell::Buf(a) => match port_name {
+            "a" => value_to_cell_id(a),
+            _ => None,
+        },
 
-        // Mux: (sel, a, b) - note the Net for selector
-        Cell::Mux(s, a, b) => {
-            vec![net_to_cell_id(s), value_to_cell_id(a), value_to_cell_id(b)]
-        }
+        // Mux: (sel, a, b)
+        Cell::Mux(s, a, b) => match port_name {
+            "sel" => net_to_cell_id(s),
+            "a" => value_to_cell_id(a),
+            "b" => value_to_cell_id(b),
+            _ => None,
+        },
 
         // Adc: (a, b, carry_in)
-        Cell::Adc(a, b, ci) => {
-            vec![value_to_cell_id(a), value_to_cell_id(b), net_to_cell_id(ci)]
-        }
+        Cell::Adc(a, b, ci) => match port_name {
+            "a" => value_to_cell_id(a),
+            "b" => value_to_cell_id(b),
+            "carry_in" | "cin" | "ci" => net_to_cell_id(ci),
+            _ => None,
+        },
 
-        // Aig: (a, b) - both are ControlNets
-        Cell::Aig(a, b) => {
-            vec![control_net_to_cell_id(a), control_net_to_cell_id(b)]
-        }
+        // AIG: (a, b) - both are ControlNets
+        Cell::Aig(a, b) => match port_name {
+            "a" => control_net_to_cell_id(a),
+            "b" => control_net_to_cell_id(b),
+            _ => None,
+        },
 
-        // Shift operations: (value, shift_amount, multiplier)
+        // Shift operations
         Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
-            vec![value_to_cell_id(a), value_to_cell_id(b)]
-        }
-
-        // For complex cells (DFF, Memory, etc.) or I/O cells,
-        // fall back to setting all ports to the cell itself
-        _ => {
-            for item in entries.iter_mut().take(schema_size) {
-                *item = ColumnEntry::Cell { id: Some(cell_id) };
+            match port_name {
+                "a" => value_to_cell_id(a),
+                "b" => value_to_cell_id(b),
+                _ => None,
             }
-            return EntryArray::new(entries);
         }
-    };
 
-    // Map extracted input values to schema ports based on direction
-    let mut input_idx = 0;
-
-    for (col_idx, col_def) in schema.defs.iter().enumerate() {
-        match col_def.direction {
-            PortDirection::Input => {
-                // Assign the next input value in order
-                if input_idx < input_values.len() {
-                    entries[col_idx] = ColumnEntry::Cell {
-                        id: input_values[input_idx],
-                    };
-                    input_idx += 1;
-                } else {
-                    // Shouldn't happen if schema matches cell structure
-                    tracing::warn!(
-                        "Schema has more input ports than cell provides for {:?}",
-                        cell
-                    );
-                    entries[col_idx] = ColumnEntry::Cell { id: None };
+        // DFF - the critical fix!
+        Cell::Dff(ff) => {
+            match port_name {
+                "clk" => net_to_cell_id(&ff.clock.net()),
+                "d" | "data_in" => value_to_cell_id(&ff.data),
+                // Handle various names for enable
+                "en" | "enable" | "write_en" => {
+                    if ff.enable.net().is_cell() {
+                        net_to_cell_id(&ff.enable.net())
+                    } else {
+                        None
+                    }
                 }
-            }
-            PortDirection::Output => {
-                // Output is always the gate cell itself
-                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
-            }
-            PortDirection::Inout | PortDirection::None => {
-                // For bidirectional or unspecified, use cell_id as fallback
-                entries[col_idx] = ColumnEntry::Cell { id: Some(cell_id) };
+                // Synchronous reset
+                "reset" | "rst" | "srst" => {
+                    if ff.reset.net().is_cell() {
+                        net_to_cell_id(&ff.reset.net())
+                    } else {
+                        None
+                    }
+                }
+                // Asynchronous reset (inverted)
+                "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
+                    if let Some(net) = ff.clear.nets().first() {
+                        if ff.reset.net().is_cell() {
+                            net_to_cell_id(net)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
             }
         }
-    }
 
-    // Validation: warn if we didn't use all extracted inputs
-    if input_idx < input_values.len() {
-        tracing::warn!(
-            "Cell {:?} provided {} inputs but schema only consumed {}",
-            cell,
-            input_values.len(),
-            input_idx
-        );
+        // Add memory and other complex cells as needed
+        _ => None,
+    }
+}
+
+/// Resolve primitive ports by extracting inputs from the cell structure.
+///
+/// Creates an entry array aligned with the schema, where each port is populated
+/// only if it exists in the cell and has a valid driving cell ID.
+pub fn resolve_primitive_ports(
+    cell: &prjunnamed_netlist::Cell,
+    cell_wrapper: &CellWrapper,
+    schema: &PatternSchema,
+) -> EntryArray {
+    let cell_id = CellId::from_usize(cell_wrapper.debug_index());
+    let schema_size = schema.defs.len();
+
+    // Initialize all entries as None
+    let mut entries = vec![ColumnEntry::Cell { id: None }; schema_size];
+
+    // For each column in the schema, try to extract the corresponding port value
+    for (idx, col_def) in schema.defs.iter().enumerate() {
+        let port_name = col_def.name;
+
+        let cell_id_opt = match col_def.direction {
+            PortDirection::Output => {
+                // Output port typically maps to the cell itself
+                Some(cell_id)
+            }
+            PortDirection::Input | PortDirection::Inout => {
+                // Extract input value based on cell type and port name
+                extract_input_port(cell, port_name)
+            }
+            PortDirection::None => {
+                // Non-port column (shouldn't happen in primitives), skip
+                None
+            }
+        };
+
+        entries[idx] = ColumnEntry::Cell { id: cell_id_opt };
     }
 
     EntryArray::new(entries)
