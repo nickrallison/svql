@@ -62,9 +62,9 @@ where
 
     let container = spec.get_design(&driver, &config)?;
 
-    for cell in container.index().cells_topo() {
-        tracing::trace!("Cell: {:#?}", cell);
-    }
+    // for cell in container.index().cells_topo() {
+    //     tracing::trace!("Cell: {:#?}", cell);
+    // }
 
     // Execute query using the new DataFrame API
     let store = svql_query::run_query::<P>(&driver, &spec.get_key(), &config)?;
@@ -76,10 +76,12 @@ where
 
     if stored_count != spec.expected_count {
         tracing::error!(
-            "Expected {} matches, found {} for pattern {}",
+            "Expected {} matches, found {} for needle: {}, and haystack: {} ({}).",
             spec.expected_count,
             stored_count,
-            std::any::type_name::<P>()
+            std::any::type_name::<P>(),
+            spec.haystack_module,
+            spec.haystack_path
         );
         let mut rehydrated: Vec<P> = Vec::new();
         for row in rows.iter() {
@@ -91,7 +93,7 @@ where
             rehydrated.push(item.unwrap());
         }
 
-        let cells = container.index().cells_topo();
+        // let cells = container.index().cells_topo();
         tracing::trace!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
@@ -111,13 +113,13 @@ where
             tracing::trace!("{}", table);
         }
 
-        let cells_str = cells
-            .iter()
-            .map(|c| format!(" - {:#?}", c))
-            .collect::<Vec<String>>()
-            .join("\n");
+        // let cells_str = cells
+        //     .iter()
+        //     .map(|c| format!(" - {:#?}", c))
+        //     .collect::<Vec<String>>()
+        //     .join("\n");
 
-        tracing::trace!("Cell List: {}", cells_str);
+        // tracing::trace!("Cell List: {}", cells_str);
         if let Some(table) = store.get::<P>() {
             for (i, row) in table.rows().enumerate() {
                 tracing::trace!("Match #{}: {}", i, row);
