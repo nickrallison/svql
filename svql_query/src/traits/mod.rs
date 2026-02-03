@@ -12,7 +12,7 @@ pub mod variant;
 // Re-export key traits
 pub use netlist::Netlist;
 pub use primitive::Primitive;
-use tracing::trace;
+use tracing::{info, trace};
 
 use crate::prelude::*;
 
@@ -123,6 +123,17 @@ pub trait Pattern: Sized + Send + Sync {
         Self: Send + Sync + 'static,
     {
         let (plan, slots) = ExecutionPlan::build(Self::EXEC_INFO);
+        info!(
+            "Preload driver for pattern: {}, haystack: {:?}",
+            std::any::type_name::<Self>(),
+            design_key
+        );
+        Self::preload_driver(driver, design_key, config)
+            .map_err(|e| QueryError::design_load(e.to_string()))?;
+        info!(
+            "Executing search for pattern: {}",
+            std::any::type_name::<Self>()
+        );
         plan.execute(driver, design_key, config, slots)
     }
 

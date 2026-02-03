@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 
 use svql_common::{DesignPath, YosysModule};
 use thiserror::Error;
+use tracing::info;
 
 use crate::DriverKey;
 use crate::design_container::DesignContainer;
@@ -113,6 +114,7 @@ impl Driver {
         module_config: &svql_common::ModuleConfig,
     ) -> Result<Arc<DesignContainer>, DriverError> {
         if let Some(design) = self.check_registry(key) {
+            info!("Design already loaded: {:?}", key);
             return Ok(design);
         }
 

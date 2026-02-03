@@ -12,7 +12,7 @@ use crate::{
 };
 use std::{cell, sync::Arc};
 use svql_driver::{Driver, DriverKey};
-use tracing::debug;
+use tracing::{debug, info, trace};
 
 // svql_query/src/traits/primitive.rs
 
@@ -293,12 +293,6 @@ where
     {
         let haystack_key = ctx.design_key();
 
-        debug!(
-            "Searching for primitive {} matching cell kind {:?}",
-            std::any::type_name::<T>(),
-            T::CELL_KIND
-        );
-
         // Warn if Dedupe::None is used with primitives
         if matches!(ctx.config().dedupe, svql_common::Dedupe::None) {
             // tracing::warn!(
@@ -307,12 +301,30 @@ where
             // );
         }
 
+        info!(
+            "Loading design for primitive {} search: {:?}",
+            std::any::type_name::<T>(),
+            haystack_key
+        );
+
         let haystack_container = ctx
             .driver()
             .get_design(&haystack_key, &ctx.config().haystack_options)
             .map_err(|e| QueryError::design_load(e.to_string()))?;
 
+        trace!(
+            "Design loaded for primitive {} search: {:?}",
+            std::any::type_name::<T>(),
+            haystack_key
+        );
+
         let index = haystack_container.index();
+
+        trace!(
+            "Searching design index for primitive {} of kind {:?}",
+            std::any::type_name::<T>(),
+            T::CELL_KIND
+        );
 
         let row_matches = match index.cells_of_type_iter(T::CELL_KIND) {
             Some(cells_iter) => cells_iter
