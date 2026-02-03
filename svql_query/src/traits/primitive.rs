@@ -10,7 +10,7 @@ use crate::{
     traits::{Component, PatternInternal, kind, search_table_any},
     wire::WireRef,
 };
-use std::sync::Arc;
+use std::{cell, sync::Arc};
 use svql_driver::{Driver, DriverKey};
 use tracing::debug;
 
@@ -314,16 +314,13 @@ where
 
         let index = haystack_container.index();
 
-        // Find all cells of the matching kind
-        let mut row_matches = Vec::new();
-
-        if let Some(cells) = index.cells_of_type_iter(T::CELL_KIND) {
-            for cell_wrapper in cells {
-                if T::cell_filter(cell_wrapper.get()) {
-                    row_matches.push(T::resolve(cell_wrapper));
-                }
-            }
-        }
+        let row_matches = match index.cells_of_type_iter(T::CELL_KIND) {
+            Some(cells_iter) => cells_iter
+                .filter(|cell_wrapper| T::cell_filter(cell_wrapper.get()))
+                .map(|cw| T::resolve(cw))
+                .collect(),
+            None => Vec::new(),
+        };
 
         debug!(
             "Found {} matches for primitive {}",

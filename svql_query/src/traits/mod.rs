@@ -12,11 +12,12 @@ pub mod variant;
 // Re-export key traits
 pub use netlist::Netlist;
 pub use primitive::Primitive;
+use tracing::trace;
 
 use crate::prelude::*;
 
 /// Returns the column index for a given column name in the schema.
-#[must_use] 
+#[must_use]
 pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
     let mut i = 0;
     while i < schema.len() {
@@ -57,19 +58,19 @@ pub trait Pattern: Sized + Send + Sync {
     fn schema() -> &'static PatternSchema;
 
     /// Get the indices of all Input columns in the Schema.
-    #[must_use] 
+    #[must_use]
     fn input_indices() -> Vec<usize> {
         Self::schema().inputs.clone()
     }
 
     /// Get the indices of all Output columns in the Schema.
-    #[must_use] 
+    #[must_use]
     fn output_indices() -> Vec<usize> {
         Self::schema().outputs.clone()
     }
 
     /// Check if a specific column name is an Output.
-    #[must_use] 
+    #[must_use]
     fn is_output(name: &str) -> bool {
         Self::schema()
             .get(name)
@@ -77,7 +78,7 @@ pub trait Pattern: Sized + Send + Sync {
     }
 
     /// Check if a specific column name is an Input.
-    #[must_use] 
+    #[must_use]
     fn is_input(name: &str) -> bool {
         Self::schema()
             .get(name)

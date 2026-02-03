@@ -1,9 +1,12 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::cwe1234::Cwe1234;
+use svql_query_lib::{AndGate, security::cwe1234::Cwe1234};
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_thread_ids(true)
+        .init();
 
     let driver = Driver::new_workspace()?;
     // let mut driver = Driver::new_workspace_yosys(
@@ -45,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<AndGate>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
