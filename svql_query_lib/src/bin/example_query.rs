@@ -1,5 +1,5 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::primitives::locked_register::LockedRegister;
+use svql_query_lib::security::cwe1234::Cwe1234;
 use tracing::{Level, info};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,13 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get(2)
         .map_or("e203_soc_top", std::string::String::as_str);
 
-    let max_recursion_depth: usize = args
-        .get(3)
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(2);
-
     let use_raw_import: bool = args
-        .get(4)
+        .get(3)
         .and_then(|s| s.parse::<bool>().ok())
         .unwrap_or(false);
 
@@ -41,17 +36,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .match_length(MatchLength::NeedleSubsetHaystack)
         .dedupe(Dedupe::All)
         .haystack_options(haystack_options)
-        .max_recursion_depth(Some(max_recursion_depth))
         .build();
 
     let design_key = DriverKey::new(design_path, design_module);
-    info!("Loading design...");
+    info!("Loading design...: {:?}", design_key);
 
-    let _design_result = driver.get_design(&design_key, &config.haystack_options);
+    // let _design_result = driver.get_design(&design_key, &config.haystack_options);
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<LockedRegister>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");

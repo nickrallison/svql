@@ -24,9 +24,12 @@ enum OutputFormat {
 impl YosysModule {
     /// Creates a new `YosysModule` reference.
     /// Resolves relative paths against the workspace root.
-    pub fn new(path: &str, module: &str) -> Result<Self, Box<dyn core::error::Error>> {
+    pub fn new<P: AsRef<Path>, S: AsRef<str>>(
+        path: P,
+        module: S,
+    ) -> Result<Self, Box<dyn core::error::Error>> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let design_path = Path::new(path);
+        let design_path = Path::new(path.as_ref());
         let design_path = if design_path.is_absolute() {
             design_path.to_path_buf()
         } else {
@@ -37,24 +40,24 @@ impl YosysModule {
 
         Ok(Self {
             path: design_path,
-            module: module.to_owned(),
+            module: module.as_ref().to_owned(),
         })
     }
 
     /// Returns the categorized design path.
-    #[must_use] 
+    #[must_use]
     pub const fn design_path(&self) -> &DesignPath {
         &self.path
     }
 
     /// Returns the filesystem path.
-    #[must_use] 
+    #[must_use]
     pub fn path(&self) -> &Path {
         self.path.path()
     }
 
     /// Returns the top module name.
-    #[must_use] 
+    #[must_use]
     pub fn module_name(&self) -> &str {
         &self.module
     }
