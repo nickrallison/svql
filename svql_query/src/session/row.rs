@@ -165,6 +165,60 @@ where
         self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx };
         self
     }
+
+    /// Validate that a selector path exists in the schema.
+    ///
+    /// Returns `true` if the path is valid, `false` otherwise.
+    /// Logs warnings for invalid paths to help debug connection issues.
+    pub fn validate_selector_path(selector: crate::selector::Selector<'_>) -> bool {
+        if selector.is_empty() {
+            tracing::warn!(
+                "[{}] Connection uses empty selector path",
+                std::any::type_name::<T>()
+            );
+            return false;
+        }
+
+        let head = match selector.head() {
+            Some(h) => h,
+            None => return false,
+        };
+
+        let schema = T::schema();
+
+        // Check if the first segment exists in schema
+        if schema.index_of(head).is_none() {
+            let available: Vec<&str> = schema.columns().iter().map(|c| c.name).collect();
+
+            tracing::warn!(
+                "[{}] Connection path '{}' references non-existent field/submodule.\n  \
+                 Available columns: [{}]",
+                std::any::type_name::<T>(),
+                selector.path().join("."),
+                available.join(", "),
+            );
+            return false;
+        }
+
+        // If multi-segment, verify it's a submodule
+        if selector.len() > 1 {
+            let col_idx = T::schema().index_of(head).unwrap();
+            let col_def = T::schema().column(col_idx);
+
+            if !col_def.kind.is_sub() {
+                tracing::warn!(
+                    "[{}] Connection path '{}' tries to traverse into '{}', but it's not a submodule (it's a {:?})",
+                    std::any::type_name::<T>(),
+                    selector.path().join("."),
+                    head,
+                    col_def.kind
+                );
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 impl<T> Default for Row<T>

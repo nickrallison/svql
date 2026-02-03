@@ -11,7 +11,7 @@ use svql_query::prelude::*;
 #[connection(from = ["grant_access", "grant"], to = ["reg_any", "d"])]
 pub struct Cwe1280 {
     #[submodule]
-    pub delayed_grant_access: GrantAccess,
+    pub grant_access: GrantAccess,
     #[submodule]
     pub reg_any: DffAny,
     #[submodule]

@@ -94,7 +94,6 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
             }
         }
 
-        // DFF - the critical fix!
         Cell::Dff(ff) => {
             match port_name {
                 "clk" => net_to_cell_id(&ff.clock.net()),
@@ -107,7 +106,6 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
                         None
                     }
                 }
-                // Synchronous reset
                 "reset" | "rst" | "srst" => {
                     if ff.reset.net().is_cell() {
                         net_to_cell_id(&ff.reset.net())
@@ -115,10 +113,9 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
                         None
                     }
                 }
-                // Asynchronous reset (inverted)
                 "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
                     if let Some(net) = ff.clear.nets().first() {
-                        if ff.reset.net().is_cell() {
+                        if net.is_cell() {
                             net_to_cell_id(net)
                         } else {
                             None
@@ -286,10 +283,10 @@ where
 
         // Warn if Dedupe::None is used with primitives
         if matches!(ctx.config().dedupe, svql_common::Dedupe::None) {
-            tracing::warn!(
-                "Dedupe::None has no effect on primitive {} - primitives enumerate cells directly without combinatorial expansion. Use Dedupe::All instead, behavior does not change, but will match the expected behavior of netlists.",
-                std::any::type_name::<T>()
-            );
+            // tracing::warn!(
+            //     "Dedupe::None has no effect on primitive {} - primitives enumerate cells directly without combinatorial expansion. Use Dedupe::All instead, behavior does not change, but will match the expected behavior of netlists.",
+            //     std::any::type_name::<T>()
+            // );
         }
 
         let haystack_container = ctx

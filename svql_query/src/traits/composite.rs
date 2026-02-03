@@ -135,31 +135,134 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let _graph = design.index();
 
         // Check each CNF group (conjunction of disjunctions)
-        for group in Self::CONNECTIONS.connections {
+        for (group_idx, group) in Self::CONNECTIONS.connections.iter().enumerate() {
             let mut group_satisfied = false;
 
             // Try each alternative in this group (disjunction)
-            for conn in *group {
+            for (conn_idx, conn) in group.iter().enumerate() {
+                // SCHEMA VALIDATION (compile-time check)
+                let from_valid = Row::<Self>::validate_selector_path(conn.from.selector);
+                let to_valid = Row::<Self>::validate_selector_path(conn.to.selector);
+
+                if !from_valid || !to_valid {
+                    tracing::warn!(
+                        "[{}] Connection group {} alternative {} has invalid selector(s)",
+                        std::any::type_name::<Self>(),
+                        group_idx,
+                        conn_idx
+                    );
+                    continue; // Try next alternative
+                }
+
+                // RESOLVABILITY CHECK (runtime check - are submodules joined?)
+                let from_resolvable = Self::is_selector_resolvable(row, conn.from.selector);
+                let to_resolvable = Self::is_selector_resolvable(row, conn.to.selector);
+
+                if !from_resolvable || !to_resolvable {
+                    // Can't validate this connection yet - submodule not joined
+                    // Optimistically assume it will be satisfied in a later join iteration
+                    tracing::trace!(
+                        "[{}] Connection {:?} → {:?} deferred (submodule not joined yet)",
+                        std::any::type_name::<Self>(),
+                        conn.from.selector.path(),
+                        conn.to.selector.path()
+                    );
+                    group_satisfied = true; // Defer validation to later iteration
+                    break;
+                }
+
+                // CONNECTIVITY VALIDATION (both sides are resolvable)
                 let src_wire = row.resolve(conn.from.selector, ctx);
                 let dst_wire = row.resolve(conn.to.selector, ctx);
 
                 match (src_wire, dst_wire) {
                     (Some(s), Some(d)) if s.id() == d.id() => {
+                        tracing::trace!(
+                            "[{}] Connection {:?} → {:?} satisfied (cell {})",
+                            std::any::type_name::<Self>(),
+                            conn.from.selector.path(),
+                            conn.to.selector.path(),
+                            s.id()
+                        );
                         group_satisfied = true;
-                        break; // This alternative worked, move to next group
+                        break; // This alternative worked
                     }
-                    _ => continue, // Try next alternative
+                    (None, _) | (_, None) => {
+                        // Wire resolved to None despite submodule being joined
+                        // Could be NULL wire (nullable port) or traversal failure
+                        tracing::debug!(
+                            "[{}] Connection {:?} → {:?} resolved to None (nullable port or traversal failed)",
+                            std::any::type_name::<Self>(),
+                            conn.from.selector.path(),
+                            conn.to.selector.path()
+                        );
+                        continue; // Try next alternative
+                    }
+                    (Some(s), Some(d)) => {
+                        // Different cell IDs - not connected
+                        tracing::trace!(
+                            "[{}] Connection {:?} → {:?} failed: different cells ({} != {})",
+                            std::any::type_name::<Self>(),
+                            conn.from.selector.path(),
+                            conn.to.selector.path(),
+                            s.id(),
+                            d.id()
+                        );
+                        continue; // Try next alternative
+                    }
                 }
             }
 
             // If no alternative in this group was satisfied, validation fails
             if !group_satisfied {
+                tracing::debug!(
+                    "[{}] Connection group {} failed all alternatives",
+                    std::any::type_name::<Self>(),
+                    group_idx
+                );
                 return false;
             }
         }
 
         true
     }
+
+        /// Check if a selector path can be fully resolved given the current row state.
+    /// 
+    /// Returns `false` if the path traverses through a NULL submodule reference,
+    /// meaning we can't validate this connection yet (submodule not joined).
+    fn is_selector_resolvable(row: &Row<Self>, selector: Selector<'_>) -> bool {
+        if selector.is_empty() {
+            return false;
+        }
+
+        let Some(head) = selector.head() else {
+            return false;
+        };
+
+        // Single segment (e.g., ["grant"]) - just check schema
+        if selector.len() == 1 {
+            return Self::schema().index_of(head).is_some();
+        }
+
+        // Multi-segment (e.g., ["reg_any", "q"]) - check if submodule is populated
+        let Some(col_idx) = Self::schema().index_of(head) else {
+            return false;
+        };
+
+        let col_def = Self::schema().column(col_idx);
+        if !col_def.kind.is_sub() {
+            return false; // Not a submodule
+        }
+
+        // Check if the submodule reference is populated
+        match &row.entry_array.entries[col_idx] {
+            ColumnEntry::Sub { id: Some(_) } => true,  // Submodule is joined ✓
+            ColumnEntry::Sub { id: None } => false,    // Submodule not joined yet
+            _ => false,
+        }
+    }
+
 
     /// Validate (calls both connection and custom validation)
     fn validate(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
