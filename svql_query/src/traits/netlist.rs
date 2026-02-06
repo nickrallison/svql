@@ -98,13 +98,6 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             }
         }
 
-        for (idx, item) in row_match.iter().enumerate().take(schema_size) {
-            if item.is_none() {
-                let col_name = Self::netlist_schema().column(idx).name;
-                panic!("Unmapped column in match: {col_name}");
-            }
-        }
-
         let final_row_match: Vec<ColumnEntry> = row_match
             .into_iter()
             .map(|opt| ColumnEntry::Wire {
