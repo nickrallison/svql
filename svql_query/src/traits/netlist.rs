@@ -196,16 +196,26 @@ where
     where
         Self: Send + Sync + 'static,
     {
+        tracing::info!("[NETLIST] Starting netlist search for: {}", std::any::type_name::<Self>());
+        
         let needle_key = Self::driver_key();
         let haystack_key = ctx.design_key();
+        
+        tracing::debug!("[NETLIST] Needle: {:?}", needle_key);
+        tracing::debug!("[NETLIST] Haystack: {:?}", haystack_key);
 
         // Load needle design once, use cached haystack design from context
+        tracing::debug!("[NETLIST] Loading needle design...");
         let needle_container = ctx
             .driver()
             .get_design(&needle_key, &ctx.config().needle_options)
             .map_err(|e| QueryError::needle_load(e.to_string()))?;
+        tracing::debug!("[NETLIST] Needle design loaded");
+        
         let haystack_container = ctx.haystack_design();
+        tracing::debug!("[NETLIST] Using cached haystack design");
 
+        tracing::info!("[NETLIST] Starting subgraph matching...");
         let assignments = subgraph::SubgraphMatcher::enumerate_with_indices(
             needle_container.design(),
             haystack_container.design(),
@@ -215,17 +225,26 @@ where
             haystack_key.module_name().to_string(),
             ctx.config(),
         );
+        tracing::info!("[NETLIST] Subgraph matching complete: {} assignments found", assignments.items.len());
 
+        tracing::debug!("[NETLIST] Resolving assignments to table rows...");
         let mut row_matches: Vec<EntryArray> = assignments
             .items
             .iter()
             .map(|assignment| Self::resolve(assignment))
             .collect();
+        tracing::debug!("[NETLIST] {} rows created from assignments", row_matches.len());
 
         // Apply automatic row-level deduplication
+        let before_dedup = row_matches.len();
         crate::traits::apply_deduplication(&mut row_matches);
+        if before_dedup != row_matches.len() {
+            tracing::debug!("[NETLIST] Deduplication: {} -> {} rows ({} removed)", 
+                before_dedup, row_matches.len(), before_dedup - row_matches.len());
+        }
 
         let table = Table::<Self>::new(row_matches)?;
+        tracing::info!("[NETLIST] Netlist search complete: {} total matches", table.len());
         Ok(table)
     }
 

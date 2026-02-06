@@ -1,5 +1,8 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::{cwe1234::Cwe1234, primitives::locked_register::LockedRegister};
+use svql_query_lib::security::{
+    cwe1234::Cwe1234,
+    primitives::locked_register::{LockedRegister, SyncDffMuxEnable},
+};
 use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -57,28 +60,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{table}");
     }
 
-    let patt = regex::Regex::new(r"noc1encoder_noc1buffer_req_ack").unwrap();
+    let patt = regex::Regex::new(r"(command_buffer_val_next)|(csm_noc1encoder_req_val)").unwrap();
 
     for row in store
-        .get::<LockedRegister>()
+        .get::<SyncDffMuxEnable>()
         .expect("Store should have table")
         .rows()
-        .take(20)
     {
         // println!("\n--- Match ---");
         // println!(
         //     "{}",
-        //     LockedRegister::render_row(&row, &store, &driver, &design_key)
+        //     SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key)
         // );
 
-        if let Some(report) =
-            render_wire::<LockedRegister>(&row, "data_out", &driver, &design_key, &config)
-        {
-            if patt.is_match(&report) {
-                println!("\n--- Matched Wire ---");
-                println!("{}", report);
-            }
-            // println!("{}", report);
+        let report = SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key);
+        if patt.find(&report).is_some() {
+            println!("\n--- Match ---");
+            println!(
+                "{}",
+                SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key)
+            );
         }
     }
 

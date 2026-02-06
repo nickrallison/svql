@@ -301,6 +301,7 @@ where
     }
 
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
+        tracing::info!("[RECURSIVE] Starting recursive search for: {}", std::any::type_name::<T>());
         T::build_recursive(ctx)
     }
 
@@ -394,7 +395,10 @@ mod tests {
         }
 
         fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
+            tracing::info!("[RECURSIVE] Building recursive structure for RecAnd");
+            
             // 1. Get base pattern (AndGate) results
+            tracing::debug!("[RECURSIVE] Retrieving base pattern table (AndGate)...");
             let base_table = ctx
                 .get_any_table(std::any::TypeId::of::<AndGate>())
                 .ok_or_else(|| QueryError::missing_dep("AndGate"))?;
@@ -404,7 +408,10 @@ mod tests {
                 .downcast_ref()
                 .ok_or_else(|| QueryError::missing_dep("AndGate (downcast failed)"))?;
 
+            tracing::info!("[RECURSIVE] Base pattern has {} AndGate instances", and_table.len());
+            
             if and_table.is_empty() {
+                tracing::info!("[RECURSIVE] No base patterns found, returning empty table");
                 return Table::new(vec![]);
             }
 
@@ -442,6 +449,8 @@ mod tests {
             for (idx, info) in gate_info.iter().enumerate() {
                 output_to_gate.insert(info.y, idx as u32);
             }
+            
+            tracing::debug!("[RECURSIVE] Built output-to-gate lookup with {} entries", output_to_gate.len());
 
             // 3. Initialize: every AND gate starts as a leaf (depth=0)
             struct RecAndEntry {
@@ -470,8 +479,11 @@ mod tests {
                 .enumerate()
                 .map(|(idx, e)| (e.y, idx as u32))
                 .collect();
+            
+            tracing::debug!("[RECURSIVE] Initialized {} entries (all starting as leaves)", entries.len());
 
             // 4. Fixpoint iteration: link children and compute depths
+            tracing::info!("[RECURSIVE] Starting fixpoint iteration to link children...");
             let mut changed = true;
             let mut iterations = 0;
             const MAX_ITERATIONS: usize = 1000; // Safety limit
@@ -518,14 +530,24 @@ mod tests {
                 }
             }
 
+            tracing::info!("[RECURSIVE] Fixpoint iteration converged after {} iterations", iterations);
+            
             if iterations >= MAX_ITERATIONS {
                 tracing::warn!(
                     "RecAnd fixpoint did not converge after {} iterations",
                     MAX_ITERATIONS
                 );
             }
+            
+            // Count nodes by depth
+            let mut depth_counts: AHashMap<u32, usize> = AHashMap::new();
+            for entry in &entries {
+                *depth_counts.entry(entry.depth).or_insert(0) += 1;
+            }
+            tracing::debug!("[RECURSIVE] Depth distribution: {:?}", depth_counts);
 
             // 5. Convert to EntryArray format
+            tracing::debug!("[RECURSIVE] Converting entries to table format...");
             let schema = Self::recursive_schema();
             let base_idx = schema.index_of("base").expect("schema has 'base'");
             let left_idx = schema
@@ -556,6 +578,7 @@ mod tests {
                 })
                 .collect();
 
+            tracing::info!("[RECURSIVE] Recursive structure built: {} total entries", row_entries.len());
             Table::new(row_entries)
         }
 

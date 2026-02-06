@@ -12,7 +12,6 @@ use crate::{
 };
 use std::sync::Arc;
 use svql_driver::{Driver, DriverKey};
-use tracing::{debug, info, trace};
 
 // svql_query/src/traits/primitive.rs
 
@@ -330,45 +329,46 @@ where
     where
         Self: Send + Sync + 'static,
     {
+        tracing::info!("[PRIMITIVE] Starting primitive search for: {}", std::any::type_name::<T>());
+        
         let haystack_key = ctx.design_key();
-
-        info!(
-            "Loading design for primitive {} search: {:?}",
-            std::any::type_name::<T>(),
-            haystack_key
-        );
+        tracing::debug!("[PRIMITIVE] Haystack: {:?}", haystack_key);
+        tracing::debug!("[PRIMITIVE] Target cell kind: {:?}", T::CELL_KIND);
 
         // Use the cached haystack design from context instead of calling get_design
         let haystack_container = ctx.haystack_design();
-
-        trace!(
-            "Design loaded for primitive {} search: {:?}",
-            std::any::type_name::<T>(),
-            haystack_key
-        );
+        tracing::trace!("[PRIMITIVE] Using cached haystack design");
 
         let index = haystack_container.index();
-
-        trace!(
-            "Searching design index for primitive {} of kind {:?}",
-            std::any::type_name::<T>(),
-            T::CELL_KIND
-        );
+        tracing::debug!("[PRIMITIVE] Searching design index for cells of type {:?}...", T::CELL_KIND);
 
         let row_matches = match index.cells_of_type_iter(T::CELL_KIND) {
-            Some(cells_iter) => cells_iter
-                .filter(|cell_wrapper| T::cell_filter(cell_wrapper.get()))
-                .map(|cw| T::resolve(cw))
-                .collect(),
-            None => Vec::new(),
+            Some(cells_iter) => {
+                let all_cells: Vec<_> = cells_iter.collect();
+                tracing::debug!("[PRIMITIVE] Found {} cells of type {:?}", all_cells.len(), T::CELL_KIND);
+                
+                let filtered: Vec<_> = all_cells
+                    .into_iter()
+                    .filter(|cell_wrapper| {
+                        let passes = T::cell_filter(cell_wrapper.get());
+                        if !passes {
+                            tracing::trace!("[PRIMITIVE] Cell filtered out: {:?}", cell_wrapper.debug_index());
+                        }
+                        passes
+                    })
+                    .map(|cw| T::resolve(cw))
+                    .collect();
+                    
+                tracing::debug!("[PRIMITIVE] {} cells passed filter", filtered.len());
+                filtered
+            }
+            None => {
+                tracing::debug!("[PRIMITIVE] No cells of type {:?} found in design", T::CELL_KIND);
+                Vec::new()
+            }
         };
 
-        debug!(
-            "Found {} matches for primitive {}",
-            row_matches.len(),
-            std::any::type_name::<T>()
-        );
-
+        tracing::info!("[PRIMITIVE] Primitive search complete: {} total matches", row_matches.len());
         Table::<Self>::new(row_matches)
     }
 

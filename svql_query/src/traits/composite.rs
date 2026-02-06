@@ -87,21 +87,35 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
+        tracing::info!("[COMPOSITE] Starting composition for: {}", std::any::type_name::<Self>());
+        
         let schema = Self::composite_schema();
         let sub_indices = &schema.submodules;
+        
+        tracing::debug!("[COMPOSITE] Submodule count: {}", sub_indices.len());
+        for (i, &col_idx) in sub_indices.iter().enumerate() {
+            let col = schema.column(col_idx);
+            tracing::debug!("  [{}] {} (nullable: {}): {} rows", 
+                i, col.name, col.nullable, dep_tables[i].len());
+        }
 
         // Early exit for empty required tables
         for (i, &col_idx) in sub_indices.iter().enumerate() {
             if dep_tables[i].is_empty() && !schema.column(col_idx).nullable {
+                tracing::info!("[COMPOSITE] Early exit: required submodule '{}' has no matches", 
+                    schema.column(col_idx).name);
                 return Table::new(vec![]);
             }
         }
 
         // Incremental join with filtering
         let join_order: Vec<usize> = (0..sub_indices.len()).collect();
+        tracing::debug!("[COMPOSITE] Join order: {:?}", join_order);
 
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
+        tracing::info!("[COMPOSITE] Starting with {} entries from first table: {}", 
+            first_table.len(), schema.column(sub_indices[first_idx]).name);
 
         #[cfg(feature = "parallel")]
         let mut entries: Vec<EntryArray> = if ctx.config().parallel {
@@ -121,21 +135,40 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
             .collect();
 
-        for &join_idx in &join_order[1..] {
+        tracing::debug!("[COMPOSITE] Initial entries created: {}", entries.len());
+        
+        for (join_step, &join_idx) in join_order[1..].iter().enumerate() {
             let table = dep_tables[join_idx];
+            let table_name = schema.column(sub_indices[join_idx]).name;
+            tracing::info!("[COMPOSITE] Join step {}/{}: joining with {} ({} rows)", 
+                join_step + 1, join_order.len() - 1, table_name, table.len());
+            
+            let before_join = entries.len();
             entries = Self::join_and_filter(entries, join_idx, table, sub_indices, ctx);
+            
+            tracing::debug!("[COMPOSITE] After join: {} -> {} entries ({} filtered out)", 
+                before_join, entries.len(), before_join.saturating_sub(entries.len()));
 
             if entries.is_empty() {
+                tracing::info!("[COMPOSITE] Join resulted in no matches, stopping early");
                 return Table::new(vec![]);
             }
         }
 
         // Resolve aliases
+        tracing::debug!("[COMPOSITE] Resolving {} aliases...", Self::ALIASES.len());
         let mut final_entries = Self::resolve_aliases(entries, ctx)?;
+        tracing::debug!("[COMPOSITE] Aliases resolved: {} entries", final_entries.len());
 
         // Apply automatic deduplication
+        let before_dedup = final_entries.len();
         Self::apply_deduplication(&mut final_entries);
+        if before_dedup != final_entries.len() {
+            tracing::debug!("[COMPOSITE] Deduplication: {} -> {} entries ({} removed)", 
+                before_dedup, final_entries.len(), before_dedup - final_entries.len());
+        }
 
+        tracing::info!("[COMPOSITE] Composition complete: {} total matches", final_entries.len());
         Table::new(final_entries)
     }
 
@@ -154,6 +187,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Use the cached haystack design from context instead of calling get_design
         let design = ctx.haystack_design();
         let _graph = design.index();
+        
+        let num_groups = Self::CONNECTIONS.connections.len();
+        tracing::trace!("[COMPOSITE] Validating {} connection groups for {}", 
+            num_groups, std::any::type_name::<Self>());
 
         // Check each CNF group (conjunction of disjunctions)
         for (group_idx, group) in Self::CONNECTIONS.connections.iter().enumerate() {
@@ -211,7 +248,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                     (None, _) | (_, None) => {
                         // Wire resolved to None despite submodule being joined
                         // Could be NULL wire (nullable port) or traversal failure
-                        tracing::debug!(
+                        tracing::trace!(
                             "[{}] Connection {:?} → {:?} resolved to None (nullable port or traversal failed)",
                             std::any::type_name::<Self>(),
                             conn.from.selector.path(),
@@ -236,7 +273,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
             // If no alternative in this group was satisfied, validation fails
             if !group_satisfied {
-                tracing::debug!(
+                tracing::trace!(
                     "[{}] Connection group {} failed all alternatives",
                     std::any::type_name::<Self>(),
                     group_idx
