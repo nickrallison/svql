@@ -1,6 +1,6 @@
 //! Orchestration and management of hardware designs.
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
@@ -29,7 +29,7 @@ pub enum DriverError {
 #[derive(Debug, Clone)]
 pub struct Driver {
     /// Thread-safe registry of loaded designs.
-    registry: Arc<RwLock<HashMap<DriverKey, Arc<DesignContainer>>>>,
+    registry: Arc<RwLock<AHashMap<DriverKey, Arc<DesignContainer>>>>,
     /// Path to the Yosys executable.
     yosys_path: PathBuf,
     /// The root directory for resolving relative design paths.
@@ -42,7 +42,7 @@ impl Driver {
         let yosys = which::which("yosys").map_err(|e| DriverError::YosysNotFound(e.to_string()))?;
 
         Ok(Self {
-            registry: Arc::new(RwLock::new(HashMap::new())),
+            registry: Arc::new(RwLock::new(AHashMap::new())),
             yosys_path: yosys,
             root_path: std::fs::canonicalize(root.as_ref())?,
         })
@@ -79,7 +79,7 @@ impl Driver {
         }
 
         Ok(Self {
-            registry: Arc::new(RwLock::new(HashMap::new())),
+            registry: Arc::new(RwLock::new(AHashMap::new())),
             yosys_path,
             root_path: std::fs::canonicalize(root.as_ref())?,
         })
@@ -148,7 +148,7 @@ impl Driver {
 
     /// Returns a copy of all currently loaded designs.
     #[must_use]
-    pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
+    pub fn get_all_designs(&self) -> AHashMap<DriverKey, Arc<DesignContainer>> {
         self.registry.read().unwrap().clone()
     }
 }

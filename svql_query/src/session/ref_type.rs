@@ -217,8 +217,8 @@ mod tests {
 
     #[test]
     fn test_ref_hash() {
-        use std::collections::HashSet;
-        let mut set: HashSet<Ref<PatternA>> = HashSet::new();
+        use ahash::AHashSet;
+        let mut set: AHashSet<Ref<PatternA>> = AHashSet::new();
         set.insert(Ref::new(1));
         set.insert(Ref::new(2));
         set.insert(Ref::new(1)); // duplicate

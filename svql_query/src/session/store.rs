@@ -3,8 +3,8 @@
 //! `Store` holds type-erased `Table<T>` instances, allowing patterns
 //! to access their dependencies' results during search and rehydration.
 
+use ahash::AHashMap;
 use std::any::TypeId;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::prelude::*;
@@ -35,25 +35,25 @@ use crate::prelude::*;
 /// ```
 pub struct Store {
     /// Type-erased table storage.
-    tables: HashMap<TypeId, Arc<dyn AnyTable + Send + Sync>>,
+    tables: AHashMap<TypeId, Arc<dyn AnyTable + Send + Sync>>,
     // cells: Vec<Cell>,
 }
 
 impl Store {
     /// Create an empty store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
-            tables: HashMap::new(),
+            tables: AHashMap::new(),
             // cells: Vec::new(),
         }
     }
 
     /// Create a store with pre-allocated capacity.
-    #[must_use] 
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            tables: HashMap::with_capacity(capacity),
+            tables: AHashMap::with_capacity(capacity),
             // cells: Vec::new(),
         }
     }
@@ -83,7 +83,7 @@ impl Store {
     /// Get a table for pattern type `T`.
     ///
     /// Returns `None` if no table exists for this type.
-    #[must_use] 
+    #[must_use]
     pub fn get<T: 'static>(&self) -> Option<&Table<T>> {
         self.tables
             .get(&TypeId::of::<T>())
@@ -91,24 +91,24 @@ impl Store {
     }
 
     /// Check if a table exists for pattern type `T`.
-    #[must_use] 
+    #[must_use]
     pub fn contains<T: 'static>(&self) -> bool {
         self.tables.contains_key(&TypeId::of::<T>())
     }
 
     /// Get the number of tables in the store.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.tables.len()
     }
 
     /// Check if the store is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tables.is_empty()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn get_from_tid(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.tables.get(&type_id).map(std::convert::AsRef::as_ref)
     }
@@ -116,7 +116,7 @@ impl Store {
     /// Resolve a reference to a row.
     ///
     /// This is a convenience method that combines `get()` and `Table::row()`.
-    #[must_use] 
+    #[must_use]
     pub fn resolve<T>(&self, r: Ref<T>) -> Option<Row<T>>
     where
         T: crate::traits::Pattern + crate::traits::Component + 'static,
@@ -132,7 +132,7 @@ impl Store {
     /// Get a type-erased table by `TypeId`.
     ///
     /// This is useful for generic code that doesn't know the concrete type.
-    #[must_use] 
+    #[must_use]
     pub fn get_any(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.tables.get(&type_id).map(std::convert::AsRef::as_ref)
     }

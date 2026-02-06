@@ -1,6 +1,6 @@
 //! Execution context for SVQL queries.
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -10,7 +10,7 @@ use crate::design_container::DesignContainer;
 /// A scoped collection of designs used as the search space for queries.
 #[derive(Debug, Clone)]
 pub struct Context {
-    designs: HashMap<DriverKey, Arc<DesignContainer>>,
+    designs: AHashMap<DriverKey, Arc<DesignContainer>>,
 }
 
 impl Default for Context {
@@ -23,7 +23,7 @@ impl Context {
     /// Creates an empty execution context.
     pub fn new() -> Self {
         Self {
-            designs: HashMap::new(),
+            designs: AHashMap::new(),
         }
     }
 

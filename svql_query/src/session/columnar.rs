@@ -3,7 +3,7 @@
 //! This replaces the polars DataFrame with a simpler implementation
 //! that's sufficient for our use case of storing u32 values.
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 
 /// A simple columnar storage structure for u32 data.
 ///
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct ColumnStore {
     /// Column data: column name -> Vec<Option<u32>>
-    columns: HashMap<String, Vec<Option<u32>>>,
+    columns: AHashMap<String, Vec<Option<u32>>>,
     /// Number of rows in the table
     num_rows: usize,
     /// Column names in order (for iteration)
@@ -21,7 +21,7 @@ pub struct ColumnStore {
 impl ColumnStore {
     /// Create an empty ColumnStore with the given column names.
     pub fn new(column_names: Vec<String>) -> Self {
-        let mut columns = HashMap::with_capacity(column_names.len());
+        let mut columns = AHashMap::with_capacity(column_names.len());
         for name in &column_names {
             columns.insert(name.clone(), Vec::new());
         }
@@ -61,7 +61,7 @@ impl ColumnStore {
             }
         }
 
-        let mut columns = HashMap::with_capacity(column_names.len());
+        let mut columns = AHashMap::with_capacity(column_names.len());
         for (name, col_data) in column_names.iter().zip(data.into_iter()) {
             columns.insert(name.clone(), col_data);
         }
@@ -98,8 +98,8 @@ impl ColumnStore {
     ///
     /// Keeps the first occurrence of each unique row.
     pub fn deduplicate(&self) -> Self {
-        let mut seen = std::collections::HashSet::new();
-        let mut new_columns: HashMap<String, Vec<Option<u32>>> = self
+        let mut seen = ahash::AHashSet::new();
+        let mut new_columns: AHashMap<String, Vec<Option<u32>>> = self
             .column_names
             .iter()
             .map(|name| (name.clone(), Vec::new()))
@@ -138,8 +138,8 @@ impl ColumnStore {
     ///
     /// Keeps the first occurrence of each unique row.
     pub fn deduplicate_subset(&self, subset: &[String]) -> Self {
-        let mut seen = std::collections::HashSet::new();
-        let mut new_columns: HashMap<String, Vec<Option<u32>>> = self
+        let mut seen = ahash::AHashSet::new();
+        let mut new_columns: AHashMap<String, Vec<Option<u32>>> = self
             .column_names
             .iter()
             .map(|name| (name.clone(), Vec::new()))

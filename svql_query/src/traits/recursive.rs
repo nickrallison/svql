@@ -363,7 +363,7 @@ mod tests {
                 .collect();
 
             // Map: output CellId → AndGate row index
-            let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
+            let mut output_to_gate: AHashMap<CellId, u32> = AHashMap::with_capacity(gate_info.len());
             for (idx, info) in gate_info.iter().enumerate() {
                 output_to_gate.insert(info.y, idx as u32);
             }
@@ -390,7 +390,7 @@ mod tests {
                 .collect();
 
             // Map: output CellId → RecAnd entry index (same as gate index initially)
-            let output_to_rec: HashMap<CellId, u32> = entries
+            let output_to_rec: AHashMap<CellId, u32> = entries
                 .iter()
                 .enumerate()
                 .map(|(idx, e)| (e.y, idx as u32))

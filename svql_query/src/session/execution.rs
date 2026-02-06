@@ -8,7 +8,7 @@
 //! pointers are provided by the `Pattern` trait implementations.
 
 use std::any::{Any, TypeId};
-use std::collections::{HashMap, HashSet};
+use ahash::{AHashMap, AHashSet};
 use std::hash::Hash;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock};
@@ -75,7 +75,7 @@ impl ExecutionNode {
     }
 
     fn flatten_deps(&self) -> Vec<Arc<Self>> {
-        let mut seen: HashSet<TypeId> = HashSet::new();
+        let mut seen: AHashSet<TypeId> = AHashSet::new();
         let mut result: Vec<Arc<Self>> = Vec::new();
 
         for dep in &self.deps {
@@ -145,7 +145,7 @@ impl std::fmt::Debug for ExecutionPlan {
 
 impl ExecutionPlan {
     #[must_use]
-    pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
+    pub fn build(root: &super::ExecInfo) -> (Self, AHashMap<TypeId, TableSlot>) {
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
         all_deps.push(Arc::clone(&root_node));
@@ -174,7 +174,7 @@ impl ExecutionPlan {
         driver: &Driver,
         key: &DriverKey,
         config: &svql_common::Config,
-        slots: HashMap<TypeId, TableSlot>,
+        slots: AHashMap<TypeId, TableSlot>,
     ) -> Result<Store, QueryError> {
         // Create shared context
         let ctx = ExecutionContext::new(driver.clone(), key.clone(), config.clone(), slots);
@@ -302,7 +302,7 @@ pub struct ExecutionContext {
     /// Execution configuration.
     config: svql_common::Config,
     /// Slots to hold results during execution.
-    slots: HashMap<TypeId, TableSlot>,
+    slots: AHashMap<TypeId, TableSlot>,
 }
 
 impl ExecutionContext {
@@ -311,7 +311,7 @@ impl ExecutionContext {
         driver: Driver,
         design_key: DriverKey,
         config: svql_common::Config,
-        slots: HashMap<TypeId, TableSlot>,
+        slots: AHashMap<TypeId, TableSlot>,
     ) -> Self {
         Self {
             driver,

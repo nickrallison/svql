@@ -3,7 +3,8 @@
 //! Identifies instances of a needle design within a larger haystack design
 //! using a backtracking search algorithm with topological ordering.
 
-use std::collections::{HashSet, VecDeque};
+use ahash::AHashSet;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use prjunnamed_netlist::Design;
@@ -437,12 +438,12 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Removes duplicate assignments based on the configured deduplication strategy.
     fn apply_deduplication(&self, results: &mut Vec<SingleAssignment<'needle, 'haystack>>) {
         if self.config.dedupe.all() {
-            let mut seen = HashSet::new();
+            let mut seen = AHashSet::new();
             results.retain(|m| seen.insert(m.signature()));
         }
 
         if self.config.dedupe.inner() {
-            let mut seen = HashSet::new();
+            let mut seen = AHashSet::new();
             results.retain(|m| seen.insert(m.internal_signature()));
         }
     }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
@@ -19,11 +19,11 @@ pub struct ReportNode {
 
 impl ReportNode {
     pub fn render(&self) -> String {
-        let mut cache = HashMap::new();
+        let mut cache = AHashMap::new();
         self.render_with_cache(&mut cache)
     }
 
-    pub fn render_with_cache(&self, cache: &mut HashMap<Arc<str>, Vec<String>>) -> String {
+    pub fn render_with_cache(&self, cache: &mut AHashMap<Arc<str>, Vec<String>>) -> String {
         let mut output = String::new();
         self.render_recursive(&mut output, "", true, true, cache);
         output

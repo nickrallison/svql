@@ -178,8 +178,8 @@ mod tests {
 
     #[test]
     fn test_cell_id_hash() {
-        use std::collections::HashSet;
-        let mut set = HashSet::new();
+        use ahash::AHashSet;
+        let mut set = AHashSet::new();
         set.insert(CellId::new(1));
         set.insert(CellId::new(2));
         set.insert(CellId::new(1)); // duplicate

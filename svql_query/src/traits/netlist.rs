@@ -187,12 +187,12 @@ where
         // SubgraphMatcher deduplicates assignments, but different assignments
         // can produce identical rows (e.g., when internal structure differs
         // but port connections are the same)
-        use std::collections::HashSet;
+        use ahash::AHashSet;
         if ctx.config().dedupe.all() {
-            let mut seen = HashSet::new();
+            let mut seen = AHashSet::new();
             row_matches.retain(|entry| seen.insert(entry.signature_all()));
         } else if ctx.config().dedupe.inner() {
-            let mut seen = HashSet::new();
+            let mut seen = AHashSet::new();
             row_matches.retain(|entry| seen.insert(entry.signature_inner()));
         }
 

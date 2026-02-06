@@ -691,6 +691,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "svql_common"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "argparse",
  "lazy_static",
  "prjunnamed-netlist",
@@ -705,6 +706,7 @@ dependencies = [
 name = "svql_driver"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "contracts",
  "lazy_static",
  "ouroboros",
@@ -799,6 +801,7 @@ dependencies = [
 name = "svql_subgraph"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "contracts",
  "dashmap",
  "itertools",

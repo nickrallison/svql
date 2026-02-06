@@ -13,7 +13,7 @@ pub use io_mapping::IoMapping;
 
 use crate::cell::{CellIndex, CellKind, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
-use std::collections::{HashMap, HashSet};
+use ahash::{AHashMap, AHashSet};
 
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
@@ -92,10 +92,10 @@ impl<'a> GraphIndex<'a> {
     /// Returns the set of cells in the immediate fan-out of the specified cell.
     #[allow(clippy::mutable_key_type)]
     #[must_use] 
-    pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
+    pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanout_indices_set(idx);
-        let cells: HashSet<CellWrapper<'a>> = indices_set
+        let cells: AHashSet<CellWrapper<'a>> = indices_set
             .into_iter()
             .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
             .collect();
@@ -105,10 +105,10 @@ impl<'a> GraphIndex<'a> {
     /// Returns the set of cells in the immediate fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
     #[must_use] 
-    pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<HashSet<CellWrapper<'a>>> {
+    pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
         let indices_set = self.connectivity.fanin_indices_set(idx);
-        let cells: HashSet<CellWrapper<'a>> = indices_set
+        let cells: AHashSet<CellWrapper<'a>> = indices_set
             .into_iter()
             .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
             .collect();
@@ -149,9 +149,9 @@ impl<'a> GraphIndex<'a> {
     pub fn get_intersect_fanout_of_fanin(
         &self,
         cell: &CellWrapper<'a>,
-    ) -> HashSet<CellWrapper<'a>> {
+    ) -> AHashSet<CellWrapper<'a>> {
         let Some(idx) = self.get_cell_index(cell) else {
-            return HashSet::new();
+            return AHashSet::new();
         };
 
         let intersection_indices = self.connectivity.get_intersect_fanout_of_fanin_indices(idx);
@@ -164,14 +164,14 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns a map of input port names to their fan-out cells.
     #[must_use] 
-    pub fn get_input_fanout_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+    pub fn get_input_fanout_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_input_fanout_by_name(&self.cell_registry)
     }
 
     /// Returns a map of output port names to their fan-in cells.
     #[must_use] 
-    pub fn get_output_fanin_by_name(&self) -> HashMap<String, Vec<(CellWrapper<'a>, usize)>> {
+    pub fn get_output_fanin_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_output_fanin_by_name(&self.cell_registry)
     }

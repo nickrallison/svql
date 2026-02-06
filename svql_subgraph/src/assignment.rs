@@ -1,6 +1,6 @@
 //! Mapping between needle and haystack cells.
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 
 use crate::cell::{CellKind, CellWrapper};
 
@@ -8,16 +8,16 @@ use crate::cell::{CellKind, CellWrapper};
 #[derive(Clone, Debug, Default)]
 pub struct AssignmentSet<'needle, 'haystack> {
     pub items: Vec<SingleAssignment<'needle, 'haystack>>,
-    pub needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
-    pub needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+    pub needle_input_fanout_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+    pub needle_output_fanin_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
 }
 
 impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
     #[must_use]
     pub const fn new(
         items: Vec<SingleAssignment<'needle, 'haystack>>,
-        needle_input_fanout_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
-        needle_output_fanin_by_name: HashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+        needle_input_fanout_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+        needle_output_fanin_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
     ) -> Self {
         Self {
             items,
@@ -41,16 +41,16 @@ impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
 #[derive(Clone, Debug, Default)]
 pub struct SingleAssignment<'needle, 'haystack> {
     /// Pattern to Design cell mapping
-    needle_to_haystack: HashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
+    needle_to_haystack: AHashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
     /// Design to Pattern cell mapping
-    haystack_to_needle: HashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>>,
+    haystack_to_needle: AHashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>>,
 }
 
 impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     pub(super) fn new() -> Self {
         Self {
-            needle_to_haystack: HashMap::new(),
-            haystack_to_needle: HashMap::new(),
+            needle_to_haystack: AHashMap::new(),
+            haystack_to_needle: AHashMap::new(),
         }
     }
 
@@ -110,13 +110,13 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     #[must_use]
     pub const fn haystack_mapping(
         &self,
-    ) -> &HashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>> {
+    ) -> &AHashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>> {
         &self.haystack_to_needle
     }
 
     #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub const fn needle_mapping(&self) -> &HashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
+    pub const fn needle_mapping(&self) -> &AHashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
         &self.needle_to_haystack
     }
 
