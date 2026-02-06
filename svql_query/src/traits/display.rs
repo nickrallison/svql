@@ -154,3 +154,179 @@ pub fn wire_to_report_node(
         children: vec![],
     }
 }
+
+/// Information about a wire in a match row.
+///
+/// Returned by `get_wire_info()` for programmatic access to wire details.
+#[derive(Debug, Clone)]
+pub struct WireInfo {
+    /// The name of the wire field
+    pub name: String,
+    /// The wire reference (Cell, PrimaryPort, or Constant)
+    pub wire: Wire,
+    /// The direction from the schema
+    pub direction: PortDirection,
+    /// Source location if available
+    pub source_loc: Option<SourceLocation>,
+}
+
+/// Get structured information about a wire without rendering.
+///
+/// Useful for custom formatting or analysis.
+pub fn get_wire_info<T: Pattern + Component>(
+    row: &Row<T>,
+    wire_name: &str,
+    driver: &Driver,
+    key: &DriverKey,
+    config: &Config,
+) -> Option<WireInfo> {
+    let wire = row.wire(wire_name)?;
+    let direction = T::schema().get(wire_name)?.direction;
+    let source_loc = wire_source_location(&wire, driver, key, config);
+
+    Some(WireInfo {
+        name: wire_name.to_string(),
+        wire,
+        direction,
+        source_loc,
+    })
+}
+
+/// Render a single wire field from a pattern match as a formatted report.
+///
+/// Uses the same tree structure as `render_row()` but focuses on one wire.
+/// Shows direction, type, cell ID, and source code location.
+pub fn render_wire<T: Pattern + Component>(
+    row: &Row<T>,
+    wire_name: &str,
+    driver: &Driver,
+    key: &DriverKey,
+    config: &Config,
+) -> Option<String> {
+    let wire = row.wire(wire_name)?;
+    let direction = T::schema().get(wire_name)?.direction;
+
+    let node = wire_to_report_node(wire_name, &wire, direction, driver, key, config);
+
+    Some(node.render())
+}
+
+/// Render a wire in compact single-line format for quick debugging.
+///
+/// Format: `wire_name (direction: type) @ file:line`
+pub fn render_wire_compact<T: Pattern + Component>(
+    row: &Row<T>,
+    wire_name: &str,
+    driver: &Driver,
+    key: &DriverKey,
+) -> Option<String> {
+    let wire = row.wire(wire_name)?;
+    let direction = T::schema().get(wire_name)?.direction;
+
+    let config = Config::default();
+    let source_loc = wire_source_location(&wire, driver, key, &config);
+
+    let type_info = match &wire {
+        Wire::Cell { id, .. } => format!("cell_{}", id.raw()),
+        Wire::PrimaryPort { name, .. } => format!("port_{}", name),
+        Wire::Constant { value } => format!("const_{}", value),
+    };
+
+    let location = source_loc
+        .and_then(|loc| {
+            loc.lines
+                .first()
+                .map(|l| format!("{}:{}", loc.file, l.number))
+        })
+        .unwrap_or_else(|| "<no source>".to_string());
+
+    Some(format!(
+        "{} ({:?}: {}) @ {}",
+        wire_name, direction, type_info, location
+    ))
+}
+
+/// Render just the source code lines for a wire, without tree formatting.
+///
+/// Useful for extracting source context without visual clutter.
+pub fn render_wire_source_only<T: Pattern + Component>(
+    row: &Row<T>,
+    wire_name: &str,
+    driver: &Driver,
+    key: &DriverKey,
+) -> Option<String> {
+    let wire = row.wire(wire_name)?;
+    let config = Config::default();
+    let source_loc = wire_source_location(&wire, driver, key, &config)?;
+
+    let mut output = String::new();
+    output.push_str(&format!("{}:\n", source_loc.file));
+
+    // Read file
+    let lines = read_file_lines(&source_loc.file).ok()?;
+
+    for line_meta in &source_loc.lines {
+        if line_meta.number > 0 && line_meta.number <= lines.len() {
+            let content = lines[line_meta.number - 1].trim_end();
+            output.push_str(&format!("  {:>5} | {}\n", line_meta.number, content));
+        }
+    }
+
+    Some(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Clone, Netlist)]
+    #[netlist(
+        file = "examples/fixtures/basic/and/verilog/and_gate.v",
+        module = "and_gate"
+    )]
+    pub struct TestAndGate {
+        #[port(input)]
+        pub a: Wire,
+        #[port(input)]
+        pub b: Wire,
+        #[port(output)]
+        pub y: Wire,
+    }
+
+    #[test]
+    fn test_wire_reporting() -> Result<(), Box<dyn std::error::Error>> {
+        let driver = Driver::new_workspace()?;
+        let key = DriverKey::new(
+            "examples/fixtures/basic/and/json/mixed_and_tree.json",
+            "mixed_and_tree",
+        );
+        let config = Config::default();
+
+        let store = crate::run_query::<TestAndGate>(&driver, &key, &config)?;
+        let table = store.get::<TestAndGate>().ok_or("Table not found")?;
+        let row = table.rows().next().ok_or("No rows found")?;
+
+        // Test render_wire
+        let report = render_wire(&row, "y", &driver, &key, &config).ok_or("render_wire failed")?;
+        assert!(report.contains("y"));
+        assert!(report.contains("(Output"));
+
+        // Test render_wire_compact
+        let compact =
+            render_wire_compact(&row, "y", &driver, &key).ok_or("render_wire_compact failed")?;
+        assert!(compact.contains("y"));
+        assert!(compact.contains("Output"));
+
+        // Test render_wire_source_only
+        // Note: Source location might be missing in some JSON-loaded designs
+        let _ = render_wire_source_only(&row, "y", &driver, &key);
+
+        // Test get_wire_info
+        let info =
+            get_wire_info(&row, "y", &driver, &key, &config).ok_or("get_wire_info failed")?;
+        assert_eq!(info.name, "y");
+        assert_eq!(info.direction, PortDirection::Output);
+
+        Ok(())
+    }
+}
