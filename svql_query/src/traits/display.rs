@@ -276,6 +276,7 @@ pub fn render_wire_source_only<T: Pattern + Component>(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
 

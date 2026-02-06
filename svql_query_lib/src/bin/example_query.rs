@@ -74,24 +74,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // );
 
         let report = SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key);
-        if patt.find(&report).is_some() {
-            println!("\n--- Match ---");
-            println!(
-                "{}",
-                SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key)
-            );
-        }
+        // if patt.find(&report).is_some() {
+        println!("\n--- Match ---");
+        println!("{}", report);
+        // }
     }
-
-    // if let Some(table) = store.get::<LockedRegister>() {
-    //     println!("\n=== LockedRegister Table Details ===");
-    //     println!("{}", table);
-    // }
-
-    // if let Some(table) = store.get::<AsyncDffMuxEnable>() {
-    //     println!("\n=== AsyncDffMuxEnable Table Details ===");
-    //     println!("{}", table);
-    // }
 
     Ok(())
 }
