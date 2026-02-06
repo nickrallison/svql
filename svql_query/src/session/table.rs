@@ -70,7 +70,7 @@ where
         }
 
         let store = ColumnStore::from_columns(column_names, columns_data)
-            .map_err(|e| QueryError::ExecutionError(e))?;
+            .map_err(QueryError::ExecutionError)?;
 
         Ok(Self {
             store,

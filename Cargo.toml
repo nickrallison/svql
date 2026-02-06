@@ -89,7 +89,11 @@ all = "deny"
 [profile.release]
 # codegen-units = 1
 # lto = "fat"
-debug = 1
+debug = 2
+strip = false
+
+[profile.dev]
+debug = 2
 
 # [profile.profiling]
 # inherits = "release"
