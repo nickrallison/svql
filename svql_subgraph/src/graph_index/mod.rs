@@ -12,14 +12,14 @@ pub use connectivity_graph::ConnectivityGraph;
 pub use io_mapping::IoMapping;
 
 use crate::cell::{CellIndex, CellKind, CellWrapper};
-use prjunnamed_netlist::{CellRef, Design};
 use ahash::{AHashMap, AHashSet};
+use prjunnamed_netlist::{CellRef, Design};
 
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
 pub struct GraphIndex<'a> {
     cell_registry: CellRegistry<'a>,
-    connectivity: ConnectivityGraph,
+    connectivity: ConnectivityGraph<'a>,
     io_mapping: IoMapping,
 }
 
@@ -30,8 +30,12 @@ impl<'a> GraphIndex<'a> {
 
         let cell_refs_topo = Self::build_cell_refs_topo(design);
         let cell_registry = CellRegistry::build(&cell_refs_topo);
-        let connectivity =
-            ConnectivityGraph::build(design, &cell_refs_topo, cell_registry.cell_id_map());
+        let connectivity = ConnectivityGraph::build(
+            design,
+            &cell_refs_topo,
+            cell_registry.cell_id_map(),
+            cell_registry.cells_topo(),
+        );
         let io_mapping = IoMapping::build(
             cell_registry.cells_topo(),
             connectivity.fanin_map(),
@@ -52,7 +56,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns the total number of cells in the index.
-    #[must_use] 
+    #[must_use]
     pub const fn num_cells(&self) -> usize {
         self.cell_registry.len()
     }
@@ -70,7 +74,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns an iterator over cells of a specific type.
-    #[must_use] 
+    #[must_use]
     pub fn cells_of_type_iter(
         &self,
         node_type: CellKind,
@@ -79,7 +83,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns a slice of all cells in topological order.
-    #[must_use] 
+    #[must_use]
     pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
         self.cell_registry.cells_topo()
     }
@@ -91,32 +95,22 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the set of cells in the immediate fan-out of the specified cell.
     #[allow(clippy::mutable_key_type)]
-    #[must_use] 
+    #[must_use]
     pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
-        let indices_set = self.connectivity.fanout_indices_set(idx);
-        let cells: AHashSet<CellWrapper<'a>> = indices_set
-            .into_iter()
-            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
-            .collect();
-        Some(cells)
+        self.connectivity.fanout_cell_set(idx).cloned()
     }
 
     /// Returns the set of cells in the immediate fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
-    #[must_use] 
+    #[must_use]
     pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
-        let indices_set = self.connectivity.fanin_indices_set(idx);
-        let cells: AHashSet<CellWrapper<'a>> = indices_set
-            .into_iter()
-            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
-            .collect();
-        Some(cells)
+        self.connectivity.fanin_cell_set(idx).cloned()
     }
 
     /// Returns the fan-out cells paired with their source pin indices.
-    #[must_use] 
+    #[must_use]
     pub fn fanout_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -130,7 +124,7 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Returns the fan-in cells paired with their source pin indices.
-    #[must_use] 
+    #[must_use]
     pub fn fanin_with_ports(
         &self,
         cell: &CellWrapper<'a>,
@@ -145,7 +139,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
-    #[must_use] 
+    #[must_use]
     pub fn get_intersect_fanout_of_fanin(
         &self,
         cell: &CellWrapper<'a>,
@@ -154,30 +148,28 @@ impl<'a> GraphIndex<'a> {
             return AHashSet::new();
         };
 
-        let intersection_indices = self.connectivity.get_intersect_fanout_of_fanin_indices(idx);
-
-        intersection_indices
-            .into_iter()
-            .map(|idx| self.cell_registry.get_cell_by_index(idx).clone())
-            .collect()
+        self.connectivity
+            .intersect_fanout_of_fanin_cell_set(idx)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Returns a map of input port names to their fan-out cells.
-    #[must_use] 
+    #[must_use]
     pub fn get_input_fanout_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_input_fanout_by_name(&self.cell_registry)
     }
 
     /// Returns a map of output port names to their fan-in cells.
-    #[must_use] 
+    #[must_use]
     pub fn get_output_fanin_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
         self.io_mapping
             .get_output_fanin_by_name(&self.cell_registry)
     }
 
     /// Retrieves a cell wrapper by its unique debug identifier.
-    #[must_use] 
+    #[must_use]
     pub fn get_cell_by_id(&self, id: usize) -> Option<&CellWrapper<'a>> {
         self.cell_registry
             .cell_id_map()
@@ -189,7 +181,7 @@ impl<'a> GraphIndex<'a> {
     ///
     /// This is used by the query engine to validate structural constraints between
     /// matched components.
-    #[must_use] 
+    #[must_use]
     pub fn is_connected(&self, from_id: u64, to_id: u64) -> bool {
         // 1. Map external ID (u64) to internal CellIndex
         let from_idx = match self.cell_registry.cell_id_map().get(&(from_id as usize)) {

@@ -49,7 +49,7 @@ pub enum CellKind {
 
 impl CellKind {
     /// Returns true if the cell represents a combinational or sequential logic gate.
-    #[must_use] 
+    #[must_use]
     pub const fn is_logic_gate(&self) -> bool {
         matches!(
             self,
@@ -82,24 +82,21 @@ impl CellKind {
     }
 
     /// Returns true if the cell is an input port.
-    #[must_use] 
+    #[must_use]
     pub const fn is_input(&self) -> bool {
         matches!(self, Self::Input)
     }
 
     /// Returns true if the cell is an output port.
-    #[must_use] 
+    #[must_use]
     pub const fn is_output(&self) -> bool {
         matches!(self, Self::Output)
     }
 
     /// Returns true if the inputs to this cell can be swapped without changing logic.
-    #[must_use] 
+    #[must_use]
     pub const fn has_commutative_inputs(&self) -> bool {
-        matches!(
-            self,
-            Self::And | Self::Or | Self::Xor | Self::Aig
-        )
+        matches!(self, Self::And | Self::Or | Self::Xor | Self::Aig)
     }
 }
 
@@ -157,14 +154,14 @@ pub struct CellIndex {
 
 impl CellIndex {
     /// Creates a new `CellIndex` from a raw usize.
-    #[must_use] 
+    #[must_use]
     pub const fn new(idx: usize) -> Self {
         Self { idx }
     }
 
     /// Returns the raw index value.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.idx
     }
@@ -182,7 +179,7 @@ pub struct CellInfo {
 
 impl CellInfo {
     /// Retrieves the source code location of the cell if available.
-    #[must_use] 
+    #[must_use]
     pub fn get_source(&self) -> Option<SourceLocation> {
         self.source_loc.clone()
     }
@@ -216,38 +213,38 @@ impl Eq for CellWrapper<'_> {}
 
 impl Hash for CellWrapper<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.cell.hash(state);
+        // self.cell.hash(state);
         self.debug_index.hash(state);
     }
 }
 
 impl<'a> CellWrapper<'a> {
     /// Returns the categorized type of the underlying cell.
-    #[must_use] 
+    #[must_use]
     pub fn cell_type(&self) -> CellKind {
         CellKind::from(self.cell.as_ref())
     }
 
     /// Returns a reference to the underlying netlist cell.
-    #[must_use] 
+    #[must_use]
     pub fn get(&'a self) -> &'a Cell {
         self.cell.as_ref()
     }
 
     /// Returns the unique debug index assigned by the netlist parser.
-    #[must_use] 
+    #[must_use]
     pub const fn debug_index(&self) -> usize {
         self.debug_index
     }
 
     /// Returns the metadata associated with this cell.
-    #[must_use] 
+    #[must_use]
     pub const fn debug_info(&self) -> MetaItemRef<'a> {
         self.metadata
     }
 
     /// Returns the name of the input port if this cell is an Input.
-    #[must_use] 
+    #[must_use]
     pub const fn input_name(&self) -> Option<&str> {
         match &self.cell {
             std::borrow::Cow::Borrowed(Cell::Input(name, _)) => Some(name.as_str()),
@@ -257,7 +254,7 @@ impl<'a> CellWrapper<'a> {
     }
 
     /// Returns the name of the output port if this cell is an Output.
-    #[must_use] 
+    #[must_use]
     pub const fn output_name(&self) -> Option<&'a str> {
         match &self.cell {
             std::borrow::Cow::Borrowed(Cell::Output(name, _)) => Some(name.as_str()),
@@ -266,7 +263,7 @@ impl<'a> CellWrapper<'a> {
     }
 
     /// Extracts source location information from cell metadata if available.
-    #[must_use] 
+    #[must_use]
     pub fn get_source(&self) -> Option<SourceLocation> {
         match self.metadata.get() {
             MetaItem::Source { file, start, end } => {
@@ -309,7 +306,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn to_info(&self) -> CellInfo {
         CellInfo {
             id: self.debug_index,
@@ -338,7 +335,7 @@ pub struct SourceLocation {
 
 impl SourceLocation {
     /// Formats the source location for pretty-printed reports.
-    #[must_use] 
+    #[must_use]
     pub fn report(&self) -> String {
         match self.lines.as_slice() {
             [] => format!("{}:<unknown>", self.file),
@@ -358,7 +355,7 @@ pub struct SourceLine {
 
 impl SourceLine {
     /// Formats the line and column range for reporting.
-    #[must_use] 
+    #[must_use]
     pub fn report(&self) -> String {
         if self.end_column == 0 {
             format!("Line {}, Col {}+", self.number, self.start_column)

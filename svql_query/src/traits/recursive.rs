@@ -256,6 +256,7 @@ mod tests {
     use crate::define_primitive;
 
     use super::*;
+    use ahash::AHashMap;
     use svql_query::query_test;
 
     define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
@@ -363,7 +364,8 @@ mod tests {
                 .collect();
 
             // Map: output CellId → AndGate row index
-            let mut output_to_gate: AHashMap<CellId, u32> = AHashMap::with_capacity(gate_info.len());
+            let mut output_to_gate: AHashMap<CellId, u32> =
+                AHashMap::with_capacity(gate_info.len());
             for (idx, info) in gate_info.iter().enumerate() {
                 output_to_gate.insert(info.y, idx as u32);
             }
