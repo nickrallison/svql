@@ -503,4 +503,29 @@ impl EntryArray {
         sig.sort_unstable();
         sig
     }
+
+    /// Generate a signature for deduplication based on the specified strategy.
+    ///
+    /// This is the unified deduplication method that handles all strategies:
+    /// - `Dedupe::None` - returns None (no deduplication should be performed)
+    /// - `Dedupe::Inner` - considers only Sub and Metadata entries; if those produce an
+    ///   empty signature (e.g., for pure Netlist types with only Wire entries), falls back to `All`
+    /// - `Dedupe::All` - considers all entries (Wire, Sub, Metadata)
+    #[must_use]
+    pub fn signature(&self, dedupe: &svql_common::Dedupe) -> Option<Vec<(usize, u32)>> {
+        match dedupe {
+            svql_common::Dedupe::None => None,
+            svql_common::Dedupe::Inner => {
+                let inner_sig = self.signature_inner();
+                // If inner signature is empty (no Sub/Metadata entries),
+                // fall back to All to avoid collapsing distinct rows
+                if inner_sig.is_empty() {
+                    Some(self.signature_all())
+                } else {
+                    Some(inner_sig)
+                }
+            }
+            svql_common::Dedupe::All => Some(self.signature_all()),
+        }
+    }
 }

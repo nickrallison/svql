@@ -94,7 +94,7 @@ where
         }
 
         // let cells = container.index().cells_topo();
-        tracing::trace!(
+        tracing::error!(
             "Test Failed: Expected {} matches, found {}.\nQuery: {}\nHaystack: {} ({}), Store: {}",
             spec.expected_count,
             stored_count,
@@ -108,9 +108,9 @@ where
             tracing::trace!("Result #{}: {:#?}", i, result);
         }
 
-        tracing::trace!("Tables:");
+        tracing::error!("Tables:");
         for (_, table) in store.tables() {
-            tracing::trace!("{}", table);
+            tracing::error!("{}", table);
         }
 
         // let cells_str = cells

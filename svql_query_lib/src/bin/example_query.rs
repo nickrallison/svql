@@ -1,5 +1,5 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::cwe1234::Cwe1234;
+use svql_query_lib::security::{cwe1234::Cwe1234, cwe1280::Cwe1280};
 use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::All)
+        .dedupe(Dedupe::None)
         .haystack_options(haystack_options)
         .build();
 

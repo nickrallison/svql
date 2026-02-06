@@ -140,6 +140,13 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
             .map(|(_, d)| d.debug_index())
             .collect();
         sig.sort_unstable();
+        
+        // If there are no internal cells (pure I/O pattern), fall back to full signature
+        // to avoid incorrectly deduplicating distinct matches
+        if sig.is_empty() {
+            return self.signature();
+        }
+        
         sig
     }
 }

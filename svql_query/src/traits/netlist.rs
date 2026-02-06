@@ -181,18 +181,11 @@ where
             .map(|assignment| Self::resolve(assignment))
             .collect();
 
-        // Apply row-level deduplication
+        // Apply row-level deduplication using unified signature method
         // SubgraphMatcher deduplicates assignments, but different assignments
         // can produce identical rows (e.g., when internal structure differs
         // but port connections are the same)
-        use ahash::AHashSet;
-        if ctx.config().dedupe.all() {
-            let mut seen = AHashSet::new();
-            row_matches.retain(|entry| seen.insert(entry.signature_all()));
-        } else if ctx.config().dedupe.inner() {
-            let mut seen = AHashSet::new();
-            row_matches.retain(|entry| seen.insert(entry.signature_inner()));
-        }
+        crate::traits::apply_deduplication(&mut row_matches, ctx.config());
 
         let table = Table::<Self>::new(row_matches)?;
         Ok(table)

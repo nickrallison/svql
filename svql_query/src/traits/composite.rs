@@ -134,16 +134,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     /// Apply deduplication based on the configured strategy.
     fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
-        use ahash::AHashSet;
-
-        if config.dedupe.all() {
-            let mut seen = AHashSet::new();
-            entries.retain(|entry| seen.insert(entry.signature_all()));
-        } else if config.dedupe.inner() {
-            let mut seen = AHashSet::new();
-            entries.retain(|entry| seen.insert(entry.signature_inner()));
-        }
-        // Dedupe::None: no action
+        crate::traits::apply_deduplication(entries, config);
     }
 
     /// Custom validation hook for filters (override to add filtering logic)

@@ -12,7 +12,7 @@ query_test!(
     name: test_locked_reg_simple,
     query: LockedRegister,
     haystack: ("examples/fixtures/cwes/cwe1234/cwe1234_simple.v", "cwe1234_simple"),
-    expect: 1,
+    expect: 2,
     config: cwe1234_config
 );
 

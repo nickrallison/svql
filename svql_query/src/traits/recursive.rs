@@ -251,8 +251,6 @@ where
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::define_primitive;
 
     use super::*;
