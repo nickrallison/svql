@@ -55,7 +55,6 @@ prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", br
 ahash = "0.8.8"
 argparse = "0.2"
 contracts = "0.6.6"
-polars = { version = "0.46", features = ["lazy", "dtype-u8", "dtype-i8"] }
 dashmap = "6.1.0"
 easy-smt = "0.3"
 env_logger = "0.11.5"
@@ -88,11 +87,11 @@ all = "deny"
 # pedantic = "deny"
 
 [profile.release]
-codegen-units = 1
-lto = "fat"
+# codegen-units = 1
+# lto = "fat"
 debug = 1
 
-[profile.profiling]
-inherits = "release"
-lto = "thin"
-debug = 1
+# [profile.profiling]
+# inherits = "release"
+# lto = "thin"
+# debug = 1

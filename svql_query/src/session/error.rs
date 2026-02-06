@@ -5,7 +5,6 @@
 
 use std::any::TypeId;
 
-use polars::prelude::PolarsError;
 use thiserror::Error;
 
 /// Errors that can occur during query preparation or execution.
@@ -38,10 +37,6 @@ pub enum QueryError {
     MissingRegistration(TypeId),
 
     // === Execution phase errors (rare, indicate bugs or resource issues) ===
-    /// DataFrame/Polars operation failed.
-    #[error("DataFrame operation failed: {0}")]
-    DataFrame(#[from] PolarsError),
-
     /// Missing dependency table during search (indicates DAG ordering bug).
     #[error("Internal: missing dependency table '{0}' (DAG ordering bug)")]
     MissingDependency(String),
@@ -53,6 +48,7 @@ pub enum QueryError {
     #[error("Execution error: {0}")]
     ExecutionError(String),
 }
+
 
 impl QueryError {
     /// Create a design load error.

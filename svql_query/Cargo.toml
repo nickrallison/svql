@@ -28,7 +28,6 @@ ahash.workspace = true
 contracts.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
-polars.workspace = true
 rayon = { workspace = true, optional = true }
 regex.workspace = true
 serde.workspace = true
@@ -40,7 +39,6 @@ tracing-subscriber.workspace = true
 unstringify.workspace = true
 walkdir.workspace = true
 argparse.workspace = true
-# polars-core.workspace = true
 
 [build-dependencies]
 ###############

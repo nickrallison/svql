@@ -1,13 +1,13 @@
 //! Type-safe wrapper for cell IDs in hardware designs.
 //!
 //! `CellId` is a wrapper around `u32` that provides type safety and
-//! compatibility with Polars `DataFrame` indexing.
+//! compact storage.
 
 use std::fmt;
 
 /// A type-safe identifier for cells in a hardware design.
 ///
-/// Internally uses `u32` to match Polars `DataFrame` indexing requirements.
+/// Internally uses `u32` for compact storage and efficient indexing.
 /// This provides compile-time guarantees that cell IDs aren't confused
 /// with other numeric values.
 ///
@@ -108,7 +108,7 @@ impl From<CellId> for usize {
     }
 }
 
-// Polars integration: allow collecting CellId into DataFrame columns
+// Allow collecting CellId into table columns
 impl From<CellId> for i64 {
     #[inline]
     fn from(id: CellId) -> Self {

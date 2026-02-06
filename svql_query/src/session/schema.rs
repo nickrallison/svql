@@ -296,18 +296,6 @@ impl ColumnDef {
             _ => None,
         }
     }
-
-    #[must_use]
-    pub fn into_polars_column(&self) -> polars::frame::column::Column {
-        use polars::prelude::*;
-
-        let d_type = match &self.kind {
-            ColumnKind::Cell => DataType::UInt64,
-            ColumnKind::Sub(_tid) => DataType::UInt32,
-            ColumnKind::Metadata => DataType::UInt64,
-        };
-        Column::new_empty(PlSmallStr::from_static(self.name), &d_type)
-    }
 }
 
 /// Port declaration for netlist and variant schemas

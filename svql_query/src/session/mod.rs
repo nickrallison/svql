@@ -1,11 +1,12 @@
-//! DataFrame-based session management for query results.
+//! Session management for query results.
 //!
-//! This module provides a `Session` struct that replaces the traditional
-//! index lookup tables with polars `DataFrames`, enabling:
+//! This module provides a `Session` struct that uses simple columnar storage
+//! for pattern results, enabling:
 //! - Foreign-key style references between result tables
 //! - Lazy rehydration of match results
 //! - Efficient columnar storage of dehydrated matches
 
+mod columnar;
 pub mod connection_builder;
 mod error;
 mod execution;
@@ -16,6 +17,7 @@ mod store;
 mod table;
 // mod variant_ref;
 
+pub use columnar::ColumnStore;
 pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
@@ -29,7 +31,6 @@ pub use store::Store;
 pub use table::{AnyTable, Table};
 // pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
 
-use polars::prelude::*;
 use thiserror::Error;
 
 /// Errors that can occur during session operations.
@@ -39,8 +40,6 @@ pub enum SessionError {
     DesignNotLoaded(String),
     #[error("Query results not found for type: {0}")]
     ResultsNotFound(String),
-    #[error("Polars error: {0}")]
-    Polars(#[from] PolarsError),
     #[error("Invalid match index: {0}")]
     InvalidMatchIndex(u32),
     #[error("Rehydration error: {0}")]

@@ -149,7 +149,7 @@ impl<T> Default for Ref<T> {
     }
 }
 
-// Polars integration: allow collecting Ref<T> into a column
+// Allow collecting Ref<T> into a column
 impl<T> From<Ref<T>> for i64 {
     #[inline]
     fn from(r: Ref<T>) -> Self {

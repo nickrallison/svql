@@ -1,25 +1,23 @@
-//! Typed `DataFrame` wrapper for pattern results.
+//! Typed table wrapper for pattern results.
 //!
-//! `Table<T>` wraps a Polars `DataFrame` while providing type-safe
+//! `Table<T>` wraps a simple columnar store while providing type-safe
 //! access to rows as `Row<T>` and references as `Ref<T>`.
 
 use std::marker::PhantomData;
 
-use polars::prelude::*;
-
+use super::columnar::ColumnStore;
 use crate::prelude::*;
 
-/// A typed wrapper around a `DataFrame` storing pattern match results.
+/// A typed wrapper around a columnar store for pattern match results.
 ///
-/// Each row in the `DataFrame` represents one match of pattern `T`.
+/// Each row represents one match of pattern `T`.
 /// The schema is defined by `T::COLUMNS` on the `Pattern` trait.
 ///
 /// # Column Types
 ///
-/// - **Wire columns** (`ColumnKind::Wire`): Store as `i64` (`CellId::raw()`)
-/// - **Sub columns** (`ColumnKind::Sub`): Store as `u32` (row index or -1 for NULL)
-/// - **Metadata columns**: Various types (depth as u32, etc.)
-/// - **path**: Always present as `Utf8` column
+/// - **Wire columns** (`ColumnKind::Wire`): Store as `u32` (`CellId::raw()`)
+/// - **Sub columns** (`ColumnKind::Sub`): Store as `u32` (row index)
+/// - **Metadata columns**: Store as `u32`
 ///
 /// # Usage
 ///
@@ -31,13 +29,8 @@ use crate::prelude::*;
 /// }
 /// ```
 pub struct Table<T> {
-    /// The underlying Polars `DataFrame`.
-    df: DataFrame,
-    // /// Column schema for this pattern type.
-    // columns: &'static [ColumnDef],
-    // /// Mapping from submodule column names to their target TypeId.
-    // /// Used for runtime type checking when accessing sub columns.
-    // sub_types: HashMap<&'static str, TypeId>,
+    /// The underlying columnar storage.
+    store: ColumnStore,
     /// Type marker.
     _marker: PhantomData<T>,
 }
@@ -53,35 +46,34 @@ where
     where
         T: Pattern,
     {
+        let column_names: Vec<String> = T::schema()
+            .columns()
+            .iter()
+            .map(|c| c.name.to_string())
+            .collect();
+
         if rows.is_empty() {
-            let cols: Vec<Column> = T::schema()
-                .columns()
-                .iter()
-                .map(super::schema::ColumnDef::into_polars_column)
-                .collect();
-            let df = DataFrame::new(cols)?;
+            let store = ColumnStore::new(column_names);
             return Ok(Self {
-                df,
+                store,
                 _marker: PhantomData,
             });
         }
 
-        let mut columns = Vec::with_capacity(T::SCHEMA_SIZE + 1);
+        let mut columns_data = Vec::with_capacity(T::SCHEMA_SIZE);
 
         // 1. Handle structural columns from the RowMatch array
         for i in 0..T::SCHEMA_SIZE {
-            let col_def = T::schema().column(i);
             let series_data: Vec<Option<u32>> =
                 rows.iter().map(|r| r.entries[i].as_u32()).collect();
-            columns.push(Column::new(
-                PlSmallStr::from_static(col_def.name),
-                series_data,
-            ));
+            columns_data.push(series_data);
         }
 
-        let df = DataFrame::new(columns)?;
+        let store = ColumnStore::from_columns(column_names, columns_data)
+            .map_err(|e| QueryError::ExecutionError(e))?;
+
         Ok(Self {
-            df,
+            store,
             _marker: PhantomData,
         })
     }
@@ -94,14 +86,10 @@ where
             .map(|c| c.name.to_string())
             .collect();
 
-        let df = self.df.clone().unique::<Vec<String>, String>(
-            Some(&subset),
-            UniqueKeepStrategy::First,
-            None,
-        )?;
+        let store = self.store.deduplicate_subset(&subset);
 
         Ok(Self {
-            df,
+            store,
             _marker: PhantomData,
         })
     }
@@ -109,48 +97,38 @@ where
     /// Get the number of rows (matches) in this table.
     #[inline]
     pub fn len(&self) -> usize {
-        self.df.height()
+        self.store.height()
     }
 
     /// Check if the table is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.df.height() == 0
+        self.store.height() == 0
     }
 
-    /// Get a reference to the underlying `DataFrame` for bulk operations.
+    /// Get a reference to the underlying columnar store for bulk operations.
     #[inline]
-    pub const fn df(&self) -> &DataFrame {
-        &self.df
+    pub const fn store(&self) -> &ColumnStore {
+        &self.store
     }
 
-    /// Get a mutable reference to the underlying `DataFrame`.
+    /// Get a mutable reference to the underlying columnar store.
     #[inline]
-    pub const fn df_mut(&mut self) -> &mut DataFrame {
-        &mut self.df
+    pub fn store_mut(&mut self) -> &mut ColumnStore {
+        &mut self.store
     }
 
     pub fn get_entry(&self, row_idx: usize, col_name: &str) -> Option<ColumnEntry> {
-        let col = self.df.column(col_name).ok()?;
+        let col = self.store.column(col_name)?;
         let idx = T::schema().index_of(col_name)?;
+        let val = col.get(row_idx).copied().flatten();
+
         match T::schema().column(idx).kind {
-            ColumnKind::Cell => {
-                let ca = col.u32().ok()?;
-                let val = ca.get(row_idx);
-                Some(ColumnEntry::Wire {
-                    value: val.map(CellId::new).map(crate::wire::WireRef::Cell),
-                })
-            }
-            ColumnKind::Sub(_) => {
-                let ca = col.u32().ok()?;
-                let val = ca.get(row_idx);
-                Some(ColumnEntry::Sub { id: val })
-            }
-            ColumnKind::Metadata => {
-                let ca = col.u32().ok()?;
-                let val = ca.get(row_idx);
-                Some(ColumnEntry::Metadata { id: val })
-            }
+            ColumnKind::Cell => Some(ColumnEntry::Wire {
+                value: val.map(CellId::new).map(crate::wire::WireRef::Cell),
+            }),
+            ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
+            ColumnKind::Metadata => Some(ColumnEntry::Metadata { id: val }),
         }
     }
 
@@ -159,7 +137,7 @@ where
     /// Returns `None` if the index is out of bounds.
     pub fn row(&self, row_idx: u32) -> Option<Row<T>> {
         let row_idx_usize = row_idx as usize;
-        if row_idx_usize >= self.df.height() {
+        if row_idx_usize >= self.store.height() {
             return None;
         }
 
@@ -198,7 +176,7 @@ where
             .field("type", &std::any::type_name::<T>())
             .field("len", &self.len())
             .field("columns", &T::schema().columns())
-            .field("df", &self.df)
+            .field("store", &self.store)
             .finish()
     }
 }
@@ -211,19 +189,13 @@ impl<T> std::fmt::Display for Table<T> {
             "\n╔══════════════════════════════════════════════════════════════════════════════"
         )?;
         writeln!(f, "║ Table: {type_name}  ")?;
-        writeln!(f, "║ Rows: {}", self.df.height())?;
+        writeln!(f, "║ Rows: {}", self.store.height())?;
         writeln!(
             f,
             "╚══════════════════════════════════════════════════════════════════════════════"
         )?;
 
-        // Use Polars' built-in DataFrame display with row index for easier reference
-        let df_with_row = self
-            .df
-            .clone()
-            .with_row_index("row".into(), None)
-            .unwrap_or(self.df.clone());
-        write!(f, "{df_with_row}")?;
+        write!(f, "{}", self.store)?;
 
         Ok(())
     }
@@ -272,7 +244,7 @@ where
     }
 
     fn len(&self) -> usize {
-        self.df.height()
+        self.store.height()
     }
 
     fn type_name(&self) -> &str {
@@ -288,9 +260,8 @@ where
             return None;
         }
 
-        let col = self.df.column(col_name).ok()?;
-        let ca = col.u32().ok()?;
-        ca.get(row_idx).map(crate::CellId::new)
+        let col = self.store.column(col_name)?;
+        col.get(row_idx).copied().flatten().map(crate::CellId::new)
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
@@ -302,9 +273,8 @@ where
         let col_def = T::schema().column(col_idx);
         let target_type = col_def.as_submodule()?;
 
-        let col = self.df.column(col_name).ok()?;
-        let ca = col.u32().ok()?;
-        let val = ca.get(row_idx)?;
+        let col = self.store.column(col_name)?;
+        let val = col.get(row_idx).copied().flatten()?;
 
         Some((val, target_type))
     }
