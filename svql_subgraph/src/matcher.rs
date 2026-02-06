@@ -109,6 +109,11 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Executes the matching process and applies deduplication.
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
+        #[cfg(not(feature = "rayon"))]
+        if self.config.parallel {
+            tracing::warn!("Parallel execution requested but 'rayon' feature is not enabled. Falling back to sequential execution.");
+        }
+
         tracing::info!(
             "[{} -> {}] starting subgraph search: needle cells: {}, haystack cells: {}",
             self.needle_name,
@@ -192,11 +197,32 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         self.active_branches.fetch_add(1, Ordering::SeqCst);
 
         #[cfg(feature = "rayon")]
-        let iter = candidates.into_par_iter();
-        #[cfg(not(feature = "rayon"))]
-        let iter = candidates.into_iter();
+        if self.config.parallel {
+            let results: Vec<_> = candidates
+                .into_par_iter()
+                .flat_map(|candidate| {
+                    let mut next_assignment = assignment.clone();
+                    next_assignment.assign(current_needle.clone(), candidate);
 
-        let results: Vec<_> = iter
+                    let res = self.match_gate_cells(
+                        next_assignment,
+                        gate_queue.clone(),
+                        input_queue.clone(),
+                        output_queue.clone(),
+                    );
+
+                    if is_root {
+                        self.initial_candidates_done.fetch_add(1, Ordering::SeqCst);
+                    }
+                    res
+                })
+                .collect();
+            self.active_branches.fetch_sub(1, Ordering::SeqCst);
+            return results;
+        }
+
+        let results: Vec<_> = candidates
+            .into_iter()
             .flat_map(|candidate| {
                 let mut next_assignment = assignment.clone();
                 next_assignment.assign(current_needle.clone(), candidate);
@@ -237,17 +263,27 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         }
 
         #[cfg(feature = "rayon")]
-        let iter = candidates.into_par_iter();
-        #[cfg(not(feature = "rayon"))]
-        let iter = candidates.into_iter();
+        if self.config.parallel {
+            return candidates
+                .into_par_iter()
+                .flat_map(|candidate| {
+                    let mut next_assignment = assignment.clone();
+                    next_assignment.assign(current_needle.clone(), candidate);
 
-        iter.flat_map(|candidate| {
-            let mut next_assignment = assignment.clone();
-            next_assignment.assign(current_needle.clone(), candidate);
+                    self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
+                })
+                .collect();
+        }
 
-            self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
-        })
-        .collect()
+        candidates
+            .into_iter()
+            .flat_map(|candidate| {
+                let mut next_assignment = assignment.clone();
+                next_assignment.assign(current_needle.clone(), candidate);
+
+                self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
+            })
+            .collect()
     }
 
     /// Recursive backtracking step for matching output ports.
@@ -268,17 +304,27 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         }
 
         #[cfg(feature = "rayon")]
-        let iter = candidates.into_par_iter();
-        #[cfg(not(feature = "rayon"))]
-        let iter = candidates.into_iter();
+        if self.config.parallel {
+            return candidates
+                .into_par_iter()
+                .flat_map(|candidate| {
+                    let mut next_assignment = assignment.clone();
+                    next_assignment.assign(current_needle.clone(), candidate);
 
-        iter.flat_map(|candidate| {
-            let mut next_assignment = assignment.clone();
-            next_assignment.assign(current_needle.clone(), candidate);
+                    self.match_output_cells(next_assignment, output_queue.clone())
+                })
+                .collect();
+        }
 
-            self.match_output_cells(next_assignment, output_queue.clone())
-        })
-        .collect()
+        candidates
+            .into_iter()
+            .flat_map(|candidate| {
+                let mut next_assignment = assignment.clone();
+                next_assignment.assign(current_needle.clone(), candidate);
+
+                self.match_output_cells(next_assignment, output_queue.clone())
+            })
+            .collect()
     }
 
     /// Filters haystack cells for output ports based on fan-in connectivity.

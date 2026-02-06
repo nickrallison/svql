@@ -327,6 +327,13 @@ impl ExecutionContext {
         config: svql_common::Config,
         slots: AHashMap<TypeId, TableSlot>,
     ) -> Self {
+        #[cfg(not(feature = "parallel"))]
+        if config.parallel {
+            tracing::warn!(
+                "Parallel execution requested but 'parallel' feature is not enabled. Falling back to sequential execution."
+            );
+        }
+
         Self {
             driver,
             design_key,

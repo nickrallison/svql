@@ -102,13 +102,20 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
-        
+
         #[cfg(feature = "parallel")]
-        let mut entries: Vec<EntryArray> = (0..first_table.len() as u32)
-            .into_par_iter()
-            .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
-            .collect();
-        
+        let mut entries: Vec<EntryArray> = if ctx.config().parallel {
+            (0..first_table.len() as u32)
+                .into_par_iter()
+                .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
+                .collect()
+        } else {
+            (0..first_table.len() as u32)
+                .into_iter()
+                .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
+                .collect()
+        };
+
         #[cfg(not(feature = "parallel"))]
         let mut entries: Vec<EntryArray> = (0..first_table.len() as u32)
             .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
@@ -375,8 +382,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let col_idx = sub_indices[join_idx];
 
         #[cfg(feature = "parallel")]
-        {
-            entries
+        if ctx.config().parallel {
+            return entries
                 .into_par_iter()
                 .flat_map_iter(|entry| {
                     (0..table.len() as u32).filter_map(move |new_row_idx| {
@@ -394,31 +401,28 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                         Self::validate(&row, ctx).then_some(candidate)
                     })
                 })
-                .collect()
+                .collect();
         }
-        
-        #[cfg(not(feature = "parallel"))]
-        {
-            entries
-                .into_iter()
-                .flat_map(|entry| {
-                    (0..table.len() as u32).filter_map(move |new_row_idx| {
-                        let mut candidate = entry.clone();
-                        candidate.entries[col_idx] = ColumnEntry::Sub {
-                            id: Some(new_row_idx),
-                        };
 
-                        let row = Row::<Self> {
-                            idx: 0,
-                            entry_array: candidate.clone(),
-                            _marker: PhantomData,
-                        };
+        entries
+            .into_iter()
+            .flat_map(|entry| {
+                (0..table.len() as u32).filter_map(move |new_row_idx| {
+                    let mut candidate = entry.clone();
+                    candidate.entries[col_idx] = ColumnEntry::Sub {
+                        id: Some(new_row_idx),
+                    };
 
-                        Self::validate(&row, ctx).then_some(candidate)
-                    })
+                    let row = Row::<Self> {
+                        idx: 0,
+                        entry_array: candidate.clone(),
+                        _marker: PhantomData,
+                    };
+
+                    Self::validate(&row, ctx).then_some(candidate)
                 })
-                .collect()
-        }
+            })
+            .collect()
     }
 
     fn resolve_aliases(
@@ -426,11 +430,36 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         ctx: &ExecutionContext,
     ) -> Result<Vec<EntryArray>, QueryError> {
         #[cfg(feature = "parallel")]
-        let iter = entries.into_par_iter();
-        #[cfg(not(feature = "parallel"))]
-        let iter = entries.into_iter();
-        
-        let final_entries = iter
+        if ctx.config().parallel {
+            let final_entries = entries
+                .into_par_iter()
+                .map(|mut entry| {
+                    let row = Row::<Self> {
+                        idx: 0,
+                        entry_array: entry.clone(),
+                        _marker: PhantomData,
+                    };
+
+                    for alias in Self::ALIASES {
+                        let wire_ref = row
+                            .resolve(alias.target, ctx)
+                            .and_then(|w| w.cell_id())
+                            .map(crate::wire::WireRef::Cell);
+
+                        if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
+                            entry.entries[idx] = ColumnEntry::Wire { value: wire_ref };
+                        }
+                    }
+
+                    entry
+                })
+                .collect();
+
+            return Ok(final_entries);
+        }
+
+        let final_entries = entries
+            .into_iter()
             .map(|mut entry| {
                 let row = Row::<Self> {
                     idx: 0,
