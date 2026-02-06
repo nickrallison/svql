@@ -435,16 +435,9 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             .collect()
     }
 
-    /// Removes duplicate assignments based on the configured deduplication strategy.
+    /// Removes duplicate assignments automatically.
     fn apply_deduplication(&self, results: &mut Vec<SingleAssignment<'needle, 'haystack>>) {
-        if self.config.dedupe.all() {
-            let mut seen = AHashSet::new();
-            results.retain(|m| seen.insert(m.signature()));
-        }
-
-        if self.config.dedupe.inner() {
-            let mut seen = AHashSet::new();
-            results.retain(|m| seen.insert(m.internal_signature()));
-        }
+        let mut seen = AHashSet::new();
+        results.retain(|assignment| seen.insert(assignment.signature()));
     }
 }

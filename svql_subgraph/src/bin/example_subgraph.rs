@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     // 3. Create the matcher
     let config = svql_common::Config::builder()
-        .dedupe(svql_common::Dedupe::Inner)
         .match_length(svql_common::MatchLength::NeedleSubsetHaystack)
         .build();
     let assignment_set = svql_subgraph::SubgraphMatcher::enumerate_all(

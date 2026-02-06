@@ -5,7 +5,7 @@ Provides shared configuration types, Yosys integration logic, and common test fi
 
 ## Key Responsibilities
 - **Yosys Management**: Manages the invocation of calls to Yosys to ingest netlist designs in a standardized format.
-- **Configuration**: Defines parameters for both design ingestion (e.g., flattening, optimization) and the subgraph isomorphism engine (e.g., match length, deduplication).
+- **Configuration**: Defines parameters for design ingestion (e.g., flattening, optimization) and the subgraph isomorphism engine (e.g., match length).
 - **Test Infrastructure**: Centralizes a library of "needle" and "haystack" definitions to ensure reproducible benchmarking and testing across the workspace.
 
 ## Core Abstractions
@@ -13,7 +13,7 @@ Provides shared configuration types, Yosys integration logic, and common test fi
 | :--- | :--- |
 | `YosysModule` | Represents a specific module within a source file and handles the transformation pipeline via Yosys. |
 | `ModuleConfig` | Encapsulates Yosys-specific passes such as `proc`, `flatten`, `memory`, and `opt_clean`. |
-| `Config` | Defines search constraints including `MatchLength` and `Dedupe` strategies. |
+| `Config` | Defines search constraints inlcuding `MatchLength`. |
 | `DesignPath` | Categorizes input files by extension to determine the appropriate Yosys read command. |
 
 

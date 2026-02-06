@@ -9,13 +9,11 @@ fn cwe1280_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
         .pattern_vars_match_design_consts(true)
         .haystack_opt(true)
-        .dedupe(Dedupe::None)
 }
 
 /// Configuration for the GrantAccess atomic netlist component
 fn grant_access_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::First)
-        .dedupe(Dedupe::None)
         .pattern_vars_match_design_consts(true)
 }
 

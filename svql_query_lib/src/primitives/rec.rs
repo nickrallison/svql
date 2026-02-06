@@ -510,7 +510,7 @@ mod tests {
         setup_test_logging();
 
         let driver = Driver::new_workspace()?;
-        let config = Config::builder().dedupe(Dedupe::All).build();
+        let config = Config::builder().build();
         let key = DriverKey::new(
             "examples/fixtures/basic/and/verilog/small_and_tree.v",
             "small_and_tree",
@@ -548,7 +548,7 @@ mod tests {
         setup_test_logging();
 
         let driver = Driver::new_workspace()?;
-        let config = Config::builder().dedupe(Dedupe::All).build();
+        let config = Config::builder().build();
         let key = DriverKey::new(
             "examples/fixtures/basic/and/verilog/small_and_tree.v",
             "small_and_tree",

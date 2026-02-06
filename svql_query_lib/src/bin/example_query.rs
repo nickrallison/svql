@@ -37,7 +37,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::None)
         .haystack_options(haystack_options)
         .build();
 

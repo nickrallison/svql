@@ -98,7 +98,6 @@ svql_query::define_dff_primitive!(Dff, [(clk, input), (d, input), (q, output)], 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use svql_common::Dedupe;
     use svql_query::query_test;
 
     query_test!(
@@ -106,6 +105,6 @@ mod tests {
         query: Dff,
         haystack: ("examples/fixtures/basic/ff/verilog/and_q_double_sdffe.v", "and_q_double_sdffe"),
         expect: 2,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        config: |config_builder| config_builder
     );
 }

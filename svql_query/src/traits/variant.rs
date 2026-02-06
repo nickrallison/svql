@@ -109,15 +109,15 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             }
         }
 
-        // Apply deduplication
-        Self::apply_deduplication(&mut all_entries, ctx.config());
+        // Apply automatic deduplication
+        Self::apply_deduplication(&mut all_entries);
 
         Table::new(all_entries)
     }
 
-    /// Apply deduplication based on the configured strategy.
-    fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
-        crate::traits::apply_deduplication(entries, config);
+    /// Apply automatic deduplication.
+    fn apply_deduplication(entries: &mut Vec<EntryArray>) {
+        crate::traits::apply_deduplication(entries);
     }
 
     fn preload_driver(
@@ -222,7 +222,6 @@ mod test {
     use crate::traits::composite::test::And2Gates;
     use crate::traits::netlist::test::AndGate;
 
-    use svql_common::Dedupe;
     use svql_query::query_test;
 
     #[derive(Debug, Clone, Variant)]
@@ -235,19 +234,10 @@ mod test {
     }
 
     query_test!(
-        name: test_and_mixed_and_tree_dedupe_none,
+        name: test_and_mixed_and_tree,
         query: AndOrAnd2,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 14,  // 6 AndGate + 8 And2Gates
-        config: |config_builder| config_builder.dedupe(Dedupe::None)
-    );
-
-    query_test!(
-        name: test_and_mixed_and_tree_dedupe_all,
-        query: AndOrAnd2,
-        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 5,  // 3 AndGate + 2 And2Gates
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        expect: 5  // 3 AndGate + 2 And2Gates
     );
 
     #[derive(Debug, Clone)]
@@ -345,7 +335,6 @@ mod test {
         name: test_manual_variant_small_tree,
         query: ManualAndOrAnd2,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 5,
-        config: |cb| cb.dedupe(Dedupe::All)
+        expect: 5
     );
 }

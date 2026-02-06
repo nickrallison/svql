@@ -4,7 +4,6 @@ use svql_query_lib::security::cwe1271::Cwe1271;
 
 fn cwe1271_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::All)
 }
 
 query_test!(

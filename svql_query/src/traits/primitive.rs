@@ -293,14 +293,6 @@ where
     {
         let haystack_key = ctx.design_key();
 
-        // Warn if Dedupe::None is used with primitives
-        if matches!(ctx.config().dedupe, svql_common::Dedupe::None) {
-            // tracing::warn!(
-            //     "Dedupe::None has no effect on primitive {} - primitives enumerate cells directly without combinatorial expansion. Use Dedupe::All instead, behavior does not change, but will match the expected behavior of netlists.",
-            //     std::any::type_name::<T>()
-            // );
-        }
-
         info!(
             "Loading design for primitive {} search: {:?}",
             std::any::type_name::<T>(),
@@ -514,28 +506,17 @@ macro_rules! define_dff_primitive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use svql_common::Dedupe;
     use svql_query::query_test;
 
     // Example primitive gate
     define_primitive!(TestAndGate, And, [(a, input), (b, input), (y, output)]);
 
     // small_and_tree has 3 AND gates total
-    // Dedupe::None will warn but still return 3 matches (same as Dedupe::All)
     query_test!(
-        name: test_and_gate_small_tree_dedupe_none,
+        name: test_and_gate_small_tree,
         query: TestAndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 3,  // Same as Dedupe::All - primitives don't have permutations
-        config: |config_builder| config_builder.dedupe(Dedupe::None)
-    );
-
-    query_test!(
-        name: test_and_gate_small_tree_dedupe_all,
-        query: TestAndGate,
-        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 3,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        expect: 3  // Automatically deduplicated
     );
 
     #[test]
@@ -545,7 +526,7 @@ mod tests {
         setup_test_logging();
 
         let driver = Driver::new_workspace()?;
-        let config = Config::builder().dedupe(Dedupe::All).build();
+        let config = Config::builder().build();
         let key = DriverKey::new(
             "examples/fixtures/basic/and/verilog/small_and_tree.v",
             "small_and_tree",

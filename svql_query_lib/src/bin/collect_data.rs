@@ -262,7 +262,6 @@
 //         let driver = Driver::new_workspace().expect("Failed to create driver");
 //         let search_config = Config::builder()
 //             .match_length(MatchLength::NeedleSubsetHaystack)
-//             .dedupe(Dedupe::Inner)
 //             .max_recursion_depth(Some(task.max_depth))
 //             .build();
 
@@ -333,7 +332,6 @@
 //         let driver = Driver::new_workspace().expect("Failed to create driver");
 //         let search_config = Config::builder()
 //             .match_length(MatchLength::NeedleSubsetHaystack)
-//             .dedupe(Dedupe::Inner)
 //             .max_recursion_depth(Some(task.max_depth))
 //             .build();
 

@@ -126,15 +126,15 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Resolve aliases
         let mut final_entries = Self::resolve_aliases(entries, ctx)?;
 
-        // Apply deduplication
-        Self::apply_deduplication(&mut final_entries, ctx.config());
+        // Apply automatic deduplication
+        Self::apply_deduplication(&mut final_entries);
 
         Table::new(final_entries)
     }
 
-    /// Apply deduplication based on the configured strategy.
-    fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
-        crate::traits::apply_deduplication(entries, config);
+    /// Apply automatic deduplication.
+    fn apply_deduplication(entries: &mut Vec<EntryArray>) {
+        crate::traits::apply_deduplication(entries);
     }
 
     /// Custom validation hook for filters (override to add filtering logic)
@@ -489,7 +489,6 @@ pub(crate) mod test {
 
     use crate::traits::netlist::test::AndGate;
 
-    use svql_common::Dedupe;
     use svql_query::query_test;
 
     #[derive(Debug, Clone, Composite)]
@@ -511,19 +510,10 @@ pub(crate) mod test {
     }
 
     query_test!(
-        name: test_and2gates_small_and_tree_dedupe_none,
+        name: test_and2gates_small_and_tree,
         query: And2Gates,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 8,
-        config: |config_builder| config_builder.dedupe(Dedupe::None)
-    );
-
-    query_test!(
-        name: test_and2gates_small_and_tree_dedupe_all,
-        query: And2Gates,
-        haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 2,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        expect: 2  // Automatically deduplicated
     );
 
     #[derive(Debug, Clone)]
@@ -609,7 +599,6 @@ pub(crate) mod test {
         name: test_manual_and2gates_small_tree,
         query: ManualAnd2Gates,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 2,
-        config: |cb| cb.dedupe(Dedupe::All)
+        expect: 2
     );
 }

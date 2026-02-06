@@ -34,7 +34,6 @@ svql_query::define_primitive!(MulGate, Mul, [(a, input), (b, input), (y, output)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use svql_common::Dedupe;
     use svql_query::query_test;
 
     query_test!(
@@ -42,7 +41,7 @@ mod tests {
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
         expect: 3,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        config: |config_builder| config_builder
     );
 
     query_test!(
@@ -50,6 +49,6 @@ mod tests {
         query: OrGate,
         haystack: ("examples/fixtures/basic/or/verilog/small_or_tree.v", "small_or_tree"),
         expect: 3,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        config: |config_builder| config_builder
     );
 }

@@ -7,7 +7,6 @@ use svql_query_lib::security::cwe1234::Cwe1234;
 // Common config for CWE-1234 tests
 fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(Dedupe::All)
 }
 
 query_test!(

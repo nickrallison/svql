@@ -12,8 +12,6 @@ use crate::ModuleConfig;
 pub struct Config {
     /// The length of the match to find.
     pub match_length: MatchLength,
-    /// How to deduplicate matches.
-    pub dedupe: Dedupe,
     /// Configuration for the needle (pattern) module.
     pub needle_options: ModuleConfig,
     /// Configuration for the haystack (target) module.
@@ -25,11 +23,10 @@ pub struct Config {
 }
 
 impl Default for Config {
-    /// Returns default configuration with First match length and Inner deduplication.
+    /// Returns default configuration with First match length.
     fn default() -> Self {
         Self {
             match_length: MatchLength::First,
-            dedupe: Dedupe::None,
             needle_options: ModuleConfig::default(),
             haystack_options: ModuleConfig::default(),
             pattern_vars_match_design_consts: true,
@@ -43,7 +40,6 @@ impl Config {
     #[must_use]
     pub const fn new(
         match_length: MatchLength,
-        dedupe: Dedupe,
         needle_options: ModuleConfig,
         haystack_options: ModuleConfig,
         pattern_vars_match_design_consts: bool,
@@ -51,7 +47,6 @@ impl Config {
     ) -> Self {
         Self {
             match_length,
-            dedupe,
             needle_options,
             haystack_options,
             pattern_vars_match_design_consts,
@@ -69,7 +64,6 @@ impl Config {
 impl Hash for Config {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.match_length.hash(state);
-        self.dedupe.hash(state);
         self.needle_options.hash(state);
         self.pattern_vars_match_design_consts.hash(state);
     }
@@ -79,7 +73,6 @@ impl Hash for Config {
 #[derive(Clone, Debug)]
 pub struct ConfigBuilder {
     match_length: MatchLength,
-    dedupe: Dedupe,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
     pub pattern_vars_match_design_consts: bool,
@@ -91,7 +84,6 @@ impl Default for ConfigBuilder {
     fn default() -> Self {
         Self {
             match_length: MatchLength::default(),
-            dedupe: Dedupe::default(),
             needle_options: ModuleConfig::default(),
             haystack_options: ModuleConfig::default(),
             pattern_vars_match_design_consts: true, // Match Config::default()
@@ -106,13 +98,6 @@ impl ConfigBuilder {
     #[must_use]
     pub const fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
-        self
-    }
-
-    /// Sets the deduplication strategy.
-    #[must_use]
-    pub const fn dedupe(mut self, value: Dedupe) -> Self {
-        self.dedupe = value;
         self
     }
 
@@ -203,7 +188,6 @@ impl ConfigBuilder {
     pub fn build(self) -> Config {
         Config {
             match_length: self.match_length,
-            dedupe: self.dedupe,
             needle_options: self.needle_options,
             haystack_options: self.haystack_options,
             pattern_vars_match_design_consts: self.pattern_vars_match_design_consts,
@@ -250,49 +234,6 @@ impl FromStr for MatchLength {
             "first" => Ok(Self::First),
             "needle_subset_haystack" => Ok(Self::NeedleSubsetHaystack),
             "exact" => Ok(Self::Exact),
-            _ => Err(()),
-        }
-    }
-}
-
-/// Defines how to handle duplicate results in the search output.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub enum Dedupe {
-    /// No deduplication is performed.
-    None,
-    /// Deduplicate based on the internal logic gates (ignoring I/O ports).
-    #[default]
-    Inner,
-    /// Deduplicate based on the entire set of assigned cells (including I/O ports).
-    All,
-}
-
-impl Dedupe {
-    /// Returns true if the strategy is None.
-    #[must_use]
-    pub const fn none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-    /// Returns true if the strategy is Inner.
-    #[must_use]
-    pub const fn inner(&self) -> bool {
-        matches!(self, Self::Inner)
-    }
-    /// Returns true if the strategy is All.
-    #[must_use]
-    pub const fn all(&self) -> bool {
-        matches!(self, Self::All)
-    }
-}
-
-impl FromStr for Dedupe {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "none" => Ok(Self::None),
-            "inner" => Ok(Self::Inner),
-            "all" => Ok(Self::All),
             _ => Err(()),
         }
     }

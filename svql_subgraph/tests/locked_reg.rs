@@ -3,7 +3,6 @@ use svql_subgraph::query_test;
 
 fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
-        .dedupe(svql_common::Dedupe::Inner)
 }
 
 query_test!(

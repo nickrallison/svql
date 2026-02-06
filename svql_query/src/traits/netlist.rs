@@ -181,11 +181,8 @@ where
             .map(|assignment| Self::resolve(assignment))
             .collect();
 
-        // Apply row-level deduplication using unified signature method
-        // SubgraphMatcher deduplicates assignments, but different assignments
-        // can produce identical rows (e.g., when internal structure differs
-        // but port connections are the same)
-        crate::traits::apply_deduplication(&mut row_matches, ctx.config());
+        // Apply automatic row-level deduplication
+        crate::traits::apply_deduplication(&mut row_matches);
 
         let table = Table::<Self>::new(row_matches)?;
         Ok(table)
@@ -210,7 +207,6 @@ pub(crate) mod test {
     use crate::Wire;
 
     use super::{Component, Driver, DriverKey, Netlist, Port, Row, Store, kind};
-    use svql_common::Dedupe;
 
     use svql_query::query_test;
 
@@ -229,19 +225,10 @@ pub(crate) mod test {
     }
 
     query_test!(
-        name: test_and_mixed_and_tree_dedupe_none,
+        name: test_and_mixed_and_tree,
         query: AndGate,
         haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-        expect: 6,
-        config: |config_builder| config_builder.dedupe(Dedupe::None)
-    );
-
-    query_test!(
-        name: test_and_mixed_and_tree_dedupe_all,
-        query: AndGate,
-        haystack: ("examples/fixtures/basic/and/json/mixed_and_tree.json", "mixed_and_tree"),
-        expect: 3,
-        config: |config_builder| config_builder.dedupe(Dedupe::All)
+        expect: 3  // Automatically deduplicated
     );
 
     // --- Reference Implementation (Manual) ---

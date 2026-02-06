@@ -17,29 +17,15 @@ use tracing::info;
 use crate::prelude::*;
 use crate::session::EntryArray;
 
-/// Apply deduplication to a list of entries based on the configured strategy.
+/// Apply automatic deduplication to a list of entries.
 ///
-/// Uses the unified `EntryArray::signature()` method which handles all strategies:
-/// - `Dedupe::None` - no deduplication
-/// - `Dedupe::Inner` - deduplicates based on Sub/Metadata entries (falls back to All if empty)
-/// - `Dedupe::All` - deduplicates based on all entries
-pub fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
+/// Removes rows with identical signatures (all wire references, submodule references,
+/// and metadata). This is always enabled to prevent redundant results.
+pub fn apply_deduplication(entries: &mut Vec<EntryArray>) {
     use ahash::AHashSet;
 
-    // Use the unified signature method that handles the fallback logic
-    if let Some(mut seen) = entries
-        .first()
-        .and_then(|e| e.signature(&config.dedupe))
-        .map(|_| AHashSet::new())
-    {
-        entries.retain(|entry| {
-            if let Some(sig) = entry.signature(&config.dedupe) {
-                seen.insert(sig)
-            } else {
-                true // Dedupe::None returns None, keep all entries
-            }
-        });
-    }
+    let mut seen = AHashSet::new();
+    entries.retain(|entry| seen.insert(entry.signature()));
 }
 
 /// Returns the column index for a given column name in the schema.

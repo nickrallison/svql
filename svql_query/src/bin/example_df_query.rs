@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     let haystack_path = "examples/fixtures/basic/and/verilog/small_and_tree.v";
     let haystack_module = "small_and_tree";
-    let config = Config::builder().dedupe(Dedupe::None).build();
+    let config = Config::builder().build();
 
     let driver = Driver::new_workspace()?;
 
