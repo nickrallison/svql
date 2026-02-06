@@ -142,13 +142,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     /// Validate connectivity constraints
     fn validate_connections(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
-        let driver = ctx.driver();
-        let key = ctx.design_key();
-
-        let design = match driver.get_design(&key, &ctx.config().haystack_options) {
-            Ok(d) => d,
-            Err(_) => return false,
-        };
+        // Use the cached haystack design from context instead of calling get_design
+        let design = ctx.haystack_design();
         let _graph = design.index();
 
         // Check each CNF group (conjunction of disjunctions)

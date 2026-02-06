@@ -7,8 +7,8 @@
 //! This module provides the infrastructure. The actual `search` function
 //! pointers are provided by the `Pattern` trait implementations.
 
-use std::any::{Any, TypeId};
 use ahash::{AHashMap, AHashSet};
+use std::any::{Any, TypeId};
 use std::hash::Hash;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock};
@@ -176,8 +176,19 @@ impl ExecutionPlan {
         config: &svql_common::Config,
         slots: AHashMap<TypeId, TableSlot>,
     ) -> Result<Store, QueryError> {
+        // Load and cache the haystack design once
+        let haystack_design = driver
+            .get_design(key, &config.haystack_options)
+            .map_err(|e| QueryError::design_load(e.to_string()))?;
+
         // Create shared context
-        let ctx = ExecutionContext::new(driver.clone(), key.clone(), config.clone(), slots);
+        let ctx = ExecutionContext::new(
+            driver.clone(),
+            key.clone(),
+            haystack_design,
+            config.clone(),
+            slots,
+        );
 
         if config.parallel {
             self.execute_parallel(&ctx)?;
@@ -299,6 +310,8 @@ pub struct ExecutionContext {
     driver: Driver,
     /// Key for the design being searched.
     design_key: DriverKey,
+    /// Cached haystack design container to avoid repeated get_design calls.
+    haystack_design: Arc<svql_driver::design_container::DesignContainer>,
     /// Execution configuration.
     config: svql_common::Config,
     /// Slots to hold results during execution.
@@ -310,12 +323,14 @@ impl ExecutionContext {
     pub fn new(
         driver: Driver,
         design_key: DriverKey,
+        haystack_design: Arc<svql_driver::design_container::DesignContainer>,
         config: svql_common::Config,
         slots: AHashMap<TypeId, TableSlot>,
     ) -> Self {
         Self {
             driver,
             design_key,
+            haystack_design,
             config,
             slots,
         }
@@ -337,6 +352,12 @@ impl ExecutionContext {
     #[must_use]
     pub const fn config(&self) -> &svql_common::Config {
         &self.config
+    }
+
+    /// Get the cached haystack design container.
+    #[must_use]
+    pub fn haystack_design(&self) -> &Arc<svql_driver::design_container::DesignContainer> {
+        &self.haystack_design
     }
 
     /// Retrieve a completed dependency table by `TypeId`.

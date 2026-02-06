@@ -158,14 +158,12 @@ where
         let needle_key = Self::driver_key();
         let haystack_key = ctx.design_key();
 
+        // Load needle design once, use cached haystack design from context
         let needle_container = ctx
             .driver()
             .get_design(&needle_key, &ctx.config().needle_options)
             .map_err(|e| QueryError::needle_load(e.to_string()))?;
-        let haystack_container = ctx
-            .driver()
-            .get_design(&haystack_key, &ctx.config().haystack_options)
-            .map_err(|e| QueryError::design_load(e.to_string()))?;
+        let haystack_container = ctx.haystack_design();
 
         let assignments = subgraph::SubgraphMatcher::enumerate_with_indices(
             needle_container.design(),

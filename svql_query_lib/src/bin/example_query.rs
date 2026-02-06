@@ -1,6 +1,6 @@
 use svql_query::prelude::*;
-use svql_query_lib::{AndGate, security::cwe1234::Cwe1234};
-use tracing::{Level, info};
+use svql_query_lib::security::cwe1234::Cwe1234;
+use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()

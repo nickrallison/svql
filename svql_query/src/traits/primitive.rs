@@ -307,10 +307,8 @@ where
             haystack_key
         );
 
-        let haystack_container = ctx
-            .driver()
-            .get_design(&haystack_key, &ctx.config().haystack_options)
-            .map_err(|e| QueryError::design_load(e.to_string()))?;
+        // Use the cached haystack design from context instead of calling get_design
+        let haystack_container = ctx.haystack_design();
 
         trace!(
             "Design loaded for primitive {} search: {:?}",
