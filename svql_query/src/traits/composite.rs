@@ -3,7 +3,12 @@ use std::marker::PhantomData;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use crate::{prelude::*, selector::Selector};
+use ahash::AHashSet;
+use crate::{
+    prelude::*,
+    selector::Selector,
+    session::join_planner::ConnectivityCache,
+};
 
 /// Connection constraint (keeping existing struct, just updating signature)
 #[derive(Debug, Clone, Copy)]
@@ -112,6 +117,9 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let join_order: Vec<usize> = (0..sub_indices.len()).collect();
         tracing::debug!("[COMPOSITE] Join order: {:?}", join_order);
 
+        // Build connectivity cache once
+        let connectivity_cache = ConnectivityCache::build::<Self>(dep_tables, ctx);
+
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
         tracing::info!("[COMPOSITE] Starting with {} entries from first table: {}", 
@@ -144,7 +152,14 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 join_step + 1, join_order.len() - 1, table_name, table.len());
             
             let before_join = entries.len();
-            entries = Self::join_and_filter(entries, join_idx, table, sub_indices, ctx);
+            entries = Self::join_and_filter(
+                entries,
+                join_idx,
+                table,
+                sub_indices,
+                ctx,
+                &connectivity_cache,
+            );
             
             tracing::debug!("[COMPOSITE] After join: {} -> {} entries ({} filtered out)", 
                 before_join, entries.len(), before_join.saturating_sub(entries.len()));
@@ -416,51 +431,212 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         table: &(dyn AnyTable + Send + Sync),
         sub_indices: &[usize],
         ctx: &ExecutionContext,
+        connectivity_cache: &ConnectivityCache,
     ) -> Vec<EntryArray> {
-        let col_idx = sub_indices[join_idx];
+        tracing::debug!(
+            "[JOIN] Joining submodule {} ({} existing entries × {} new rows)",
+            join_idx,
+            entries.len(),
+            table.len()
+        );
+
+        let start = std::time::Instant::now();
 
         #[cfg(feature = "parallel")]
-        if ctx.config().parallel {
-            return entries
+        let result = if ctx.config().parallel {
+            entries
                 .into_par_iter()
                 .flat_map_iter(|entry| {
-                    (0..table.len() as u32).filter_map(move |new_row_idx| {
-                        let mut candidate = entry.clone();
-                        candidate.entries[col_idx] = ColumnEntry::Sub {
-                            id: Some(new_row_idx),
-                        };
-
-                        let row = Row::<Self> {
-                            idx: 0,
-                            entry_array: candidate.clone(),
-                            _marker: PhantomData,
-                        };
-
-                        Self::validate(&row, ctx).then_some(candidate)
-                    })
+                    Self::expand_with_index(
+                        entry,
+                        join_idx,
+                        table,
+                        sub_indices,
+                        ctx,
+                        connectivity_cache,
+                    )
                 })
-                .collect();
-        }
+                .collect()
+        } else {
+            entries
+                .into_iter()
+                .flat_map(|entry| {
+                    Self::expand_with_index(
+                        entry,
+                        join_idx,
+                        table,
+                        sub_indices,
+                        ctx,
+                        connectivity_cache,
+                    )
+                })
+                .collect()
+        };
 
-        entries
+        #[cfg(not(feature = "parallel"))]
+        let result: Vec<EntryArray> = entries
             .into_iter()
             .flat_map(|entry| {
-                (0..table.len() as u32).filter_map(move |new_row_idx| {
-                    let mut candidate = entry.clone();
-                    candidate.entries[col_idx] = ColumnEntry::Sub {
-                        id: Some(new_row_idx),
-                    };
-
-                    let row = Row::<Self> {
-                        idx: 0,
-                        entry_array: candidate.clone(),
-                        _marker: PhantomData,
-                    };
-
-                    Self::validate(&row, ctx).then_some(candidate)
-                })
+                Self::expand_with_index(
+                    entry,
+                    join_idx,
+                    table,
+                    sub_indices,
+                    ctx,
+                    connectivity_cache,
+                )
             })
-            .collect()
+            .collect();
+
+        tracing::debug!(
+            "[JOIN] Join complete: {} candidates in {:?}",
+            result.len(),
+            start.elapsed()
+        );
+
+        result
+    }
+
+    /// Expand a partial assignment by joining with a new submodule.
+    ///
+    /// Uses connectivity index to only enumerate valid candidates.
+    fn expand_with_index(
+        partial_entry: EntryArray,
+        new_sub_idx: usize,
+        new_table: &(dyn AnyTable + Send + Sync),
+        sub_indices: &[usize],
+        ctx: &ExecutionContext,
+        connectivity_cache: &ConnectivityCache,
+    ) -> impl Iterator<Item = EntryArray> {
+        let col_idx = sub_indices[new_sub_idx];
+
+        // Determine which existing submodules the new one connects to
+        let connected_subs = Self::find_connected_submodules(new_sub_idx);
+
+        // Get valid candidates from connectivity indices
+        let valid_new_rows = if connected_subs.is_empty() {
+            // No constraints - try all rows
+            (0..new_table.len() as u32).collect()
+        } else {
+            // Intersect valid sets from all connections
+            Self::compute_valid_candidates(
+                &partial_entry,
+                new_sub_idx,
+                &connected_subs,
+                sub_indices,
+                connectivity_cache,
+                new_table.len(),
+            )
+        };
+
+        // Only enumerate the valid candidates
+        valid_new_rows.into_iter().filter_map(move |new_row_idx| {
+            let mut candidate = partial_entry.clone();
+            candidate.entries[col_idx] = ColumnEntry::Sub {
+                id: Some(new_row_idx),
+            };
+
+            // Still need to validate (handles CNF OR groups, custom filters, etc.)
+            let row = Row::<Self> {
+                idx: 0,
+                entry_array: candidate.clone(),
+                _marker: PhantomData,
+            };
+
+            Self::validate(&row, ctx).then_some(candidate)
+        })
+    }
+
+    /// Find which already-joined submodules the new submodule connects to.
+    fn find_connected_submodules(new_sub_idx: usize) -> Vec<(usize, usize, bool)> {
+        let mut result = Vec::new();
+
+        for (cnf_idx, cnf_group) in Self::CONNECTIONS.connections.iter().enumerate() {
+            for conn in cnf_group.iter() {
+                let from_sub = Self::resolve_submodule(&conn.from);
+                let to_sub = Self::resolve_submodule(&conn.to);
+
+                // Check if this connection involves the new submodule
+                match (from_sub, to_sub) {
+                    (Some(f), Some(t)) if f == new_sub_idx => {
+                        result.push((t, cnf_idx, true)); // true = new_sub is source
+                    }
+                    (Some(f), Some(t)) if t == new_sub_idx => {
+                        result.push((f, cnf_idx, false)); // false = new_sub is target
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Compute valid candidate rows for the new submodule.
+    ///
+    /// Returns intersection of all connectivity constraints.
+    fn compute_valid_candidates(
+        partial_entry: &EntryArray,
+        new_sub_idx: usize,
+        connected_subs: &[(usize, usize, bool)],
+        sub_indices: &[usize],
+        connectivity_cache: &ConnectivityCache,
+        new_table_len: usize,
+    ) -> Vec<u32> {
+        let mut valid_sets: Vec<AHashSet<u32>> = Vec::new();
+
+        for (existing_sub_idx, cnf_idx, is_new_sub_from) in connected_subs {
+            // Get the row index of the already-joined submodule
+            let existing_col_idx = sub_indices[*existing_sub_idx];
+            let existing_row = match partial_entry.entries[existing_col_idx] {
+                ColumnEntry::Sub { id: Some(row_idx) } => row_idx,
+                _ => continue,
+            };
+
+            // Determine direction of the connection for the cache lookup
+            let (from_sub, to_sub) = if *is_new_sub_from {
+                (new_sub_idx, *existing_sub_idx)
+            } else {
+                (*existing_sub_idx, new_sub_idx)
+            };
+
+            // Get the connectivity index
+            if let Some(index) = connectivity_cache.get(from_sub, to_sub, *cnf_idx) {
+                let valid_candidates = if *is_new_sub_from {
+                    // New submodule is source, existing is target
+                    index.sources(existing_row)
+                } else {
+                    // Existing is source, new submodule is target
+                    index.targets(existing_row)
+                };
+
+                if let Some(candidates) = valid_candidates {
+                    valid_sets.push(candidates.clone());
+                } else {
+                    // No valid candidates - early exit
+                    return Vec::new();
+                }
+            }
+        }
+
+        // Intersect all constraint sets
+        if valid_sets.is_empty() {
+            (0..new_table_len as u32).collect()
+        } else {
+            let mut result = valid_sets[0].clone();
+            for other_set in &valid_sets[1..] {
+                result.retain(|x| other_set.contains(x));
+                if result.is_empty() {
+                    return Vec::new();
+                }
+            }
+            result.into_iter().collect()
+        }
+    }
+
+    fn resolve_submodule(selector: &Endpoint) -> Option<usize> {
+        let head = selector.selector.head()?;
+        Self::composite_schema().submodule_index(head)
     }
 
     fn resolve_aliases(

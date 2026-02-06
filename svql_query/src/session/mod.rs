@@ -8,8 +8,10 @@
 
 mod columnar;
 pub mod connection_builder;
+pub mod connectivity_index;
 mod error;
 mod execution;
+pub mod join_planner;
 mod ref_type;
 mod row;
 mod schema;
