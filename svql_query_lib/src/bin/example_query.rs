@@ -1,7 +1,4 @@
-use svql_query::{
-    prelude::*,
-    traits::display::{render_wire, render_wire_compact},
-};
+use svql_query::prelude::*;
 use svql_query_lib::security::{cwe1234::Cwe1234, primitives::locked_register::LockedRegister};
 use tracing::info;
 
@@ -60,28 +57,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{table}");
     }
 
+    let patt = regex::Regex::new(r"noc1encoder_noc1buffer_req_ack").unwrap();
+
     for row in store
         .get::<LockedRegister>()
         .expect("Store should have table")
         .rows()
         .take(20)
     {
-        println!("\n--- Match ---");
-        println!(
-            "{}",
-            LockedRegister::render_row(&row, &store, &driver, &design_key)
-        );
+        // println!("\n--- Match ---");
+        // println!(
+        //     "{}",
+        //     LockedRegister::render_row(&row, &store, &driver, &design_key)
+        // );
 
         if let Some(report) =
             render_wire::<LockedRegister>(&row, "data_out", &driver, &design_key, &config)
         {
-            println!("{}", report);
-        }
-
-        if let Some(compact) =
-            render_wire_compact::<LockedRegister>(&row, "data_out", &driver, &design_key)
-        {
-            println!("Quick look: {}", compact);
+            if patt.is_match(&report) {
+                println!("\n--- Matched Wire ---");
+                println!("{}", report);
+            }
+            // println!("{}", report);
         }
     }
 
