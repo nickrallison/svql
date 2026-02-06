@@ -1,8 +1,5 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::{
-    cwe1234::Cwe1234,
-    primitives::locked_register::{LockedRegister, SyncDffMuxEnable},
-};
+use svql_query_lib::security::cwe1234::Cwe1234;
 use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

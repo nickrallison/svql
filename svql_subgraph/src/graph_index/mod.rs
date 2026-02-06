@@ -96,17 +96,17 @@ impl<'a> GraphIndex<'a> {
     /// Returns the set of cells in the immediate fan-out of the specified cell.
     #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
+    pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<&AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
-        self.connectivity.fanout_cell_set(idx).cloned()
+        self.connectivity.fanout_cell_set(idx)
     }
 
     /// Returns the set of cells in the immediate fan-in of the specified cell.
     #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<AHashSet<CellWrapper<'a>>> {
+    pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<&AHashSet<CellWrapper<'a>>> {
         let idx = self.get_cell_index(cell)?;
-        self.connectivity.fanin_cell_set(idx).cloned()
+        self.connectivity.fanin_cell_set(idx)
     }
 
     /// Returns the fan-out cells paired with their source pin indices.

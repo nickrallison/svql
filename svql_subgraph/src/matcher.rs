@@ -111,7 +111,9 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
         #[cfg(not(feature = "rayon"))]
         if self.config.parallel {
-            tracing::warn!("Parallel execution requested but 'rayon' feature is not enabled. Falling back to sequential execution.");
+            tracing::warn!(
+                "Parallel execution requested but 'rayon' feature is not enabled. Falling back to sequential execution."
+            );
         }
 
         tracing::info!(
@@ -270,7 +272,11 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                     let mut next_assignment = assignment.clone();
                     next_assignment.assign(current_needle.clone(), candidate);
 
-                    self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
+                    self.match_input_cells(
+                        next_assignment,
+                        input_queue.clone(),
+                        output_queue.clone(),
+                    )
                 })
                 .collect();
         }
@@ -364,6 +370,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         intersect_sets(fanout_sets)
             .into_iter()
             .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
+            .cloned()
             .collect()
     }
 
@@ -417,7 +424,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .iter()
                 .filter_map(|haystack_pred| self.haystack_index.fanout_set(haystack_pred))
                 .collect();
-            intersect_sets(fanout_sets).into_iter().collect()
+            intersect_sets(fanout_sets).into_iter().cloned().collect()
         };
 
         unfiltered
@@ -455,7 +462,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             .into_iter()
             .filter(|candidate| {
                 let mut next_assignment = assignment.clone();
-                next_assignment.assign(needle_input.clone(), candidate.clone());
+                next_assignment.assign(needle_input.clone(), candidate.clone().clone());
 
                 self.haystack_index
                     .fanout_set(candidate)
@@ -478,6 +485,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                         })
                     })
             })
+            .cloned()
             .collect()
     }
 

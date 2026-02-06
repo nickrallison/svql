@@ -45,12 +45,13 @@ impl BipartiteIndex {
                     b_table.resolve_path(b_idx as usize, connection.to.selector.tail(), ctx);
 
                 // Check physical connectivity
-                if let (Some(src), Some(dst)) = (a_cell, b_cell) {
-                    if src.as_u64() == dst.as_u64() {
+                match (&a_cell, &b_cell) {
+                    (Some(src), Some(dst)) if src.as_u64() == dst.as_u64() => {
                         forward.entry(a_idx).or_default().insert(b_idx);
                         reverse.entry(b_idx).or_default().insert(a_idx);
                         edge_count += 1;
                     }
+                    _ => {}
                 }
             }
         }

@@ -443,7 +443,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let start = std::time::Instant::now();
 
         #[cfg(feature = "parallel")]
-        let result = if ctx.config().parallel {
+        let result: Vec<EntryArray> = if ctx.config().parallel {
             entries
                 .into_par_iter()
                 .flat_map_iter(|entry| {
