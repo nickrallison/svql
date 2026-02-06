@@ -150,12 +150,17 @@ impl ExecutionPlan {
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
         all_deps.push(Arc::clone(&root_node));
-        
+
         tracing::debug!("Execution plan has {} nodes total", all_deps.len());
         for (i, node) in all_deps.iter().enumerate() {
-            tracing::trace!("  Node {}: {} (deps: {})", i, node.type_name, node.deps.len());
+            tracing::trace!(
+                "  Node {}: {} (deps: {})",
+                i,
+                node.type_name,
+                node.deps.len()
+            );
         }
-        
+
         let slots = all_deps
             .iter()
             .map(|node| (node.type_id, OnceLock::new()))
@@ -184,8 +189,15 @@ impl ExecutionPlan {
         slots: AHashMap<TypeId, TableSlot>,
     ) -> Result<Store, QueryError> {
         tracing::info!("Starting execution plan for design: {:?}", key);
-        tracing::info!("Execution mode: {}", if config.parallel { "parallel" } else { "sequential" });
-        
+        tracing::info!(
+            "Execution mode: {}",
+            if config.parallel {
+                "parallel"
+            } else {
+                "sequential"
+            }
+        );
+
         // Load and cache the haystack design once
         tracing::debug!("Loading haystack design...");
         let haystack_design = driver
@@ -221,7 +233,12 @@ impl ExecutionPlan {
     fn execute_sequential(&self, ctx: &ExecutionContext) -> Result<(), QueryError> {
         tracing::debug!("Executing {} nodes sequentially", self.nodes.len());
         for (i, node) in self.nodes.iter().enumerate() {
-            tracing::debug!("[{}/{}] Executing node: {}", i + 1, self.nodes.len(), node.type_name);
+            tracing::debug!(
+                "[{}/{}] Executing node: {}",
+                i + 1,
+                self.nodes.len(),
+                node.type_name
+            );
             ExecutionPlan::execute_node(node, ctx)?;
         }
         tracing::debug!("Sequential execution complete");
@@ -253,7 +270,10 @@ impl ExecutionPlan {
         tracing::trace!("Attempting to execute node: {}", node.type_name);
 
         if !node.try_execute() {
-            tracing::trace!("Node {} already executing or completed, waiting...", node.type_name);
+            tracing::trace!(
+                "Node {} already executing or completed, waiting...",
+                node.type_name
+            );
             // Another thread is running this dep; wait for it to complete
             if let Some(slot) = ctx.slots.get(&node.type_id()) {
                 // Wait for the slot to be filled
@@ -263,20 +283,38 @@ impl ExecutionPlan {
             return Ok(());
         }
 
-        tracing::debug!("Executing node: {} (with {} dependencies)", node.type_name, node.deps.len());
-        
+        tracing::debug!(
+            "Executing node: {} (with {} dependencies)",
+            node.type_name,
+            node.deps.len()
+        );
+
         // await all dependencies
         for (i, dep) in node.deps.iter().enumerate() {
-            tracing::trace!("  Waiting for dependency {}/{}: {}", i + 1, node.deps.len(), dep.type_name);
+            tracing::trace!(
+                "  Waiting for dependency {}/{}: {}",
+                i + 1,
+                node.deps.len(),
+                dep.type_name
+            );
             // will not re-execute due to cas_runner, and will just block until done
             ExecutionPlan::execute_node(dep, ctx)?;
-            tracing::trace!("  Dependency {}/{} complete: {}", i + 1, node.deps.len(), dep.type_name);
+            tracing::trace!(
+                "  Dependency {}/{} complete: {}",
+                i + 1,
+                node.deps.len(),
+                dep.type_name
+            );
         }
 
         // Execute search
         tracing::info!("[SEARCH] Starting search for: {}", node.type_name);
         let result = (node.search_fn)(ctx)?;
-        tracing::info!("[SEARCH] Completed search for: {} -> {} results", node.type_name, result.len());
+        tracing::info!(
+            "[SEARCH] Completed search for: {} -> {} results",
+            node.type_name,
+            result.len()
+        );
 
         // Store result wrapped in Arc (OnceLock ensures single write)
         if let Some(slot) = ctx.slots.get(&node.type_id) {

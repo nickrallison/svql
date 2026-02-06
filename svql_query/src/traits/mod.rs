@@ -137,13 +137,19 @@ pub trait Pattern: Sized + Send + Sync {
         Self: Send + Sync + 'static,
     {
         info!("═══════════════════════════════════════════════════════");
-        info!("Starting pattern search for: {}", std::any::type_name::<Self>());
+        info!(
+            "Starting pattern search for: {}",
+            std::any::type_name::<Self>()
+        );
         info!("Design: {:?}", design_key);
-        info!("Config: parallel={}, match_length={:?}", config.parallel, config.match_length);
+        info!(
+            "Config: parallel={}, match_length={:?}",
+            config.parallel, config.match_length
+        );
         info!("═══════════════════════════════════════════════════════");
-        
+
         let (plan, slots) = ExecutionPlan::build(Self::EXEC_INFO);
-        
+
         info!(
             "Preloading driver for pattern: {}, haystack: {:?}",
             std::any::type_name::<Self>(),
@@ -152,18 +158,21 @@ pub trait Pattern: Sized + Send + Sync {
         Self::preload_driver(driver, design_key, config)
             .map_err(|e| QueryError::design_load(e.to_string()))?;
         info!("Driver preload complete");
-        
+
         info!(
             "Executing search for pattern: {}",
             std::any::type_name::<Self>()
         );
         let store = plan.execute(driver, design_key, config, slots)?;
-        
+
         info!("═══════════════════════════════════════════════════════");
-        info!("Pattern search completed for: {}", std::any::type_name::<Self>());
+        info!(
+            "Pattern search completed for: {}",
+            std::any::type_name::<Self>()
+        );
         info!("Store contains {} table(s)", store.len());
         info!("═══════════════════════════════════════════════════════\n");
-        
+
         Ok(store)
     }
 
