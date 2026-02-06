@@ -306,11 +306,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
     /// Create a hierarchical report node from a match row
     ///
-    /// Default implementation shows submodules and aliases non-recursively.
-    /// Macro should override to recursively display submodules.
+    /// Recursive implementation uses macro-generated metadata to display
+    /// submodules and alias ports.
     fn composite_row_to_report_node(
         row: &Row<Self>,
-        _store: &Store,
+        store: &Store,
         driver: &Driver,
         key: &DriverKey,
     ) -> crate::traits::display::ReportNode {
@@ -322,18 +322,19 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         let mut children = Vec::new();
 
-        // Show submodules (non-recursive default - macro overrides for recursion)
+        // Recursively display each submodule using metadata
         for sub in Self::SUBMODULES {
-            children.push(ReportNode {
-                name: sub.name.to_string(),
-                type_name: "Submodule".to_string(),
-                details: None,
-                source_loc: None,
-                children: vec![],
-            });
+            if let Some(mut sub_node) = row
+                .sub_any(sub.name)
+                .and_then(|sub_ref| store.get_from_tid(sub.type_id).map(|t| (sub_ref, t)))
+                .and_then(|(sub_ref, table)| table.row_to_report_node(sub_ref as usize, store, driver, key))
+            {
+                sub_node.name = sub.name.to_string();
+                children.push(sub_node);
+            }
         }
 
-        // Show alias ports
+        // Display alias ports using metadata
         for alias in Self::ALIASES {
             if let Some(wire) = row.wire(alias.port_name) {
                 children.push(wire_to_report_node(

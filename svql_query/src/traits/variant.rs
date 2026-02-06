@@ -139,39 +139,52 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
     /// Create a hierarchical report node from a match row
     ///
-    /// Default implementation shows which variant is active.
-    /// Macro should override to delegate to inner type's display.
+    /// Recursive implementation dispatches to the active variant's display
+    /// logic using macro-generated metadata.
     fn variant_row_to_report_node(
         row: &Row<Self>,
-        _store: &Store,
-        _driver: &Driver,
-        _key: &DriverKey,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
     ) -> crate::traits::display::ReportNode {
+        use crate::traits::display::*;
+
+        let schema = Self::variant_schema();
         let type_name = std::any::type_name::<Self>();
         let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
 
-        // Get discriminant to show which variant
-        let schema = Self::variant_schema();
-        let discrim_idx = schema
+        // Get discriminant and inner_ref from schema
+        let discrim = schema
             .index_of("discriminant")
-            .expect("Variant must have discriminant");
-        let discrim = row
-            .entry_array
-            .entries
-            .get(discrim_idx)
+            .and_then(|idx| row.entry_array.entries.get(idx))
             .and_then(|e| e.as_u32())
             .unwrap_or(0);
 
-        let variant_name = if (discrim as usize) < Self::NUM_VARIANTS {
-            Self::VARIANT_ARMS[discrim as usize].type_name
-        } else {
-            "Unknown"
-        };
+        let inner_ref = schema
+            .index_of("inner_ref")
+            .and_then(|idx| row.entry_array.entries.get(idx))
+            .and_then(|e| e.as_u32())
+            .unwrap_or(0);
 
-        crate::traits::display::ReportNode {
+        // Dispatch to active variant using metadata
+        if (discrim as usize) < Self::NUM_VARIANTS {
+            let arm = &Self::VARIANT_ARMS[discrim as usize];
+
+            if let Some(mut node) = store
+                .get_from_tid(arm.type_id)
+                .and_then(|table| table.row_to_report_node(inner_ref as usize, store, driver, key))
+            {
+                // Add variant type to details
+                node.details = Some(format!("{}::{}", short_name, arm.type_name));
+                return node;
+            }
+        }
+
+        // Fallback for invalid discriminant
+        ReportNode {
             name: short_name.to_string(),
             type_name: type_name.to_string(),
-            details: Some(variant_name.to_string()),
+            details: Some("Unknown variant".to_string()),
             source_loc: None,
             children: vec![],
         }

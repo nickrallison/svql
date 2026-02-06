@@ -78,6 +78,18 @@ where
             .map(|wire_ref| Wire::from_ref(wire_ref, col_def.direction))
     }
 
+    /// Get a submodule reference by name (type-erased)
+    pub fn sub_any(&self, name: &str) -> Option<u32> {
+        let idx = T::schema().index_of(name)?;
+        self.entry_array
+            .entries
+            .get(idx)
+            .and_then(|entry| match entry {
+                ColumnEntry::Sub { id } => *id,
+                _ => None,
+            })
+    }
+
     /// Resolve a path to a wire using a Selector
     ///
     /// # Examples
@@ -148,7 +160,11 @@ where
     // --- Builder methods (used by Table when constructing rows) ---
 
     /// Set a wire column value using a WireRef.
-    pub fn with_wire_ref(mut self, name: &'static str, wire_ref: crate::wire::WireRef) -> Result<Self, QueryError> {
+    pub fn with_wire_ref(
+        mut self,
+        name: &'static str,
+        wire_ref: crate::wire::WireRef,
+    ) -> Result<Self, QueryError> {
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
@@ -260,13 +276,13 @@ where
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
-                Some(crate::session::ColumnEntry::Wire { value: Some(wire_ref) }) => {
-                    match wire_ref {
-                        crate::wire::WireRef::Cell(id) => format!("cell({id})"),
-                        crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
-                        crate::wire::WireRef::Constant(val) => format!("const({})", val),
-                    }
-                }
+                Some(crate::session::ColumnEntry::Wire {
+                    value: Some(wire_ref),
+                }) => match wire_ref {
+                    crate::wire::WireRef::Cell(id) => format!("cell({id})"),
+                    crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
+                    crate::wire::WireRef::Constant(val) => format!("const({})", val),
+                },
                 Some(crate::session::ColumnEntry::Wire { value: None }) => "wire=NULL".to_string(),
                 Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {
                     format!("ref({id})")

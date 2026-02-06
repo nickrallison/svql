@@ -63,6 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get::<LockedRegister>()
         .expect("Store should have table")
         .rows()
+        .take(20)
     {
         println!("\n--- Match ---");
         println!(

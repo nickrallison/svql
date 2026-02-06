@@ -203,6 +203,15 @@ impl<T> std::fmt::Display for Table<T> {
 
 /// Type-erased table trait for storing in `Store`.
 pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
+    /// Create a report node for a row (type-erased dispatch)
+    fn row_to_report_node(
+        &self,
+        row_idx: usize,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<crate::traits::display::ReportNode>;
+
     /// Downcast to concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
@@ -266,6 +275,17 @@ where
 
     fn pattern_type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<T>()
+    }
+
+    fn row_to_report_node(
+        &self,
+        row_idx: usize,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> Option<crate::traits::display::ReportNode> {
+        let row = self.row(row_idx as u32)?;
+        Some(T::row_to_report_node(&row, store, driver, key))
     }
 
     fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)> {

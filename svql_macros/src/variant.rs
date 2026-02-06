@@ -126,34 +126,6 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Generate report node match arms
-    let report_arms: Vec<_> = arms
-        .iter()
-        .enumerate()
-        .map(|(idx, arm)| {
-            let ty = &arm.inner_ty;
-            let idx_lit = idx as u32;
-            quote! {
-                #idx_lit => {
-                    if let Some(inner_row) = store.get::<#ty>().and_then(|t| t.row(inner_row_idx)) {
-                        let mut node = <#ty as svql_query::traits::PatternInternal<_>>::internal_row_to_report_node(
-                            &inner_row, store, driver, key
-                        );
-                        node.details = Some(Self::VARIANT_ARMS[#idx as usize].type_name.to_string());
-                        return node;
-                    }
-                    ReportNode {
-                        name: stringify!(#name).to_string(),
-                        type_name: std::any::type_name::<Self>().to_string(),
-                        details: Some(format!("Error: active variant Missing: {}", Self::VARIANT_ARMS[#idx as usize].type_name)),
-                        source_loc: None,
-                        children: vec![],
-                    }
-                }
-            }
-        })
-        .collect();
-
     // Generate preload_driver calls
     let preload_calls: Vec<_> = arms
         .iter()
@@ -221,54 +193,6 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
                 match discrim {
                     #(#rehydrate_arms)*
                     _ => None,
-                }
-            }
-
-            fn variant_row_to_report_node(
-                row: &svql_query::session::Row<Self>,
-                store: &svql_query::session::Store,
-                driver: &svql_query::driver::Driver,
-                key: &svql_query::driver::DriverKey,
-            ) -> svql_query::traits::display::ReportNode {
-                use svql_query::traits::display::*;
-                use svql_query::traits::Pattern;
-
-                // Get discriminant
-                let discrim_idx = Self::schema()
-                    .index_of("discriminant")
-                    .expect("Variant must have discriminant");
-                let discrim = row
-                    .entry_array()
-                    .entries
-                    .get(discrim_idx)
-                    .and_then(|e| e.as_u32())
-                    .unwrap_or(0);
-
-                // Get inner_ref
-                let inner_ref_idx = Self::schema()
-                    .index_of("inner_ref")
-                    .expect("Variant must have inner_ref");
-                let inner_row_idx = row
-                    .entry_array()
-                    .entries
-                    .get(inner_ref_idx)
-                    .and_then(|e| e.as_u32())
-                    .unwrap_or(0);
-
-                // Dispatch to active variant
-                match discrim {
-                    #(#report_arms)*
-                    _ => {
-                        let mut node = ReportNode {
-                            name: stringify!(#name).to_string(),
-                            type_name: std::any::type_name::<Self>().to_string(),
-                            details: Some("Unknown".to_string()),
-                            source_loc: None,
-                            children: vec![],
-                        };
-                        node.type_name = std::any::type_name::<Self>().to_string();
-                        node
-                    }
                 }
             }
 

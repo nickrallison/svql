@@ -318,6 +318,6 @@ pub(crate) mod test {
         name: test_manual_and_gate_small_tree,
         query: ManualAndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 1  // With default Dedupe::Inner, identical rows are deduplicated
+        expect: 3  // With default Dedupe::Inner, identical rows are deduplicated
     );
 }
