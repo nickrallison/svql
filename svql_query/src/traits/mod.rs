@@ -4,12 +4,14 @@
 //! implement to participate in the SVQL query system.
 
 pub mod composite;
+pub mod display;
 pub mod netlist;
 pub mod primitive;
 pub mod recursive;
 pub mod variant;
 
 // Re-export key traits
+pub use display::{ReportNode, wire_source_location, wire_to_report_node};
 pub use netlist::Netlist;
 pub use primitive::Primitive;
 use tracing::info;
@@ -153,14 +155,27 @@ pub trait Pattern: Sized + Send + Sync {
     ///
     /// Reconstructs a full `Self::Match` object from the row data and
     /// any referenced submodule rows in the store.
-    fn rehydrate(
-        _row: &Row<Self>,
-        _store: &Store,
-        _driver: &Driver,
-        key: &DriverKey,
-    ) -> Option<Self>
+    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
     where
         Self: Component + Send + Sync + 'static;
+
+    /// Create a hierarchical report node from a match row.
+    fn row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> ReportNode
+    where
+        Self: Component + Send + Sync + 'static;
+
+    /// Render a match row as a formatted string.
+    fn render_row(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> String
+    where
+        Self: Component + Send + Sync + 'static,
+    {
+        Self::row_to_report_node(row, store, driver, key).render()
+    }
 }
 
 pub mod kind {
@@ -200,6 +215,15 @@ pub trait PatternInternal<K>: Sized {
         _driver: &Driver,
         _key: &DriverKey,
     ) -> Option<Self>
+    where
+        Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
+
+    fn internal_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> ReportNode
     where
         Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
 }
@@ -244,30 +268,13 @@ where
     {
         T::internal_rehydrate(row, store, driver, key)
     }
+
+    fn row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> ReportNode {
+        T::internal_row_to_report_node(row, store, driver, key)
+    }
 }
-
-// /// Validates that a physical connection exists between two matched wires in the haystack.
-// pub fn validate_connection<'ctx>(
-//     from: &CellId,
-//     to: &CellId,
-//     haystack_index: &GraphIndex<'ctx>,
-// ) -> bool {
-//     // validate_connection_inner(from, to, haystack_index).unwrap_or(false)
-//     todo!();
-// }
-
-// /// Internal helper to resolve CellInfo to CellWrappers and check connectivity.
-// fn validate_connection_inner<'ctx>(
-//     from: &CellId,
-//     to: &CellId,
-//     haystack_index: &GraphIndex<'ctx>,
-// ) -> Option<bool> {
-//     let from_id = from.cell_idx();
-//     let to_id = to.cell_idx();
-
-//     let f_wrapper = haystack_index.get_cell_by_id(from_id as usize)?;
-//     let t_wrapper = haystack_index.get_cell_by_id(to_id as usize)?;
-
-//     let fanout = haystack_index.fanout_set(f_wrapper)?;
-//     Some(fanout.contains(t_wrapper))
-// }

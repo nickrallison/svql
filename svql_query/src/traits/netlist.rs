@@ -115,6 +115,47 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static;
+
+    /// Create a hierarchical report node from a match row
+    ///
+    /// Default implementation uses the PORTS schema to display all ports
+    /// with their source locations. No macro override needed.
+    fn netlist_row_to_report_node(
+        row: &Row<Self>,
+        _store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        use crate::traits::display::*;
+
+        let config = Config::default();
+        let type_name = std::any::type_name::<Self>();
+        let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
+
+        let mut children = Vec::new();
+
+        // Iterate through ports using the schema
+        for port in Self::PORTS {
+            if let Some(wire) = row.wire(port.name) {
+                children.push(wire_to_report_node(
+                    port.name,
+                    &wire,
+                    port.direction,
+                    driver,
+                    key,
+                    &config,
+                ));
+            }
+        }
+
+        ReportNode {
+            name: short_name.to_string(),
+            type_name: type_name.to_string(),
+            details: None,
+            source_loc: None,
+            children,
+        }
+    }
 }
 
 impl<T> PatternInternal<kind::Netlist> for T
@@ -198,6 +239,15 @@ where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
         Self::netlist_rehydrate(row, store, driver, key)
+    }
+
+    fn internal_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        Self::netlist_row_to_report_node(row, store, driver, key)
     }
 }
 

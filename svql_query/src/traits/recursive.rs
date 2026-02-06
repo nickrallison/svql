@@ -200,6 +200,72 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         design_key: &DriverKey,
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
+
+    /// Create a hierarchical report node from a match row
+    fn recursive_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        use crate::traits::display::*;
+        let config = Config::default();
+        let type_name = std::any::type_name::<Self>();
+        let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
+
+        let mut children = Vec::new();
+
+        // 1. Show base pattern
+        if let Some(base_row) = row.sub::<Self::Base>("base").and_then(|base_ref| {
+            store
+                .get::<Self::Base>()
+                .and_then(|t| t.row(base_ref.index()))
+        }) {
+            let mut base_node = Self::Base::row_to_report_node(&base_row, store, driver, key);
+            base_node.name = "base".to_string();
+            children.push(base_node);
+        }
+
+        // 2. Show children (recursive)
+        for child_name in ["left_child", "right_child"] {
+            if let Some(child_row) = row
+                .sub::<Self>(child_name)
+                .and_then(|child_ref| store.get::<Self>().and_then(|t| t.row(child_ref.index())))
+            {
+                let mut child_node =
+                    Self::recursive_row_to_report_node(&child_row, store, driver, key);
+                child_node.name = child_name.to_string();
+                children.push(child_node);
+            }
+        }
+
+        // 3. Show ports
+        for port in Self::PORTS {
+            if let Some(wire) = row.wire(port.name) {
+                children.push(wire_to_report_node(
+                    port.name,
+                    &wire,
+                    port.direction,
+                    driver,
+                    key,
+                    &config,
+                ));
+            }
+        }
+
+        ReportNode {
+            name: short_name.to_string(),
+            type_name: type_name.to_string(),
+            details: row
+                .entry_array
+                .entries
+                .last()
+                .and_then(|e| e.as_u32())
+                .map(|d| format!("depth: {d}")),
+            source_loc: None,
+            children,
+        }
+    }
 }
 
 // Blanket implementation of PatternInternal for all Recursive types
@@ -245,6 +311,15 @@ where
         key: &DriverKey,
     ) -> Option<Self> {
         Self::recursive_rehydrate(row, store, driver, key)
+    }
+
+    fn internal_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        Self::recursive_row_to_report_node(row, store, driver, key)
     }
 }
 

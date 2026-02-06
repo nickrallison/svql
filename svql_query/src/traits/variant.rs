@@ -136,6 +136,46 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static;
+
+    /// Create a hierarchical report node from a match row
+    ///
+    /// Default implementation shows which variant is active.
+    /// Macro should override to delegate to inner type's display.
+    fn variant_row_to_report_node(
+        row: &Row<Self>,
+        _store: &Store,
+        _driver: &Driver,
+        _key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        let type_name = std::any::type_name::<Self>();
+        let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
+
+        // Get discriminant to show which variant
+        let schema = Self::variant_schema();
+        let discrim_idx = schema
+            .index_of("discriminant")
+            .expect("Variant must have discriminant");
+        let discrim = row
+            .entry_array
+            .entries
+            .get(discrim_idx)
+            .and_then(|e| e.as_u32())
+            .unwrap_or(0);
+
+        let variant_name = if (discrim as usize) < Self::NUM_VARIANTS {
+            Self::VARIANT_ARMS[discrim as usize].type_name
+        } else {
+            "Unknown"
+        };
+
+        crate::traits::display::ReportNode {
+            name: short_name.to_string(),
+            type_name: type_name.to_string(),
+            details: Some(variant_name.to_string()),
+            source_loc: None,
+            children: vec![],
+        }
+    }
 }
 
 impl<T> PatternInternal<kind::Variant> for T
@@ -202,6 +242,15 @@ where
         Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static,
     {
         Self::variant_rehydrate(row, store, driver, key)
+    }
+
+    fn internal_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        Self::variant_row_to_report_node(row, store, driver, key)
     }
 }
 

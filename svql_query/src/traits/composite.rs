@@ -297,6 +297,58 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         key: &DriverKey,
     ) -> Option<Self>;
 
+    /// Create a hierarchical report node from a match row
+    ///
+    /// Default implementation shows submodules and aliases non-recursively.
+    /// Macro should override to recursively display submodules.
+    fn composite_row_to_report_node(
+        row: &Row<Self>,
+        _store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        use crate::traits::display::*;
+
+        let config = Config::default();
+        let type_name = std::any::type_name::<Self>();
+        let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
+
+        let mut children = Vec::new();
+
+        // Show submodules (non-recursive default - macro overrides for recursion)
+        for sub in Self::SUBMODULES {
+            children.push(ReportNode {
+                name: sub.name.to_string(),
+                type_name: "Submodule".to_string(),
+                details: None,
+                source_loc: None,
+                children: vec![],
+            });
+        }
+
+        // Show alias ports
+        for alias in Self::ALIASES {
+            if let Some(wire) = row.wire(alias.port_name) {
+                children.push(wire_to_report_node(
+                    alias.port_name,
+                    &wire,
+                    alias.direction,
+                    driver,
+                    key,
+                    &config,
+                ));
+            }
+        }
+
+        ReportNode {
+            name: short_name.to_string(),
+            type_name: type_name.to_string(),
+            details: None,
+            source_loc: None,
+            children,
+        }
+    }
+
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -471,6 +523,15 @@ where
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,
     {
         Self::composite_rehydrate(row, store, driver, key)
+    }
+
+    fn internal_row_to_report_node(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+    ) -> crate::traits::display::ReportNode {
+        Self::composite_row_to_report_node(row, store, driver, key)
     }
 }
 

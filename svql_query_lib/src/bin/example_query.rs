@@ -1,5 +1,7 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::{cwe1234::Cwe1234, cwe1280::Cwe1280};
+use svql_query_lib::security::{
+    cwe1234::Cwe1234, cwe1280::Cwe1280, primitives::locked_register::LockedRegister,
+};
 use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,6 +57,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (_, table) in store.tables() {
         println!("\n=== Table Details ===");
         println!("{table}");
+    }
+
+    for row in store
+        .get::<LockedRegister>()
+        .expect("Store should have table")
+        .rows()
+    {
+        println!("\n--- Match ---");
+        println!(
+            "{}",
+            LockedRegister::render_row(&row, &store, &driver, &design_key)
+        );
     }
 
     // if let Some(table) = store.get::<LockedRegister>() {

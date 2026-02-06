@@ -162,8 +162,18 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let submodule_types: Vec<_> = submodules.iter().map(|s| &s.ty).collect();
     let submodule_names: Vec<_> = submodules.iter().map(|s| &s.name).collect();
     let alias_names: Vec<_> = aliases.iter().map(|a| &a.name).collect();
+    let alias_directions: Vec<_> = aliases
+        .iter()
+        .map(|a| match a.direction {
+            Direction::Output => quote! { svql_query::session::PortDirection::Output },
+            Direction::Input | Direction::Inout => {
+                quote! { svql_query::session::PortDirection::Input }
+            }
+        })
+        .collect();
 
     // Generate preload_driver calls
     let preload_calls: Vec<_> = submodules
@@ -230,6 +240,62 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                     #(#submodule_names,)*
                     #(#alias_names),*  // ADD THIS LINE
                 })
+            }
+
+            fn composite_row_to_report_node(
+                row: &svql_query::session::Row<Self>,
+                store: &svql_query::session::Store,
+                driver: &svql_query::driver::Driver,
+                key: &svql_query::driver::DriverKey,
+            ) -> svql_query::traits::display::ReportNode {
+                use svql_query::traits::display::*;
+                // Generic trait imports to ensure row_to_report_node is visible
+                use svql_query::traits::Netlist;
+                use svql_query::traits::composite::Composite;
+                use svql_query::traits::variant::Variant;
+                use svql_query::traits::primitive::Primitive;
+
+                let config = svql_query::common::Config::default();
+                let mut children = Vec::new();
+
+                // Recursively display each submodule
+                #(
+                    if let Some(sub_row) = row
+                        .sub::<#submodule_types>(stringify!(#submodule_names))
+                        .and_then(|sub_ref| store.get::<#submodule_types>().and_then(|t| t.row(sub_ref.index())))
+                    {
+                        let mut sub_node = <#submodule_types as svql_query::traits::PatternInternal<_>>::internal_row_to_report_node(
+                            &sub_row,
+                            store,
+                            driver,
+                            key,
+                        );
+                        sub_node.name = stringify!(#submodule_names).to_string();
+                        children.push(sub_node);
+                    }
+                )*
+
+                // Display alias ports
+                #(
+                    if let Some(wire) = row.wire(stringify!(#alias_names)) {
+                        children.push(wire_to_report_node(
+                            stringify!(#alias_names),
+                            &wire,
+                            #alias_directions,
+                            driver,
+                            key,
+                            &config,
+                        ));
+                    }
+                )*
+
+                svql_query::traits::display::ReportNode {
+                    name: stringify!(#name).to_string(),
+                    type_name: std::any::type_name::<Self>().to_string(),
+                    details: None,
+                    source_loc: None,
+                    children,
+                }
             }
 
             fn preload_driver(
