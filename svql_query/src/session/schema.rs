@@ -472,4 +472,47 @@ impl EntryArray {
     pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
         Self { entries }
     }
+
+    /// Generate a signature for deduplication that includes all cell IDs and submodule refs.
+    ///
+    /// Used for `Dedupe::All` - considers all wire references, submodule references, and metadata in the entry.
+    /// Includes column index to distinguish entries with same values in different positions.
+    #[must_use]
+    pub fn signature_all(&self) -> Vec<(usize, u32)> {
+        let mut sig: Vec<(usize, u32)> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(col_idx, entry)| match entry {
+                ColumnEntry::Wire {
+                    value: Some(wire_ref),
+                } => wire_ref.as_cell().map(|cid| (col_idx, cid.raw())),
+                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, *id)),
+                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, *id)),
+                _ => None,
+            })
+            .collect();
+        sig.sort_unstable();
+        sig
+    }
+
+    /// Generate a signature for deduplication that only includes submodule references and metadata.
+    ///
+    /// Used for `Dedupe::Inner` - considers Sub entries and Metadata (e.g., variant discriminant), excluding external ports.
+    /// Includes column index to distinguish entries with same values in different positions.
+    #[must_use]
+    pub fn signature_inner(&self) -> Vec<(usize, u32)> {
+        let mut sig: Vec<(usize, u32)> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(col_idx, entry)| match entry {
+                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, *id)),
+                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, *id)),
+                _ => None,
+            })
+            .collect();
+        sig.sort_unstable();
+        sig
+    }
 }

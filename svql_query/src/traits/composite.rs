@@ -113,9 +113,26 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         }
 
         // Resolve aliases
-        let final_entries = Self::resolve_aliases(entries, ctx)?;
+        let mut final_entries = Self::resolve_aliases(entries, ctx)?;
+
+        // Apply deduplication
+        Self::apply_deduplication(&mut final_entries, ctx.config());
 
         Table::new(final_entries)
+    }
+
+    /// Apply deduplication based on the configured strategy.
+    fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
+        use std::collections::HashSet;
+
+        if config.dedupe.all() {
+            let mut seen = HashSet::new();
+            entries.retain(|entry| seen.insert(entry.signature_all()));
+        } else if config.dedupe.inner() {
+            let mut seen = HashSet::new();
+            entries.retain(|entry| seen.insert(entry.signature_inner()));
+        }
+        // Dedupe::None: no action
     }
 
     /// Custom validation hook for filters (override to add filtering logic)

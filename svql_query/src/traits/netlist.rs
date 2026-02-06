@@ -177,13 +177,24 @@ where
             ctx.config(),
         );
 
-        // todo!();
-
-        let row_matches: Vec<EntryArray> = assignments
+        let mut row_matches: Vec<EntryArray> = assignments
             .items
             .iter()
             .map(|assignment| Self::resolve(assignment))
             .collect();
+
+        // Apply row-level deduplication
+        // SubgraphMatcher deduplicates assignments, but different assignments
+        // can produce identical rows (e.g., when internal structure differs
+        // but port connections are the same)
+        use std::collections::HashSet;
+        if ctx.config().dedupe.all() {
+            let mut seen = HashSet::new();
+            row_matches.retain(|entry| seen.insert(entry.signature_all()));
+        } else if ctx.config().dedupe.inner() {
+            let mut seen = HashSet::new();
+            row_matches.retain(|entry| seen.insert(entry.signature_inner()));
+        }
 
         let table = Table::<Self>::new(row_matches)?;
         Ok(table)
@@ -279,6 +290,6 @@ pub(crate) mod test {
         name: test_manual_and_gate_small_tree,
         query: ManualAndGate,
         haystack: ("examples/fixtures/basic/and/verilog/small_and_tree.v", "small_and_tree"),
-        expect: 3
+        expect: 1  // With default Dedupe::Inner, identical rows are deduplicated
     );
 }

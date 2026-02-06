@@ -40,7 +40,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     }
 
     /// Convert declarations to column definitions
-    #[must_use] 
+    #[must_use]
     fn variant_to_defs() -> Vec<ColumnDef> {
         let mut defs = vec![
             ColumnDef::metadata("discriminant"),
@@ -109,7 +109,24 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             }
         }
 
+        // Apply deduplication
+        Self::apply_deduplication(&mut all_entries, ctx.config());
+
         Table::new(all_entries)
+    }
+
+    /// Apply deduplication based on the configured strategy.
+    fn apply_deduplication(entries: &mut Vec<EntryArray>, config: &svql_common::Config) {
+        use std::collections::HashSet;
+
+        if config.dedupe.all() {
+            let mut seen = HashSet::new();
+            entries.retain(|entry| seen.insert(entry.signature_all()));
+        } else if config.dedupe.inner() {
+            let mut seen = HashSet::new();
+            entries.retain(|entry| seen.insert(entry.signature_inner()));
+        }
+        // Dedupe::None: no action
     }
 
     fn preload_driver(
@@ -207,7 +224,9 @@ mod test {
         traits::{Netlist, Pattern, composite::Composite},
     };
 
-    use super::{Variant, Component, kind, Port, PortMap, VariantArm, Row, Store, Driver, DriverKey};
+    use super::{
+        Component, Driver, DriverKey, Port, PortMap, Row, Store, Variant, VariantArm, kind,
+    };
 
     use crate::traits::composite::test::And2Gates;
     use crate::traits::netlist::test::AndGate;

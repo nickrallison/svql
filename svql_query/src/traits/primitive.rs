@@ -10,7 +10,7 @@ use crate::{
     traits::{Component, PatternInternal, kind, search_table_any},
     wire::WireRef,
 };
-use std::{cell, sync::Arc};
+use std::sync::Arc;
 use svql_driver::{Driver, DriverKey};
 use tracing::{debug, info, trace};
 

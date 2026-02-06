@@ -12,7 +12,7 @@ pub mod variant;
 // Re-export key traits
 pub use netlist::Netlist;
 pub use primitive::Primitive;
-use tracing::{info, trace};
+use tracing::info;
 
 use crate::prelude::*;
 
