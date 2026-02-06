@@ -60,7 +60,7 @@ where
     }
     let config = config_builder.build();
 
-    let container = spec.get_design(&driver, &config)?;
+    // let container = spec.get_design(&driver, &config)?;
 
     // for cell in container.index().cells_topo() {
     //     tracing::trace!("Cell: {:#?}", cell);

@@ -285,7 +285,30 @@ where
         selector: crate::selector::Selector<'_>,
         ctx: &super::ExecutionContext,
     ) -> Option<crate::CellId> {
-        let row = self.row(row_idx as u32)?;
-        row.resolve(selector, ctx).and_then(|wire| wire.cell_id())
+        // Optimized: avoid allocating full Row<T> by directly accessing columns
+        if selector.is_empty() {
+            return None;
+        }
+
+        // Single segment: direct wire lookup
+        if selector.len() == 1 {
+            return self.get_cell_id(row_idx, selector.head()?);
+        }
+
+        // Multi-segment: traverse through submodules
+        let head = selector.head()?;
+        let col_idx = T::schema().index_of(head)?;
+        let col_def = T::schema().column(col_idx);
+
+        // Head must be a submodule reference
+        let sub_type_id = col_def.as_submodule()?;
+
+        // Get the submodule row index directly from the column
+        let col = self.store.column(head)?;
+        let sub_row_idx = col.get(row_idx).copied().flatten()?;
+
+        // Get the submodule's table and continue resolution
+        let sub_table = ctx.get_any_table(sub_type_id)?;
+        sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
     }
 }
