@@ -5,11 +5,11 @@
 #![allow(clippy::missing_errors_doc)]
 
 pub mod bridge;
-pub mod design;
 mod config;
+pub mod design;
 
+pub use crate::bridge::yosys::*;
 pub use crate::config::*;
 pub use crate::design::*;
-pub use crate::bridge::yosys::*;
 
 pub use gxhash::{HashMap, HashMapExt, HashSet, HashSetExt};
