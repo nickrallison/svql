@@ -4,7 +4,6 @@
 //! primitives match directly against cell types in the design index.
 
 use crate::{
-    CellId,
     prelude::*,
     session::{ColumnEntry, EntryArray, ExecutionContext, Port, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, search_table_any},
@@ -33,7 +32,7 @@ fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
 fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
     // Try as cell first
     if let Ok(cell_idx) = net.as_cell_index() {
-        return Some(WireRef::Cell(CellId::new(cell_idx as u32)));
+        return Some(WireRef::Cell(CellId::new(cell_idx as usize)));
     }
 
     // If not a cell, assume it's an input port or constant
@@ -329,8 +328,11 @@ where
     where
         Self: Send + Sync + 'static,
     {
-        tracing::info!("[PRIMITIVE] Starting primitive search for: {}", std::any::type_name::<T>());
-        
+        tracing::info!(
+            "[PRIMITIVE] Starting primitive search for: {}",
+            std::any::type_name::<T>()
+        );
+
         let haystack_key = ctx.design_key();
         tracing::debug!("[PRIMITIVE] Haystack: {:?}", haystack_key);
         tracing::debug!("[PRIMITIVE] Target cell kind: {:?}", T::CELL_KIND);
@@ -340,14 +342,24 @@ where
         tracing::trace!("[PRIMITIVE] Using cached haystack design");
 
         let index = haystack_container.index();
-        tracing::debug!("[PRIMITIVE] Searching design index for cells of type {:?}...", T::CELL_KIND);
+        tracing::debug!(
+            "[PRIMITIVE] Searching design index for cells of type {:?}...",
+            T::CELL_KIND
+        );
 
         let cell_indices = index.cells_of_type_indices(T::CELL_KIND);
         let row_matches = if cell_indices.is_empty() {
-            tracing::debug!("[PRIMITIVE] No cells of type {:?} found in design", T::CELL_KIND);
+            tracing::debug!(
+                "[PRIMITIVE] No cells of type {:?} found in design",
+                T::CELL_KIND
+            );
             Vec::new()
         } else {
-            tracing::debug!("[PRIMITIVE] Found {} cells of type {:?}", cell_indices.len(), T::CELL_KIND);
+            tracing::debug!(
+                "[PRIMITIVE] Found {} cells of type {:?}",
+                cell_indices.len(),
+                T::CELL_KIND
+            );
 
             let filtered: Vec<_> = cell_indices
                 .iter()
@@ -356,7 +368,10 @@ where
                     let cell = cell_wrapper.get();
                     let passes = T::cell_filter(cell);
                     if !passes {
-                        tracing::trace!("[PRIMITIVE] Cell filtered out: {:?}", cell_wrapper.debug_index());
+                        tracing::trace!(
+                            "[PRIMITIVE] Cell filtered out: {:?}",
+                            cell_wrapper.debug_index()
+                        );
                         return None;
                     }
                     Some(T::resolve(cell, cell_wrapper.debug_index()))
@@ -367,7 +382,10 @@ where
             filtered
         };
 
-        tracing::info!("[PRIMITIVE] Primitive search complete: {} total matches", row_matches.len());
+        tracing::info!(
+            "[PRIMITIVE] Primitive search complete: {} total matches",
+            row_matches.len()
+        );
         Table::<Self>::new(row_matches)
     }
 

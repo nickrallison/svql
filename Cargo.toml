@@ -92,11 +92,11 @@ all = "deny"
 [profile.release]
 codegen-units = 1
 lto = "fat"
-# rustflags = ["-C", "target-cpu=native"]
+rustflags = ["-C", "target-cpu=native", "-Z", "threads=8"]
 
 [profile.dev]
 debug = 2
-# rustflags = ["-C", "target-cpu=native"]
+rustflags = ["-C", "target-cpu=native", "-Z", "threads=8"]
 
 [profile.profiling]
 inherits = "release"

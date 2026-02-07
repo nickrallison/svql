@@ -1,7 +1,7 @@
 //! Utility functions for the subgraph matcher.
 
 use std::hash::Hash;
-use svql_common::prelude::*;
+use svql_common::*;
 
 /// Computes the intersection of multiple sets.
 /// Returns an empty set if the input is empty.

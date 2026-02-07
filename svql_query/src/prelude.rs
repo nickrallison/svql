@@ -4,12 +4,12 @@ pub use svql_driver as driver;
 pub use svql_subgraph as subgraph;
 pub use tracing;
 
-pub use crate::{CellId, Wire, run_query};
+pub use crate::run_query;
 
 pub use crate::session::{
     Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, ConnectionBuilder, EntryArray, ExecInfo,
-    ExecutionContext, ExecutionPlan, PatternSchema, Port, PortDirection, PortMap, QueryError, Ref,
-    Row, SearchFn, Store, Submodule, Table, TableSlot,
+    ExecutionContext, ExecutionPlan, PatternSchema, Port, PortMap, QueryError, Ref, Row, SearchFn,
+    Store, Submodule, Table, TableSlot,
 };
 
 // Trait re-exports
@@ -29,8 +29,7 @@ pub use crate::traits::{
 
 pub use crate::selector::Selector;
 
-pub use common::prelude::*;
-pub use common::{Config, ConfigBuilder, MatchLength, ModuleConfig, YosysModule};
+pub use common::*;
 
 pub use subgraph::{
     AssignmentSet, SingleAssignment,

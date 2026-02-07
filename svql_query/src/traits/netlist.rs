@@ -101,7 +101,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         let mut internal_defs = Vec::new();
 
         for i in 0..index.num_cells() {
-            let cell_idx = subgraph::cell::CellIndex::new(i);
+            let cell_idx = CellId::new(i);
             let cell_wrapper = index.get_cell_by_index(cell_idx);
             let kind = cell_wrapper.cell_type();
 
@@ -205,7 +205,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                 let col_def = schema.column(idx);
                 match col_def.kind {
                     ColumnKind::Cell => ColumnEntry::Wire {
-                        value: opt.map(CellId::new).map(crate::wire::WireRef::Cell),
+                        value: opt.map(|v| CellId::new(v as usize)).map(crate::wire::WireRef::Cell),
                     },
                     ColumnKind::Metadata => ColumnEntry::Metadata { id: opt },
                     _ => ColumnEntry::Metadata { id: None },

@@ -4,10 +4,14 @@
 //! used across the SVQL project.
 #![allow(clippy::missing_errors_doc)]
 
+pub mod cell;
 mod config;
-pub mod prelude;
+pub mod wire;
 mod yosys;
 
+pub use crate::cell::*;
 pub use crate::config::*;
+pub use crate::wire::*;
 pub use crate::yosys::*;
-pub use crate::prelude::{HashMap, HashSet};
+
+pub use gxhash::{HashMap, HashMapExt, HashSet, HashSetExt};

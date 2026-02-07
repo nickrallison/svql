@@ -7,7 +7,6 @@ use crate::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
-use tracing::warn;
 
 /// A node in a hierarchical match report
 #[derive(Debug, Clone)]
@@ -139,8 +138,6 @@ pub fn wire_to_report_node(
     key: &DriverKey,
     config: &Config,
 ) -> ReportNode {
-    let fix_later = "Dear god please remind me to fix this later";
-    // I hate this, but I'm not sure how to fix it
     match wire {
         Wire::Cell { id, .. } => {
             let design = driver.get_design(key, &config.haystack_options).ok();

@@ -5,15 +5,15 @@
 
 use crate::SubgraphMatcherCore;
 use crate::assignment::SingleAssignment;
-use crate::cell::CellIndex;
+use crate::cell::CellId;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 
 impl SubgraphMatcherCore<'_, '_, '_> {
     /// Validates that the haystack cell's inputs match the mapped inputs of the needle cell.
     pub(crate) fn check_fanin_constraints(
         &self,
-        needle_cell: CellIndex,
-        haystack_cell: CellIndex,
+        needle_cell: CellId,
+        haystack_cell: CellId,
         mapping: &SingleAssignment,
     ) -> bool {
         let needle_wrapper = self.needle_index.get_cell_by_index(needle_cell);

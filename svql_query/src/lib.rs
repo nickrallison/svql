@@ -9,29 +9,20 @@
 
 extern crate self as svql_query;
 
-// pub mod binding;
-// pub mod instance;
-pub mod cell_id;
 pub mod prelude;
 pub mod selector;
-// pub mod report;
 pub mod session;
 pub mod traits;
-pub mod wire;
-
-pub use cell_id::CellId;
-pub use wire::Wire;
-pub mod driver {
-    pub use svql_driver::*;
-}
 
 #[macro_use]
 pub mod test_harness;
 
-pub use svql_common as common;
-pub use svql_subgraph as subgraph;
-
 use prelude::*;
+
+// Re-export for macro usage
+pub use svql_common as common;
+pub use svql_common::Wire;
+pub use svql_driver as driver;
 
 /// Execute a query with custom execution configuration.
 ///
@@ -60,4 +51,3 @@ where
 {
     P::search(driver, key, config).map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
 }
-

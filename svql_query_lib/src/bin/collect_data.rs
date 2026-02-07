@@ -2,7 +2,7 @@
 
 // use argparse::{ArgumentParser, Store};
 // use serde::{Deserialize, Serialize};
-// use svql_common::prelude::*;
+// use svql_common::*;
 // use std::fs::File;
 // use std::io::{BufRead, BufReader};
 // use std::sync::{Arc, Mutex};

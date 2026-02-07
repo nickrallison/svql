@@ -164,7 +164,7 @@ where
         let cell_id = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
 
         // Direction is lost through traversal
-        Some(Wire::new(cell_id, crate::session::PortDirection::None))
+        Some(Wire::new(cell_id, PortDirection::None))
     }
 
     /// Get a submodule reference by column name.

@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 #[allow(unused)]
-use svql_common::prelude::*;
+use svql_common::*;
 
 /// A typed reference to a row in another pattern's result table.
 ///

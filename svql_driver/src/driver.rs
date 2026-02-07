@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tracing::debug;
 
-use svql_common::prelude::*;
+use svql_common::*;
 use svql_common::{DesignPath, YosysModule};
 use thiserror::Error;
 

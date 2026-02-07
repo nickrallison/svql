@@ -11,9 +11,9 @@ pub use cell_registry::CellRegistry;
 pub use connectivity_graph::ConnectivityGraph;
 pub use io_mapping::IoMapping;
 
-use crate::cell::{CellIndex, CellKind, CellWrapper};
+use crate::cell::{CellId, CellKind, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
-use svql_common::prelude::*;
+use svql_common::*;
 
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
@@ -71,62 +71,62 @@ impl<'a> GraphIndex<'a> {
 
     /// Retrieves the internal index for a cell by its debug identifier.
     #[must_use]
-    pub fn get_cell_index_by_debug_id(&self, debug_index: usize) -> Option<CellIndex> {
+    pub fn get_cell_index_by_debug_id(&self, debug_index: usize) -> Option<CellId> {
         self.cell_registry.cell_id_map().get(&debug_index).copied()
     }
 
     /// Returns the set of cell indices in the immediate fan-out of the specified cell.
     #[must_use]
-    pub fn fanout_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
+    pub fn fanout_set(&self, cell_idx: CellId) -> &HashSet<CellId> {
         self.connectivity.fanout_indices_set(cell_idx)
     }
 
     /// Returns the set of cell indices in the immediate fan-in of the specified cell.
     #[must_use]
-    pub fn fanin_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
+    pub fn fanin_set(&self, cell_idx: CellId) -> &HashSet<CellId> {
         self.connectivity.fanin_indices_set(cell_idx)
     }
 
     /// Returns the fan-out cell indices paired with their source pin indices.
     #[must_use]
-    pub fn fanout_with_ports(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+    pub fn fanout_with_ports(&self, cell_idx: CellId) -> Option<&[(CellId, usize)]> {
         self.connectivity.fanout_indices(cell_idx)
     }
 
     /// Returns the fan-in cell indices paired with their source pin indices.
     #[must_use]
-    pub fn fanin_with_ports(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+    pub fn fanin_with_ports(&self, cell_idx: CellId) -> Option<&[(CellId, usize)]> {
         self.connectivity.fanin_indices(cell_idx)
     }
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     #[must_use]
-    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
+    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellId) -> &HashSet<CellId> {
         self.connectivity
             .get_intersect_fanout_of_fanin_indices(cell_idx)
     }
 
     /// Returns a map of input port names to their fan-out cell indices.
     #[must_use]
-    pub fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+    pub fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(CellId, usize)>> {
         self.io_mapping.input_fanout_by_name_map()
     }
 
     /// Returns a map of output port names to their fan-in cell indices.
     #[must_use]
-    pub fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
+    pub fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(CellId, usize)>> {
         self.io_mapping.output_fanin_by_name_map()
     }
 
-    /// Resolves a `CellIndex` to its `CellWrapper`.
+    /// Resolves a `CellId` to its `CellWrapper`.
     #[must_use]
-    pub fn get_cell_by_index(&self, index: CellIndex) -> &CellWrapper<'a> {
+    pub fn get_cell_by_index(&self, index: CellId) -> &CellWrapper<'a> {
         self.cell_registry.get_cell_by_index(index)
     }
 
     /// Returns indices for cells of a specific type.
     #[must_use]
-    pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
+    pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellId] {
         self.cell_registry.cells_of_type_indices(node_type)
     }
 
@@ -143,7 +143,7 @@ impl<'a> GraphIndex<'a> {
     /// matched components.
     #[must_use]
     pub fn is_connected(&self, from_id: u64, to_id: u64) -> bool {
-        // 1. Map external ID (u64) to internal CellIndex
+        // 1. Map external ID (u64) to internal CellId
         let from_idx = match self.get_cell_index_by_debug_id(from_id as usize) {
             Some(idx) => idx,
             None => return false, // Source cell not found in graph

@@ -214,7 +214,7 @@ impl Recursive for RecAnd {
                 arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
                 arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: e.y.cell_id().map(svql_query::wire::WireRef::Cell),
+                    value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
 
@@ -445,7 +445,7 @@ impl Recursive for RecOr {
                 arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
                 arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: e.y.cell_id().map(svql_query::wire::WireRef::Cell),
+                    value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
 

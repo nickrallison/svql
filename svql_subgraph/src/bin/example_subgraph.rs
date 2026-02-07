@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         &config,
     );
 
-    // Build indices for resolving CellIndex → CellWrapper
+    // Build indices for resolving CellId → CellWrapper
     let needle_index = svql_subgraph::GraphIndex::build(&needle);
     let haystack_index = svql_subgraph::GraphIndex::build(&design);
 

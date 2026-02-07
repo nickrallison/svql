@@ -27,8 +27,7 @@ pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use ref_type::Ref;
 pub use row::Row;
 pub use schema::{
-    Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortDirection,
-    PortMap, Submodule,
+    Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortMap, Submodule,
 };
 pub use slot::TableSlot;
 pub use store::Store;

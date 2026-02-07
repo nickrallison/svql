@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::*;
 use std::sync::Arc;
 
 /// Core wire reference type that can be stored in tables.
@@ -126,5 +126,29 @@ impl Wire {
     pub fn as_u64(&self) -> u64 {
         #[allow(deprecated)]
         self.id().as_u64()
+    }
+}
+
+/// Defines the direction of a port column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PortDirection {
+    /// Not a port (internal wire, submodule reference, or metadata).
+    None,
+    /// Input port (receives signal).
+    Input,
+    /// Output port (drives signal).
+    Output,
+    /// Bidirectional port.
+    Inout,
+}
+
+impl std::fmt::Display for PortDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "None"),
+            Self::Input => write!(f, "Input"),
+            Self::Output => write!(f, "Output"),
+            Self::Inout => write!(f, "Inout"),
+        }
     }
 }

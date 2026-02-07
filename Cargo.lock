@@ -784,7 +784,6 @@ dependencies = [
  "syn 2.0.104",
  "sysinfo",
  "thiserror",
- "tikv-jemallocator",
  "tracing",
  "tracing-subscriber",
  "unstringify",

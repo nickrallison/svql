@@ -959,7 +959,6 @@ where
 pub(crate) mod test {
 
     use crate::{
-        Wire,
         traits::{Netlist, Pattern},
     };
 
@@ -967,6 +966,8 @@ pub(crate) mod test {
         Alias, Component, Composite, Connection, Connections, Driver, DriverKey, ExecInfo, Row,
         Selector, Store, Submodule, kind,
     };
+
+    use svql_common::Wire;
 
     use crate::traits::netlist::test::AndGate;
 

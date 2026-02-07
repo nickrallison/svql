@@ -126,7 +126,7 @@ where
 
         match T::schema().column(idx).kind {
             ColumnKind::Cell => Some(ColumnEntry::Wire {
-                value: val.map(CellId::new).map(crate::wire::WireRef::Cell),
+                value: val.map(|v| CellId::new(v as usize)).map(crate::wire::WireRef::Cell),
             }),
             ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
             ColumnKind::Metadata => Some(ColumnEntry::Metadata { id: val }),
@@ -271,7 +271,7 @@ where
         }
 
         let col = self.store.column(col_name)?;
-        col.get(row_idx).copied().flatten().map(crate::CellId::new)
+        col.get(row_idx).copied().flatten().map(|v| crate::CellId::new(v as usize))
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {

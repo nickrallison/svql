@@ -1,6 +1,6 @@
 //! Configuration for Yosys module processing.
 
-use crate::prelude::*;
+use crate::*;
 use core::hash::{Hash, Hasher};
 
 /// Configuration options for processing a Yosys module.
