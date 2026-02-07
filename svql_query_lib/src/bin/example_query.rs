@@ -29,6 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|s| s.parse::<bool>().ok())
         .unwrap_or(false);
 
+    let parallel: bool = args
+        .get(4)
+        .and_then(|s| s.parse::<bool>().ok())
+        .unwrap_or(true);
+
     let haystack_options = ModuleConfig {
         // default
         load_raw: use_raw_import,
@@ -38,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::builder()
         .match_length(MatchLength::NeedleSubsetHaystack)
         .haystack_options(haystack_options)
+        .parallel(parallel)
         .build();
 
     let design_key = DriverKey::new(design_path, design_module);

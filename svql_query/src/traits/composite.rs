@@ -87,8 +87,7 @@ fn estimate_combined_selectivity<T: Composite>(
             let involves_joined = from_sub.is_some_and(|i| joined.contains(&i))
                 || to_sub.is_some_and(|i| joined.contains(&i));
 
-            if involves_new && involves_joined {
-                if let (Some(from), Some(to)) = (from_sub, to_sub) {
+            if involves_new && involves_joined && let (Some(from), Some(to)) = (from_sub, to_sub) {
                     let sel = estimate_selectivity_from_index(
                         connectivity_cache,
                         from,
@@ -106,7 +105,7 @@ fn estimate_combined_selectivity<T: Composite>(
                         max_group_selectivity = f64::max(max_group_selectivity, sel);
                     }
                 }
-            }
+            
         }
 
         if group_has_relevant_conn {

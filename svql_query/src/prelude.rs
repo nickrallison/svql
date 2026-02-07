@@ -9,7 +9,7 @@ pub use crate::{CellId, Wire, run_query};
 pub use crate::session::{
     Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, ConnectionBuilder, EntryArray, ExecInfo,
     ExecutionContext, ExecutionPlan, PatternSchema, Port, PortDirection, PortMap, QueryError, Ref,
-    Row, SearchFn, Store, Submodule, Table,
+    Row, SearchFn, Store, Submodule, Table, TableSlot,
 };
 
 // Trait re-exports

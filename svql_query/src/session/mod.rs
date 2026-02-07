@@ -15,6 +15,7 @@ pub mod join_planner;
 mod ref_type;
 mod row;
 mod schema;
+mod slot;
 mod store;
 mod table;
 // mod variant_ref;
@@ -29,6 +30,7 @@ pub use schema::{
     Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortDirection,
     PortMap, Submodule,
 };
+pub use slot::TableSlot;
 pub use store::Store;
 pub use table::{AnyTable, Table};
 // pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};

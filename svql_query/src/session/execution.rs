@@ -8,12 +8,12 @@
 //! pointers are provided by the `Pattern` trait implementations.
 
 use ahash::{AHashMap, AHashSet};
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::hash::Hash;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use crate::prelude::*;
+use crate::session::slot::ClaimResult;
 
 /// Type alias for a search function.
 ///
@@ -28,12 +28,6 @@ pub struct ExecInfo {
     pub nested_dependancies: &'static [&'static Self],
 }
 
-/// Slot for storing a table during execution.
-///
-/// Uses `OnceLock<Arc<dyn AnyTable>>` so tables can be shared during execution
-/// and then cloned into the final Store.
-type TableSlot = OnceLock<Arc<dyn AnyTable + Send + Sync>>;
-
 /// A node in the execution DAG.
 #[derive(Debug)]
 struct ExecutionNode {
@@ -43,37 +37,12 @@ struct ExecutionNode {
     type_name: &'static str,
     /// The search function to execute.
     search_fn: SearchFn,
-    /// Atomic flag to ensure single execution in parallel mode.
-    cas_runner: AtomicBool,
     /// Dependencies that must complete before this node.
     deps: Vec<Arc<Self>>,
 }
 
 impl ExecutionNode {
     // /// Check if this node has already been executed.
-    // fn is_executed(&self) -> bool {
-    //     self.cas_runner.load(std::sync::atomic::Ordering::SeqCst)
-    // }
-
-    // fn is_done(&self, ctx: &ExecutionContext) -> bool {
-    //     if let Some(slot) = ctx.slots.get(&self.type_id)
-    //         && slot.get().is_some()
-    //     {
-    //         return true;
-    //     }
-    //     false
-    // }
-
-    fn try_execute(&self) -> bool {
-        let cas_result = self.cas_runner.compare_exchange(
-            false,
-            true,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::SeqCst,
-        );
-        cas_result.is_ok()
-    }
-
     fn flatten_deps(&self) -> Vec<Arc<Self>> {
         let mut seen: AHashSet<TypeId> = AHashSet::new();
         let mut result: Vec<Arc<Self>> = Vec::new();
@@ -103,7 +72,6 @@ impl ExecutionNode {
             type_id: exec_info.type_id,
             type_name: exec_info.type_name,
             search_fn: exec_info.search_function,
-            cas_runner: AtomicBool::new(false),
             deps,
         }
     }
@@ -163,7 +131,7 @@ impl ExecutionPlan {
 
         let slots = all_deps
             .iter()
-            .map(|node| (node.type_id, OnceLock::new()))
+            .map(|node| (node.type_id, Default::default()))
             .collect();
         (
             Self {
@@ -265,31 +233,50 @@ impl ExecutionPlan {
     }
 
     /// Execute a single node, waiting for deps first.
+    ///
+    /// Coordination is done via `TableSlot::try_claim()` which is keyed by
+    /// `TypeId` in the shared slots map.  This avoids the problem of duplicate
+    /// `ExecutionNode` instances (from recursive `from_dep`) each carrying
+    /// their own atomic flag.
+    ///
+    /// Three possible paths:
+    /// - **Ready**: slot already filled → return immediately (lock-free read)
+    /// - **Claimed**: we won the CAS → execute deps, run search, fill slot
+    /// - **Wait**: another thread is executing → block on condvar until filled
     fn execute_node(node: &Arc<ExecutionNode>, ctx: &ExecutionContext) -> Result<(), QueryError> {
-        // Check if already executed
         tracing::trace!("Attempting to execute node: {}", node.type_name);
 
-        if !node.try_execute() {
-            tracing::trace!(
-                "Node {} already executing or completed, waiting...",
-                node.type_name
-            );
-            // Another thread is running this dep; wait for it to complete
-            if let Some(slot) = ctx.slots.get(&node.type_id()) {
-                // Wait for the slot to be filled
-                let _ = slot.wait();
+        let slot = ctx.slots.get(&node.type_id).ok_or_else(|| {
+            QueryError::ExecutionError(format!(
+                "No slot for node {} ({:?})",
+                node.type_name, node.type_id
+            ))
+        })?;
+
+        match slot.try_claim() {
+            ClaimResult::Ready(_) => {
+                tracing::trace!("Node {} already complete (fast path)", node.type_name);
+                return Ok(());
             }
-            tracing::trace!("Node {} execution complete (waited)", node.type_name);
-            return Ok(());
+            ClaimResult::Wait => {
+                tracing::trace!(
+                    "Node {} being executed by another thread, waiting...",
+                    node.type_name
+                );
+                let _ = slot.wait();
+                tracing::trace!("Node {} execution complete (waited)", node.type_name);
+                return Ok(());
+            }
+            ClaimResult::Claimed => {
+                tracing::debug!(
+                    "Executing node: {} (with {} dependencies)",
+                    node.type_name,
+                    node.deps.len()
+                );
+            }
         }
 
-        tracing::debug!(
-            "Executing node: {} (with {} dependencies)",
-            node.type_name,
-            node.deps.len()
-        );
-
-        // await all dependencies
+        // We won the claim — first ensure all dependencies are ready
         for (i, dep) in node.deps.iter().enumerate() {
             tracing::trace!(
                 "  Waiting for dependency {}/{}: {}",
@@ -297,7 +284,6 @@ impl ExecutionPlan {
                 node.deps.len(),
                 dep.type_name
             );
-            // will not re-execute due to cas_runner, and will just block until done
             ExecutionPlan::execute_node(dep, ctx)?;
             tracing::trace!(
                 "  Dependency {}/{} complete: {}",
@@ -316,11 +302,9 @@ impl ExecutionPlan {
             result.len()
         );
 
-        // Store result wrapped in Arc (OnceLock ensures single write)
-        if let Some(slot) = ctx.slots.get(&node.type_id) {
-            let _ = slot.set(Arc::from(result)); // Ignore if already set (race condition)
-            tracing::trace!("Stored results for: {}", node.type_name);
-        }
+        // Store result and notify waiters
+        slot.set(Arc::from(result));
+        tracing::trace!("Stored results for: {}", node.type_name);
 
         tracing::debug!("Node execution complete: {}", node.type_name);
         Ok(())
@@ -341,8 +325,8 @@ impl ExecutionPlan {
     ) -> Option<&'a super::table::Table<T>> {
         ctx.slots
             .get(&TypeId::of::<T>())
-            .and_then(|lock| lock.get())
-            .and_then(|arc| arc.as_any().downcast_ref())
+            .and_then(|slot| slot.get_ref())
+            .and_then(|any_table| any_table.as_any().downcast_ref())
     }
 
     /// Convert the context into a Store after execution completes.
@@ -350,13 +334,10 @@ impl ExecutionPlan {
         let mut store = Store::with_capacity(ctx.slots.len());
 
         // Clone tables from slots into the store
-        // Since we use Arc<dyn AnyTable>, we can clone the Arc and then
-        // use Arc::try_unwrap or just clone the inner table
         for (&type_id, slot) in &ctx.slots {
             if let Some(arc_table) = slot.get() {
-                // Clone the Arc and then box it for the store
-                // This is a cheap reference count bump
-                store.insert_arc(type_id, Arc::clone(arc_table));
+                // slot.get() already returns a cloned Arc, so we can use it directly
+                store.insert_arc(type_id, arc_table);
             } else {
                 return Err(QueryError::ExecutionError(format!(
                     "Missing table for type_id: {type_id:?}"
@@ -442,9 +423,6 @@ impl ExecutionContext {
     /// (though DAG ordering guarantees it should be computed).
     #[must_use]
     pub fn get_any_table(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
-        self.slots
-            .get(&type_id)
-            .and_then(|slot| slot.get())
-            .map(std::convert::AsRef::as_ref)
+        self.slots.get(&type_id).and_then(|slot| slot.get_ref())
     }
 }
