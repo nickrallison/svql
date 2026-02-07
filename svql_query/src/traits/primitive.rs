@@ -32,7 +32,7 @@ fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
 fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
     // Try as cell first
     if let Ok(cell_idx) = net.as_cell_index() {
-        return Some(WireRef::Cell(CellId::new(cell_idx as usize)));
+        return Some(WireRef::Cell(CellId::new(cell_idx)));
     }
 
     // If not a cell, assume it's an input port or constant
