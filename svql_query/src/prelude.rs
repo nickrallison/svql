@@ -33,7 +33,7 @@ pub use common::{Config, ConfigBuilder, MatchLength, ModuleConfig, YosysModule};
 
 pub use subgraph::{
     AssignmentSet, SingleAssignment,
-    cell::{CellInfo, CellKind, CellWrapper, SourceLocation},
+    cell::{CellInfo, CellKind, SourceLocation},
     graph_index::GraphIndex,
 };
 

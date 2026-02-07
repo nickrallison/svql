@@ -127,7 +127,8 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         .get_design(&key, &config.haystack_options)
         .map_err(|e| QueryError::design_load(e.to_string()))?;
 
-    for cell in container.index().cells_topo() {
+    for i in 0..container.index().num_cells() {
+        let cell = container.index().get_cell_by_index(svql_subgraph::cell::CellIndex::new(i));
         println!("Cell: {cell:#?}");
     }
 

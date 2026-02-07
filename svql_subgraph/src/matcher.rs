@@ -141,9 +141,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             results.len()
         );
 
-        AssignmentSet {
-            items: results,
-        }
+        AssignmentSet { items: results }
     }
 
     /// Recursive backtracking step for matching logic gates.
@@ -349,13 +347,14 @@ impl SubgraphMatcherCore<'_, '_, '_> {
 
         if mapped_haystack_fanin.is_empty() {
             // If no fanin is mapped yet, allow matching to any logic gate
-            return self
-                .haystack_index
-                .cells_topo()
-                .iter()
-                .enumerate()
-                .filter(|(_, cell)| cell.cell_type().is_logic_gate())
-                .map(|(i, _)| CellIndex::new(i))
+            return (0..self.haystack_index.num_cells())
+                .map(CellIndex::new)
+                .filter(|&idx| {
+                    self.haystack_index
+                        .get_cell_by_index(idx)
+                        .cell_type()
+                        .is_logic_gate()
+                })
                 .filter(|candidate| assignment.haystack_is_free(*candidate))
                 .collect();
         }
@@ -388,8 +387,9 @@ impl SubgraphMatcherCore<'_, '_, '_> {
         let mut gates = VecDeque::new();
         let mut outputs = VecDeque::new();
 
-        for (i, cell) in self.needle_index.cells_topo().iter().enumerate().rev() {
+        for i in (0..self.needle_index.num_cells()).rev() {
             let idx = CellIndex::new(i);
+            let cell = self.needle_index.get_cell_by_index(idx);
             match cell.cell_type() {
                 CellKind::Output => outputs.push_back(idx),
                 CellKind::Input => inputs.push_back(idx),
@@ -418,9 +418,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             .collect();
 
         let unfiltered: Vec<CellIndex> = if mapped_haystack_fanin.is_empty() {
-            self.haystack_index
-                .cells_of_type_indices(kind)
-                .to_vec()
+            self.haystack_index.cells_of_type_indices(kind).to_vec()
         } else {
             let mut result: Option<AHashSet<CellIndex>> = None;
             for haystack_pred in &mapped_haystack_fanin {
@@ -436,12 +434,13 @@ impl SubgraphMatcherCore<'_, '_, '_> {
         unfiltered
             .into_iter()
             .filter(|candidate| {
-                self.haystack_index.get_cell_by_index(*candidate).cell_type() == kind
+                self.haystack_index
+                    .get_cell_by_index(*candidate)
+                    .cell_type()
+                    == kind
             })
             .filter(|candidate| assignment.haystack_is_free(*candidate))
-            .filter(|candidate| {
-                self.check_fanin_constraints(needle_cell, *candidate, assignment)
-            })
+            .filter(|candidate| self.check_fanin_constraints(needle_cell, *candidate, assignment))
             .collect()
     }
 
@@ -483,15 +482,13 @@ impl SubgraphMatcherCore<'_, '_, '_> {
                     if needle_cells.is_empty() {
                         true
                     } else {
-                        needle_cells
-                            .iter()
-                            .all(|needle_succ| {
-                                self.check_fanin_constraints(
-                                    *needle_succ,
-                                    *haystack_succ,
-                                    &next_assignment,
-                                )
-                            })
+                        needle_cells.iter().all(|needle_succ| {
+                            self.check_fanin_constraints(
+                                *needle_succ,
+                                *haystack_succ,
+                                &next_assignment,
+                            )
+                        })
                     }
                 })
             })

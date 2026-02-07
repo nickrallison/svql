@@ -1,6 +1,6 @@
 use crate::cell::{CellIndex, CellKind, CellWrapper};
-use prjunnamed_netlist::CellRef;
 use ahash::AHashMap;
+use prjunnamed_netlist::CellRef;
 
 #[derive(Clone, Debug)]
 pub struct CellRegistry<'a> {
@@ -13,7 +13,7 @@ pub struct CellRegistry<'a> {
 }
 
 impl<'a> CellRegistry<'a> {
-    #[must_use] 
+    #[must_use]
     pub fn build(cell_refs_topo: &[CellRef<'a>]) -> Self {
         let cells_topo = Self::build_cells_topo(cell_refs_topo);
         let cell_id_map = Self::build_cell_id_map(&cells_topo);
@@ -26,12 +26,12 @@ impl<'a> CellRegistry<'a> {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.cells_topo.len()
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.cells_topo.is_empty()
     }
@@ -66,59 +66,20 @@ impl<'a> CellRegistry<'a> {
         cell_type_indices
     }
 
-    #[must_use] 
-    pub fn cells_of_type_iter(
-        &self,
-        node_type: CellKind,
-    ) -> Option<impl Iterator<Item = &CellWrapper<'a>>> {
-        self.cell_type_indices
-            .get(&node_type)
-            .map(|indices| indices.iter().map(|idx| &self.cells_topo[idx.index()]))
-    }
-
-    #[must_use] 
+    #[must_use]
     pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
         self.cell_type_indices
             .get(&node_type)
             .map_or(&[], std::vec::Vec::as_slice)
     }
 
-    #[must_use] 
-    pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
-        &self.cells_topo
-    }
-
-    #[must_use] 
+    #[must_use]
     pub const fn cell_id_map(&self) -> &AHashMap<usize, CellIndex> {
         &self.cell_id_map
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn get_cell_by_index(&self, index: CellIndex) -> &CellWrapper<'a> {
         &self.cells_topo[index.index()]
-    }
-
-    #[must_use] 
-    pub fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
-        self.cell_id_map.get(&cell.debug_index()).copied()
-    }
-
-    #[must_use] 
-    pub fn indices_to_cells(&self, indices: &[CellIndex]) -> Vec<CellWrapper<'a>> {
-        indices
-            .iter()
-            .map(|idx| self.cells_topo[idx.index()].clone())
-            .collect()
-    }
-
-    #[must_use] 
-    pub fn indices_with_ports_to_cells(
-        &self,
-        indices_with_ports: &[(CellIndex, usize)],
-    ) -> Vec<(CellWrapper<'a>, usize)> {
-        indices_with_ports
-            .iter()
-            .map(|(idx, port)| (self.cells_topo[idx.index()].clone(), *port))
-            .collect()
     }
 }

@@ -28,7 +28,11 @@ impl SubgraphMatcherCore<'_, '_, '_> {
         haystack_cell: &Cell,
         mapping: &SingleAssignment,
     ) -> bool {
-        use Cell::{Buf, Not, And, Or, Xor, Mux, Adc, Aig, Eq, ULt, SLt, Shl, UShr, SShr, XShr, Mul, UDiv, UMod, SDivTrunc, SDivFloor, SModTrunc, SModFloor, Match, Assign, Dff, Memory, Input};
+        use Cell::{
+            Adc, Aig, And, Assign, Buf, Dff, Eq, Input, Match, Memory, Mul, Mux, Not, Or,
+            SDivFloor, SDivTrunc, SLt, SModFloor, SModTrunc, SShr, Shl, UDiv, ULt, UMod, UShr,
+            XShr, Xor,
+        };
         match (needle_cell, haystack_cell) {
             (Buf(p_value), Buf(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
             (Not(p_value), Not(d_value)) => self.values_match_fan_in(p_value, d_value, mapping),
@@ -234,11 +238,11 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             (Ok((d_fan_in_cell_ref, _d_fan_in_idx)), Ok((p_fan_in_cell_ref, _p_fan_in_idx))) => {
                 let p_fan_in_idx = self
                     .needle_index
-                    .get_cell_index(&p_fan_in_cell_ref.into())
+                    .get_cell_index_by_debug_id(p_fan_in_cell_ref.debug_index())
                     .expect("Needle cell should be in index");
                 let d_fan_in_idx = self
                     .haystack_index
-                    .get_cell_index(&d_fan_in_cell_ref.into())
+                    .get_cell_index_by_debug_id(d_fan_in_cell_ref.debug_index())
                     .expect("Haystack cell should be in index");
 
                 let expected_haystack_idx = mapping.get_haystack_cell(p_fan_in_idx);

@@ -33,7 +33,7 @@ impl<'a> GraphIndex<'a> {
         let connectivity =
             ConnectivityGraph::build(design, &cell_refs_topo, cell_registry.cell_id_map());
         let io_mapping = IoMapping::build(
-            cell_registry.cells_topo(),
+            &cell_refs_topo,
             connectivity.fanin_map(),
             connectivity.fanout_map(),
         );
@@ -69,25 +69,10 @@ impl<'a> GraphIndex<'a> {
             .collect()
     }
 
-    /// Returns an iterator over cells of a specific type.
+    /// Retrieves the internal index for a cell by its debug identifier.
     #[must_use]
-    pub fn cells_of_type_iter(
-        &self,
-        node_type: CellKind,
-    ) -> Option<impl Iterator<Item = &CellWrapper<'a>>> {
-        self.cell_registry.cells_of_type_iter(node_type)
-    }
-
-    /// Returns a slice of all cells in topological order.
-    #[must_use]
-    pub fn cells_topo(&self) -> &[CellWrapper<'a>] {
-        self.cell_registry.cells_topo()
-    }
-
-    /// Retrieves the internal index for a given cell wrapper.
-    #[must_use]
-    pub fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
-        self.cell_registry.get_cell_index(cell)
+    pub fn get_cell_index_by_debug_id(&self, debug_index: usize) -> Option<CellIndex> {
+        self.cell_registry.cell_id_map().get(&debug_index).copied()
     }
 
     /// Returns the set of cell indices in the immediate fan-out of the specified cell.
@@ -148,10 +133,8 @@ impl<'a> GraphIndex<'a> {
     /// Retrieves a cell wrapper by its unique debug identifier.
     #[must_use]
     pub fn get_cell_by_id(&self, id: usize) -> Option<&CellWrapper<'a>> {
-        self.cell_registry
-            .cell_id_map()
-            .get(&id)
-            .map(|idx| self.cell_registry.get_cell_by_index(*idx))
+        self.get_cell_index_by_debug_id(id)
+            .map(|idx| self.cell_registry.get_cell_by_index(idx))
     }
 
     /// Checks if the cell with `from_id` physically drives the cell with `to_id`.
@@ -161,13 +144,13 @@ impl<'a> GraphIndex<'a> {
     #[must_use]
     pub fn is_connected(&self, from_id: u64, to_id: u64) -> bool {
         // 1. Map external ID (u64) to internal CellIndex
-        let from_idx = match self.cell_registry.cell_id_map().get(&(from_id as usize)) {
-            Some(idx) => *idx,
+        let from_idx = match self.get_cell_index_by_debug_id(from_id as usize) {
+            Some(idx) => idx,
             None => return false, // Source cell not found in graph
         };
 
-        let to_idx = match self.cell_registry.cell_id_map().get(&(to_id as usize)) {
-            Some(idx) => *idx,
+        let to_idx = match self.get_cell_index_by_debug_id(to_id as usize) {
+            Some(idx) => idx,
             None => return false, // Target cell not found in graph
         };
 

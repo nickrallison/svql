@@ -154,10 +154,10 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
 /// only if it exists in the cell and has a valid driving wire reference.
 pub fn resolve_primitive_ports(
     cell: &prjunnamed_netlist::Cell,
-    cell_wrapper: &CellWrapper,
+    debug_index: usize,
     schema: &PatternSchema,
 ) -> EntryArray {
-    let cell_id = CellId::from_usize(cell_wrapper.debug_index());
+    let cell_id = CellId::from_usize(debug_index);
     let schema_size = schema.defs.len();
 
     // Initialize all entries as None
@@ -237,8 +237,8 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     /// Default implementation handles common gate patterns automatically.
     /// Override this for special cases (e.g., DFFs with named ports).
     #[must_use]
-    fn resolve(cell_wrapper: &CellWrapper<'_>) -> EntryArray {
-        resolve_primitive_ports(cell_wrapper.get(), cell_wrapper, Self::primitive_schema())
+    fn resolve(cell: &prjunnamed_netlist::Cell, debug_index: usize) -> EntryArray {
+        resolve_primitive_ports(cell, debug_index, Self::primitive_schema())
     }
 
     /// Rehydrate from row.
@@ -342,30 +342,29 @@ where
         let index = haystack_container.index();
         tracing::debug!("[PRIMITIVE] Searching design index for cells of type {:?}...", T::CELL_KIND);
 
-        let row_matches = match index.cells_of_type_iter(T::CELL_KIND) {
-            Some(cells_iter) => {
-                let all_cells: Vec<_> = cells_iter.collect();
-                tracing::debug!("[PRIMITIVE] Found {} cells of type {:?}", all_cells.len(), T::CELL_KIND);
-                
-                let filtered: Vec<_> = all_cells
-                    .into_iter()
-                    .filter(|cell_wrapper| {
-                        let passes = T::cell_filter(cell_wrapper.get());
-                        if !passes {
-                            tracing::trace!("[PRIMITIVE] Cell filtered out: {:?}", cell_wrapper.debug_index());
-                        }
-                        passes
-                    })
-                    .map(|cw| T::resolve(cw))
-                    .collect();
-                    
-                tracing::debug!("[PRIMITIVE] {} cells passed filter", filtered.len());
-                filtered
-            }
-            None => {
-                tracing::debug!("[PRIMITIVE] No cells of type {:?} found in design", T::CELL_KIND);
-                Vec::new()
-            }
+        let cell_indices = index.cells_of_type_indices(T::CELL_KIND);
+        let row_matches = if cell_indices.is_empty() {
+            tracing::debug!("[PRIMITIVE] No cells of type {:?} found in design", T::CELL_KIND);
+            Vec::new()
+        } else {
+            tracing::debug!("[PRIMITIVE] Found {} cells of type {:?}", cell_indices.len(), T::CELL_KIND);
+
+            let filtered: Vec<_> = cell_indices
+                .iter()
+                .filter_map(|&cell_idx| {
+                    let cell_wrapper = index.get_cell_by_index(cell_idx);
+                    let cell = cell_wrapper.get();
+                    let passes = T::cell_filter(cell);
+                    if !passes {
+                        tracing::trace!("[PRIMITIVE] Cell filtered out: {:?}", cell_wrapper.debug_index());
+                        return None;
+                    }
+                    Some(T::resolve(cell, cell_wrapper.debug_index()))
+                })
+                .collect();
+
+            tracing::debug!("[PRIMITIVE] {} cells passed filter", filtered.len());
+            filtered
         };
 
         tracing::info!("[PRIMITIVE] Primitive search complete: {} total matches", row_matches.len());

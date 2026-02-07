@@ -54,7 +54,7 @@ impl ConnectivityGraph {
         let mut fanout_map: FanoutMap = AHashMap::new();
         let mut fanin_map: FaninMap = AHashMap::new();
 
-        for sink_ref in cell_refs_topo.iter().copied() {
+        for sink_ref in cell_refs_topo.iter() {
             let sink_idx = *cell_id_map
                 .get(&sink_ref.debug_index())
                 .expect("Sink cell should be in map");
