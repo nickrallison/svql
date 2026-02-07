@@ -40,6 +40,179 @@ pub struct Connections {
     pub connections: &'static [&'static [Connection]],
 }
 
+/// Resolve a selector path to its root submodule index.
+fn resolve_submodule<T: Composite>(endpoint: &Endpoint) -> Option<usize> {
+    let head = endpoint.selector.head()?;
+    T::composite_schema().submodule_index(head)
+}
+
+fn estimate_selectivity_from_index(
+    connectivity_cache: &ConnectivityCache,
+    from_sub: usize,
+    to_sub: usize,
+    cnf_idx: usize,
+    a_table: &dyn AnyTable,
+    b_table: &dyn AnyTable,
+) -> f64 {
+    if a_table.is_empty() || b_table.is_empty() {
+        return 0.0;
+    }
+    if let Some(index) = connectivity_cache.get(from_sub, to_sub, cnf_idx) {
+        index.edge_count as f64 / (a_table.len() as f64 * b_table.len() as f64)
+    } else {
+        1.0 // Conservative: assume no filtering if index missing
+    }
+}
+
+/// Estimate how much filtering occurs when joining `new_idx` with already-joined submodules
+fn estimate_combined_selectivity<T: Composite>(
+    new_idx: usize,
+    joined: &AHashSet<usize>,
+    connections: &Connections,
+    connectivity_cache: &ConnectivityCache,
+    dep_tables: &[&(dyn AnyTable + Send + Sync)],
+) -> f64 {
+    let mut product_selectivity = 1.0;
+
+    // For each CNF group, find connections involving new_idx and joined submodules
+    for (cnf_idx, cnf_group) in connections.connections.iter().enumerate() {
+        let mut max_group_selectivity = 0.0;
+        let mut group_has_relevant_conn = false;
+
+        for conn in cnf_group.iter() {
+            let from_sub = resolve_submodule::<T>(&conn.from);
+            let to_sub = resolve_submodule::<T>(&conn.to);
+
+            let involves_new = from_sub == Some(new_idx) || to_sub == Some(new_idx);
+            let involves_joined = from_sub.is_some_and(|i| joined.contains(&i))
+                || to_sub.is_some_and(|i| joined.contains(&i));
+
+            if involves_new && involves_joined {
+                if let (Some(from), Some(to)) = (from_sub, to_sub) {
+                    let sel = estimate_selectivity_from_index(
+                        connectivity_cache,
+                        from,
+                        to,
+                        cnf_idx,
+                        dep_tables[from],
+                        dep_tables[to],
+                    );
+
+                    // Pessimistic bound for OR group: use the maximum selectivity (least filtering)
+                    if !group_has_relevant_conn {
+                        max_group_selectivity = sel;
+                        group_has_relevant_conn = true;
+                    } else {
+                        max_group_selectivity = f64::max(max_group_selectivity, sel);
+                    }
+                }
+            }
+        }
+
+        if group_has_relevant_conn {
+            product_selectivity *= max_group_selectivity;
+        }
+    }
+
+    // Return P(survives)
+    product_selectivity
+}
+
+/// Estimate the cost of joining submodule `new_idx` with the current partial join
+fn estimate_join_cost<T: Composite>(
+    new_idx: usize,
+    dep_tables: &[&(dyn AnyTable + Send + Sync)],
+    current_order: &[usize],
+    joined: &AHashSet<usize>,
+    connections: &Connections,
+    connectivity_cache: &ConnectivityCache,
+) -> f64 {
+    let new_table = dep_tables[new_idx];
+
+    // Base cost: size of Cartesian product
+    let current_size = current_order
+        .iter()
+        .map(|&i| dep_tables[i].len() as f64)
+        .product::<f64>();
+
+    let new_size = new_table.len() as f64;
+    let base_cost = current_size * new_size;
+
+    // Adjustment: how much will connections filter?
+    let survival_prob = estimate_combined_selectivity::<T>(
+        new_idx,
+        joined,
+        connections,
+        connectivity_cache,
+        dep_tables,
+    );
+
+    // Cost = work to enumerate × fraction that survive
+    base_cost * survival_prob
+}
+
+/// Compute optimal join order using greedy cost minimization
+fn compute_optimal_join_order<T: Composite>(
+    dep_tables: &[&(dyn AnyTable + Send + Sync)],
+    connections: &Connections,
+    connectivity_cache: &ConnectivityCache,
+) -> Vec<usize> {
+    let n = dep_tables.len();
+    if n == 0 {
+        return vec![];
+    }
+    let mut order = Vec::with_capacity(n);
+    let mut joined = AHashSet::with_capacity(n);
+
+    // 1. Start with smallest table
+    let first = (0..n)
+        .min_by_key(|&i| dep_tables[i].len())
+        .expect("At least one submodule");
+
+    order.push(first);
+    joined.insert(first);
+
+    // 2. Greedily pick next submodule with minimum join cost
+    while order.len() < n {
+        let next = (0..n)
+            .filter(|i| !joined.contains(i))
+            .min_by(|&a, &b| {
+                let cost_a = estimate_join_cost::<T>(
+                    a,
+                    dep_tables,
+                    &order,
+                    &joined,
+                    connections,
+                    connectivity_cache,
+                );
+                let cost_b = estimate_join_cost::<T>(
+                    b,
+                    dep_tables,
+                    &order,
+                    &joined,
+                    connections,
+                    connectivity_cache,
+                );
+
+                cost_a
+                    .partial_cmp(&cost_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .expect("Should find next candidate");
+
+        order.push(next);
+        joined.insert(next);
+    }
+
+    tracing::debug!(
+        "[JOIN_ORDER] Optimized order for {}: {:?}",
+        std::any::type_name::<T>(),
+        order
+    );
+
+    order
+}
+
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
     /// Submodule declarations (macro-generated)
     const SUBMODULES: &'static [Submodule];
@@ -113,12 +286,16 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             }
         }
 
-        // Incremental join with filtering
-        let join_order: Vec<usize> = (0..sub_indices.len()).collect();
-        tracing::debug!("[COMPOSITE] Join order: {:?}", join_order);
-
         // Build connectivity cache once
         let connectivity_cache = ConnectivityCache::build::<Self>(dep_tables, ctx);
+
+        // Incremental join with filtering (Optimization 2: Intelligent Join Ordering)
+        let join_order = compute_optimal_join_order::<Self>(
+            dep_tables,
+            &Self::CONNECTIONS,
+            &connectivity_cache,
+        );
+        tracing::debug!("[COMPOSITE] Join order: {:?}", join_order);
 
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
