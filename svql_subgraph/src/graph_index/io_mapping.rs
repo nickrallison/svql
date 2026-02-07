@@ -1,4 +1,3 @@
-use super::CellRegistry;
 use crate::cell::{CellIndex, CellWrapper};
 use ahash::AHashMap;
 use prjunnamed_netlist::Cell;
@@ -55,42 +54,6 @@ impl IoMapping {
                 } else {
                     None
                 }
-            })
-            .collect()
-    }
-
-    #[must_use]
-    pub fn get_input_fanout_by_name<'a>(
-        &self,
-        registry: &CellRegistry<'a>,
-    ) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        self.input_fanout_by_name
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    v.iter()
-                        .map(|(c, pin)| (registry.get_cell_by_index(*c).clone(), *pin))
-                        .collect(),
-                )
-            })
-            .collect()
-    }
-
-    #[must_use]
-    pub fn get_output_fanin_by_name<'a>(
-        &self,
-        registry: &CellRegistry<'a>,
-    ) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        self.output_fanin_by_name
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    v.iter()
-                        .map(|(c, pin)| (registry.get_cell_by_index(*c).clone(), *pin))
-                        .collect(),
-                )
             })
             .collect()
     }

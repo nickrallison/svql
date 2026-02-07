@@ -2,28 +2,18 @@
 
 use ahash::AHashMap;
 
-use crate::cell::{CellKind, CellWrapper};
+use crate::cell::CellIndex;
 
 /// A collection of mappings found during a search.
 #[derive(Clone, Debug, Default)]
-pub struct AssignmentSet<'needle, 'haystack> {
-    pub items: Vec<SingleAssignment<'needle, 'haystack>>,
-    pub needle_input_fanout_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
-    pub needle_output_fanin_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
+pub struct AssignmentSet {
+    pub items: Vec<SingleAssignment>,
 }
 
-impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
+impl AssignmentSet {
     #[must_use]
-    pub const fn new(
-        items: Vec<SingleAssignment<'needle, 'haystack>>,
-        needle_input_fanout_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
-        needle_output_fanin_by_name: AHashMap<String, Vec<(CellWrapper<'needle>, usize)>>,
-    ) -> Self {
-        Self {
-            items,
-            needle_input_fanout_by_name,
-            needle_output_fanin_by_name,
-        }
+    pub const fn new(items: Vec<SingleAssignment>) -> Self {
+        Self { items }
     }
 
     #[must_use]
@@ -39,14 +29,14 @@ impl<'needle, 'haystack> AssignmentSet<'needle, 'haystack> {
 
 /// A partial mapping of cell assignments during the search.
 #[derive(Clone, Debug, Default)]
-pub struct SingleAssignment<'needle, 'haystack> {
-    /// Pattern to Design cell mapping
-    needle_to_haystack: AHashMap<CellWrapper<'needle>, CellWrapper<'haystack>>,
-    /// Design to Pattern cell mapping
-    haystack_to_needle: AHashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>>,
+pub struct SingleAssignment {
+    /// Pattern to Design cell index mapping
+    needle_to_haystack: AHashMap<CellIndex, CellIndex>,
+    /// Design to Pattern cell index mapping
+    haystack_to_needle: AHashMap<CellIndex, Vec<CellIndex>>,
 }
 
-impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
+impl SingleAssignment {
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: AHashMap::new(),
@@ -56,11 +46,11 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
 
     pub(super) fn assign(
         &mut self,
-        needle: CellWrapper<'needle>,
-        haystack: CellWrapper<'haystack>,
+        needle: CellIndex,
+        haystack: CellIndex,
     ) {
         self.needle_to_haystack
-            .insert(needle.clone(), haystack.clone());
+            .insert(needle, haystack);
         self.haystack_to_needle
             .entry(haystack)
             .or_default()
@@ -70,11 +60,11 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     #[allow(dead_code)]
     pub(super) fn remove_by_needle(
         &mut self,
-        needle: CellWrapper<'needle>,
-    ) -> Option<CellWrapper<'haystack>> {
-        if let Some(haystack_cell) = self.needle_to_haystack.remove(&needle) {
-            self.haystack_to_needle.remove(&haystack_cell);
-            return Some(haystack_cell);
+        needle: CellIndex,
+    ) -> Option<CellIndex> {
+        if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
+            self.haystack_to_needle.remove(&haystack_idx);
+            return Some(haystack_idx);
         }
         None
     }
@@ -82,16 +72,22 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
     #[must_use]
     pub fn get_haystack_cell(
         &self,
-        needle: &CellWrapper<'needle>,
-    ) -> Option<&CellWrapper<'haystack>> {
-        self.needle_to_haystack.get(needle)
+        needle: CellIndex,
+    ) -> Option<CellIndex> {
+        self.needle_to_haystack.get(&needle).copied()
     }
 
     #[must_use]
-    pub fn get_needle_cell(&self, haystack: &CellWrapper<'haystack>) -> Vec<&CellWrapper<'needle>> {
+    pub fn get_needle_cells(&self, haystack: CellIndex) -> &[CellIndex] {
         self.haystack_to_needle
-            .get(haystack)
-            .map_or_else(Vec::new, |v| v.iter().collect())
+            .get(&haystack)
+            .map_or(&[], |v| v.as_slice())
+    }
+
+    /// Returns true if the haystack cell is not yet assigned.
+    #[must_use]
+    pub fn haystack_is_free(&self, haystack: CellIndex) -> bool {
+        !self.haystack_to_needle.contains_key(&haystack)
     }
 
     #[must_use]
@@ -106,17 +102,15 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         self.needle_to_haystack.is_empty()
     }
 
-    #[allow(clippy::mutable_key_type)]
     #[must_use]
     pub const fn haystack_mapping(
         &self,
-    ) -> &AHashMap<CellWrapper<'haystack>, Vec<CellWrapper<'needle>>> {
+    ) -> &AHashMap<CellIndex, Vec<CellIndex>> {
         &self.haystack_to_needle
     }
 
-    #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub const fn needle_mapping(&self) -> &AHashMap<CellWrapper<'needle>, CellWrapper<'haystack>> {
+    pub const fn needle_mapping(&self) -> &AHashMap<CellIndex, CellIndex> {
         &self.needle_to_haystack
     }
 
@@ -124,20 +118,28 @@ impl<'needle, 'haystack> SingleAssignment<'needle, 'haystack> {
         let mut sig: Vec<usize> = self
             .needle_to_haystack
             .values()
-            .map(super::cell::CellWrapper::debug_index)
+            .map(|idx| idx.index())
             .collect();
         sig.sort_unstable();
         sig.dedup();
         sig
     }
 
+    /// Signature excluding I/O cells — requires the needle graph index to classify cells.
     #[must_use]
-    pub fn internal_signature(&self) -> Vec<usize> {
+    pub fn internal_signature(
+        &self,
+        needle_index: &crate::graph_index::GraphIndex<'_>,
+    ) -> Vec<usize> {
+        use crate::cell::CellKind;
         let mut sig: Vec<usize> = self
             .needle_mapping()
             .iter()
-            .filter(|(p, _)| !matches!(p.cell_type(), CellKind::Input | CellKind::Output))
-            .map(|(_, d)| d.debug_index())
+            .filter(|(needle_idx, _)| {
+                let kind = needle_index.get_cell_by_index(**needle_idx).cell_type();
+                !matches!(kind, CellKind::Input | CellKind::Output)
+            })
+            .map(|(_, haystack_idx)| haystack_idx.index())
             .collect();
         sig.sort_unstable();
 

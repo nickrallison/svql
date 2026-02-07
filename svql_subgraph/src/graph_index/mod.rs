@@ -19,7 +19,7 @@ use prjunnamed_netlist::{CellRef, Design};
 #[derive(Clone, Debug)]
 pub struct GraphIndex<'a> {
     cell_registry: CellRegistry<'a>,
-    connectivity: ConnectivityGraph<'a>,
+    connectivity: ConnectivityGraph,
     io_mapping: IoMapping,
 }
 
@@ -30,12 +30,8 @@ impl<'a> GraphIndex<'a> {
 
         let cell_refs_topo = Self::build_cell_refs_topo(design);
         let cell_registry = CellRegistry::build(&cell_refs_topo);
-        let connectivity = ConnectivityGraph::build(
-            design,
-            &cell_refs_topo,
-            cell_registry.cell_id_map(),
-            cell_registry.cells_topo(),
-        );
+        let connectivity =
+            ConnectivityGraph::build(design, &cell_refs_topo, cell_registry.cell_id_map());
         let io_mapping = IoMapping::build(
             cell_registry.cells_topo(),
             connectivity.fanin_map(),
@@ -89,83 +85,64 @@ impl<'a> GraphIndex<'a> {
     }
 
     /// Retrieves the internal index for a given cell wrapper.
-    fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
+    #[must_use]
+    pub fn get_cell_index(&self, cell: &CellWrapper<'a>) -> Option<CellIndex> {
         self.cell_registry.get_cell_index(cell)
     }
 
-    /// Returns the set of cells in the immediate fan-out of the specified cell.
-    #[allow(clippy::mutable_key_type)]
+    /// Returns the set of cell indices in the immediate fan-out of the specified cell.
     #[must_use]
-    pub fn fanout_set(&self, cell: &CellWrapper<'a>) -> Option<&AHashSet<CellWrapper<'a>>> {
-        let idx = self.get_cell_index(cell)?;
-        self.connectivity.fanout_cell_set(idx)
+    pub fn fanout_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+        self.connectivity.fanout_indices_set(cell_idx)
     }
 
-    /// Returns the set of cells in the immediate fan-in of the specified cell.
-    #[allow(clippy::mutable_key_type)]
+    /// Returns the set of cell indices in the immediate fan-in of the specified cell.
     #[must_use]
-    pub fn fanin_set(&self, cell: &CellWrapper<'a>) -> Option<&AHashSet<CellWrapper<'a>>> {
-        let idx = self.get_cell_index(cell)?;
-        self.connectivity.fanin_cell_set(idx)
+    pub fn fanin_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+        self.connectivity.fanin_indices_set(cell_idx)
     }
 
-    /// Returns the fan-out cells paired with their source pin indices.
+    /// Returns the fan-out cell indices paired with their source pin indices.
     #[must_use]
-    pub fn fanout_with_ports(
-        &self,
-        cell: &CellWrapper<'a>,
-    ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        let idx = self.get_cell_index(cell)?;
-        let indices_with_ports = self.connectivity.fanout_indices(idx)?;
-        Some(
-            self.cell_registry
-                .indices_with_ports_to_cells(indices_with_ports),
-        )
+    pub fn fanout_with_ports(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+        self.connectivity.fanout_indices(cell_idx)
     }
 
-    /// Returns the fan-in cells paired with their source pin indices.
+    /// Returns the fan-in cell indices paired with their source pin indices.
     #[must_use]
-    pub fn fanin_with_ports(
-        &self,
-        cell: &CellWrapper<'a>,
-    ) -> Option<Vec<(CellWrapper<'a>, usize)>> {
-        let idx = self.get_cell_index(cell)?;
-        let indices_with_ports = self.connectivity.fanin_indices(idx)?;
-        Some(
-            self.cell_registry
-                .indices_with_ports_to_cells(indices_with_ports),
-        )
+    pub fn fanin_with_ports(&self, cell_idx: CellIndex) -> Option<&[(CellIndex, usize)]> {
+        self.connectivity.fanin_indices(cell_idx)
     }
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
-    #[allow(clippy::mutable_key_type)]
     #[must_use]
-    pub fn get_intersect_fanout_of_fanin(
-        &self,
-        cell: &CellWrapper<'a>,
-    ) -> AHashSet<CellWrapper<'a>> {
-        let Some(idx) = self.get_cell_index(cell) else {
-            return AHashSet::new();
-        };
-
+    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
         self.connectivity
-            .intersect_fanout_of_fanin_cell_set(idx)
-            .cloned()
-            .unwrap_or_default()
+            .get_intersect_fanout_of_fanin_indices(cell_idx)
     }
 
-    /// Returns a map of input port names to their fan-out cells.
+    /// Returns a map of input port names to their fan-out cell indices.
     #[must_use]
-    pub fn get_input_fanout_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        self.io_mapping
-            .get_input_fanout_by_name(&self.cell_registry)
+    pub fn get_input_fanout_by_name_indices(&self) -> &AHashMap<String, Vec<(CellIndex, usize)>> {
+        self.io_mapping.input_fanout_by_name_map()
     }
 
-    /// Returns a map of output port names to their fan-in cells.
+    /// Returns a map of output port names to their fan-in cell indices.
     #[must_use]
-    pub fn get_output_fanin_by_name(&self) -> AHashMap<String, Vec<(CellWrapper<'a>, usize)>> {
-        self.io_mapping
-            .get_output_fanin_by_name(&self.cell_registry)
+    pub fn get_output_fanin_by_name_indices(&self) -> &AHashMap<String, Vec<(CellIndex, usize)>> {
+        self.io_mapping.output_fanin_by_name_map()
+    }
+
+    /// Resolves a `CellIndex` to its `CellWrapper`.
+    #[must_use]
+    pub fn get_cell_by_index(&self, index: CellIndex) -> &CellWrapper<'a> {
+        self.cell_registry.get_cell_by_index(index)
+    }
+
+    /// Returns indices for cells of a specific type.
+    #[must_use]
+    pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[CellIndex] {
+        self.cell_registry.cells_of_type_indices(node_type)
     }
 
     /// Retrieves a cell wrapper by its unique debug identifier.

@@ -1,4 +1,4 @@
-use crate::cell::{CellIndex, CellWrapper};
+use crate::cell::CellIndex;
 use ahash::{AHashMap, AHashSet};
 use prjunnamed_netlist::{CellRef, Design};
 
@@ -6,7 +6,7 @@ type FaninMap = AHashMap<CellIndex, Vec<(CellIndex, usize)>>;
 type FanoutMap = AHashMap<CellIndex, Vec<(CellIndex, usize)>>;
 
 #[derive(Clone, Debug)]
-pub struct ConnectivityGraph<'a> {
+pub struct ConnectivityGraph {
     /// Maps each cell to its fan-in cells with port information
     fanin_map: FaninMap,
     /// Maps each cell to its fan-out cells with port information
@@ -17,21 +17,14 @@ pub struct ConnectivityGraph<'a> {
     fanin_sets: AHashMap<CellIndex, AHashSet<CellIndex>>,
     /// Precomputed intersection of fanout of fanin
     intersect_fanout_of_fanin: AHashMap<CellIndex, AHashSet<CellIndex>>,
-    /// Precomputed fan-out cell sets (CellWrapper) for zero-cost queries
-    fanout_cell_sets: AHashMap<CellIndex, AHashSet<CellWrapper<'a>>>,
-    /// Precomputed fan-in cell sets (CellWrapper) for zero-cost queries
-    fanin_cell_sets: AHashMap<CellIndex, AHashSet<CellWrapper<'a>>>,
-    /// Precomputed intersection of fanout of fanin (CellWrapper)
-    intersect_fanout_of_fanin_cells: AHashMap<CellIndex, AHashSet<CellWrapper<'a>>>,
 }
 
-impl<'a> ConnectivityGraph<'a> {
+impl ConnectivityGraph {
     #[must_use]
     pub fn build(
-        design: &'a Design,
-        cell_refs_topo: &[CellRef<'a>],
+        design: &Design,
+        cell_refs_topo: &[CellRef<'_>],
         cell_id_map: &AHashMap<usize, CellIndex>,
-        cells_topo: &[CellWrapper<'a>],
     ) -> Self {
         let (fanin_map, fanout_map) =
             Self::build_fanin_fanout_maps(design, cell_refs_topo, cell_id_map);
@@ -44,50 +37,39 @@ impl<'a> ConnectivityGraph<'a> {
         let intersect_fanout_of_fanin =
             Self::precompute_intersect_fanout_of_fanin(&fanin_map, &fanout_sets);
 
-        // Precompute CellWrapper sets for zero-cost queries
-        let fanout_cell_sets = Self::precompute_cell_sets(&fanout_sets, cells_topo);
-        let fanin_cell_sets = Self::precompute_cell_sets(&fanin_sets, cells_topo);
-        let intersect_fanout_of_fanin_cells =
-            Self::precompute_cell_sets(&intersect_fanout_of_fanin, cells_topo);
-
         Self {
             fanin_map,
             fanout_map,
             fanout_sets,
             fanin_sets,
             intersect_fanout_of_fanin,
-            fanout_cell_sets,
-            fanin_cell_sets,
-            intersect_fanout_of_fanin_cells,
         }
     }
 
     fn build_fanin_fanout_maps(
-        design: &'a Design,
-        cell_refs_topo: &[CellRef<'a>],
+        design: &Design,
+        cell_refs_topo: &[CellRef<'_>],
         cell_id_map: &AHashMap<usize, CellIndex>,
     ) -> (FaninMap, FanoutMap) {
         let mut fanout_map: FanoutMap = AHashMap::new();
         let mut fanin_map: FaninMap = AHashMap::new();
 
         for sink_ref in cell_refs_topo.iter().copied() {
-            let sink_wrapper: CellWrapper<'a> = sink_ref.into();
+            let sink_idx = *cell_id_map
+                .get(&sink_ref.debug_index())
+                .expect("Sink cell should be in map");
             sink_ref.visit(|net| {
                 if let Ok((source_ref, source_pin_idx)) = design.find_cell(net) {
                     let source_ref_idx = *cell_id_map
                         .get(&source_ref.debug_index())
                         .expect("Source cell should be in map");
 
-                    let sink_wrapper_idx = *cell_id_map
-                        .get(&sink_wrapper.debug_index())
-                        .expect("Sink cell should be in map");
-
                     fanout_map
                         .entry(source_ref_idx)
                         .or_default()
-                        .push((sink_wrapper_idx, source_pin_idx));
+                        .push((sink_idx, source_pin_idx));
                     fanin_map
-                        .entry(sink_wrapper_idx)
+                        .entry(sink_idx)
                         .or_default()
                         .push((source_ref_idx, source_pin_idx));
                 }
@@ -133,22 +115,6 @@ impl<'a> ConnectivityGraph<'a> {
                 }
 
                 Some((*cell_idx, result))
-            })
-            .collect()
-    }
-
-    fn precompute_cell_sets(
-        index_sets: &AHashMap<CellIndex, AHashSet<CellIndex>>,
-        cells_topo: &[CellWrapper<'a>],
-    ) -> AHashMap<CellIndex, AHashSet<CellWrapper<'a>>> {
-        index_sets
-            .iter()
-            .map(|(cell_idx, index_set)| {
-                let cell_set = index_set
-                    .iter()
-                    .map(|idx| cells_topo[idx.index()].clone())
-                    .collect();
-                (*cell_idx, cell_set)
             })
             .collect()
     }
@@ -200,23 +166,5 @@ impl<'a> ConnectivityGraph<'a> {
     #[must_use]
     pub const fn fanout_map(&self) -> &AHashMap<CellIndex, Vec<(CellIndex, usize)>> {
         &self.fanout_map
-    }
-
-    #[must_use]
-    pub fn fanout_cell_set(&self, cell_idx: CellIndex) -> Option<&AHashSet<CellWrapper<'a>>> {
-        self.fanout_cell_sets.get(&cell_idx)
-    }
-
-    #[must_use]
-    pub fn fanin_cell_set(&self, cell_idx: CellIndex) -> Option<&AHashSet<CellWrapper<'a>>> {
-        self.fanin_cell_sets.get(&cell_idx)
-    }
-
-    #[must_use]
-    pub fn intersect_fanout_of_fanin_cell_set(
-        &self,
-        cell_idx: CellIndex,
-    ) -> Option<&AHashSet<CellWrapper<'a>>> {
-        self.intersect_fanout_of_fanin_cells.get(&cell_idx)
     }
 }

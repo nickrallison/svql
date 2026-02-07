@@ -5,18 +5,20 @@
 
 use crate::SubgraphMatcherCore;
 use crate::assignment::SingleAssignment;
-use crate::cell::CellWrapper;
+use crate::cell::CellIndex;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 
-impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
+impl SubgraphMatcherCore<'_, '_, '_> {
     /// Validates that the haystack cell's inputs match the mapped inputs of the needle cell.
     pub(crate) fn check_fanin_constraints(
         &self,
-        needle_cell: CellWrapper<'needle>,
-        haystack_cell: CellWrapper<'haystack>,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        needle_cell: CellIndex,
+        haystack_cell: CellIndex,
+        mapping: &SingleAssignment,
     ) -> bool {
-        self.cells_match_fan_in(needle_cell.get(), haystack_cell.get(), mapping)
+        let needle_wrapper = self.needle_index.get_cell_by_index(needle_cell);
+        let haystack_wrapper = self.haystack_index.get_cell_by_index(haystack_cell);
+        self.cells_match_fan_in(needle_wrapper.get(), haystack_wrapper.get(), mapping)
     }
 
     /// Dispatches fan-in matching based on the specific cell primitive type.
@@ -24,7 +26,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_cell: &Cell,
         haystack_cell: &Cell,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        mapping: &SingleAssignment,
     ) -> bool {
         use Cell::{Buf, Not, And, Or, Xor, Mux, Adc, Aig, Eq, ULt, SLt, Shl, UShr, SShr, XShr, Mul, UDiv, UMod, SDivTrunc, SDivFloor, SModTrunc, SModFloor, Match, Assign, Dff, Memory, Input};
         match (needle_cell, haystack_cell) {
@@ -174,7 +176,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_value: &Value,
         haystack_value: &Value,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        mapping: &SingleAssignment,
     ) -> bool {
         let needle_nets_vec = needle_value.iter().collect::<Vec<Net>>();
         let haystack_nets_vec = haystack_value.iter().collect::<Vec<Net>>();
@@ -223,32 +225,35 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_net: &prjunnamed_netlist::Net,
         haystack_net: &prjunnamed_netlist::Net,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        mapping: &SingleAssignment,
     ) -> bool {
         let actual_fan_in_haystack_cell = self.haystack.find_cell(*haystack_net);
         let fan_in_needle_cell = self.needle.find_cell(*needle_net);
 
         match (actual_fan_in_haystack_cell, fan_in_needle_cell) {
             (Ok((d_fan_in_cell_ref, _d_fan_in_idx)), Ok((p_fan_in_cell_ref, _p_fan_in_idx))) => {
-                let p_fan_in_cell_wrapper: CellWrapper<'needle> = From::from(p_fan_in_cell_ref);
-                let d_fan_in_cell_wrapper: CellWrapper<'haystack> = From::from(d_fan_in_cell_ref);
+                let p_fan_in_idx = self
+                    .needle_index
+                    .get_cell_index(&p_fan_in_cell_ref.into())
+                    .expect("Needle cell should be in index");
+                let d_fan_in_idx = self
+                    .haystack_index
+                    .get_cell_index(&d_fan_in_cell_ref.into())
+                    .expect("Haystack cell should be in index");
 
-                let expected_fan_in_haystack_cell_opt =
-                    mapping.get_haystack_cell(&p_fan_in_cell_wrapper);
+                let expected_haystack_idx = mapping.get_haystack_cell(p_fan_in_idx);
 
-                if expected_fan_in_haystack_cell_opt.is_none() {
+                if expected_haystack_idx.is_none() {
                     return true;
                 }
 
-                let expected_fan_in_haystack_cell_wrapper =
-                    expected_fan_in_haystack_cell_opt.unwrap();
-                expected_fan_in_haystack_cell_wrapper == &d_fan_in_cell_wrapper
+                expected_haystack_idx.unwrap() == d_fan_in_idx
             }
             (Err(haystack_trit), Err(needle_trit)) => haystack_trit == needle_trit,
             (Err(_haystack_const), Ok((needle_cell_ref, _))) => {
                 if self.config.pattern_vars_match_design_consts {
-                    let needle_cell: CellWrapper = needle_cell_ref.into();
-                    needle_cell.cell_type().is_input()
+                    let needle_kind = crate::cell::CellKind::from(needle_cell_ref.get().as_ref());
+                    needle_kind.is_input()
                 } else {
                     false
                 }
@@ -262,7 +267,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNet,
         haystack_c_net: &prjunnamed_netlist::ControlNet,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        mapping: &SingleAssignment,
     ) -> bool {
         match (needle_c_net, haystack_c_net) {
             (
@@ -282,7 +287,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_c_net: &prjunnamed_netlist::ControlNets,
         haystack_c_net: &prjunnamed_netlist::ControlNets,
-        mapping: &SingleAssignment<'needle, 'haystack>,
+        mapping: &SingleAssignment,
     ) -> bool {
         match (needle_c_net, haystack_c_net) {
             (
@@ -308,7 +313,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
         &self,
         needle_const: &prjunnamed_netlist::Const,
         haystack_const: &prjunnamed_netlist::Const,
-        _mapping: &SingleAssignment<'needle, 'haystack>,
+        _mapping: &SingleAssignment,
     ) -> bool {
         let mut needle_const_iter = needle_const.clone().into_iter();
         let mut haystack_const_iter = haystack_const.clone().into_iter();

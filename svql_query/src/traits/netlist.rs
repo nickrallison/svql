@@ -58,11 +58,17 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     }
 
     #[must_use]
-    fn resolve(assignment: &SingleAssignment<'_, '_>) -> EntryArray {
+    fn resolve(
+        assignment: &SingleAssignment,
+        needle_index: &subgraph::GraphIndex<'_>,
+        haystack_index: &subgraph::GraphIndex<'_>,
+    ) -> EntryArray {
         let schema_size = Self::PORTS.len();
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
-        for (needle_cell_wrapper, haystack_cell_wrapper) in assignment.needle_mapping() {
+        for (needle_idx, haystack_idx) in assignment.needle_mapping() {
+            let needle_cell_wrapper = needle_index.get_cell_by_index(*needle_idx);
             let needle_cell = needle_cell_wrapper.get();
+            let haystack_debug_index = haystack_index.get_cell_by_index(*haystack_idx).debug_index();
 
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _) => {
@@ -72,7 +78,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::FILE_PATH
                     );
                     let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
-                    row_match[col_idx] = Some(haystack_cell_wrapper.debug_index() as u32);
+                    row_match[col_idx] = Some(haystack_debug_index as u32);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
                     let err_msg = format!(
@@ -83,16 +89,16 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
                     let needle_output_driver_id: u32 =
                         value_to_cell_id(output_value).expect("Output should have driver");
-                    let haystack_output_driver_wrapper = assignment
+                    let haystack_output_driver = assignment
                         .needle_mapping()
                         .iter()
-                        .find(|(needle_cell_wrapper, _haystack_cell_wrapper)| {
-                            needle_cell_wrapper.debug_index() as u32 == needle_output_driver_id
+                        .find(|(n_idx, _h_idx)| {
+                            needle_index.get_cell_by_index(**n_idx).debug_index() as u32 == needle_output_driver_id
                         })
-                        .map(|(_needle_cell_wrapper, haystack_cell_wrapper)| haystack_cell_wrapper)
+                        .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    row_match[col_idx] = Some(haystack_output_driver_wrapper.debug_index() as u32);
+                    row_match[col_idx] = Some(haystack_index.get_cell_by_index(*haystack_output_driver).debug_index() as u32);
                 }
                 _ => continue,
             }
@@ -237,7 +243,7 @@ where
         let mut row_matches: Vec<EntryArray> = assignments
             .items
             .iter()
-            .map(|assignment| Self::resolve(assignment))
+            .map(|assignment| Self::resolve(assignment, needle_container.index(), haystack_container.index()))
             .collect();
         tracing::debug!(
             "[NETLIST] {} rows created from assignments",

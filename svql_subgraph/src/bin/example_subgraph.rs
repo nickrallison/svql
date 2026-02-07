@@ -31,9 +31,15 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         &config,
     );
 
+    // Build indices for resolving CellIndex → CellWrapper
+    let needle_index = svql_subgraph::GraphIndex::build(&needle);
+    let haystack_index = svql_subgraph::GraphIndex::build(&design);
+
     for (match_idx, assignment) in assignment_set.items.iter().enumerate() {
         println!("--- Match {match_idx} ---");
-        for (needle_cell, haystack_cell) in assignment.needle_mapping() {
+        for (needle_idx, haystack_idx) in assignment.needle_mapping() {
+            let needle_cell = needle_index.get_cell_by_index(*needle_idx);
+            let haystack_cell = haystack_index.get_cell_by_index(*haystack_idx);
             println!(
                 "Needle Cell [id={}]: {:?} -> Haystack Cell [id={}]: {:?}",
                 needle_cell.debug_index(),

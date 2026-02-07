@@ -14,9 +14,8 @@ use svql_common::Config;
 use rayon::prelude::*;
 
 use crate::assignment::{AssignmentSet, SingleAssignment};
-use crate::cell::{CellKind, CellWrapper};
+use crate::cell::{CellIndex, CellKind};
 use crate::graph_index::GraphIndex;
-use crate::utils::intersect_sets;
 
 /// Entry point for subgraph isomorphism searches.
 #[allow(dead_code)]
@@ -55,7 +54,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         needle_name: String,
         haystack_name: String,
         config: &'cfg Config,
-    ) -> AssignmentSet<'needle, 'haystack> {
+    ) -> AssignmentSet {
         let needle_index = GraphIndex::build(needle);
         let haystack_index = GraphIndex::build(haystack);
 
@@ -87,7 +86,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         needle_name: String,
         haystack_name: String,
         config: &'cfg Config,
-    ) -> AssignmentSet<'needle, 'haystack> {
+    ) -> AssignmentSet {
         let matcher = SubgraphMatcherCore {
             needle,
             haystack,
@@ -106,9 +105,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     }
 }
 
-impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
+impl SubgraphMatcherCore<'_, '_, '_> {
     /// Executes the matching process and applies deduplication.
-    pub fn enumerate_assignments(&self) -> AssignmentSet<'needle, 'haystack> {
+    pub fn enumerate_assignments(&self) -> AssignmentSet {
         #[cfg(not(feature = "rayon"))]
         if self.config.parallel {
             tracing::warn!(
@@ -144,19 +143,17 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
 
         AssignmentSet {
             items: results,
-            needle_input_fanout_by_name: self.needle_index.get_input_fanout_by_name(),
-            needle_output_fanin_by_name: self.needle_index.get_output_fanin_by_name(),
         }
     }
 
     /// Recursive backtracking step for matching logic gates.
     fn match_gate_cells(
         &self,
-        assignment: SingleAssignment<'needle, 'haystack>,
-        mut gate_queue: VecDeque<CellWrapper<'needle>>,
-        input_queue: VecDeque<CellWrapper<'needle>>,
-        output_queue: VecDeque<CellWrapper<'needle>>,
-    ) -> Vec<SingleAssignment<'needle, 'haystack>> {
+        assignment: SingleAssignment,
+        mut gate_queue: VecDeque<CellIndex>,
+        input_queue: VecDeque<CellIndex>,
+        output_queue: VecDeque<CellIndex>,
+    ) -> Vec<SingleAssignment> {
         let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
         let is_root = assignment.is_empty();
 
@@ -182,7 +179,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             return self.match_input_cells(assignment, input_queue, output_queue);
         };
 
-        let candidates = self.find_candidates_for_cell(current_needle.clone(), &assignment);
+        let candidates = self.find_candidates_for_cell(current_needle, &assignment);
 
         if candidates.is_empty() {
             if is_root {
@@ -204,7 +201,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .into_par_iter()
                 .flat_map(|candidate| {
                     let mut next_assignment = assignment.clone();
-                    next_assignment.assign(current_needle.clone(), candidate);
+                    next_assignment.assign(current_needle, candidate);
 
                     let res = self.match_gate_cells(
                         next_assignment,
@@ -227,7 +224,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             .into_iter()
             .flat_map(|candidate| {
                 let mut next_assignment = assignment.clone();
-                next_assignment.assign(current_needle.clone(), candidate);
+                next_assignment.assign(current_needle, candidate);
 
                 let res = self.match_gate_cells(
                     next_assignment,
@@ -250,15 +247,15 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Recursive backtracking step for matching input ports.
     fn match_input_cells(
         &self,
-        assignment: SingleAssignment<'needle, 'haystack>,
-        mut input_queue: VecDeque<CellWrapper<'needle>>,
-        output_queue: VecDeque<CellWrapper<'needle>>,
-    ) -> Vec<SingleAssignment<'needle, 'haystack>> {
+        assignment: SingleAssignment,
+        mut input_queue: VecDeque<CellIndex>,
+        output_queue: VecDeque<CellIndex>,
+    ) -> Vec<SingleAssignment> {
         let Some(current_needle) = input_queue.pop_front() else {
             return self.match_output_cells(assignment, output_queue);
         };
 
-        let candidates = self.find_candidates_for_input(current_needle.clone(), &assignment);
+        let candidates = self.find_candidates_for_input(current_needle, &assignment);
 
         if candidates.is_empty() && self.config.pattern_vars_match_design_consts {
             return self.match_input_cells(assignment, input_queue, output_queue);
@@ -270,7 +267,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .into_par_iter()
                 .flat_map(|candidate| {
                     let mut next_assignment = assignment.clone();
-                    next_assignment.assign(current_needle.clone(), candidate);
+                    next_assignment.assign(current_needle, candidate);
 
                     self.match_input_cells(
                         next_assignment,
@@ -285,7 +282,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             .into_iter()
             .flat_map(|candidate| {
                 let mut next_assignment = assignment.clone();
-                next_assignment.assign(current_needle.clone(), candidate);
+                next_assignment.assign(current_needle, candidate);
 
                 self.match_input_cells(next_assignment, input_queue.clone(), output_queue.clone())
             })
@@ -295,15 +292,15 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Recursive backtracking step for matching output ports.
     fn match_output_cells(
         &self,
-        assignment: SingleAssignment<'needle, 'haystack>,
-        mut output_queue: VecDeque<CellWrapper<'needle>>,
-    ) -> Vec<SingleAssignment<'needle, 'haystack>> {
+        assignment: SingleAssignment,
+        mut output_queue: VecDeque<CellIndex>,
+    ) -> Vec<SingleAssignment> {
         let Some(current_needle) = output_queue.pop_front() else {
             self.matches_found.fetch_add(1, Ordering::Relaxed);
             return vec![assignment];
         };
 
-        let candidates = self.find_candidates_for_output(current_needle.clone(), &assignment);
+        let candidates = self.find_candidates_for_output(current_needle, &assignment);
 
         if candidates.is_empty() {
             return vec![];
@@ -315,7 +312,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .into_par_iter()
                 .flat_map(|candidate| {
                     let mut next_assignment = assignment.clone();
-                    next_assignment.assign(current_needle.clone(), candidate);
+                    next_assignment.assign(current_needle, candidate);
 
                     self.match_output_cells(next_assignment, output_queue.clone())
                 })
@@ -326,7 +323,7 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
             .into_iter()
             .flat_map(|candidate| {
                 let mut next_assignment = assignment.clone();
-                next_assignment.assign(current_needle.clone(), candidate);
+                next_assignment.assign(current_needle, candidate);
 
                 self.match_output_cells(next_assignment, output_queue.clone())
             })
@@ -337,17 +334,17 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Output cells in the pattern can match any logic gate in the haystack.
     fn find_candidates_for_output(
         &self,
-        needle_output: CellWrapper<'needle>,
-        assignment: &SingleAssignment<'needle, 'haystack>,
-    ) -> Vec<CellWrapper<'haystack>> {
+        needle_output: CellIndex,
+        assignment: &SingleAssignment,
+    ) -> Vec<CellIndex> {
         let needle_fanin = self
             .needle_index
-            .fanin_with_ports(&needle_output)
+            .fanin_with_ports(needle_output)
             .unwrap_or_default();
 
-        let mapped_haystack_fanin: Vec<_> = needle_fanin
+        let mapped_haystack_fanin: Vec<CellIndex> = needle_fanin
             .iter()
-            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred))
+            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(*needle_pred))
             .collect();
 
         if mapped_haystack_fanin.is_empty() {
@@ -356,21 +353,26 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
                 .haystack_index
                 .cells_topo()
                 .iter()
-                .filter(|cell| cell.cell_type().is_logic_gate())
-                .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
-                .cloned()
+                .enumerate()
+                .filter(|(_, cell)| cell.cell_type().is_logic_gate())
+                .map(|(i, _)| CellIndex::new(i))
+                .filter(|candidate| assignment.haystack_is_free(*candidate))
                 .collect();
         }
 
-        let fanout_sets: Vec<_> = mapped_haystack_fanin
-            .iter()
-            .filter_map(|haystack_pred| self.haystack_index.fanout_set(haystack_pred))
-            .collect();
+        let mut result: Option<AHashSet<CellIndex>> = None;
+        for haystack_pred in &mapped_haystack_fanin {
+            let fanout = self.haystack_index.fanout_set(*haystack_pred);
+            match &mut result {
+                None => result = Some(fanout.clone()),
+                Some(r) => r.retain(|x| fanout.contains(x)),
+            }
+        }
 
-        intersect_sets(fanout_sets)
+        result
+            .unwrap_or_default()
             .into_iter()
-            .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
-            .cloned()
+            .filter(|candidate| assignment.haystack_is_free(*candidate))
             .collect()
     }
 
@@ -378,19 +380,20 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     fn prepare_search_queues(
         &self,
     ) -> (
-        VecDeque<CellWrapper<'needle>>,
-        VecDeque<CellWrapper<'needle>>,
-        VecDeque<CellWrapper<'needle>>,
+        VecDeque<CellIndex>,
+        VecDeque<CellIndex>,
+        VecDeque<CellIndex>,
     ) {
         let mut inputs = VecDeque::new();
         let mut gates = VecDeque::new();
         let mut outputs = VecDeque::new();
 
-        for cell in self.needle_index.cells_topo().iter().rev() {
+        for (i, cell) in self.needle_index.cells_topo().iter().enumerate().rev() {
+            let idx = CellIndex::new(i);
             match cell.cell_type() {
-                CellKind::Output => outputs.push_back(cell.clone()),
-                CellKind::Input => inputs.push_back(cell.clone()),
-                _ => gates.push_back(cell.clone()),
+                CellKind::Output => outputs.push_back(idx),
+                CellKind::Input => inputs.push_back(idx),
+                _ => gates.push_back(idx),
             }
         }
 
@@ -400,39 +403,44 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Filters haystack cells based on type and fan-in constraints.
     fn find_candidates_for_cell(
         &self,
-        needle_cell: CellWrapper<'needle>,
-        assignment: &SingleAssignment<'needle, 'haystack>,
-    ) -> Vec<CellWrapper<'haystack>> {
-        let kind = needle_cell.cell_type();
+        needle_cell: CellIndex,
+        assignment: &SingleAssignment,
+    ) -> Vec<CellIndex> {
+        let kind = self.needle_index.get_cell_by_index(needle_cell).cell_type();
         let needle_fanin = self
             .needle_index
-            .fanin_with_ports(&needle_cell)
+            .fanin_with_ports(needle_cell)
             .unwrap_or_default();
 
-        let mapped_haystack_fanin: Vec<_> = needle_fanin
+        let mapped_haystack_fanin: Vec<CellIndex> = needle_fanin
             .iter()
-            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(needle_pred))
+            .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(*needle_pred))
             .collect();
 
-        let unfiltered: Vec<CellWrapper<'haystack>> = if mapped_haystack_fanin.is_empty() {
+        let unfiltered: Vec<CellIndex> = if mapped_haystack_fanin.is_empty() {
             self.haystack_index
-                .cells_of_type_iter(kind)
-                .map(|i| i.cloned().collect())
-                .unwrap_or_default()
+                .cells_of_type_indices(kind)
+                .to_vec()
         } else {
-            let fanout_sets: Vec<_> = mapped_haystack_fanin
-                .iter()
-                .filter_map(|haystack_pred| self.haystack_index.fanout_set(haystack_pred))
-                .collect();
-            intersect_sets(fanout_sets).into_iter().cloned().collect()
+            let mut result: Option<AHashSet<CellIndex>> = None;
+            for haystack_pred in &mapped_haystack_fanin {
+                let fanout = self.haystack_index.fanout_set(*haystack_pred);
+                match &mut result {
+                    None => result = Some(fanout.clone()),
+                    Some(r) => r.retain(|x| fanout.contains(x)),
+                }
+            }
+            result.unwrap_or_default().into_iter().collect()
         };
 
         unfiltered
             .into_iter()
-            .filter(|candidate| candidate.cell_type() == kind)
-            .filter(|candidate| assignment.get_needle_cell(candidate).is_empty())
             .filter(|candidate| {
-                self.check_fanin_constraints(needle_cell.clone(), candidate.clone(), assignment)
+                self.haystack_index.get_cell_by_index(*candidate).cell_type() == kind
+            })
+            .filter(|candidate| assignment.haystack_is_free(*candidate))
+            .filter(|candidate| {
+                self.check_fanin_constraints(needle_cell, *candidate, assignment)
             })
             .collect()
     }
@@ -440,57 +448,58 @@ impl<'needle, 'haystack> SubgraphMatcherCore<'needle, 'haystack, '_> {
     /// Filters haystack cells for input ports based on fan-out connectivity.
     fn find_candidates_for_input(
         &self,
-        needle_input: CellWrapper<'needle>,
-        assignment: &SingleAssignment<'needle, 'haystack>,
-    ) -> Vec<CellWrapper<'haystack>> {
+        needle_input: CellIndex,
+        assignment: &SingleAssignment,
+    ) -> Vec<CellIndex> {
         let needle_fanout = self
             .needle_index
-            .fanout_with_ports(&needle_input)
+            .fanout_with_ports(needle_input)
             .unwrap_or_default();
 
-        let mapped_haystack_fanout: Vec<_> = needle_fanout
+        let mapped_haystack_fanout: Vec<CellIndex> = needle_fanout
             .iter()
-            .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(needle_succ))
+            .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(*needle_succ))
             .collect();
 
-        let fanin_sets: Vec<_> = mapped_haystack_fanout
-            .iter()
-            .filter_map(|haystack_succ| self.haystack_index.fanin_set(haystack_succ))
-            .collect();
+        let mut intersection: Option<AHashSet<CellIndex>> = None;
+        for haystack_succ in &mapped_haystack_fanout {
+            let fanin = self.haystack_index.fanin_set(*haystack_succ);
+            match &mut intersection {
+                None => intersection = Some(fanin.clone()),
+                Some(r) => r.retain(|x| fanin.contains(x)),
+            }
+        }
 
-        intersect_sets(fanin_sets)
+        intersection
+            .unwrap_or_default()
             .into_iter()
             .filter(|candidate| {
                 let mut next_assignment = assignment.clone();
-                next_assignment.assign(needle_input.clone(), candidate.clone().clone());
+                next_assignment.assign(needle_input, *candidate);
 
-                self.haystack_index
-                    .fanout_set(candidate)
-                    .is_some_and(|fanout| {
-                        fanout.iter().all(|haystack_succ| {
-                            if next_assignment.get_needle_cell(haystack_succ).is_empty() {
-                                true
-                            } else {
-                                next_assignment
-                                    .get_needle_cell(haystack_succ)
-                                    .into_iter()
-                                    .all(|needle_succ| {
-                                        self.check_fanin_constraints(
-                                            needle_succ.clone(),
-                                            haystack_succ.clone(),
-                                            &next_assignment,
-                                        )
-                                    })
-                            }
-                        })
-                    })
+                let fanout = self.haystack_index.fanout_set(*candidate);
+                fanout.iter().all(|haystack_succ| {
+                    let needle_cells = next_assignment.get_needle_cells(*haystack_succ);
+                    if needle_cells.is_empty() {
+                        true
+                    } else {
+                        needle_cells
+                            .iter()
+                            .all(|needle_succ| {
+                                self.check_fanin_constraints(
+                                    *needle_succ,
+                                    *haystack_succ,
+                                    &next_assignment,
+                                )
+                            })
+                    }
+                })
             })
-            .cloned()
             .collect()
     }
 
     /// Removes duplicate assignments automatically.
-    fn apply_deduplication(&self, results: &mut Vec<SingleAssignment<'needle, 'haystack>>) {
+    fn apply_deduplication(&self, results: &mut Vec<SingleAssignment>) {
         let mut seen = AHashSet::new();
         results.retain(|assignment| seen.insert(assignment.signature()));
     }
