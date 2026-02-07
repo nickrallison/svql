@@ -3,7 +3,7 @@
 //! `Store` holds type-erased `Table<T>` instances, allowing patterns
 //! to access their dependencies' results during search and rehydration.
 
-use ahash::AHashMap;
+
 use std::any::TypeId;
 use std::sync::Arc;
 
@@ -35,7 +35,7 @@ use crate::prelude::*;
 /// ```
 pub struct Store {
     /// Type-erased table storage.
-    tables: AHashMap<TypeId, Arc<dyn AnyTable + Send + Sync>>,
+    tables: HashMap<TypeId, Arc<dyn AnyTable + Send + Sync>>,
     // cells: Vec<Cell>,
 }
 
@@ -44,7 +44,7 @@ impl Store {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            tables: AHashMap::new(),
+            tables: HashMap::new(),
             // cells: Vec::new(),
         }
     }
@@ -53,7 +53,7 @@ impl Store {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            tables: AHashMap::with_capacity(capacity),
+            tables: HashMap::with_capacity(capacity),
             // cells: Vec::new(),
         }
     }

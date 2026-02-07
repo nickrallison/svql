@@ -17,7 +17,7 @@ prjunnamed-yosys_json.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
-ahash = { workspace = true }
+gxhash = { workspace = true }
 argparse = { workspace = true }
 lazy_static = { workspace = true }
 regex = { workspace = true }

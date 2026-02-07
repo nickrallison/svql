@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::sync::OnceLock;
 
 use crate::primitives::gates::*;
 use svql_query::prelude::*;

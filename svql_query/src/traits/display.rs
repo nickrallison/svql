@@ -3,10 +3,11 @@
 //! Provides hierarchical tree display with source location information.
 
 use crate::prelude::*;
-use ahash::AHashMap;
+
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
+use tracing::warn;
 
 /// A node in a hierarchical match report
 #[derive(Debug, Clone)]
@@ -26,12 +27,12 @@ pub struct ReportNode {
 impl ReportNode {
     /// Render the report tree as a formatted string
     pub fn render(&self) -> String {
-        let mut cache = AHashMap::new();
+        let mut cache = HashMap::new();
         self.render_with_cache(&mut cache)
     }
 
     /// Render with file content caching for efficiency
-    pub fn render_with_cache(&self, cache: &mut AHashMap<Arc<str>, Vec<String>>) -> String {
+    pub fn render_with_cache(&self, cache: &mut HashMap<Arc<str>, Vec<String>>) -> String {
         let mut output = String::new();
         self.render_recursive(&mut output, "", true, true, cache);
         output
@@ -43,7 +44,7 @@ impl ReportNode {
         prefix: &str,
         is_last: bool,
         is_root: bool,
-        cache: &mut AHashMap<Arc<str>, Vec<String>>,
+        cache: &mut HashMap<Arc<str>, Vec<String>>,
     ) {
         let marker = if is_root {
             ""
@@ -138,20 +139,73 @@ pub fn wire_to_report_node(
     key: &DriverKey,
     config: &Config,
 ) -> ReportNode {
-    let source_loc = wire_source_location(wire, driver, key, config);
+    let fix_later = "Dear god please remind me to fix this later";
+    // I hate this, but I'm not sure how to fix it
+    match wire {
+        Wire::Cell { id, .. } => {
+            let design = driver.get_design(key, &config.haystack_options).ok();
+            let cell_wrapper = design
+                .as_ref()
+                .and_then(|d| d.index().get_cell_by_id(id.as_usize()));
 
-    let details = match wire {
-        Wire::Cell { id, .. } => Some(format!("cell_{}", id.raw())),
-        Wire::PrimaryPort { name, .. } => Some(format!("port_{}", name)),
-        Wire::Constant { value } => Some(format!("const_{}", value)),
-    };
-
-    ReportNode {
-        name: name.to_string(),
-        type_name: format!("{:?}", direction),
-        details,
-        source_loc,
-        children: vec![],
+            if let Some(cell) = cell_wrapper {
+                let kind = cell.cell_type();
+                if kind.is_input() {
+                    let port_name = cell.input_name().unwrap_or("<unnamed>");
+                    return ReportNode {
+                        name: name.to_string(),
+                        type_name: format!("{:?}", direction),
+                        details: Some(format!("Port: {}", port_name)),
+                        source_loc: None,
+                        children: vec![],
+                    };
+                } else if kind.is_output() {
+                    let port_name = cell.output_name().unwrap_or("<unnamed>");
+                    return ReportNode {
+                        name: name.to_string(),
+                        type_name: format!("{:?}", direction),
+                        details: Some(format!("Port: {}", port_name)),
+                        source_loc: None,
+                        children: vec![],
+                    };
+                }
+                // Regular cell — try to get source
+                let source_loc = cell.get_source();
+                ReportNode {
+                    name: name.to_string(),
+                    type_name: format!("{:?}", direction),
+                    details: Some(format!("CellId: {}", id.raw())),
+                    source_loc,
+                    children: vec![],
+                }
+            } else {
+                // Cell not found in design — just show the raw id
+                ReportNode {
+                    name: name.to_string(),
+                    type_name: format!("{:?}", direction),
+                    details: Some(format!("CellId: {}", id.raw())),
+                    source_loc: None,
+                    children: vec![],
+                }
+            }
+        }
+        Wire::PrimaryPort {
+            name: port_name,
+            direction: port_dir,
+        } => ReportNode {
+            name: name.to_string(),
+            type_name: format!("{:?}", direction),
+            details: Some(format!("Port ({}): {}", port_dir, port_name)),
+            source_loc: None,
+            children: vec![],
+        },
+        Wire::Constant { value } => ReportNode {
+            name: name.to_string(),
+            type_name: format!("{:?}", direction),
+            details: Some(format!("Const: {}", value)),
+            source_loc: None,
+            children: vec![],
+        },
     }
 }
 

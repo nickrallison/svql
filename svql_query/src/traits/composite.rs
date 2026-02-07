@@ -3,12 +3,13 @@ use std::marker::PhantomData;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use ahash::AHashSet;
+
 use crate::{
     prelude::*,
     selector::Selector,
     session::join_planner::ConnectivityCache,
 };
+
 
 /// Connection constraint (keeping existing struct, just updating signature)
 #[derive(Debug, Clone, Copy)]
@@ -67,7 +68,7 @@ fn estimate_selectivity_from_index(
 /// Estimate how much filtering occurs when joining `new_idx` with already-joined submodules
 fn estimate_combined_selectivity<T: Composite>(
     new_idx: usize,
-    joined: &AHashSet<usize>,
+    joined: &HashSet<usize>,
     connections: &Connections,
     connectivity_cache: &ConnectivityCache,
     dep_tables: &[&(dyn AnyTable + Send + Sync)],
@@ -122,7 +123,7 @@ fn estimate_join_cost<T: Composite>(
     new_idx: usize,
     dep_tables: &[&(dyn AnyTable + Send + Sync)],
     current_order: &[usize],
-    joined: &AHashSet<usize>,
+    joined: &HashSet<usize>,
     connections: &Connections,
     connectivity_cache: &ConnectivityCache,
 ) -> f64 {
@@ -161,7 +162,7 @@ fn compute_optimal_join_order<T: Composite>(
         return vec![];
     }
     let mut order = Vec::with_capacity(n);
-    let mut joined = AHashSet::with_capacity(n);
+    let mut joined = HashSet::with_capacity(n);
 
     // 1. Start with smallest table
     let first = (0..n)
@@ -759,7 +760,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         connectivity_cache: &ConnectivityCache,
         new_table_len: usize,
     ) -> Vec<u32> {
-        let mut valid_sets: Vec<AHashSet<u32>> = Vec::new();
+        let mut valid_sets: Vec<HashSet<u32>> = Vec::new();
 
         for (existing_sub_idx, cnf_idx, is_new_sub_from) in connected_subs {
             // Get the row index of the already-joined submodule

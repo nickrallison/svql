@@ -1,6 +1,6 @@
 //! Configuration for Yosys module processing.
 
-use ahash::AHashMap;
+use crate::prelude::*;
 use core::hash::{Hash, Hasher};
 
 /// Configuration options for processing a Yosys module.
@@ -14,7 +14,7 @@ pub struct ModuleConfig {
     /// Whether to run `opt`.
     pub opt: bool,
     /// Parameters to set on the module.
-    pub params: AHashMap<String, String>,
+    pub params: HashMap<String, String>,
     /// Additional Yosys commands to run.
     pub other_steps: Vec<String>,
     /// Whether to use Verific for parsing.

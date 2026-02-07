@@ -43,7 +43,7 @@ prjunnamed-yosys_json.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
-ahash.workspace = true
+gxhash.workspace = true
 dashmap.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

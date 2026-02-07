@@ -4,12 +4,12 @@ use crate::prelude::*;
 use crate::session::PatternSchema;
 use crate::session::connectivity_index::BipartiteIndex;
 use crate::traits::composite::Endpoint;
-use ahash::AHashMap;
+
 
 /// Precomputed connectivity indices for all connections in a pattern.
 pub struct ConnectivityCache {
     /// Keyed by (from_submodule_idx, to_submodule_idx, connection_idx_in_cnf)
-    pub indices: AHashMap<(usize, usize, usize), BipartiteIndex>,
+    pub indices: HashMap<(usize, usize, usize), BipartiteIndex>,
 }
 
 impl ConnectivityCache {
@@ -25,7 +25,7 @@ impl ConnectivityCache {
         ctx: &ExecutionContext,
     ) -> Self {
         let schema = T::composite_schema();
-        let mut indices: AHashMap<(usize, usize, usize), BipartiteIndex> = AHashMap::new();
+        let mut indices: HashMap<(usize, usize, usize), BipartiteIndex> = HashMap::new();
 
         tracing::info!(
             "[CONNECTIVITY_CACHE] Building indices for {} CNF groups",

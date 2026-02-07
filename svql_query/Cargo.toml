@@ -24,8 +24,9 @@ prjunnamed-netlist.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
-ahash.workspace = true
+argparse.workspace = true
 contracts.workspace = true
+gxhash.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
 rayon = { workspace = true, optional = true }
@@ -39,7 +40,6 @@ tracing-subscriber.workspace = true
 unstringify.workspace = true
 walkdir.workspace = true
 which.workspace = true
-argparse.workspace = true
 
 [build-dependencies]
 ###############

@@ -1,7 +1,7 @@
 // svql_query/src/session/connectivity_index.rs
 
 use crate::prelude::*;
-use ahash::{AHashMap, AHashSet};
+
 
 /// Maps relationships between two pattern tables based on a connection.
 ///
@@ -10,10 +10,10 @@ use ahash::{AHashMap, AHashSet};
 /// - `reverse[b_row]` = set of A rows that can drive `b.x`
 pub struct BipartiteIndex {
     /// Maps source row index → set of valid target row indices
-    pub forward: AHashMap<u32, AHashSet<u32>>,
+    pub forward: HashMap<u32, HashSet<u32>>,
 
     /// Maps target row index → set of valid source row indices
-    pub reverse: AHashMap<u32, AHashSet<u32>>,
+    pub reverse: HashMap<u32, HashSet<u32>>,
 
     /// Total number of valid edges in the bipartite graph
     pub edge_count: usize,
@@ -31,8 +31,8 @@ impl BipartiteIndex {
         connection: &Connection,
         ctx: &ExecutionContext,
     ) -> Self {
-        let mut forward: AHashMap<u32, AHashSet<u32>> = AHashMap::new();
-        let mut reverse: AHashMap<u32, AHashSet<u32>> = AHashMap::new();
+        let mut forward: HashMap<u32, HashSet<u32>> = HashMap::new();
+        let mut reverse: HashMap<u32, HashSet<u32>> = HashMap::new();
         let mut edge_count = 0;
 
         // Iterate all (A, B) pairs - this is the O(|A| × |B|) work
@@ -73,13 +73,13 @@ impl BipartiteIndex {
 
     /// Get all valid target rows for a given source row.
     #[inline]
-    pub fn targets(&self, source_row: u32) -> Option<&AHashSet<u32>> {
+    pub fn targets(&self, source_row: u32) -> Option<&HashSet<u32>> {
         self.forward.get(&source_row)
     }
 
     /// Get all valid source rows for a given target row.
     #[inline]
-    pub fn sources(&self, target_row: u32) -> Option<&AHashSet<u32>> {
+    pub fn sources(&self, target_row: u32) -> Option<&HashSet<u32>> {
         self.reverse.get(&target_row)
     }
 

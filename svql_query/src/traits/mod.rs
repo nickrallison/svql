@@ -24,9 +24,7 @@ use crate::session::EntryArray;
 /// Removes rows with identical signatures (all wire references, submodule references,
 /// and metadata). This is always enabled to prevent redundant results.
 pub fn apply_deduplication(entries: &mut Vec<EntryArray>) {
-    use ahash::AHashSet;
-
-    let mut seen = AHashSet::new();
+    let mut seen = HashSet::new();
     entries.retain(|entry| seen.insert(entry.signature()));
 }
 

@@ -12,8 +12,8 @@ pub use connectivity_graph::ConnectivityGraph;
 pub use io_mapping::IoMapping;
 
 use crate::cell::{CellIndex, CellKind, CellWrapper};
-use ahash::{AHashMap, AHashSet};
 use prjunnamed_netlist::{CellRef, Design};
+use svql_common::prelude::*;
 
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
@@ -77,13 +77,13 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the set of cell indices in the immediate fan-out of the specified cell.
     #[must_use]
-    pub fn fanout_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+    pub fn fanout_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
         self.connectivity.fanout_indices_set(cell_idx)
     }
 
     /// Returns the set of cell indices in the immediate fan-in of the specified cell.
     #[must_use]
-    pub fn fanin_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+    pub fn fanin_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
         self.connectivity.fanin_indices_set(cell_idx)
     }
 
@@ -101,20 +101,20 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     #[must_use]
-    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
         self.connectivity
             .get_intersect_fanout_of_fanin_indices(cell_idx)
     }
 
     /// Returns a map of input port names to their fan-out cell indices.
     #[must_use]
-    pub fn get_input_fanout_by_name_indices(&self) -> &AHashMap<String, Vec<(CellIndex, usize)>> {
+    pub fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
         self.io_mapping.input_fanout_by_name_map()
     }
 
     /// Returns a map of output port names to their fan-in cell indices.
     #[must_use]
-    pub fn get_output_fanin_by_name_indices(&self) -> &AHashMap<String, Vec<(CellIndex, usize)>> {
+    pub fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(CellIndex, usize)>> {
         self.io_mapping.output_fanin_by_name_map()
     }
 

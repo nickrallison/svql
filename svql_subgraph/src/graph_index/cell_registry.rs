@@ -1,15 +1,15 @@
 use crate::cell::{CellIndex, CellKind, CellWrapper};
-use ahash::AHashMap;
 use prjunnamed_netlist::CellRef;
+use svql_common::prelude::*;
 
 #[derive(Clone, Debug)]
 pub struct CellRegistry<'a> {
     /// Nodes in topological order (Name nodes filtered out)
     cells_topo: Vec<CellWrapper<'a>>,
     /// Maps cell debug index to internal `CellIndex`
-    cell_id_map: AHashMap<usize, CellIndex>,
+    cell_id_map: HashMap<usize, CellIndex>,
     /// Maps cell types to lists of cell indices
-    cell_type_indices: AHashMap<CellKind, Vec<CellIndex>>,
+    cell_type_indices: HashMap<CellKind, Vec<CellIndex>>,
 }
 
 impl<'a> CellRegistry<'a> {
@@ -44,7 +44,7 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
-    fn build_cell_id_map(cells_topo: &[CellWrapper<'a>]) -> AHashMap<usize, CellIndex> {
+    fn build_cell_id_map(cells_topo: &[CellWrapper<'a>]) -> HashMap<usize, CellIndex> {
         cells_topo
             .iter()
             .enumerate()
@@ -54,8 +54,8 @@ impl<'a> CellRegistry<'a> {
 
     fn build_cell_type_indices(
         cell_refs_topo: &[CellRef<'a>],
-    ) -> AHashMap<CellKind, Vec<CellIndex>> {
-        let mut cell_type_indices: AHashMap<CellKind, Vec<CellIndex>> = AHashMap::new();
+    ) -> HashMap<CellKind, Vec<CellIndex>> {
+        let mut cell_type_indices: HashMap<CellKind, Vec<CellIndex>> = HashMap::new();
         for (idx, cell) in cell_refs_topo.iter().enumerate() {
             let node_type = CellKind::from(cell.get().as_ref());
             cell_type_indices
@@ -74,7 +74,7 @@ impl<'a> CellRegistry<'a> {
     }
 
     #[must_use]
-    pub const fn cell_id_map(&self) -> &AHashMap<usize, CellIndex> {
+    pub const fn cell_id_map(&self) -> &HashMap<usize, CellIndex> {
         &self.cell_id_map
     }
 

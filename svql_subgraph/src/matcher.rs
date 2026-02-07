@@ -3,9 +3,9 @@
 //! Identifies instances of a needle design within a larger haystack design
 //! using a backtracking search algorithm with topological ordering.
 
-use ahash::AHashSet;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use svql_common::prelude::*;
 
 use prjunnamed_netlist::Design;
 use svql_common::Config;
@@ -359,7 +359,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
                 .collect();
         }
 
-        let mut result: Option<AHashSet<CellIndex>> = None;
+        let mut result: Option<HashSet<CellIndex>> = None;
         for haystack_pred in &mapped_haystack_fanin {
             let fanout = self.haystack_index.fanout_set(*haystack_pred);
             match &mut result {
@@ -420,7 +420,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
         let unfiltered: Vec<CellIndex> = if mapped_haystack_fanin.is_empty() {
             self.haystack_index.cells_of_type_indices(kind).to_vec()
         } else {
-            let mut result: Option<AHashSet<CellIndex>> = None;
+            let mut result: Option<HashSet<CellIndex>> = None;
             for haystack_pred in &mapped_haystack_fanin {
                 let fanout = self.haystack_index.fanout_set(*haystack_pred);
                 match &mut result {
@@ -460,7 +460,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(*needle_succ))
             .collect();
 
-        let mut intersection: Option<AHashSet<CellIndex>> = None;
+        let mut intersection: Option<HashSet<CellIndex>> = None;
         for haystack_succ in &mapped_haystack_fanout {
             let fanin = self.haystack_index.fanin_set(*haystack_succ);
             match &mut intersection {
@@ -497,7 +497,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
 
     /// Removes duplicate assignments automatically.
     fn apply_deduplication(&self, results: &mut Vec<SingleAssignment>) {
-        let mut seen = AHashSet::new();
+        let mut seen = HashSet::new();
         results.retain(|assignment| seen.insert(assignment.signature()));
     }
 }

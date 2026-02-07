@@ -1,6 +1,6 @@
 //! Mapping between needle and haystack cells.
 
-use ahash::AHashMap;
+use svql_common::prelude::*;
 
 use crate::cell::CellIndex;
 
@@ -31,26 +31,21 @@ impl AssignmentSet {
 #[derive(Clone, Debug, Default)]
 pub struct SingleAssignment {
     /// Pattern to Design cell index mapping
-    needle_to_haystack: AHashMap<CellIndex, CellIndex>,
+    needle_to_haystack: HashMap<CellIndex, CellIndex>,
     /// Design to Pattern cell index mapping
-    haystack_to_needle: AHashMap<CellIndex, Vec<CellIndex>>,
+    haystack_to_needle: HashMap<CellIndex, Vec<CellIndex>>,
 }
 
 impl SingleAssignment {
     pub(super) fn new() -> Self {
         Self {
-            needle_to_haystack: AHashMap::new(),
-            haystack_to_needle: AHashMap::new(),
+            needle_to_haystack: HashMap::new(),
+            haystack_to_needle: HashMap::new(),
         }
     }
 
-    pub(super) fn assign(
-        &mut self,
-        needle: CellIndex,
-        haystack: CellIndex,
-    ) {
-        self.needle_to_haystack
-            .insert(needle, haystack);
+    pub(super) fn assign(&mut self, needle: CellIndex, haystack: CellIndex) {
+        self.needle_to_haystack.insert(needle, haystack);
         self.haystack_to_needle
             .entry(haystack)
             .or_default()
@@ -58,10 +53,7 @@ impl SingleAssignment {
     }
 
     #[allow(dead_code)]
-    pub(super) fn remove_by_needle(
-        &mut self,
-        needle: CellIndex,
-    ) -> Option<CellIndex> {
+    pub(super) fn remove_by_needle(&mut self, needle: CellIndex) -> Option<CellIndex> {
         if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
             self.haystack_to_needle.remove(&haystack_idx);
             return Some(haystack_idx);
@@ -70,10 +62,7 @@ impl SingleAssignment {
     }
 
     #[must_use]
-    pub fn get_haystack_cell(
-        &self,
-        needle: CellIndex,
-    ) -> Option<CellIndex> {
+    pub fn get_haystack_cell(&self, needle: CellIndex) -> Option<CellIndex> {
         self.needle_to_haystack.get(&needle).copied()
     }
 
@@ -103,14 +92,12 @@ impl SingleAssignment {
     }
 
     #[must_use]
-    pub const fn haystack_mapping(
-        &self,
-    ) -> &AHashMap<CellIndex, Vec<CellIndex>> {
+    pub const fn haystack_mapping(&self) -> &HashMap<CellIndex, Vec<CellIndex>> {
         &self.haystack_to_needle
     }
 
     #[must_use]
-    pub const fn needle_mapping(&self) -> &AHashMap<CellIndex, CellIndex> {
+    pub const fn needle_mapping(&self) -> &HashMap<CellIndex, CellIndex> {
         &self.needle_to_haystack
     }
 

@@ -1,9 +1,9 @@
 use crate::cell::CellIndex;
-use ahash::{AHashMap, AHashSet};
 use prjunnamed_netlist::{CellRef, Design};
+use svql_common::prelude::*;
 
-type FaninMap = AHashMap<CellIndex, Vec<(CellIndex, usize)>>;
-type FanoutMap = AHashMap<CellIndex, Vec<(CellIndex, usize)>>;
+type FaninMap = HashMap<CellIndex, Vec<(CellIndex, usize)>>;
+type FanoutMap = HashMap<CellIndex, Vec<(CellIndex, usize)>>;
 
 #[derive(Clone, Debug)]
 pub struct ConnectivityGraph {
@@ -12,11 +12,11 @@ pub struct ConnectivityGraph {
     /// Maps each cell to its fan-out cells with port information
     fanout_map: FanoutMap,
     /// Precomputed fan-out sets (no port info) for fast queries
-    fanout_sets: AHashMap<CellIndex, AHashSet<CellIndex>>,
+    fanout_sets: HashMap<CellIndex, HashSet<CellIndex>>,
     /// Precomputed fan-in sets (no port info) for fast queries
-    fanin_sets: AHashMap<CellIndex, AHashSet<CellIndex>>,
+    fanin_sets: HashMap<CellIndex, HashSet<CellIndex>>,
     /// Precomputed intersection of fanout of fanin
-    intersect_fanout_of_fanin: AHashMap<CellIndex, AHashSet<CellIndex>>,
+    intersect_fanout_of_fanin: HashMap<CellIndex, HashSet<CellIndex>>,
 }
 
 impl ConnectivityGraph {
@@ -24,7 +24,7 @@ impl ConnectivityGraph {
     pub fn build(
         design: &Design,
         cell_refs_topo: &[CellRef<'_>],
-        cell_id_map: &AHashMap<usize, CellIndex>,
+        cell_id_map: &HashMap<usize, CellIndex>,
     ) -> Self {
         let (fanin_map, fanout_map) =
             Self::build_fanin_fanout_maps(design, cell_refs_topo, cell_id_map);
@@ -49,10 +49,10 @@ impl ConnectivityGraph {
     fn build_fanin_fanout_maps(
         design: &Design,
         cell_refs_topo: &[CellRef<'_>],
-        cell_id_map: &AHashMap<usize, CellIndex>,
+        cell_id_map: &HashMap<usize, CellIndex>,
     ) -> (FaninMap, FanoutMap) {
-        let mut fanout_map: FanoutMap = AHashMap::new();
-        let mut fanin_map: FaninMap = AHashMap::new();
+        let mut fanout_map: FanoutMap = HashMap::new();
+        let mut fanin_map: FaninMap = HashMap::new();
 
         for sink_ref in cell_refs_topo.iter() {
             let sink_idx = *cell_id_map
@@ -79,8 +79,8 @@ impl ConnectivityGraph {
     }
 
     fn precompute_sets(
-        map: &AHashMap<CellIndex, Vec<(CellIndex, usize)>>,
-    ) -> AHashMap<CellIndex, AHashSet<CellIndex>> {
+        map: &HashMap<CellIndex, Vec<(CellIndex, usize)>>,
+    ) -> HashMap<CellIndex, HashSet<CellIndex>> {
         map.iter()
             .map(|(idx, vec)| {
                 let set = vec.iter().map(|(cell_idx, _)| *cell_idx).collect();
@@ -91,8 +91,8 @@ impl ConnectivityGraph {
 
     fn precompute_intersect_fanout_of_fanin(
         fanin_map: &FaninMap,
-        fanout_sets: &AHashMap<CellIndex, AHashSet<CellIndex>>,
-    ) -> AHashMap<CellIndex, AHashSet<CellIndex>> {
+        fanout_sets: &HashMap<CellIndex, HashSet<CellIndex>>,
+    ) -> HashMap<CellIndex, HashSet<CellIndex>> {
         fanin_map
             .iter()
             .filter_map(|(cell_idx, fanin_list)| {
@@ -100,7 +100,7 @@ impl ConnectivityGraph {
                     return None;
                 }
 
-                let fanout_sets_of_fanins: Vec<&AHashSet<CellIndex>> = fanin_list
+                let fanout_sets_of_fanins: Vec<&HashSet<CellIndex>> = fanin_list
                     .iter()
                     .filter_map(|(idx, _)| fanout_sets.get(idx))
                     .collect();
@@ -130,18 +130,18 @@ impl ConnectivityGraph {
     }
 
     #[must_use]
-    pub fn fanout_indices_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+    pub fn fanout_indices_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
         self.fanout_sets.get(&cell_idx).unwrap_or_else(|| {
-            static EMPTY: std::sync::OnceLock<AHashSet<CellIndex>> = std::sync::OnceLock::new();
-            EMPTY.get_or_init(AHashSet::new)
+            static EMPTY: std::sync::OnceLock<HashSet<CellIndex>> = std::sync::OnceLock::new();
+            EMPTY.get_or_init(HashSet::new)
         })
     }
 
     #[must_use]
-    pub fn fanin_indices_set(&self, cell_idx: CellIndex) -> &AHashSet<CellIndex> {
+    pub fn fanin_indices_set(&self, cell_idx: CellIndex) -> &HashSet<CellIndex> {
         self.fanin_sets.get(&cell_idx).unwrap_or_else(|| {
-            static EMPTY: std::sync::OnceLock<AHashSet<CellIndex>> = std::sync::OnceLock::new();
-            EMPTY.get_or_init(AHashSet::new)
+            static EMPTY: std::sync::OnceLock<HashSet<CellIndex>> = std::sync::OnceLock::new();
+            EMPTY.get_or_init(HashSet::new)
         })
     }
 
@@ -149,22 +149,22 @@ impl ConnectivityGraph {
     pub fn get_intersect_fanout_of_fanin_indices(
         &self,
         cell_idx: CellIndex,
-    ) -> &AHashSet<CellIndex> {
+    ) -> &HashSet<CellIndex> {
         self.intersect_fanout_of_fanin
             .get(&cell_idx)
             .unwrap_or_else(|| {
-                static EMPTY: std::sync::OnceLock<AHashSet<CellIndex>> = std::sync::OnceLock::new();
-                EMPTY.get_or_init(AHashSet::new)
+                static EMPTY: std::sync::OnceLock<HashSet<CellIndex>> = std::sync::OnceLock::new();
+                EMPTY.get_or_init(HashSet::new)
             })
     }
 
     #[must_use]
-    pub const fn fanin_map(&self) -> &AHashMap<CellIndex, Vec<(CellIndex, usize)>> {
+    pub const fn fanin_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
         &self.fanin_map
     }
 
     #[must_use]
-    pub const fn fanout_map(&self) -> &AHashMap<CellIndex, Vec<(CellIndex, usize)>> {
+    pub const fn fanout_map(&self) -> &HashMap<CellIndex, Vec<(CellIndex, usize)>> {
         &self.fanout_map
     }
 }

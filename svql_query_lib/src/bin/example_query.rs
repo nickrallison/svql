@@ -1,8 +1,11 @@
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use svql_query::prelude::*;
 use svql_query_lib::{
     DffAny,
-    security::{cwe1234::Cwe1234, primitives::locked_register::LockedRegister},
     security::primitives::locked_register::AsyncDffMuxEnable,
+    security::{cwe1234::Cwe1234, primitives::locked_register::LockedRegister},
 };
 use tracing::info;
 
@@ -60,49 +63,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
 
     // Check if we should use AsyncDffMuxEnable for locked_reg haystack
-    let is_locked_reg = design_path.contains("locked_reg");
 
-    if is_locked_reg {
-        let store =
-            svql_query::run_query::<AsyncDffMuxEnable>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<DffAny>(&driver, &design_key, &config)?;
 
-        println!("\n=== DataFrame API Results ===");
-        println!("{store}");
+    println!("\n=== DataFrame API Results ===");
+    println!("{store}");
 
-        for (_, table) in store.tables() {
-            println!("\n=== Table Details ===");
-            println!("{table}");
-        }
+    for (_, table) in store.tables() {
+        println!("\n=== Table Details ===");
+        println!("{table}");
+    }
 
-        for row in store
-            .get::<AsyncDffMuxEnable>()
-            .expect("Store should have table")
-            .rows()
-        {
-            let report = AsyncDffMuxEnable::render_row(&row, &store, &driver, &design_key);
+    for row in store
+        .get::<DffAny>()
+        .expect("Store should have table")
+        .rows()
+        .take(20)
+    {
+        let report = DffAny::render_row(&row, &store, &driver, &design_key);
+        if report.contains("i_ar_arbiter.gen_arbiter.gen_int_rr.rr_d") {
             println!("{}", report);
-        }
-    } else {
-        let store = svql_query::run_query::<DffAny>(&driver, &design_key, &config)?;
-
-        println!("\n=== DataFrame API Results ===");
-        println!("{store}");
-
-        for (_, table) in store.tables() {
-            println!("\n=== Table Details ===");
-            println!("{table}");
-        }
-
-        for row in store
-            .get::<DffAny>()
-            .expect("Store should have table")
-            .rows()
-        // .take(20)
-        {
-            let report = DffAny::render_row(&row, &store, &driver, &design_key);
-            if report.contains("i_ar_arbiter.gen_arbiter.gen_int_rr.rr_d") {
-                println!("{}", report);
-            }
         }
     }
 

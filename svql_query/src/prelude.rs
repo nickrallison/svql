@@ -29,6 +29,7 @@ pub use crate::traits::{
 
 pub use crate::selector::Selector;
 
+pub use common::prelude::*;
 pub use common::{Config, ConfigBuilder, MatchLength, ModuleConfig, YosysModule};
 
 pub use subgraph::{

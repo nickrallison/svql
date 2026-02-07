@@ -330,7 +330,7 @@ mod tests {
     use crate::define_primitive;
 
     use super::*;
-    use ahash::AHashMap;
+
     use svql_query::query_test;
 
     define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
@@ -444,8 +444,8 @@ mod tests {
                 .collect();
 
             // Map: output CellId → AndGate row index
-            let mut output_to_gate: AHashMap<CellId, u32> =
-                AHashMap::with_capacity(gate_info.len());
+            let mut output_to_gate: HashMap<CellId, u32> =
+                HashMap::with_capacity(gate_info.len());
             for (idx, info) in gate_info.iter().enumerate() {
                 output_to_gate.insert(info.y, idx as u32);
             }
@@ -474,7 +474,7 @@ mod tests {
                 .collect();
 
             // Map: output CellId → RecAnd entry index (same as gate index initially)
-            let output_to_rec: AHashMap<CellId, u32> = entries
+            let output_to_rec: HashMap<CellId, u32> = entries
                 .iter()
                 .enumerate()
                 .map(|(idx, e)| (e.y, idx as u32))
@@ -540,7 +540,7 @@ mod tests {
             }
             
             // Count nodes by depth
-            let mut depth_counts: AHashMap<u32, usize> = AHashMap::new();
+            let mut depth_counts: HashMap<u32, usize> = HashMap::new();
             for entry in &entries {
                 *depth_counts.entry(entry.depth).or_insert(0) += 1;
             }

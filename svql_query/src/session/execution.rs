@@ -7,7 +7,7 @@
 //! This module provides the infrastructure. The actual `search` function
 //! pointers are provided by the `Pattern` trait implementations.
 
-use ahash::{AHashMap, AHashSet};
+
 use std::any::TypeId;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ struct ExecutionNode {
 impl ExecutionNode {
     // /// Check if this node has already been executed.
     fn flatten_deps(&self) -> Vec<Arc<Self>> {
-        let mut seen: AHashSet<TypeId> = AHashSet::new();
+        let mut seen: HashSet<TypeId> = HashSet::new();
         let mut result: Vec<Arc<Self>> = Vec::new();
 
         for dep in &self.deps {
@@ -113,7 +113,7 @@ impl std::fmt::Debug for ExecutionPlan {
 
 impl ExecutionPlan {
     #[must_use]
-    pub fn build(root: &super::ExecInfo) -> (Self, AHashMap<TypeId, TableSlot>) {
+    pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
         tracing::info!("Building execution plan for pattern: {}", root.type_name);
         let root_node = Arc::new(ExecutionNode::from_dep(root));
         let mut all_deps = root_node.flatten_deps();
@@ -154,7 +154,7 @@ impl ExecutionPlan {
         driver: &Driver,
         key: &DriverKey,
         config: &svql_common::Config,
-        slots: AHashMap<TypeId, TableSlot>,
+        slots: HashMap<TypeId, TableSlot>,
     ) -> Result<Store, QueryError> {
         tracing::info!("Starting execution plan for design: {:?}", key);
         tracing::info!(
@@ -365,7 +365,7 @@ pub struct ExecutionContext {
     /// Execution configuration.
     config: svql_common::Config,
     /// Slots to hold results during execution.
-    slots: AHashMap<TypeId, TableSlot>,
+    slots: HashMap<TypeId, TableSlot>,
 }
 
 impl ExecutionContext {
@@ -375,7 +375,7 @@ impl ExecutionContext {
         design_key: DriverKey,
         haystack_design: Arc<svql_driver::design_container::DesignContainer>,
         config: svql_common::Config,
-        slots: AHashMap<TypeId, TableSlot>,
+        slots: HashMap<TypeId, TableSlot>,
     ) -> Self {
         #[cfg(not(feature = "parallel"))]
         if config.parallel {

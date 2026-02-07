@@ -3,13 +3,12 @@
 //! These types define the schema for pattern result tables, including
 //! wire references, submodule references, and metadata columns.
 
-use ahash::AHashMap;
+
 use std::any::TypeId;
 use std::sync::Arc;
 
 use crate::prelude::*;
 use crate::wire::WireRef;
-// Assuming ahash is available, otherwise std HashMap
 
 /// A smart wrapper around the raw column definitions.
 ///
@@ -21,13 +20,13 @@ pub struct PatternSchema {
     pub defs: &'static [ColumnDef],
 
     /// Fast lookup from column name to index.
-    pub name_map: AHashMap<&'static str, usize>,
+    pub name_map: HashMap<&'static str, usize>,
 
     /// Indices of all columns that are Submodules.
     pub submodules: Vec<usize>,
 
     /// Fast lookup from submodule column name to its compose target index.
-    pub submodule_map: AHashMap<&'static str, usize>,
+    pub submodule_map: HashMap<&'static str, usize>,
 
     /// Indices of all columns that are Inputs.
     pub inputs: Vec<usize>,
@@ -55,12 +54,12 @@ impl PatternSchema {
     /// This is typically called inside a `OnceLock::get_or_init`.
     #[must_use]
     pub fn new(defs: &'static [ColumnDef]) -> Self {
-        let mut name_map = AHashMap::new();
+        let mut name_map = HashMap::new();
         let mut submodules = Vec::new();
         let mut inputs = Vec::new();
         let mut outputs = Vec::new();
 
-        let mut submodule_map = AHashMap::new();
+        let mut submodule_map = HashMap::new();
         let mut compose_idx = 0;
 
         for (i, col) in defs.iter().enumerate() {
@@ -176,6 +175,17 @@ pub enum PortDirection {
     Output,
     /// Bidirectional port.
     Inout,
+}
+
+impl std::fmt::Display for PortDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "None"),
+            Self::Input => write!(f, "Input"),
+            Self::Output => write!(f, "Output"),
+            Self::Inout => write!(f, "Inout"),
+        }
+    }
 }
 
 /// Definition of a single column in a pattern's result table.

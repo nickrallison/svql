@@ -8,6 +8,9 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
+#[allow(unused)]
+use svql_common::prelude::*;
+
 /// A typed reference to a row in another pattern's result table.
 ///
 /// This is the successor to `ForeignKey<T>`, providing the same type-safety
@@ -68,7 +71,7 @@ impl<T> Hash for Ref<T> {
 impl<T> Ref<T> {
     /// Create a new reference from a row index.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub const fn new(index: u32) -> Self {
         Self {
             index,
@@ -78,21 +81,21 @@ impl<T> Ref<T> {
 
     /// Get the raw row index.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.index
     }
 
     /// Get the index as usize for indexing into vectors/slices.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub const fn as_usize(self) -> usize {
         self.index as usize
     }
 
     /// Create from a usize index (panics if > `u32::MAX` in debug).
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub fn from_usize(index: usize) -> Self {
         debug_assert!(u32::try_from(index).is_ok(), "Ref index overflow");
         Self::new(index as u32)
@@ -105,7 +108,7 @@ impl<T> Ref<T> {
     /// This is type-safe but semantically unsafe - only use when you know
     /// the underlying index is valid for type `U`'s table.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub const fn cast<U>(self) -> Ref<U> {
         Ref::new(self.index)
     }
@@ -217,8 +220,7 @@ mod tests {
 
     #[test]
     fn test_ref_hash() {
-        use ahash::AHashSet;
-        let mut set: AHashSet<Ref<PatternA>> = AHashSet::new();
+        let mut set: HashSet<Ref<PatternA>> = HashSet::new();
         set.insert(Ref::new(1));
         set.insert(Ref::new(2));
         set.insert(Ref::new(1)); // duplicate

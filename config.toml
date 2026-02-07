@@ -1,0 +1,5 @@
+[env]
+MALLOC_CONF="thp:always,metadata_thp:always"
+
+[build]
+rustflags = ["-C", "target-cpu=native", "-Z", "threads=8"]
