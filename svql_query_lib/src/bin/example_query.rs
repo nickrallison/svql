@@ -1,5 +1,8 @@
 use svql_query::prelude::*;
-use svql_query_lib::security::cwe1234::Cwe1234;
+use svql_query_lib::{
+    DffAny,
+    security::{cwe1234::Cwe1234, primitives::locked_register::LockedRegister},
+};
 use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,7 +56,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test the DataFrame API
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    // let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<DffAny>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -63,25 +67,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{table}");
     }
 
-    // let patt = regex::Regex::new(r"(command_buffer_val_next)|(csm_noc1encoder_req_val)").unwrap();
-
-    // for row in store
-    //     .get::<SyncDffMuxEnable>()
-    //     .expect("Store should have table")
-    //     .rows()
-    // {
-    //     // println!("\n--- Match ---");
-    //     // println!(
-    //     //     "{}",
-    //     //     SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key)
-    //     // );
-
-    //     let report = SyncDffMuxEnable::render_row(&row, &store, &driver, &design_key);
-    //     // if patt.find(&report).is_some() {
-    //     println!("\n--- Match ---");
-    //     println!("{}", report);
-    //     // }
-    // }
+    for row in store
+        .get::<DffAny>()
+        .expect("Store should have table")
+        .rows()
+    // .take(20)
+    {
+        let report = DffAny::render_row(&row, &store, &driver, &design_key);
+        if report.contains("i_ar_arbiter.gen_arbiter.gen_int_rr.rr_d") {
+            println!("{}", report);
+        }
+    }
 
     Ok(())
 }
