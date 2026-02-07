@@ -1,17 +1,15 @@
 //! Common utilities and shared types for the SVQL workspace.
 //!
-//! This crate provides configuration handling, build support, and common test cases
+//! This crate provides hardware abstractions, configuration handling, and tool integration
 //! used across the SVQL project.
 #![allow(clippy::missing_errors_doc)]
 
-pub mod cell;
+pub mod bridge;
+pub mod design;
 mod config;
-pub mod wire;
-mod yosys;
 
-pub use crate::cell::*;
 pub use crate::config::*;
-pub use crate::wire::*;
-pub use crate::yosys::*;
+pub use crate::design::*;
+pub use crate::bridge::yosys::*;
 
 pub use gxhash::{HashMap, HashMapExt, HashSet, HashSetExt};

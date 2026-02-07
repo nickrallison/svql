@@ -6,8 +6,8 @@ use rayon::prelude::*;
 
 use crate::{
     prelude::*,
-    selector::Selector,
-    session::join_planner::ConnectivityCache,
+    dsl::selector::Selector,
+    session::execution::join_planner::ConnectivityCache,
 };
 
 

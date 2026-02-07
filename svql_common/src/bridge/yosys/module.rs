@@ -6,7 +6,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::yosys::{DesignPath, ModuleConfig};
+use super::{DesignPath, ModuleConfig};
 
 /// Represents a specific module within a design file to be processed by Yosys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -121,7 +121,7 @@ impl YosysModule {
 
         for step in &config.other_steps {
             args.push("-p".to_owned());
-            args.push(step.clone());
+            args.push(step.to_string());
         }
 
         args.push("-p".to_owned());

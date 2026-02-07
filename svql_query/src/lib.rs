@@ -9,10 +9,9 @@
 
 extern crate self as svql_query;
 
+pub mod dsl;
 pub mod prelude;
-pub mod selector;
 pub mod session;
-pub mod traits;
 
 #[macro_use]
 pub mod test_harness;
@@ -23,6 +22,10 @@ use prelude::*;
 pub use svql_common as common;
 pub use svql_common::Wire;
 pub use svql_driver as driver;
+
+// Maintain backward compatibility for macros
+pub use dsl::traits;
+pub use dsl::selector;
 
 /// Execute a query with custom execution configuration.
 ///

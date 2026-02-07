@@ -130,8 +130,8 @@ where
     #[must_use]
     pub fn resolve(
         &self,
-        selector: crate::selector::Selector<'_>,
-        ctx: &super::ExecutionContext,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
     ) -> Option<Wire> {
         if selector.is_empty() {
             return None;

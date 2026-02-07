@@ -13,8 +13,8 @@ use svql_common::Config;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::assignment::{AssignmentSet, SingleAssignment};
-use crate::graph_index::GraphIndex;
+use super::assignment::{AssignmentSet, SingleAssignment};
+use crate::index::graph_index::GraphIndex;
 
 /// Entry point for subgraph isomorphism searches.
 #[allow(dead_code)]

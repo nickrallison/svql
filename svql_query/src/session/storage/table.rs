@@ -240,8 +240,8 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::selector::Selector<'_>,
-        ctx: &super::ExecutionContext,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
     ) -> Option<crate::CellId>;
 }
 
@@ -303,8 +303,8 @@ where
     fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::selector::Selector<'_>,
-        ctx: &super::ExecutionContext,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
     ) -> Option<crate::CellId> {
         // Optimized: avoid allocating full Row<T> by directly accessing columns
         if selector.is_empty() {

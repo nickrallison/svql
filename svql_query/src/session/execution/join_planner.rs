@@ -2,8 +2,8 @@
 
 use crate::prelude::*;
 use crate::session::PatternSchema;
-use crate::session::connectivity_index::BipartiteIndex;
-use crate::traits::composite::Endpoint;
+use super::connectivity_index::BipartiteIndex;
+use crate::dsl::traits::composite::Endpoint;
 
 
 /// Precomputed connectivity indices for all connections in a pattern.

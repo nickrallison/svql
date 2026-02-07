@@ -116,7 +116,7 @@ impl SingleAssignment {
     #[must_use]
     pub fn internal_signature(
         &self,
-        needle_index: &crate::graph_index::GraphIndex<'_>,
+        needle_index: &crate::index::graph_index::GraphIndex<'_>,
     ) -> Vec<usize> {
         use crate::cell::CellKind;
         let mut sig: Vec<usize> = self

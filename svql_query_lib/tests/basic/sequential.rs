@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-use svql_query_lib::composites::dff_then_and::SdffeThenAnd;
-use svql_query_lib::primitives::dff::*;
-
 use crate::query_test;
+use svql_query_lib::experimental::dff_then_and::SdffeThenAnd;
+use svql_query_lib::primitives::DffAny;
 
 // --- Shift Register / Sequence Tests ---
 

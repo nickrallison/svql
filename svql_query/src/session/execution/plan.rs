@@ -13,7 +13,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::prelude::*;
-use crate::session::slot::ClaimResult;
+use super::slot::ClaimResult;
 
 /// Type alias for a search function.
 ///
@@ -322,7 +322,7 @@ impl ExecutionPlan {
     pub fn get_table<'a, T: 'static>(
         &self,
         ctx: &'a ExecutionContext,
-    ) -> Option<&'a super::table::Table<T>> {
+    ) -> Option<&'a super::super::storage::Table<T>> {
         ctx.slots
             .get(&TypeId::of::<T>())
             .and_then(|slot| slot.get_ref())

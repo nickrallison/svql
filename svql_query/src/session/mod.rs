@@ -6,33 +6,20 @@
 //! - Lazy rehydration of match results
 //! - Efficient columnar storage of dehydrated matches
 
-mod columnar;
-pub mod connection_builder;
-pub mod connectivity_index;
-mod error;
-mod execution;
-pub mod join_planner;
-mod ref_type;
-mod row;
-mod schema;
-mod slot;
-mod store;
-mod table;
-// mod variant_ref;
+pub mod execution;
+pub mod storage;
 
-pub use columnar::ColumnStore;
+pub mod connection_builder;
+pub mod schema;
+mod error;
+
 pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
-pub use ref_type::Ref;
-pub use row::Row;
 pub use schema::{
     Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortMap, Submodule,
 };
-pub use slot::TableSlot;
-pub use store::Store;
-pub use table::{AnyTable, Table};
-// pub use variant_ref::{StoreVariantExt, VariantIter, VariantPattern, VariantRef};
+pub use storage::{ColumnStore, Ref, Row, Store, Table, AnyTable};
 
 use thiserror::Error;
 

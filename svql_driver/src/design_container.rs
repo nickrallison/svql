@@ -2,7 +2,7 @@
 
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
-use svql_subgraph::graph_index::GraphIndex;
+use svql_subgraph::index::graph_index::GraphIndex;
 
 /// A self-referencing container that pairs a netlist with its graph index.
 #[self_referencing]

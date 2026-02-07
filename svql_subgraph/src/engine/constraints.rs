@@ -4,7 +4,7 @@
 //! satisfies the connectivity requirements of the needle cell.
 
 use crate::SubgraphMatcherCore;
-use crate::assignment::SingleAssignment;
+use super::assignment::SingleAssignment;
 use crate::cell::CellId;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 

@@ -9,11 +9,13 @@ pub use crate::run_query;
 pub use crate::session::{
     Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, ConnectionBuilder, EntryArray, ExecInfo,
     ExecutionContext, ExecutionPlan, PatternSchema, Port, PortMap, QueryError, Ref, Row, SearchFn,
-    Store, Submodule, Table, TableSlot,
+    Store, Submodule, Table,
 };
 
+pub use crate::session::execution::TableSlot;
+
 // Trait re-exports
-pub use crate::traits::{
+pub use crate::dsl::traits::{
     Component, Pattern, PatternInternal,
     composite::Composite,
     composite::Connection,
@@ -34,7 +36,7 @@ pub use common::*;
 pub use subgraph::{
     AssignmentSet, SingleAssignment,
     cell::{CellInfo, CellKind, SourceLocation},
-    graph_index::GraphIndex,
+    index::graph_index::GraphIndex,
 };
 
 pub use driver::{Driver, DriverKey};
