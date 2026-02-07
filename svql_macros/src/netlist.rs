@@ -85,7 +85,38 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
                 static SCHEMA: std::sync::OnceLock<svql_query::session::PatternSchema> =
                     std::sync::OnceLock::new();
                 SCHEMA.get_or_init(|| {
-                    let defs = Self::ports_to_defs();
+                    let mut defs = Self::ports_to_defs();
+
+                    // Load needle design to discover internal cells
+                    let result = std::panic::catch_unwind(|| {
+                        Self::discover_internal_cells()
+                    });
+
+                    match result {
+                        Ok(Ok(internal_defs)) => {
+                            tracing::debug!(
+                                "[NETLIST] {} discovered {} internal cells",
+                                std::any::type_name::<Self>(),
+                                internal_defs.len()
+                            );
+                            defs.extend(internal_defs);
+                        }
+                        Ok(Err(e)) => {
+                            tracing::warn!(
+                                "[NETLIST] {} failed to load needle during schema init: {}",
+                                std::any::type_name::<Self>(),
+                                e
+                            );
+                        }
+                        Err(panic_val) => {
+                            tracing::error!(
+                                "[NETLIST] {} panicked during needle loading: {:?}",
+                                std::any::type_name::<Self>(),
+                                panic_val
+                            );
+                        }
+                    }
+
                     let defs_static: &'static [svql_query::session::ColumnDef] =
                         Box::leak(defs.into_boxed_slice());
                     svql_query::session::PatternSchema::new(defs_static)

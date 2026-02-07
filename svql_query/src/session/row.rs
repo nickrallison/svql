@@ -34,7 +34,7 @@ where
     pub fn new(idx: u32) -> Self {
         Self {
             idx,
-            entry_array: EntryArray::with_capacity(T::SCHEMA_SIZE),
+            entry_array: EntryArray::with_capacity(T::schema().defs.len()),
             _marker: PhantomData,
         }
     }
@@ -87,6 +87,31 @@ where
             .and_then(|entry| match entry {
                 ColumnEntry::Sub { id } => *id,
                 _ => None,
+            })
+    }
+
+    /// Get all internal cell mappings from metadata columns.
+    ///
+    /// Returns an iterator of `(needle_debug_index, haystack_cell_id)` pairs.
+    /// Only works for Netlist patterns with discovered internal cells.
+    pub fn internal_cell_mappings(&self) -> impl Iterator<Item = (usize, u32)> + '_ {
+        T::schema()
+            .columns()
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, col_def)| {
+                if !col_def.name.starts_with("__internal_cell_") {
+                    return None;
+                }
+
+                let needle_debug_id: usize = col_def
+                    .name
+                    .strip_prefix("__internal_cell_")
+                    .and_then(|s| s.parse().ok())?;
+
+                let haystack_cell_id = self.entry_array.entries.get(idx)?.as_u32()?;
+
+                Some((needle_debug_id, haystack_cell_id))
             })
     }
 

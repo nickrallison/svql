@@ -38,6 +38,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 unstringify.workspace = true
 walkdir.workspace = true
+which.workspace = true
 argparse.workspace = true
 
 [build-dependencies]

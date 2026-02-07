@@ -764,6 +764,7 @@ dependencies = [
  "tracing-subscriber",
  "unstringify",
  "walkdir",
+ "which",
 ]
 
 [[package]]

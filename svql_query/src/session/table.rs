@@ -60,10 +60,11 @@ where
             });
         }
 
-        let mut columns_data = Vec::with_capacity(T::SCHEMA_SIZE);
+        let schema_size = T::schema().defs.len();
+        let mut columns_data = Vec::with_capacity(schema_size);
 
         // 1. Handle structural columns from the RowMatch array
-        for i in 0..T::SCHEMA_SIZE {
+        for i in 0..schema_size {
             let series_data: Vec<Option<u32>> =
                 rows.iter().map(|r| r.entries[i].as_u32()).collect();
             columns_data.push(series_data);

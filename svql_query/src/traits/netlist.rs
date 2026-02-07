@@ -32,7 +32,36 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         static SCHEMA: std::sync::OnceLock<crate::session::PatternSchema> =
             std::sync::OnceLock::new();
         SCHEMA.get_or_init(|| {
-            let defs = Self::ports_to_defs();
+            let mut defs = Self::ports_to_defs();
+
+            // Load needle design to discover internal cells
+            let result = std::panic::catch_unwind(|| Self::discover_internal_cells());
+
+            match result {
+                Ok(Ok(internal_defs)) => {
+                    tracing::debug!(
+                        "[NETLIST] {} discovered {} internal cells",
+                        std::any::type_name::<Self>(),
+                        internal_defs.len()
+                    );
+                    defs.extend(internal_defs);
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!(
+                        "[NETLIST] {} failed to load needle during schema init: {}",
+                        std::any::type_name::<Self>(),
+                        e
+                    );
+                }
+                Err(panic_val) => {
+                    tracing::error!(
+                        "[NETLIST] {} panicked during needle loading: {:?}",
+                        std::any::type_name::<Self>(),
+                        panic_val
+                    );
+                }
+            }
+
             let defs_static: &'static [ColumnDef] = Box::leak(defs.into_boxed_slice());
             crate::session::PatternSchema::new(defs_static)
         })
@@ -45,6 +74,47 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             .iter()
             .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction))
             .collect()
+    }
+
+    /// Load the needle and extract metadata columns for internal cells.
+    ///
+    /// Discovers internal logic gates in the needle design and creates
+    /// metadata columns for them. This allows storing the haystack cell IDs
+    /// for internal cells in the result table.
+    fn discover_internal_cells() -> Result<Vec<ColumnDef>, Box<dyn std::error::Error>> {
+        let ym = YosysModule::new(Self::FILE_PATH, Self::MODULE_NAME)?;
+
+        let yosys = match which::which("yosys") {
+            Ok(path) => path,
+            Err(_) => {
+                tracing::debug!(
+                    "[NETLIST] Yosys not found, skipping internal cell discovery for {}",
+                    std::any::type_name::<Self>()
+                );
+                return Ok(Vec::new());
+            }
+        };
+
+        let design = ym.import_design_yosys(&ModuleConfig::default(), &yosys)?;
+        let index = GraphIndex::build(&design);
+
+        let mut internal_defs = Vec::new();
+
+        for i in 0..index.num_cells() {
+            let cell_idx = subgraph::cell::CellIndex::new(i);
+            let cell_wrapper = index.get_cell_by_index(cell_idx);
+            let kind = cell_wrapper.cell_type();
+
+            // Only store internal logic gates, not I/O ports
+            if kind.is_logic_gate() {
+                let debug_id = cell_wrapper.debug_index();
+                let col_name: &'static str =
+                    Box::leak(format!("__internal_cell_{}", debug_id).into_boxed_str());
+                internal_defs.push(ColumnDef::metadata(col_name));
+            }
+        }
+
+        Ok(internal_defs)
     }
 
     /// Returns the driver key for this netlist.
@@ -63,12 +133,16 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         needle_index: &subgraph::GraphIndex<'_>,
         haystack_index: &subgraph::GraphIndex<'_>,
     ) -> EntryArray {
-        let schema_size = Self::PORTS.len();
+        let schema = Self::netlist_schema();
+        let schema_size = schema.defs.len();
         let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
+
         for (needle_idx, haystack_idx) in assignment.needle_mapping() {
             let needle_cell_wrapper = needle_index.get_cell_by_index(*needle_idx);
             let needle_cell = needle_cell_wrapper.get();
-            let haystack_debug_index = haystack_index.get_cell_by_index(*haystack_idx).debug_index();
+            let haystack_debug_index = haystack_index
+                .get_cell_by_index(*haystack_idx)
+                .debug_index();
 
             match needle_cell {
                 prjunnamed_netlist::Cell::Input(name, _) => {
@@ -77,7 +151,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
+                    let col_idx = schema.index_of(name).expect(&err_msg);
                     row_match[col_idx] = Some(haystack_debug_index as u32);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
@@ -86,28 +160,56 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = Self::netlist_schema().index_of(name).expect(&err_msg);
+                    let col_idx = schema.index_of(name).expect(&err_msg);
                     let needle_output_driver_id: u32 =
                         value_to_cell_id(output_value).expect("Output should have driver");
                     let haystack_output_driver = assignment
                         .needle_mapping()
                         .iter()
                         .find(|(n_idx, _h_idx)| {
-                            needle_index.get_cell_by_index(**n_idx).debug_index() as u32 == needle_output_driver_id
+                            needle_index.get_cell_by_index(**n_idx).debug_index() as u32
+                                == needle_output_driver_id
                         })
                         .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    row_match[col_idx] = Some(haystack_index.get_cell_by_index(*haystack_output_driver).debug_index() as u32);
+                    row_match[col_idx] = Some(
+                        haystack_index
+                            .get_cell_by_index(*haystack_output_driver)
+                            .debug_index() as u32,
+                    );
                 }
-                _ => continue,
+                _ => {
+                    // Internal cell — store in metadata column if we have one
+                    let needle_debug_id = needle_cell_wrapper.debug_index();
+                    let col_name = format!("__internal_cell_{}", needle_debug_id);
+
+                    if let Some(col_idx) = schema.index_of(&col_name) {
+                        row_match[col_idx] = Some(haystack_debug_index as u32);
+
+                        tracing::trace!(
+                            "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
+                            needle_debug_id,
+                            haystack_debug_index
+                        );
+                    }
+                }
             }
         }
 
+        // Convert to ColumnEntry format, respecting column kinds
         let final_row_match: Vec<ColumnEntry> = row_match
             .into_iter()
-            .map(|opt| ColumnEntry::Wire {
-                value: opt.map(CellId::new).map(crate::wire::WireRef::Cell),
+            .enumerate()
+            .map(|(idx, opt)| {
+                let col_def = schema.column(idx);
+                match col_def.kind {
+                    ColumnKind::Cell => ColumnEntry::Wire {
+                        value: opt.map(CellId::new).map(crate::wire::WireRef::Cell),
+                    },
+                    ColumnKind::Metadata => ColumnEntry::Metadata { id: opt },
+                    _ => ColumnEntry::Metadata { id: None },
+                }
             })
             .collect();
         EntryArray::new(final_row_match)
@@ -125,7 +227,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     /// Create a hierarchical report node from a match row
     ///
     /// Default implementation uses the PORTS schema to display all ports
-    /// with their source locations. No macro override needed.
+    /// with their source locations, plus any discovered internal cells.
     fn netlist_row_to_report_node(
         row: &Row<Self>,
         _store: &Store,
@@ -140,7 +242,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         let mut children = Vec::new();
 
-        // Iterate through ports using the schema
+        // 1. Show all ports from PORTS schema
         for port in Self::PORTS {
             if let Some(wire) = row.wire(port.name) {
                 children.push(wire_to_report_node(
@@ -152,6 +254,64 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     &config,
                 ));
             }
+        }
+
+        // 2. Show internal cells from metadata columns
+        let schema = Self::netlist_schema();
+        let haystack_container = driver.get_design(key, &config.haystack_options).ok();
+
+        for (idx, col_def) in schema.columns().iter().enumerate() {
+            // Skip non-metadata columns (ports already shown above)
+            if !col_def.kind.is_metadata() {
+                continue;
+            }
+
+            // Only show columns that are internal cells
+            if !col_def.name.starts_with("__internal_cell_") {
+                continue;
+            }
+
+            // Get the haystack cell ID from the row
+            let haystack_cell_id = match row.entry_array().entries.get(idx) {
+                Some(ColumnEntry::Metadata { id: Some(id) }) => *id,
+                _ => continue,
+            };
+
+            // Try to get source location from the haystack
+            let source_loc = haystack_container.as_ref().and_then(|container| {
+                container
+                    .index()
+                    .get_cell_by_id(haystack_cell_id as usize)
+                    .and_then(|cell_wrapper| cell_wrapper.get_source())
+            });
+
+            // Try to get the needle cell kind from the debug_id
+            let needle_debug_id: usize = col_def
+                .name
+                .strip_prefix("__internal_cell_")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+
+            // Load needle to get cell type info
+            let needle_key = Self::driver_key();
+            let cell_kind_str = driver
+                .get_design(&needle_key, &config.needle_options)
+                .ok()
+                .and_then(|container| {
+                    container
+                        .index()
+                        .get_cell_by_id(needle_debug_id)
+                        .map(|cell_wrapper| format!("{:?}", cell_wrapper.cell_type()))
+                })
+                .unwrap_or_else(|| "Unknown".to_string());
+
+            children.push(ReportNode {
+                name: format!("internal_{}", needle_debug_id),
+                type_name: cell_kind_str,
+                details: Some(format!("cell_{}", haystack_cell_id)),
+                source_loc,
+                children: vec![],
+            });
         }
 
         ReportNode {
@@ -243,7 +403,13 @@ where
         let mut row_matches: Vec<EntryArray> = assignments
             .items
             .iter()
-            .map(|assignment| Self::resolve(assignment, needle_container.index(), haystack_container.index()))
+            .map(|assignment| {
+                Self::resolve(
+                    assignment,
+                    needle_container.index(),
+                    haystack_container.index(),
+                )
+            })
             .collect();
         tracing::debug!(
             "[NETLIST] {} rows created from assignments",
