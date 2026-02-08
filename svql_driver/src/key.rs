@@ -1,21 +1,29 @@
-//! Unique identifiers for hardware designs.
+//! Unique identifiers for hardware design specifications.
+//!
+//! A `DriverKey` uniquely identifies a design by its file path and top-level module name.
+//! Keys are used to index designs in the driver's cache to avoid redundant reloading.
 
 use std::path::{Path, PathBuf};
 
-/// A unique identifier for a loaded design.
+/// Unique identifier for a hardware design.
 ///
-/// Identity is determined by the canonical file path and the specific module
-/// name within that file.
+/// Identifies a design by combining the file path and the top-level module name.
+/// Two designs are considered the same if they have the same path and module name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DriverKey {
-    /// The filesystem path to the design source.
+    /// Filesystem path to the design file (Verilog, RTLIL, or JSON)
     pub path: PathBuf,
-    /// The name of the top-level module.
+    /// Name of the top-level module in the design
     pub module_name: String,
 }
 
 impl DriverKey {
-    /// Creates a new key from a path and module name.
+    /// Creates a new design key.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - File path to the design
+    /// * `module_name` - Name of the top-level module
     pub fn new<P, S>(path: P, module_name: S) -> Self
     where
         P: Into<PathBuf>,
@@ -27,13 +35,13 @@ impl DriverKey {
         }
     }
 
-    /// Returns a reference to the design path.
+    /// Returns a reference to the design file path.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    /// Returns the module name.
+    /// Returns the top-level module name.
     #[must_use]
     pub fn module_name(&self) -> &str {
         &self.module_name

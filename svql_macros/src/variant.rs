@@ -1,5 +1,4 @@
 // svql_macros/src/variant.rs
-#![allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;

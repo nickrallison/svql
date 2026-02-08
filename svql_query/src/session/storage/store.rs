@@ -199,9 +199,7 @@ impl Store {
 fn sanitize_type_name_for_filename(type_name: &str) -> String {
     type_name
         .replace("::", "_")
-        .replace('<', "_")
-        .replace('>', "_")
-        .replace(',', "_")
+        .replace(['<', '>', ','], "_")
         .replace(' ', "")
         .replace("__", "_")
         .trim_matches('_')

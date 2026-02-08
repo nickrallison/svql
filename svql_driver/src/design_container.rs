@@ -1,13 +1,21 @@
-//! Storage container for designs and their structural indices.
+//! Storage container pairing a netlist design with its structural graph index.
+//!
+//! A `DesignContainer` uses self-referencing to ensure the graph index
+//! and netlist remain consistent throughout their lifetimes.
 
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
 use svql_subgraph::index::graph_index::GraphIndex;
 
-/// A self-referencing container that pairs a netlist with its graph index.
+/// Self-referencing container for a design and its graph index.
+///
+/// The design and index are kept together to ensure consistency and enable
+/// efficient traversal during subgraph matching queries.
 #[self_referencing]
 pub struct DesignContainer {
+    /// The parsed netlist design
     design: Design,
+    /// Structural graph index for efficient matching queries
     #[borrows(design)]
     #[covariant]
     index: GraphIndex<'this>,
@@ -23,8 +31,10 @@ impl std::fmt::Debug for DesignContainer {
 }
 
 impl DesignContainer {
-    /// Constructs a new container and builds the graph index for the provided design.
-    #[must_use] 
+    /// Creates a new container and builds the graph index for the design.
+    ///
+    /// The index is automatically constructed from the provided design.
+    #[must_use]
     pub fn build(design: Design) -> Self {
         DesignContainerBuilder {
             design,
@@ -33,14 +43,14 @@ impl DesignContainer {
         .build()
     }
 
-    /// Returns a reference to the underlying netlist design.
-    #[must_use] 
+    /// Returns a reference to the netlist design.
+    #[must_use]
     pub fn design(&self) -> &Design {
         self.borrow_design()
     }
 
-    /// Returns a reference to the structural graph index.
-    #[must_use] 
+    /// Returns a reference to the graph index for pattern matching.
+    #[must_use]
     pub fn index(&self) -> &GraphIndex<'_> {
         self.borrow_index()
     }

@@ -196,30 +196,37 @@ impl ConfigBuilder {
     }
 }
 
-/// Defines how much of the pattern must match the target.
+/// Defines matching strategies for pattern searches.
+///
+/// Different strategies control how much of the pattern must match the target design.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum MatchLength {
-    /// Stop after the first match.
+    /// Stop after the first valid match is found.
+    /// Fastest execution but only finds one result.
     #[default]
     First,
-    /// The needle wire must be shorter than the haystack.
+    /// The pattern (needle) must be a strict subset of the target (haystack) in length.
+    /// Useful for finding patterns embedded within larger structures.
     NeedleSubsetHaystack,
-    /// The needle and haystack wires must be the same length.
+    /// The pattern and target must have identical structure length.
+    /// Requires exact matches with no additional nodes.
     Exact,
 }
 
 impl MatchLength {
-    /// Returns true if the strategy is First.
+    /// Returns true if the strategy is `First`.
     #[must_use]
     pub const fn first(&self) -> bool {
         matches!(self, Self::First)
     }
+
     /// Returns true if the strategy is `NeedleSubsetHaystack`.
     #[must_use]
     pub const fn needle_subset_haystack(&self) -> bool {
         matches!(self, Self::NeedleSubsetHaystack)
     }
-    /// Returns true if the strategy is Exact.
+
+    /// Returns true if the strategy is `Exact`.
     #[must_use]
     pub const fn exact(&self) -> bool {
         matches!(self, Self::Exact)

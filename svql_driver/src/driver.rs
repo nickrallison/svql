@@ -1,4 +1,10 @@
-//! Orchestration and management of hardware designs.
+//! Design driver for loading, caching, and managing hardware designs.
+//!
+//! The `Driver` is responsible for:
+//! - Loading hardware designs from disk (Verilog, RTLIL, JSON)
+//! - Managing a registry to prevent redundant design reloads
+//! - Creating graph indices for subgraph matching
+//! - Providing access to loaded designs through design containers
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -11,10 +17,10 @@ use thiserror::Error;
 use crate::DriverKey;
 use crate::design_container::DesignContainer;
 
-/// Errors encountered during design ingestion or driver management.
+/// Errors that can occur during design ingestion and driver management.
 #[derive(Debug, Error)]
 pub enum DriverError {
-    /// The Yosys binary could not be located.
+    /// The Yosys binary could not be located on the system.
     #[error("Failed to find yosys binary: {0}")]
     YosysNotFound(String),
     /// An I/O error occurred during file access.
@@ -25,19 +31,30 @@ pub enum DriverError {
     DesignLoading(String),
 }
 
-/// The central manager for loading, caching, and indexing designs.
+/// Central manager for loading, caching, and indexing hardware designs.
+///
+/// The driver maintains a thread-safe registry to cache loaded designs
+/// and provides methods to load designs from files with optional Yosys processing.
 #[derive(Debug, Clone)]
 pub struct Driver {
-    /// Thread-safe registry of loaded designs.
+    /// Thread-safe registry mapping design keys to loaded design containers
     registry: Arc<RwLock<HashMap<DriverKey, Arc<DesignContainer>>>>,
-    /// Path to the Yosys executable.
+    /// Path to the Yosys executable
     yosys_path: PathBuf,
-    /// The root directory for resolving relative design paths.
+    /// Root directory for resolving relative design paths
     root_path: PathBuf,
 }
 
 impl Driver {
-    /// Creates a new driver instance with a specified root path.
+    /// Creates a new driver instance rooted at the specified directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The root directory for resolving relative design paths
+    ///
+    /// # Errors
+    ///
+    /// Returns `DriverError::YosysNotFound` if the yosys executable cannot be located in PATH.
     pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, DriverError> {
         let yosys = which::which("yosys").map_err(|e| DriverError::YosysNotFound(e.to_string()))?;
 
@@ -48,24 +65,46 @@ impl Driver {
         })
     }
 
-    /// Updates the path to the Yosys binary.
+    /// Updates the path to the Yosys executable.
     pub fn set_yosys_path<P: AsRef<Path>>(&mut self, yosys: P) {
         self.yosys_path = yosys.as_ref().to_path_buf();
     }
 
     /// Creates a driver rooted at the current Cargo workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DriverError::YosysNotFound` if yosys is not in PATH or `DriverError::Io`
+    /// if the workspace directory cannot be canonicalized.
     pub fn new_workspace() -> Result<Self, DriverError> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         Self::new(workspace)
     }
 
-    /// Creates a driver rooted at the workspace with a specific Yosys path.
+    /// Creates a driver rooted at the workspace with an explicit Yosys path.
+    ///
+    /// # Arguments
+    ///
+    /// * `yosys` - Path to the Yosys executable
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workspace cannot be canonicalized or if the yosys path is invalid.
     pub fn new_workspace_yosys<Y: AsRef<Path>>(yosys: Y) -> Result<Self, DriverError> {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         Self::with_yosys(workspace, yosys)
     }
 
     /// Creates a driver with explicit root and Yosys paths.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - Root directory for resolving relative paths
+    /// * `yosys` - Path to the Yosys executable
+    ///
+    /// # Errors
+    ///
+    /// Returns `DriverError::YosysNotFound` if the yosys binary path does not exist.
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -85,7 +124,7 @@ impl Driver {
         })
     }
 
-    /// Internal helper to resolve a design path to an absolute path.
+    /// Converts a relative or absolute path to an absolute path.
     fn resolve_path(&self, design_path: &Path) -> PathBuf {
         if design_path.is_absolute() {
             design_path.to_path_buf()
@@ -94,11 +133,21 @@ impl Driver {
         }
     }
 
-    /// Internal helper to check if a key exists in the registry.
+    /// Checks the registry for an already-loaded design.
     fn check_registry(&self, key: &DriverKey) -> Option<Arc<DesignContainer>> {
         self.registry.read().unwrap().get(key).cloned()
     }
 
+    /// Preloads a design into the registry without waiting for query execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Design identifier
+    /// * `module_config` - Configuration for design processing
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DriverError` if the design cannot be loaded.
     pub fn preload_design(
         &self,
         key: &DriverKey,
@@ -108,6 +157,20 @@ impl Driver {
         Ok(())
     }
 
+    /// Loads or retrieves a cached design.
+    ///
+    /// If the design is not already in the registry, it is loaded from disk,
+    /// processed via Yosys (unless raw loading is enabled), and cached.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Design identifier containing path and module name
+    /// * `module_config` - Configuration for design processing and optimization
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DriverError` if the design file is invalid, cannot be read,
+    /// or if Yosys processing fails.
     pub fn get_design(
         &self,
         key: &DriverKey,
@@ -121,6 +184,7 @@ impl Driver {
         let absolute_path = self.resolve_path(key.path());
         let yosys_module = YosysModule::new(&absolute_path, key.module_name())
             .map_err(|e| DriverError::DesignLoading(e.to_string()))?;
+
         let design = if module_config.load_raw {
             if !matches!(yosys_module.design_path(), DesignPath::Json(_)) {
                 return Err(DriverError::DesignLoading(
@@ -151,7 +215,7 @@ impl Driver {
         Ok(design_container)
     }
 
-    /// Returns a copy of all currently loaded designs.
+    /// Returns a snapshot of all currently loaded designs.
     #[must_use]
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
         self.registry.read().unwrap().clone()

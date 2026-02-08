@@ -1,8 +1,19 @@
-//! Core query definitions and structures for SVQL.
+//! Core query engine and result storage for SVQL.
 //!
-//! This module defines the fundamental types used to represent query states,
-//! hardware wires, and the relationships between pattern components and
-//! matched design elements.
+//! The `svql_query` crate provides:
+//! - **DSL**: Trait definitions for patterns (`Netlist`, `Composite`, `Primitive`, `Variant`, `Recursive`)
+//! - **Session**: Result storage with columnar tables, schemas, and execution planning
+//! - **Pattern Search**: Entry point via `run_query()` for executing pattern matches
+//!
+//! # Query Execution Flow
+//!
+//! 1. User calls `run_query::<P>(&driver, &key, &config)?`
+//! 2. Pattern `P` defines its structure (components, connections, filters)
+//! 3. Execution plan is built from pattern dependencies
+//! 4. Subgraph matcher finds all matches in the design
+//! 5. Results are stored in `Store` with type-safe tables
+//! 6. Patterns can render results for detailed reporting
+
 #![feature(const_type_name)]
 #![feature(const_cmp)]
 #![feature(const_trait_impl)]
@@ -18,31 +29,37 @@ pub mod test_harness;
 
 use prelude::*;
 
-// Re-export for macro usage
 pub use svql_common as common;
 pub use svql_common::Wire;
 pub use svql_driver as driver;
 
-// Maintain backward compatibility for macros
 pub use dsl::selector;
 pub use dsl::traits;
 
-/// Execute a query with custom execution configuration.
+/// Executes a pattern query against a design.
 ///
-/// Allows specifying parallel vs sequential execution and thread limits.
+/// This is the primary entry point for pattern matching. It orchestrates:
+/// 1. Design loading and caching via the driver
+/// 2. Pattern matching according to configuration
+/// 3. Result storage in a columnar table format
+///
+/// # Arguments
+///
+/// * `driver` - Design loader and cache manager
+/// * `key` - Design identifier (path + module name)
+/// * `config` - Query configuration (parallelism, match constraints, etc.)
 ///
 /// # Example
 ///
 /// ```ignore
 /// use svql_query::prelude::*;
+/// use svql_query_lib::security::cwe1234::Cwe1234;
 ///
-/// // Run in parallel with default thread count
-/// let config = ExecConfig::parallel();
-/// let store = run_query_with_config::<MyPattern>(&driver, &key, config)?;
-///
-/// // Or limit threads
-/// let config = ExecConfig { parallel: true, max_threads: Some(4) };
-/// let store = run_query_with_config::<MyPattern>(&driver, &key, config)?;
+/// let driver = Driver::new_workspace()?;
+/// let key = DriverKey::new("design.json", "top");
+/// let config = Config::builder().parallel(true).build();
+/// let store = run_query::<Cwe1234>(&driver, &key, &config)?;
+/// let results = store.get::<Cwe1234>().unwrap();
 /// ```
 pub fn run_query<P>(
     driver: &Driver,

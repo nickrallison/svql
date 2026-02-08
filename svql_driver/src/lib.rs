@@ -1,18 +1,17 @@
-//! The driver crate manages the lifetimes of hardware designs and their associated indices.
+//! Design driver for loading, caching, and managing hardware designs.
 //!
-//! It provides a registry to prevent redundant reloading of netlists,
-//! manages design loading and caching, and the creation
-//! of execution contexts.
+//! The driver crate provides:
+//! - `Driver`: Central manager for loading and caching designs with graph indices
+//! - `DriverKey`: Unique identifier for designs (path + module name)
+//! - `DesignContainer`: Self-referencing container pairing designs with graph indices
+//!
+//! The driver prevents redundant reloading of designs by caching them keyed by
+//! (file path, module name). This enables efficient multi-query execution on the same designs.
 
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
-
-// pub mod context;
 pub mod design_container;
 pub mod driver;
 pub mod key;
 
-// pub use context::Context;
 pub use driver::{Driver, DriverError};
 pub use key::DriverKey;
 

@@ -18,6 +18,7 @@ pub struct Args {
     /// Name of the top-level module in the design
     #[arg(short = 'm', long, default_value = "e203_soc_top")]
     pub design_module: String,
+
     /// Use raw import (skip Yosys processing)
     #[arg(long, default_value_t = false)]
     pub use_raw_import: bool,
@@ -25,13 +26,14 @@ pub struct Args {
     /// Enable parallel execution
     #[arg(short = 'p', long, default_value_t = false)]
     pub parallel: bool,
+
     /// Set match length constraint
     #[arg(long, value_enum, default_value = "needle-subset-haystack")]
     pub match_length: MatchLengthArg,
 }
 
 impl Args {
-    /// Convert command-line arguments into internal configuration
+    /// Converts parsed arguments into a query configuration.
     pub fn to_config(&self) -> Config {
         let haystack_options = ModuleConfig {
             load_raw: self.use_raw_import,
@@ -45,21 +47,22 @@ impl Args {
             .build()
     }
 
+    /// Creates a design key from the provided path and module name.
     pub fn key(&self) -> DriverKey {
         DriverKey::new(self.design_path.as_str(), self.design_module.as_str())
     }
 }
 
-/// Command-line argument wrapper for MatchLength
+/// Enumeration of supported match length strategies.
 #[derive(Debug, Clone, clap::ValueEnum)]
 pub enum MatchLengthArg {
-    /// First match only
+    /// Stop after the first match found
     #[value(name = "first")]
     First,
-    /// Needle must be a subset of haystack
+    /// Needle must be a strict subset of haystack in length
     #[value(name = "needle-subset-haystack")]
     NeedleSubsetHaystack,
-    /// Exact match required
+    /// Needle and haystack must have identical length
     #[value(name = "exact")]
     Exact,
 }
