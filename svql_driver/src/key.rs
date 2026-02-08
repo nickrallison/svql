@@ -1,7 +1,6 @@
 //! Unique identifiers for hardware designs.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 /// A unique identifier for a loaded design.
 ///
@@ -12,30 +11,30 @@ pub struct DriverKey {
     /// The filesystem path to the design source.
     pub path: PathBuf,
     /// The name of the top-level module.
-    pub module_name: Arc<str>,
+    pub module_name: String,
 }
 
 impl DriverKey {
     /// Creates a new key from a path and module name.
     pub fn new<P, S>(path: P, module_name: S) -> Self
     where
-        P: AsRef<Path>,
-        S: Into<Arc<str>>,
+        P: Into<PathBuf>,
+        S: Into<String>,
     {
         Self {
-            path: path.as_ref().to_path_buf(),
+            path: path.into(),
             module_name: module_name.into(),
         }
     }
 
     /// Returns a reference to the design path.
-    #[must_use] 
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Returns the module name.
-    #[must_use] 
+    #[must_use]
     pub fn module_name(&self) -> &str {
         &self.module_name
     }
