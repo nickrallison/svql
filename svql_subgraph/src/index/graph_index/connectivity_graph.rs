@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use crate::cell::CellId;
+use dashmap::DashMap;
 use prjunnamed_netlist::{CellRef, Design};
 use svql_common::*;
 
@@ -16,7 +19,7 @@ pub struct ConnectivityGraph {
     /// Precomputed fan-in sets (no port info) for fast queries
     fanin_sets: HashMap<CellId, HashSet<CellId>>,
     /// Precomputed intersection of fanout of fanin
-    intersect_fanout_of_fanin: HashMap<CellId, HashSet<CellId>>,
+    intersect_fanout_of_fanin: Arc<DashMap<CellId, Arc<HashSet<CellId>>>>,
 }
 
 impl ConnectivityGraph {
@@ -33,17 +36,39 @@ impl ConnectivityGraph {
         let fanout_sets = Self::precompute_sets(&fanout_map);
         let fanin_sets = Self::precompute_sets(&fanin_map);
 
-        // Precompute intersection of fanout of fanin
-        let intersect_fanout_of_fanin =
-            Self::precompute_intersect_fanout_of_fanin(&fanin_map, &fanout_sets);
-
         Self {
             fanin_map,
             fanout_map,
             fanout_sets,
             fanin_sets,
-            intersect_fanout_of_fanin,
+            intersect_fanout_of_fanin: Arc::new(DashMap::new()),
         }
+    }
+
+    fn compute_single_intersect(&self, cell_idx: CellId) -> HashSet<CellId> {
+        let Some(fanin_list) = self.fanin_map.get(&cell_idx) else {
+            return HashSet::new();
+        };
+
+        if fanin_list.is_empty() {
+            return HashSet::new();
+        }
+
+        let fanout_sets_of_fanins: Vec<&HashSet<CellId>> = fanin_list
+            .iter()
+            .filter_map(|(idx, _)| self.fanout_sets.get(idx))
+            .collect();
+
+        if fanout_sets_of_fanins.is_empty() {
+            return HashSet::new();
+        }
+
+        let mut result = fanout_sets_of_fanins[0].clone();
+        for set in &fanout_sets_of_fanins[1..] {
+            result = &result & *set;
+        }
+
+        result
     }
 
     fn build_fanin_fanout_maps(
@@ -89,35 +114,35 @@ impl ConnectivityGraph {
             .collect()
     }
 
-    fn precompute_intersect_fanout_of_fanin(
-        fanin_map: &FaninMap,
-        fanout_sets: &HashMap<CellId, HashSet<CellId>>,
-    ) -> HashMap<CellId, HashSet<CellId>> {
-        fanin_map
-            .iter()
-            .filter_map(|(cell_idx, fanin_list)| {
-                if fanin_list.is_empty() {
-                    return None;
-                }
+    // fn precompute_intersect_fanout_of_fanin(
+    //     fanin_map: &FaninMap,
+    //     fanout_sets: &HashMap<CellId, HashSet<CellId>>,
+    // ) -> HashMap<CellId, HashSet<CellId>> {
+    //     fanin_map
+    //         .iter()
+    //         .filter_map(|(cell_idx, fanin_list)| {
+    //             if fanin_list.is_empty() {
+    //                 return None;
+    //             }
 
-                let fanout_sets_of_fanins: Vec<&HashSet<CellId>> = fanin_list
-                    .iter()
-                    .filter_map(|(idx, _)| fanout_sets.get(idx))
-                    .collect();
+    //             let fanout_sets_of_fanins: Vec<&HashSet<CellId>> = fanin_list
+    //                 .iter()
+    //                 .filter_map(|(idx, _)| fanout_sets.get(idx))
+    //                 .collect();
 
-                if fanout_sets_of_fanins.is_empty() {
-                    return None;
-                }
+    //             if fanout_sets_of_fanins.is_empty() {
+    //                 return None;
+    //             }
 
-                let mut result = fanout_sets_of_fanins[0].clone();
-                for set in &fanout_sets_of_fanins[1..] {
-                    result = &result & *set;
-                }
+    //             let mut result = fanout_sets_of_fanins[0].clone();
+    //             for set in &fanout_sets_of_fanins[1..] {
+    //                 result = &result & *set;
+    //             }
 
-                Some((*cell_idx, result))
-            })
-            .collect()
-    }
+    //             Some((*cell_idx, result))
+    //         })
+    //         .collect()
+    // }
 
     #[must_use]
     pub fn fanout_indices(&self, cell_idx: CellId) -> Option<&[(CellId, usize)]> {
@@ -145,17 +170,13 @@ impl ConnectivityGraph {
         })
     }
 
+    /// Get intersection (computes on-demand, caches result)
     #[must_use]
-    pub fn get_intersect_fanout_of_fanin_indices(
-        &self,
-        cell_idx: CellId,
-    ) -> &HashSet<CellId> {
+    pub fn get_intersect_fanout_of_fanin_indices(&self, cell_idx: CellId) -> Arc<HashSet<CellId>> {
         self.intersect_fanout_of_fanin
-            .get(&cell_idx)
-            .unwrap_or_else(|| {
-                static EMPTY: std::sync::OnceLock<HashSet<CellId>> = std::sync::OnceLock::new();
-                EMPTY.get_or_init(HashSet::new)
-            })
+            .entry(cell_idx)
+            .or_insert_with(|| Arc::new(self.compute_single_intersect(cell_idx)))
+            .clone()
     }
 
     #[must_use]

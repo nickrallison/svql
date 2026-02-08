@@ -7,9 +7,12 @@ mod cell_registry;
 mod connectivity_graph;
 mod io_mapping;
 
+use std::sync::Arc;
+
 pub use cell_registry::CellRegistry;
 pub use connectivity_graph::ConnectivityGraph;
 pub use io_mapping::IoMapping;
+use tracing::info;
 
 use crate::cell::{CellId, CellKind, CellWrapper};
 use prjunnamed_netlist::{CellRef, Design};
@@ -26,6 +29,7 @@ pub struct GraphIndex<'a> {
 impl<'a> GraphIndex<'a> {
     /// Builds a new `GraphIndex` for the provided design.
     pub fn build(design: &'a Design) -> Self {
+        info!("Building graph index for design");
         let start = std::time::Instant::now();
 
         let cell_refs_topo = Self::build_cell_refs_topo(design);
@@ -38,7 +42,7 @@ impl<'a> GraphIndex<'a> {
             connectivity.fanout_map(),
         );
 
-        tracing::debug!(
+        tracing::info!(
             "graph index built in {:?} for {} cells",
             start.elapsed(),
             cell_registry.len()
@@ -101,7 +105,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns the intersection of fan-outs for all cells in the fan-in of the specified cell.
     #[must_use]
-    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellId) -> &HashSet<CellId> {
+    pub fn get_intersect_fanout_of_fanin(&self, cell_idx: CellId) -> Arc<HashSet<CellId>> {
         self.connectivity
             .get_intersect_fanout_of_fanin_indices(cell_idx)
     }

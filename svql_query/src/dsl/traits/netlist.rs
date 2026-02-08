@@ -205,7 +205,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                 let col_def = schema.column(idx);
                 match col_def.kind {
                     ColumnKind::Cell => ColumnEntry::Wire {
-                        value: opt.map(|v| CellId::new(v as usize)).map(crate::wire::WireRef::Cell),
+                        value: opt
+                            .map(|v| CellId::new(v as usize))
+                            .map(crate::wire::WireRef::Cell),
                     },
                     ColumnKind::Metadata => ColumnEntry::Metadata { id: opt },
                     _ => ColumnEntry::Metadata { id: None },

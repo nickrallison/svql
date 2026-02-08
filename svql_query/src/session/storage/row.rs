@@ -272,6 +272,13 @@ where
 
         true
     }
+
+    pub fn render(&self, store: &Store, driver: &Driver, key: &DriverKey) -> String
+    where
+        T: Pattern + svql_query::traits::Component + 'static,
+    {
+        T::render_row(self, store, driver, key)
+    }
 }
 
 impl<T> Default for Row<T>

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use tracing::debug;
+use tracing::{debug, info};
 
 use svql_common::*;
 use svql_common::{DesignPath, YosysModule};
@@ -136,6 +136,11 @@ impl Driver {
                 .map_err(|e| DriverError::DesignLoading(e.to_string()))?
         };
 
+        info!(
+            "Design loaded successfully: {:?}, module: {}",
+            key.path(),
+            key.module_name()
+        );
         let design_container = Arc::new(DesignContainer::build(design));
 
         self.registry

@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check if we should use AsyncDffMuxEnable for locked_reg haystack
 
-    let store = svql_query::run_query::<DffAny>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -75,15 +75,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for row in store
-        .get::<DffAny>()
+        .get::<Cwe1234>()
         .expect("Store should have table")
         .rows()
         .take(20)
     {
-        let report = DffAny::render_row(&row, &store, &driver, &design_key);
-        if report.contains("i_ar_arbiter.gen_arbiter.gen_int_rr.rr_d") {
-            println!("{}", report);
-        }
+        let report = row.render(&store, &driver, &design_key);
+        // if report.contains("i_ar_arbiter.gen_arbiter.gen_int_rr.rr_d") {
+        println!("{}", report);
+        // }
     }
 
     Ok(())
