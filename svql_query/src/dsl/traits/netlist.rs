@@ -302,7 +302,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             // Load needle to get cell type info
             let needle_key = Self::driver_key();
             let cell_kind_str = driver
-                .get_design(&needle_key, &config.needle_options)
+                .get_design(needle_key, &config.needle_options)
                 .ok()
                 .and_then(|container| {
                     container
@@ -360,7 +360,7 @@ where
     where
         Self: Sized,
     {
-        driver.preload_design(&Self::driver_key(), &config.needle_options)?;
+        driver.preload_design(Self::driver_key(), &config.needle_options)?;
         driver.preload_design(design_key, &config.haystack_options)?;
         Ok(())
     }
@@ -384,7 +384,7 @@ where
         tracing::debug!("[NETLIST] Loading needle design...");
         let needle_container = ctx
             .driver()
-            .get_design(&needle_key, &ctx.config().needle_options)
+            .get_design(needle_key, &ctx.config().needle_options)
             .map_err(|e| QueryError::needle_load(e.to_string()))?;
         tracing::debug!("[NETLIST] Needle design loaded");
 
