@@ -117,14 +117,19 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         Ok(internal_defs)
     }
 
-    /// Returns the driver key for this netlist.
-    fn driver_key() -> DriverKey {
-        debug!(
-            "Creating driver key for netlist: {}, file: {}",
-            Self::MODULE_NAME,
-            Self::FILE_PATH
-        );
-        DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
+    /// Returns a reference to the lazily-initialized driver key for this netlist.
+    ///
+    /// The driver key is constructed once on the first call and cached in a static OnceLock.
+    fn driver_key() -> &'static DriverKey {
+        static DRIVER_KEY: std::sync::OnceLock<DriverKey> = std::sync::OnceLock::new();
+        DRIVER_KEY.get_or_init(|| {
+            debug!(
+                "Creating driver key for netlist: {}, file: {}",
+                Self::MODULE_NAME,
+                Self::FILE_PATH
+            );
+            DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
+        })
     }
 
     #[must_use]
