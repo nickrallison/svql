@@ -114,36 +114,6 @@ impl ConnectivityGraph {
             .collect()
     }
 
-    // fn precompute_intersect_fanout_of_fanin(
-    //     fanin_map: &FaninMap,
-    //     fanout_sets: &HashMap<CellId, HashSet<CellId>>,
-    // ) -> HashMap<CellId, HashSet<CellId>> {
-    //     fanin_map
-    //         .iter()
-    //         .filter_map(|(cell_idx, fanin_list)| {
-    //             if fanin_list.is_empty() {
-    //                 return None;
-    //             }
-
-    //             let fanout_sets_of_fanins: Vec<&HashSet<CellId>> = fanin_list
-    //                 .iter()
-    //                 .filter_map(|(idx, _)| fanout_sets.get(idx))
-    //                 .collect();
-
-    //             if fanout_sets_of_fanins.is_empty() {
-    //                 return None;
-    //             }
-
-    //             let mut result = fanout_sets_of_fanins[0].clone();
-    //             for set in &fanout_sets_of_fanins[1..] {
-    //                 result = &result & *set;
-    //             }
-
-    //             Some((*cell_idx, result))
-    //         })
-    //         .collect()
-    // }
-
     #[must_use]
     pub fn fanout_indices(&self, cell_idx: CellId) -> Option<&[(CellId, usize)]> {
         self.fanout_map.get(&cell_idx).map(std::vec::Vec::as_slice)

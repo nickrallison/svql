@@ -24,8 +24,8 @@ pub use svql_common::Wire;
 pub use svql_driver as driver;
 
 // Maintain backward compatibility for macros
-pub use dsl::traits;
 pub use dsl::selector;
+pub use dsl::traits;
 
 /// Execute a query with custom execution configuration.
 ///

@@ -9,8 +9,8 @@ members = [
     "svql_subgraph",
     "svql_common",
     "svql_macros",
-    "svql_query_lib",
-]
+    "svql_query_lib"
+, "svql_cli"]
 
 default-members = [
     "svql_driver",
@@ -55,11 +55,12 @@ prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", br
 # OTHER LIBRARIES
 ###############
 argparse = "0.2"
-gxhash = "3.1"
+clap = { version = "4.5", features = ["derive"] }
 contracts = "0.6.6"
 dashmap = "6.1.0"
 easy-smt = "0.3"
 env_logger = "0.11.5"
+gxhash = "3.1"
 indexmap = "2.7.1"
 itertools = "0.14.0"
 jzon = "0.12.5"

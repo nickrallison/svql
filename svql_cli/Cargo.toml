@@ -1,0 +1,21 @@
+[package]
+name = "svql_cli"
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+clap.workspace = true
+tikv-jemallocator.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+svql_common.workspace = true
+svql_driver.workspace = true
+svql_query.workspace = true
+svql_query_lib.workspace = true
+
+[lints]
+workspace = true
