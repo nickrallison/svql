@@ -60,6 +60,7 @@ prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", br
 argparse = "0.2"
 clap = { version = "4.5", features = ["derive"] }
 contracts = "0.6.6"
+csv = "1.3"
 dashmap = "6.1.0"
 easy-smt = "0.3"
 env_logger = "0.11.5"

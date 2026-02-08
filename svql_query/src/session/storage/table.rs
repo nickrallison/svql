@@ -126,7 +126,9 @@ where
 
         match T::schema().column(idx).kind {
             ColumnKind::Cell => Some(ColumnEntry::Wire {
-                value: val.map(|v| CellId::new(v as usize)).map(crate::wire::WireRef::Cell),
+                value: val
+                    .map(|v| CellId::new(v as usize))
+                    .map(crate::wire::WireRef::Cell),
             }),
             ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
             ColumnKind::Metadata => Some(ColumnEntry::Metadata { id: val }),
@@ -162,10 +164,83 @@ where
         (0..self.len() as u32).map(Ref::new)
     }
 
-    // /// Get the TypeId for a submodule column.
-    // pub fn sub_type(&self, name: &str) -> Option<TypeId> {
-    //     self.sub_types.get(name).copied()
-    // }
+    /// Export this table to a CSV file.
+    ///
+    /// Writes all rows to the specified file path with a header row.
+    /// Values are written as integers, with NULL represented as empty cells.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let store = plan.execute(&driver, key, config)?;
+    /// let table = store.get::<MyPattern>().unwrap();
+    /// table.to_csv("results/my_pattern.csv")?;
+    /// ```
+    pub fn to_csv<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), QueryError> {
+        let mut writer = csv::Writer::from_path(path)
+            .map_err(|e| QueryError::ExecutionError(format!("Failed to create CSV writer: {}", e)))?;
+
+        // Write header
+        writer.write_record(self.store.column_names())
+            .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV header: {}", e)))?;
+
+        // Write data rows
+        for row_idx in 0..self.len() {
+            let mut record = Vec::with_capacity(self.store.column_names().len());
+            for col_name in self.store.column_names() {
+                if let Some(col) = self.store.column(col_name) {
+                    if let Some(Some(value)) = col.get(row_idx) {
+                        record.push(value.to_string());
+                    } else {
+                        record.push(String::new()); // NULL as empty string
+                    }
+                }
+            }
+            writer.write_record(&record)
+                .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV row: {}", e)))?;
+        }
+
+        writer.flush()
+            .map_err(|e| QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Export this table to a CSV string.
+    ///
+    /// Returns the CSV as a String instead of writing to a file.
+    pub fn to_csv_string(&self) -> Result<String, QueryError> {
+        let mut buffer = Vec::new();
+        {
+            let mut writer = csv::Writer::from_writer(&mut buffer);
+
+            // Write header
+            writer.write_record(self.store.column_names())
+                .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV header: {}", e)))?;
+
+            // Write data rows
+            for row_idx in 0..self.len() {
+                let mut record = Vec::with_capacity(self.store.column_names().len());
+                for col_name in self.store.column_names() {
+                    if let Some(col) = self.store.column(col_name) {
+                        if let Some(Some(value)) = col.get(row_idx) {
+                            record.push(value.to_string());
+                        } else {
+                            record.push(String::new()); // NULL as empty string
+                        }
+                    }
+                }
+                writer.write_record(&record)
+                    .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV row: {}", e)))?;
+            }
+
+            writer.flush()
+                .map_err(|e| QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e)))?;
+        } // writer is dropped here, releasing the borrow on buffer
+
+        String::from_utf8(buffer)
+            .map_err(|e| QueryError::ExecutionError(format!("Failed to convert CSV to string: {}", e)))
+    }
 }
 
 impl<T> std::fmt::Debug for Table<T>
@@ -243,6 +318,9 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<crate::CellId>;
+
+    /// Export this table to a CSV file.
+    fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError>;
 }
 
 impl<T: Send + Sync + 'static> AnyTable for Table<T>
@@ -271,7 +349,10 @@ where
         }
 
         let col = self.store.column(col_name)?;
-        col.get(row_idx).copied().flatten().map(|v| crate::CellId::new(v as usize))
+        col.get(row_idx)
+            .copied()
+            .flatten()
+            .map(|v| crate::CellId::new(v as usize))
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
@@ -331,5 +412,9 @@ where
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
         sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
+    }
+
+    fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError> {
+        Table::<T>::to_csv(self, path)
     }
 }

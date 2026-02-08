@@ -3,7 +3,6 @@
 //! `Store` holds type-erased `Table<T>` instances, allowing patterns
 //! to access their dependencies' results during search and rehydration.
 
-
 use std::any::TypeId;
 use std::sync::Arc;
 
@@ -32,6 +31,9 @@ use crate::prelude::*;
 /// for row in table.rows() {
 ///     let matched = MyPattern::rehydrate(&row, &store);
 /// }
+///
+/// // Export all tables (including subtables) to CSV files
+/// store.to_csv_dir("output/csv_results")?;
 /// ```
 pub struct Store {
     /// Type-erased table storage.
@@ -150,6 +152,60 @@ impl Store {
     pub fn insert_arc(&mut self, type_id: TypeId, table: Arc<dyn AnyTable + Send + Sync>) {
         self.tables.insert(type_id, table);
     }
+
+    /// Export all tables in the store to CSV files in the specified directory.
+    ///
+    /// Each table is saved as a separate CSV file named after its type.
+    /// Creates the output directory if it doesn't exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `output_dir` - Directory path where CSV files will be written
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of tables successfully exported, or an error if any export fails.
+    pub fn to_csv_dir<P: AsRef<std::path::Path>>(
+        &self,
+        output_dir: P,
+    ) -> Result<usize, QueryError> {
+        let output_path = output_dir.as_ref();
+
+        // Create output directory if it doesn't exist
+        std::fs::create_dir_all(output_path).map_err(|e| {
+            QueryError::ExecutionError(format!("Failed to create output directory: {}", e))
+        })?;
+
+        let mut count = 0;
+        for type_id in self.type_ids() {
+            if let Some(table) = self.get_any(type_id) {
+                // Sanitize the type name to create a valid filename
+                let type_name = table.type_name();
+                let filename = sanitize_type_name_for_filename(type_name);
+                let file_path = output_path.join(format!("{}.csv", filename));
+
+                table.to_csv(&file_path)?;
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+}
+
+/// Convert a Rust type name to a safe filename.
+///
+/// Replaces `::` with `_` and removes angle brackets and other special characters.
+fn sanitize_type_name_for_filename(type_name: &str) -> String {
+    type_name
+        .replace("::", "_")
+        .replace('<', "_")
+        .replace('>', "_")
+        .replace(',', "_")
+        .replace(' ', "")
+        .replace("__", "_")
+        .trim_matches('_')
+        .to_string()
 }
 
 impl Default for Store {

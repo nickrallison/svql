@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Vec<_>>();
 
     let filter = |report: &str| -> bool {
-        // report.contains("i_pulp_io.i_udma_subsystem.qspi[0].i_udma_qspi_wrap.i_udma_spim_top.u_dc_tx.i_cdc_fifo.i_dst.i_spill_register.gen_spill_reg.a_fill")
+        // report.contains("CellId: 900")
         true
     };
 
@@ -59,9 +59,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter(|report| filter(report))
         .collect::<Vec<_>>();
 
-    for report in reports {
-        println!("{report}");
+    for (i, report) in reports.iter().enumerate() {
+        // if report.contains
+        println!("{i}: {report}");
     }
+
+    store.to_csv_dir("csvs")?;
 
     Ok(())
 }

@@ -19,3 +19,4 @@ obj_dir/
 **/openpiton_*.json
 examples/fixtures/larger_designs/json/*/*.json
 examples/fixtures/larger_designs/verilog/*/*.v
+csvs/
