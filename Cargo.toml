@@ -9,8 +9,9 @@ members = [
     "svql_subgraph",
     "svql_common",
     "svql_macros",
-    "svql_query_lib"
-, "svql_cli"]
+    "svql_query_lib", 
+    "svql_cli"
+    ]
 
 default-members = [
     "svql_driver",
@@ -18,6 +19,7 @@ default-members = [
     "svql_query_lib",
     "svql_subgraph",
     "svql_common",
+    "svql_cli"
 ]
 
 [workspace.package]
@@ -38,6 +40,7 @@ svql_query = { path = "svql_query" }
 svql_query_lib = { path = "svql_query_lib" }
 svql_macros = { path = "svql_macros" }
 svql_subgraph = { path = "svql_subgraph" }
+svql_cli = { path = "svql_cli" }
 
 ###############
 # PRJUNNAMED

@@ -836,6 +836,7 @@ name = "svql_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "rayon",
  "svql_common",
  "svql_driver",
  "svql_query",

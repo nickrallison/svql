@@ -23,7 +23,7 @@ pub struct Args {
     pub use_raw_import: bool,
 
     /// Enable parallel execution
-    #[arg(short = 'p', long, default_value_t = true)]
+    #[arg(short = 'p', long, default_value_t = false)]
     pub parallel: bool,
     /// Set match length constraint
     #[arg(long, value_enum, default_value = "needle-subset-haystack")]

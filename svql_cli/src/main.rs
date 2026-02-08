@@ -4,8 +4,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod args;
 
 use clap::Parser;
+use rayon::prelude::*;
 use svql_query::prelude::*;
-use svql_query_lib::security::cwe1234::Cwe1234;
+use svql_query_lib::security::{cwe1234::Cwe1234, locked_register::LockedRegister};
 use tracing::info;
 
 use args::Args;
@@ -27,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
 
     info!("Executing query with DataFrame API...");
-    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<LockedRegister>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -37,14 +38,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{table}");
     }
 
-    for row in store
-        .get::<Cwe1234>()
+    let rows = store
+        .get::<LockedRegister>()
         .expect("Store should have table")
         .rows()
-        .take(20)
-    {
-        let report = row.render(&store, &driver, &design_key);
-        println!("{}", report);
+        .collect::<Vec<_>>();
+
+    let filter = |report: &str| -> bool {
+        report.contains("i_pulp_io.i_udma_subsystem.uart[0].i_udma_uart_wrap.i_udma_uart_top.u_dc_fifo_tx.i_cdc_fifo.i_dst.i_spill_register.gen_spill_reg.a_fill")
+    };
+
+    let reports = rows
+        .par_iter()
+        .map(|row| row.render(&store, &driver, &design_key))
+        .filter(|report| filter(report))
+        .collect::<Vec<_>>();
+
+    for report in reports {
+        println!("{report}");
     }
 
     Ok(())
