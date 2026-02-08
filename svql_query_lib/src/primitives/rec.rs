@@ -62,8 +62,9 @@ impl Recursive for RecAnd {
         })
     }
 
+    // ── RecAnd::build_recursive ──────────────────────────────────────────
+
     fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
-        // 1. Get base pattern (AndGate) results
         let base_table = ctx
             .get_any_table(std::any::TypeId::of::<AndGate>())
             .ok_or_else(|| QueryError::missing_dep("AndGate"))?;
@@ -77,25 +78,25 @@ impl Recursive for RecAnd {
             return Table::new(vec![]);
         }
 
-        // 2. Extract gate info and build output→gate lookup
+        // ── FIX: use `map` instead of `filter_map` ──
+        // Inputs are now Option<Wire> so rows with primary-port/constant
+        // inputs are kept, preserving the 1:1 correspondence with or_table.
         struct GateInfo {
-            a: Wire,
-            b: Wire,
+            a: Option<Wire>, // was: Wire (via filter_map)
+            b: Option<Wire>, // was: Wire (via filter_map)
             y: Wire,
         }
 
         let gate_info: Vec<GateInfo> = and_table
             .rows()
-            .filter_map(|row| {
-                Some(GateInfo {
-                    a: row.wire("a")?,
-                    b: row.wire("b")?,
-                    y: row.wire("y")?,
-                })
+            .map(|row| GateInfo {
+                a: row.wire("a"), // None when input is a primary port / constant
+                b: row.wire("b"),
+                y: row.wire("y").expect("AndGate output 'y' must exist"),
             })
             .collect();
+        // gate_info[i]  ↔  and_table.row(i)  — always
 
-        // Map: output CellId → AndGate row index (only for cell outputs)
         let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
             if let Some(y_id) = info.y.cell_id() {
@@ -103,7 +104,6 @@ impl Recursive for RecAnd {
             }
         }
 
-        // 3. Initialize: every AND gate starts as a leaf (depth=0)
         struct RecAndEntry {
             base_idx: u32,
             left_child: Option<u32>,
@@ -116,7 +116,7 @@ impl Recursive for RecAnd {
             .iter()
             .enumerate()
             .map(|(idx, info)| RecAndEntry {
-                base_idx: idx as u32,
+                base_idx: idx as u32, // now correct: gate_info[idx] == and_table.row(idx)
                 left_child: None,
                 right_child: None,
                 y: info.y.clone(),
@@ -124,17 +124,15 @@ impl Recursive for RecAnd {
             })
             .collect();
 
-        // Map: output CellId → RecAnd entry index (same as gate index initially, only for cells)
         let output_to_rec: HashMap<CellId, u32> = entries
             .iter()
             .enumerate()
             .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
             .collect();
 
-        // 4. Fixpoint iteration: link children and compute depths
         let mut changed = true;
         let mut iterations = 0;
-        const MAX_ITERATIONS: usize = 1000; // Safety limit
+        const MAX_ITERATIONS: usize = 1000;
 
         while changed && iterations < MAX_ITERATIONS {
             changed = false;
@@ -144,18 +142,18 @@ impl Recursive for RecAnd {
                 let base_idx = entries[i].base_idx as usize;
                 let info = &gate_info[base_idx];
 
-                // Check if input A comes from another AND's output (only if it's a cell)
+                // ── FIX: chain through Option<Wire> ──
                 let new_left = info
                     .a
-                    .cell_id()
+                    .as_ref()
+                    .and_then(|w| w.cell_id())
                     .and_then(|id| output_to_rec.get(&id).copied());
-                // Check if input B comes from another AND's output (only if it's a cell)
                 let new_right = info
                     .b
-                    .cell_id()
+                    .as_ref()
+                    .and_then(|w| w.cell_id())
                     .and_then(|id| output_to_rec.get(&id).copied());
 
-                // Detect changes
                 let children_changed =
                     new_left != entries[i].left_child || new_right != entries[i].right_child;
 
@@ -165,7 +163,6 @@ impl Recursive for RecAnd {
                     changed = true;
                 }
 
-                // Recompute depth based on children
                 let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
                 let right_depth = new_right
                     .map(|idx| entries[idx as usize].depth)
@@ -191,7 +188,7 @@ impl Recursive for RecAnd {
             );
         }
 
-        // 5. Convert to EntryArray format
+        // EntryArray conversion — unchanged
         let schema = Self::recursive_schema();
         let base_idx = schema.index_of("base").expect("schema has 'base'");
         let left_idx = schema
@@ -207,7 +204,6 @@ impl Recursive for RecAnd {
             .iter()
             .map(|e| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-
                 arr.entries[base_idx] = ColumnEntry::Sub {
                     id: Some(e.base_idx),
                 };
@@ -217,7 +213,6 @@ impl Recursive for RecAnd {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
-
                 arr
             })
             .collect();
@@ -293,8 +288,9 @@ impl Recursive for RecOr {
         })
     }
 
+    // ── RecOr::build_recursive ──────────────────────────────────────────
+
     fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
-        // 1. Get base pattern (OrGate) results
         let base_table = ctx
             .get_any_table(std::any::TypeId::of::<OrGate>())
             .ok_or_else(|| QueryError::missing_dep("OrGate"))?;
@@ -308,25 +304,25 @@ impl Recursive for RecOr {
             return Table::new(vec![]);
         }
 
-        // 2. Extract gate info and build output→gate lookup
+        // ── FIX: use `map` instead of `filter_map` ──
+        // Inputs are now Option<Wire> so rows with primary-port/constant
+        // inputs are kept, preserving the 1:1 correspondence with or_table.
         struct GateInfo {
-            a: Wire,
-            b: Wire,
+            a: Option<Wire>, // was: Wire (via filter_map)
+            b: Option<Wire>, // was: Wire (via filter_map)
             y: Wire,
         }
 
         let gate_info: Vec<GateInfo> = or_table
             .rows()
-            .filter_map(|row| {
-                Some(GateInfo {
-                    a: row.wire("a")?,
-                    b: row.wire("b")?,
-                    y: row.wire("y")?,
-                })
+            .map(|row| GateInfo {
+                a: row.wire("a"), // None when input is a primary port / constant
+                b: row.wire("b"),
+                y: row.wire("y").expect("OrGate output 'y' must exist"),
             })
             .collect();
+        // gate_info[i]  ↔  or_table.row(i)  — always
 
-        // Map: output CellId → OrGate row index (only for cell outputs)
         let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
             if let Some(y_id) = info.y.cell_id() {
@@ -334,7 +330,6 @@ impl Recursive for RecOr {
             }
         }
 
-        // 3. Initialize: every OR gate starts as a leaf (depth=0)
         struct RecOrEntry {
             base_idx: u32,
             left_child: Option<u32>,
@@ -347,7 +342,7 @@ impl Recursive for RecOr {
             .iter()
             .enumerate()
             .map(|(idx, info)| RecOrEntry {
-                base_idx: idx as u32,
+                base_idx: idx as u32, // now correct: gate_info[idx] == or_table.row(idx)
                 left_child: None,
                 right_child: None,
                 y: info.y.clone(),
@@ -355,17 +350,15 @@ impl Recursive for RecOr {
             })
             .collect();
 
-        // Map: output CellId → RecOr entry index (same as gate index initially, only for cells)
         let output_to_rec: HashMap<CellId, u32> = entries
             .iter()
             .enumerate()
             .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
             .collect();
 
-        // 4. Fixpoint iteration: link children and compute depths
         let mut changed = true;
         let mut iterations = 0;
-        const MAX_ITERATIONS: usize = 1000; // Safety limit
+        const MAX_ITERATIONS: usize = 1000;
 
         while changed && iterations < MAX_ITERATIONS {
             changed = false;
@@ -375,18 +368,18 @@ impl Recursive for RecOr {
                 let base_idx = entries[i].base_idx as usize;
                 let info = &gate_info[base_idx];
 
-                // Check if input A comes from another OR's output (only if it's a cell)
+                // ── FIX: chain through Option<Wire> ──
                 let new_left = info
                     .a
-                    .cell_id()
+                    .as_ref()
+                    .and_then(|w| w.cell_id())
                     .and_then(|id| output_to_rec.get(&id).copied());
-                // Check if input B comes from another OR's output (only if it's a cell)
                 let new_right = info
                     .b
-                    .cell_id()
+                    .as_ref()
+                    .and_then(|w| w.cell_id())
                     .and_then(|id| output_to_rec.get(&id).copied());
 
-                // Detect changes
                 let children_changed =
                     new_left != entries[i].left_child || new_right != entries[i].right_child;
 
@@ -396,7 +389,6 @@ impl Recursive for RecOr {
                     changed = true;
                 }
 
-                // Recompute depth based on children
                 let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
                 let right_depth = new_right
                     .map(|idx| entries[idx as usize].depth)
@@ -422,7 +414,7 @@ impl Recursive for RecOr {
             );
         }
 
-        // 5. Convert to EntryArray format
+        // EntryArray conversion — unchanged
         let schema = Self::recursive_schema();
         let base_idx = schema.index_of("base").expect("schema has 'base'");
         let left_idx = schema
@@ -438,7 +430,6 @@ impl Recursive for RecOr {
             .iter()
             .map(|e| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-
                 arr.entries[base_idx] = ColumnEntry::Sub {
                     id: Some(e.base_idx),
                 };
@@ -448,7 +439,6 @@ impl Recursive for RecOr {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
                 arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
-
                 arr
             })
             .collect();

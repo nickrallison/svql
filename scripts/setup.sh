@@ -31,8 +31,8 @@ gzip -d -k -f examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netli
 # sh scripts/verific_to_json_no_flatten.sh examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_tile.v tile
 # sh scripts/verific_to_json.sh examples/fixtures/larger_designs/verilog/hummingbirdv2/e203_soc_netlist.v e203_soc_top
 
-cp examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_tile.v examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_noc1encoder.v
-sh scripts/verific_to_json_no_flatten.sh examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_noc1encoder.v noc1encoder
+# cp examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_tile.v examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_noc1encoder.v
+# sh scripts/verific_to_json_no_flatten.sh examples/fixtures/larger_designs/verilog/hackatdac21/openpiton_noc1encoder.v noc1encoder
 
 # ## 4. Zip up json files
 # gzip -k examples/fixtures/larger_designs/json/hackatdac18/cv32e40p_fp_wrapper_netlist.json

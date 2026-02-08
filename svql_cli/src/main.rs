@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<UnlockLogic>()
+        .get::<Cwe1234>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{i}: {report}");
     }
 
-    store.to_csv_dir("csvs")?;
+    // store.to_csv_dir("csvs")?;
 
     Ok(())
 }
