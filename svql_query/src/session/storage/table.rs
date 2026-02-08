@@ -177,12 +177,16 @@ where
     /// table.to_csv("results/my_pattern.csv")?;
     /// ```
     pub fn to_csv<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), QueryError> {
-        let mut writer = csv::Writer::from_path(path)
-            .map_err(|e| QueryError::ExecutionError(format!("Failed to create CSV writer: {}", e)))?;
+        let mut writer = csv::Writer::from_path(path).map_err(|e| {
+            QueryError::ExecutionError(format!("Failed to create CSV writer: {}", e))
+        })?;
 
         // Write header
-        writer.write_record(self.store.column_names())
-            .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV header: {}", e)))?;
+        writer
+            .write_record(self.store.column_names())
+            .map_err(|e| {
+                QueryError::ExecutionError(format!("Failed to write CSV header: {}", e))
+            })?;
 
         // Write data rows
         for row_idx in 0..self.len() {
@@ -196,12 +200,14 @@ where
                     }
                 }
             }
-            writer.write_record(&record)
-                .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV row: {}", e)))?;
+            writer.write_record(&record).map_err(|e| {
+                QueryError::ExecutionError(format!("Failed to write CSV row: {}", e))
+            })?;
         }
 
-        writer.flush()
-            .map_err(|e| QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e)))?;
+        writer.flush().map_err(|e| {
+            QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e))
+        })?;
 
         Ok(())
     }
@@ -215,8 +221,11 @@ where
             let mut writer = csv::Writer::from_writer(&mut buffer);
 
             // Write header
-            writer.write_record(self.store.column_names())
-                .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV header: {}", e)))?;
+            writer
+                .write_record(self.store.column_names())
+                .map_err(|e| {
+                    QueryError::ExecutionError(format!("Failed to write CSV header: {}", e))
+                })?;
 
             // Write data rows
             for row_idx in 0..self.len() {
@@ -230,16 +239,19 @@ where
                         }
                     }
                 }
-                writer.write_record(&record)
-                    .map_err(|e| QueryError::ExecutionError(format!("Failed to write CSV row: {}", e)))?;
+                writer.write_record(&record).map_err(|e| {
+                    QueryError::ExecutionError(format!("Failed to write CSV row: {}", e))
+                })?;
             }
 
-            writer.flush()
-                .map_err(|e| QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e)))?;
+            writer.flush().map_err(|e| {
+                QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e))
+            })?;
         } // writer is dropped here, releasing the borrow on buffer
 
-        String::from_utf8(buffer)
-            .map_err(|e| QueryError::ExecutionError(format!("Failed to convert CSV to string: {}", e)))
+        String::from_utf8(buffer).map_err(|e| {
+            QueryError::ExecutionError(format!("Failed to convert CSV to string: {}", e))
+        })
     }
 }
 
