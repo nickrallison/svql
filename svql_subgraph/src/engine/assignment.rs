@@ -112,17 +112,20 @@ impl SingleAssignment {
         sig
     }
 
-    /// Signature excluding I/O cells — requires the needle graph index to classify cells.
+    pub fn signature_with_mask(&self, mask: &[bool]) -> Vec<u32> {
+        self.needle_to_haystack.iter()
+            .filter(|(n, _)| mask[n.as_usize()])
+            .map(|(_, &h)| h.into()) // using From<GraphNodeIdx> for u32
+            .collect()
+    }
+
+    /// Signature excluding I/O cells — uses pre-computed mask.
     #[must_use]
-    pub fn internal_signature(&self, needle_index: &svql_common::GraphIndex<'_>) -> Vec<usize> {
-        use crate::cell::CellKind;
+    pub fn internal_signature(&self, mask: &[bool]) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .needle_mapping()
             .iter()
-            .filter(|(needle_idx, _)| {
-                let kind = needle_index.get_cell_by_index(**needle_idx).cell_type();
-                !matches!(kind, CellKind::Input | CellKind::Output)
-            })
+            .filter(|(needle_idx, _)| mask[needle_idx.as_usize()])
             .map(|(_, haystack_idx)| haystack_idx.as_usize())
             .collect();
         sig.sort_unstable();

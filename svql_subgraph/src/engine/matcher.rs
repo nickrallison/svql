@@ -41,6 +41,8 @@ pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
     pub(crate) matches_found: AtomicUsize,
     pub(crate) initial_candidates_total: AtomicUsize,
     pub(crate) initial_candidates_done: AtomicUsize,
+    /// Pre-computed bitmask of which needle nodes are internal (not I/O)
+    pub(crate) needle_internal_mask: Vec<bool>,
 }
 
 impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
@@ -56,6 +58,13 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         let needle_index = GraphIndex::build(needle);
         let haystack_index = GraphIndex::build(haystack);
 
+        let needle_internal_mask = (0..needle_index.num_cells())
+            .map(|i| {
+                let kind = needle_index.get_cell_by_index(GraphNodeIdx::new(i as u32)).cell_type();
+                !matches!(kind, CellKind::Input | CellKind::Output)
+            })
+            .collect();
+
         let matcher = SubgraphMatcherCore {
             needle,
             haystack,
@@ -69,6 +78,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             matches_found: AtomicUsize::new(0),
             initial_candidates_total: AtomicUsize::new(0),
             initial_candidates_done: AtomicUsize::new(0),
+            needle_internal_mask,
         };
 
         matcher.enumerate_assignments()
@@ -85,6 +95,13 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
         haystack_name: String,
         config: &'cfg Config,
     ) -> AssignmentSet {
+        let needle_internal_mask = (0..needle_index.num_cells())
+            .map(|i| {
+                let kind = needle_index.get_cell_by_index(GraphNodeIdx::new(i as u32)).cell_type();
+                !matches!(kind, CellKind::Input | CellKind::Output)
+            })
+            .collect();
+
         let matcher = SubgraphMatcherCore {
             needle,
             haystack,
@@ -98,6 +115,7 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
             matches_found: AtomicUsize::new(0),
             initial_candidates_total: AtomicUsize::new(0),
             initial_candidates_done: AtomicUsize::new(0),
+            needle_internal_mask,
         };
         matcher.enumerate_assignments()
     }

@@ -165,6 +165,14 @@ impl<'a> GraphIndex<'a> {
         self.cell_registry.cells_of_type_indices(kind)
     }
 
+    /// Helper to get a port name directly from a physical ID.
+    /// Useful for reporting logic in `svql_query`.
+    pub fn get_port_name(&self, physical: PhysicalCellId) -> Option<&str> {
+        let node = self.resolve_node(physical)?;
+        let wrapper = self.get_cell_by_index(node);
+        wrapper.input_name().or_else(|| wrapper.output_name())
+    }
+
     /// Resolves a `CellId` to its `CellWrapper`.
     #[must_use]
     pub fn get_cell_by_index(&self, index: GraphNodeIdx) -> &CellWrapper<'a> {

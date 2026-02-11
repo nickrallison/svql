@@ -78,9 +78,27 @@ impl Recursive for RecAnd {
             return Table::new(vec![]);
         }
 
+        let index = ctx.haystack_design().index();
+
+        // Get GraphNodeIdx for each gate's output
+        let nodes: Vec<GraphNodeIdx> = and_table
+            .rows()
+            .filter_map(|row| {
+                row.wire("y")
+                    .and_then(|w| w.cell_id())
+                    .and_then(|id| index.resolve_node(id))
+            })
+            .collect();
+
+        if nodes.len() != and_table.len() {
+            return Err(QueryError::ExecutionError(
+                "Some AndGate outputs could not be resolved to graph nodes".to_string(),
+            ));
+        }
+
         // ── FIX: use `map` instead of `filter_map` ──
         // Inputs are now Option<Wire> so rows with primary-port/constant
-        // inputs are kept, preserving the 1:1 correspondence with or_table.
+        // inputs are kept, preserving the 1:1 correspondence with and_table.
         struct GateInfo {
             a: Option<Wire>, // was: Wire (via filter_map)
             b: Option<Wire>, // was: Wire (via filter_map)
@@ -97,37 +115,35 @@ impl Recursive for RecAnd {
             .collect();
         // gate_info[i]  ↔  and_table.row(i)  — always
 
-        let mut output_to_gate: HashMap<PhysicalCellId, u32> = HashMap::with_capacity(gate_info.len());
-        for (idx, info) in gate_info.iter().enumerate() {
-            if let Some(y_id) = info.y.cell_id() {
-                output_to_gate.insert(y_id, idx as u32);
-            }
-        }
-
         struct RecAndEntry {
-            base_idx: u32,
-            left_child: Option<u32>,
-            right_child: Option<u32>,
+            base_node: GraphNodeIdx,
+            left_child: Option<GraphNodeIdx>,
+            right_child: Option<GraphNodeIdx>,
             y: Wire,
             depth: u32,
         }
 
-        let mut entries: Vec<RecAndEntry> = gate_info
+        let mut entries: Vec<RecAndEntry> = nodes
             .iter()
             .enumerate()
-            .map(|(idx, info)| RecAndEntry {
-                base_idx: idx as u32, // now correct: gate_info[idx] == and_table.row(idx)
+            .map(|(idx, &node)| RecAndEntry {
+                base_node: node,
                 left_child: None,
                 right_child: None,
-                y: info.y.clone(),
+                y: gate_info[idx].y.clone(),
                 depth: 0,
             })
             .collect();
 
-        let output_to_rec: HashMap<PhysicalCellId, u32> = entries
+        let output_to_rec: HashMap<PhysicalCellId, GraphNodeIdx> = entries
+            .iter()
+            .filter_map(|e| e.y.cell_id().map(|id| (id, e.base_node)))
+            .collect();
+
+        let node_to_entry: HashMap<GraphNodeIdx, usize> = nodes
             .iter()
             .enumerate()
-            .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
+            .map(|(i, &node)| (node, i))
             .collect();
 
         let mut changed = true;
@@ -139,8 +155,8 @@ impl Recursive for RecAnd {
             iterations += 1;
 
             for i in 0..entries.len() {
-                let base_idx = entries[i].base_idx as usize;
-                let info = &gate_info[base_idx];
+                let base_node = entries[i].base_node;
+                let info = &gate_info[i];
 
                 // ── FIX: chain through Option<Wire> ──
                 let new_left = info
@@ -163,9 +179,13 @@ impl Recursive for RecAnd {
                     changed = true;
                 }
 
-                let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
+                let left_depth = new_left
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| entries[idx].depth)
+                    .unwrap_or(0);
                 let right_depth = new_right
-                    .map(|idx| entries[idx as usize].depth)
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| entries[idx].depth)
                     .unwrap_or(0);
 
                 let new_depth = if new_left.is_some() || new_right.is_some() {
@@ -202,17 +222,30 @@ impl Recursive for RecAnd {
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
-            .map(|e| {
+            .enumerate()
+            .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
                 arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(e.base_idx),
+                    id: Some(entry_index as u32),
                 };
-                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
-                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
+                arr.entries[left_idx] = ColumnEntry::Sub {
+                    id: e
+                        .left_child
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| idx as u32),
+                };
+                arr.entries[right_idx] = ColumnEntry::Sub {
+                    id: e
+                        .right_child
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| idx as u32),
+                };
                 arr.entries[y_idx] = ColumnEntry::Wire {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
-                arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(PhysicalCellId::new(e.depth)) };
+                arr.entries[depth_idx] = ColumnEntry::Metadata {
+                    id: Some(PhysicalCellId::new(e.depth)),
+                };
                 arr
             })
             .collect();
@@ -304,6 +337,24 @@ impl Recursive for RecOr {
             return Table::new(vec![]);
         }
 
+        let index = ctx.haystack_design().index();
+
+        // Get GraphNodeIdx for each gate's output
+        let nodes: Vec<GraphNodeIdx> = or_table
+            .rows()
+            .filter_map(|row| {
+                row.wire("y")
+                    .and_then(|w| w.cell_id())
+                    .and_then(|id| index.resolve_node(id))
+            })
+            .collect();
+
+        if nodes.len() != or_table.len() {
+            return Err(QueryError::ExecutionError(
+                "Some OrGate outputs could not be resolved to graph nodes".to_string(),
+            ));
+        }
+
         // ── FIX: use `map` instead of `filter_map` ──
         // Inputs are now Option<Wire> so rows with primary-port/constant
         // inputs are kept, preserving the 1:1 correspondence with or_table.
@@ -323,37 +374,35 @@ impl Recursive for RecOr {
             .collect();
         // gate_info[i]  ↔  or_table.row(i)  — always
 
-        let mut output_to_gate: HashMap<PhysicalCellId, u32> = HashMap::with_capacity(gate_info.len());
-        for (idx, info) in gate_info.iter().enumerate() {
-            if let Some(y_id) = info.y.cell_id() {
-                output_to_gate.insert(y_id, idx as u32);
-            }
-        }
-
         struct RecOrEntry {
-            base_idx: u32,
-            left_child: Option<u32>,
-            right_child: Option<u32>,
+            base_node: GraphNodeIdx,
+            left_child: Option<GraphNodeIdx>,
+            right_child: Option<GraphNodeIdx>,
             y: Wire,
             depth: u32,
         }
 
-        let mut entries: Vec<RecOrEntry> = gate_info
+        let mut entries: Vec<RecOrEntry> = nodes
             .iter()
             .enumerate()
-            .map(|(idx, info)| RecOrEntry {
-                base_idx: idx as u32, // now correct: gate_info[idx] == or_table.row(idx)
+            .map(|(idx, &node)| RecOrEntry {
+                base_node: node,
                 left_child: None,
                 right_child: None,
-                y: info.y.clone(),
+                y: gate_info[idx].y.clone(),
                 depth: 0,
             })
             .collect();
 
-        let output_to_rec: HashMap<PhysicalCellId, u32> = entries
+        let output_to_rec: HashMap<PhysicalCellId, GraphNodeIdx> = entries
+            .iter()
+            .filter_map(|e| e.y.cell_id().map(|id| (id, e.base_node)))
+            .collect();
+
+        let node_to_entry: HashMap<GraphNodeIdx, usize> = nodes
             .iter()
             .enumerate()
-            .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
+            .map(|(i, &node)| (node, i))
             .collect();
 
         let mut changed = true;
@@ -365,8 +414,8 @@ impl Recursive for RecOr {
             iterations += 1;
 
             for i in 0..entries.len() {
-                let base_idx = entries[i].base_idx as usize;
-                let info = &gate_info[base_idx];
+                let base_node = entries[i].base_node;
+                let info = &gate_info[i];
 
                 // ── FIX: chain through Option<Wire> ──
                 let new_left = info
@@ -389,9 +438,13 @@ impl Recursive for RecOr {
                     changed = true;
                 }
 
-                let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
+                let left_depth = new_left
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| entries[idx].depth)
+                    .unwrap_or(0);
                 let right_depth = new_right
-                    .map(|idx| entries[idx as usize].depth)
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| entries[idx].depth)
                     .unwrap_or(0);
 
                 let new_depth = if new_left.is_some() || new_right.is_some() {
@@ -428,17 +481,30 @@ impl Recursive for RecOr {
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
-            .map(|e| {
+            .enumerate()
+            .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
                 arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(e.base_idx),
+                    id: Some(entry_index as u32),
                 };
-                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
-                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
+                arr.entries[left_idx] = ColumnEntry::Sub {
+                    id: e
+                        .left_child
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| idx as u32),
+                };
+                arr.entries[right_idx] = ColumnEntry::Sub {
+                    id: e
+                        .right_child
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| idx as u32),
+                };
                 arr.entries[y_idx] = ColumnEntry::Wire {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
-                arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(PhysicalCellId::new(e.depth)) };
+                arr.entries[depth_idx] = ColumnEntry::Metadata {
+                    id: Some(PhysicalCellId::new(e.depth)),
+                };
                 arr
             })
             .collect();
