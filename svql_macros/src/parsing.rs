@@ -24,7 +24,7 @@ impl PathSelector {
                 return Err(Error::new_spanned(elem, "Expected string literal in path"));
             }
         }
-        Ok(PathSelector { segments })
+        Ok(Self { segments })
     }
 
     /// Generate code for a static Selector

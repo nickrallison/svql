@@ -82,13 +82,13 @@ where
 
     /// Get the number of rows (matches) in this table.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.store.height()
     }
 
     /// Check if the table is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.store.height() == 0
     }
 
