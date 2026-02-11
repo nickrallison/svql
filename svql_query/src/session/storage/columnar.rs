@@ -73,7 +73,7 @@ impl ColumnStore {
 
     /// Get the number of rows.
     #[inline]
-    pub fn height(&self) -> usize {
+    pub const fn height(&self) -> usize {
         self.num_rows
     }
 

@@ -164,7 +164,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = schema.index_of(&name).expect(&err_msg);
+                    let col_idx = schema.index_of(name).expect(&err_msg);
                     entries[col_idx] = ColumnEntry::cell(haystack_physical);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
@@ -173,9 +173,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = schema.index_of(&name).expect(&err_msg);
+                    let col_idx = schema.index_of(name).expect(&err_msg);
                     let needle_output_driver_id: u32 =
-                        value_to_cell_id(&output_value).expect("Output should have driver");
+                        value_to_cell_id(output_value).expect("Output should have driver");
                     let haystack_output_driver = assignment
                         .needle_mapping()
                         .iter()

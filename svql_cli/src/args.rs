@@ -70,9 +70,9 @@ pub enum MatchLengthArg {
 impl From<MatchLengthArg> for MatchLength {
     fn from(arg: MatchLengthArg) -> Self {
         match arg {
-            MatchLengthArg::First => MatchLength::First,
-            MatchLengthArg::NeedleSubsetHaystack => MatchLength::NeedleSubsetHaystack,
-            MatchLengthArg::Exact => MatchLength::Exact,
+            MatchLengthArg::First => Self::First,
+            MatchLengthArg::NeedleSubsetHaystack => Self::NeedleSubsetHaystack,
+            MatchLengthArg::Exact => Self::Exact,
         }
     }
 }

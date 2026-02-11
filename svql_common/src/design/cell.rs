@@ -33,7 +33,7 @@ impl PhysicalCellId {
     }
 
     /// Access for table packing logic.
-    pub fn storage_key(&self) -> u32 {
+    pub const fn storage_key(&self) -> u32 {
         self.inner
     }
 }
@@ -81,7 +81,7 @@ impl GraphNodeIdx {
         Self { inner: id }
     }
 
-    pub fn as_usize(self) -> usize {
+    pub const fn as_usize(self) -> usize {
         self.inner as usize
     }
 }

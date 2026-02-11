@@ -55,7 +55,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn entry_array(&self) -> &EntryArray {
+    pub const fn entry_array(&self) -> &EntryArray {
         &self.entry_array
     }
 

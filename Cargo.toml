@@ -91,7 +91,14 @@ which = "8.0.0"
 yap = "0.12.0"
 
 [workspace.lints.clippy]
-all = "deny"
+complexity = "deny"
+correctness = "deny"
+nursery = "deny"
+perf = "deny"
+style = "deny"
+suspicious = "deny"
+
+# restriction = "deny"
 # pedantic = "deny"
 
 [profile.release]

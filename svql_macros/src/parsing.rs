@@ -47,9 +47,9 @@ pub enum Direction {
 impl Direction {
     pub fn as_port_constructor(self) -> TokenStream {
         match self {
-            Direction::Input => quote! { svql_query::session::Port::input },
-            Direction::Output => quote! { svql_query::session::Port::output },
-            Direction::Inout => quote! { svql_query::session::Port::inout },
+            Self::Input => quote! { svql_query::session::Port::input },
+            Self::Output => quote! { svql_query::session::Port::output },
+            Self::Inout => quote! { svql_query::session::Port::inout },
         }
     }
 }

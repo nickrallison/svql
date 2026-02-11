@@ -20,7 +20,7 @@ pub struct ReportNode {
     /// Source code location if available
     pub source_loc: Option<SourceLocation>,
     /// Child nodes (submodules, fields, etc.)
-    pub children: Vec<ReportNode>,
+    pub children: Vec<Self>,
 }
 
 impl ReportNode {

@@ -121,13 +121,13 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns a map of input port names to their fan-out cell indices.
     #[must_use]
-    pub fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
+    pub const fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         self.io_mapping.input_fanout_by_name_map()
     }
 
     /// Returns a map of output port names to their fan-in cell indices.
     #[must_use]
-    pub fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
+    pub const fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         self.io_mapping.output_fanin_by_name_map()
     }
 

@@ -207,7 +207,7 @@ impl ExecutionPlan {
                 self.nodes.len(),
                 node.type_name
             );
-            ExecutionPlan::execute_node(node, ctx)?;
+            Self::execute_node(node, ctx)?;
         }
         tracing::debug!("Sequential execution complete");
         Ok(())
@@ -227,7 +227,7 @@ impl ExecutionPlan {
         #[cfg(not(feature = "parallel"))]
         self.nodes
             .iter()
-            .try_for_each(|node| ExecutionPlan::execute_node(node, ctx))?;
+            .try_for_each(|node| Self::execute_node(node, ctx))?;
 
         Ok(())
     }
@@ -284,7 +284,7 @@ impl ExecutionPlan {
                 node.deps.len(),
                 dep.type_name
             );
-            ExecutionPlan::execute_node(dep, ctx)?;
+            Self::execute_node(dep, ctx)?;
             tracing::trace!(
                 "  Dependency {}/{} complete: {}",
                 i + 1,
@@ -413,7 +413,7 @@ impl ExecutionContext {
 
     /// Get the cached haystack design container.
     #[must_use]
-    pub fn haystack_design(&self) -> &Arc<svql_driver::design_container::DesignContainer> {
+    pub const fn haystack_design(&self) -> &Arc<svql_driver::design_container::DesignContainer> {
         &self.haystack_design
     }
 

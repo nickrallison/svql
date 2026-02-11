@@ -4,7 +4,6 @@
 //! wire references, submodule references, and metadata columns.
 
 use std::any::TypeId;
-use std::fmt;
 use std::sync::Arc;
 
 use crate::prelude::*;
@@ -392,7 +391,7 @@ pub enum ColumnEntry {
 
 impl ColumnEntry {
     /// Helper to extract u32 for backward compatibility/sorting
-    pub fn as_u32(&self) -> Option<u32> {
+    pub const fn as_u32(&self) -> Option<u32> {
         match self {
             Self::Sub(idx) => Some(*idx),
             Self::Metadata(id) => Some(id.storage_key()),
@@ -403,13 +402,13 @@ impl ColumnEntry {
 
     /// Create a cell wire entry
     #[must_use]
-    pub fn cell(id: PhysicalCellId) -> Self {
+    pub const fn cell(id: PhysicalCellId) -> Self {
         Self::Wire(WireRef::Cell(id))
     }
 
     /// Create a primary port entry
     #[must_use]
-    pub fn primary_port(name: Arc<str>) -> Self {
+    pub const fn primary_port(name: Arc<str>) -> Self {
         Self::Wire(WireRef::PrimaryPort(name))
     }
 
@@ -421,13 +420,13 @@ impl ColumnEntry {
 
     /// Create a submodule entry
     #[must_use]
-    pub fn sub(id: u32) -> Self {
+    pub const fn sub(id: u32) -> Self {
         Self::Sub(id)
     }
 
     /// Create a metadata entry
     #[must_use]
-    pub fn metadata(id: PhysicalCellId) -> Self {
+    pub const fn metadata(id: PhysicalCellId) -> Self {
         Self::Metadata(id)
     }
 }

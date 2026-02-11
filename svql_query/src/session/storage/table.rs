@@ -100,7 +100,7 @@ where
 
     /// Get a mutable reference to the underlying columnar store.
     #[inline]
-    pub fn store_mut(&mut self) -> &mut ColumnStore {
+    pub const fn store_mut(&mut self) -> &mut ColumnStore {
         &mut self.store
     }
 
@@ -394,6 +394,6 @@ where
     }
 
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError> {
-        Table::<T>::to_csv(self, path)
+        Self::to_csv(self, path)
     }
 }
