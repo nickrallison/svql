@@ -374,7 +374,7 @@ where
                         );
                         return None;
                     }
-                    Some(T::resolve(cell, cell_wrapper.debug_index().inner() as usize))
+                    Some(T::resolve(cell, cell_wrapper.debug_index().storage_key() as usize))
                 })
                 .collect();
 
@@ -609,15 +609,15 @@ mod tests {
 
         // Access fields to prove they work
         assert!(
-            gate.a.cell_id().expect("Wire must be a cell").inner() > 0,
+            gate.a.cell_id().expect("Wire must be a cell").storage_key() > 0,
             "Input A should have valid ID"
         );
         assert!(
-            gate.b.cell_id().expect("Wire must be a cell").inner() > 0,
+            gate.b.cell_id().expect("Wire must be a cell").storage_key() > 0,
             "Input B should have valid ID"
         );
         assert!(
-            gate.y.cell_id().expect("Wire must be a cell").inner() > 0,
+            gate.y.cell_id().expect("Wire must be a cell").storage_key() > 0,
             "Output Y should have valid ID"
         );
 

@@ -378,35 +378,12 @@ impl PortMap {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct SlotIdx(u32);
-
-impl SlotIdx {
-    pub const fn new(idx: u32) -> Self {
-        Self(idx)
-    }
-
-    pub(crate) const fn as_usize(&self) -> usize {
-        self.0 as usize
-    }
-
-    pub(crate) const fn inner(&self) -> u32 {
-        self.0
-    }
-}
-
-impl fmt::Display for SlotIdx {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "r{}", self.0)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ColumnEntry {
     /// Wire reference (cell, primary port, or constant)
     Wire { value: Option<WireRef> },
     /// Submodule column: stores row index in the submodule's table
-    Sub { id: Option<SlotIdx> },
+    Sub { id: Option<u32> },
     /// Metadata column: stores auxiliary data
     Metadata { id: Option<PhysicalCellId> },
 }
@@ -418,9 +395,9 @@ impl ColumnEntry {
             Self::Wire { value } => value
                 .as_ref()
                 .and_then(|wr| wr.as_cell())
-                .map(|cid| cid.into()),
-            Self::Sub { id } => id.map(|s| s.0),
-            Self::Metadata { id } => id.map(|p| p.into()),
+                .map(|cid| cid.storage_key()),
+            Self::Sub { id } => *id,
+            Self::Metadata { id } => id.map(|p| p.storage_key()),
         }
     }
 
@@ -486,9 +463,9 @@ impl EntryArray {
             .filter_map(|(col_idx, entry)| match entry {
                 ColumnEntry::Wire {
                     value: Some(wire_ref),
-                } => wire_ref.as_cell().map(|cid| (col_idx, cid.inner())),
-                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, id.inner())),
-                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, id.inner())),
+                } => wire_ref.as_cell().map(|cid| (col_idx, cid.storage_key())),
+                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, *id)),
+                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, id.storage_key())),
                 _ => None,
             })
             .collect();

@@ -125,7 +125,7 @@ pub fn wire_source_location(
 ) -> Option<SourceLocation> {
     let physical_id = wire.cell_id()?;
     let design = driver.get_design(key, &config.haystack_options).ok()?;
-    
+
     // Use Translation API to find the cell wrapper
     let node = design.index().resolve_node(physical_id)?;
     design.index().get_cell_by_index(node).get_source()
@@ -145,7 +145,7 @@ pub fn wire_to_report_node(
             let design = driver.get_design(key, &config.haystack_options).ok();
             let cell_wrapper = design
                 .as_ref()
-                .and_then(|d| d.index().get_cell_by_id(id.inner() as usize));
+                .and_then(|d| d.index().get_cell_by_id(id.storage_key() as usize));
 
             if let Some(cell) = cell_wrapper {
                 let kind = cell.cell_type();
@@ -173,7 +173,7 @@ pub fn wire_to_report_node(
                 ReportNode {
                     name: name.to_string(),
                     type_name: format!("{:?}", direction),
-                    details: Some(format!("CellId: {}", id.inner())),
+                    details: Some(format!("CellId: {}", id.storage_key())),
                     source_loc,
                     children: vec![],
                 }
@@ -182,7 +182,7 @@ pub fn wire_to_report_node(
                 ReportNode {
                     name: name.to_string(),
                     type_name: format!("{:?}", direction),
-                    details: Some(format!("CellId: {}", id.inner())),
+                    details: Some(format!("CellId: {}", id.storage_key())),
                     source_loc: None,
                     children: vec![],
                 }
@@ -280,7 +280,7 @@ pub fn render_wire_compact<T: Pattern + Component>(
     let source_loc = wire_source_location(&wire, driver, key, &config);
 
     let type_info = match &wire {
-        Wire::Cell { id, .. } => format!("cell_{}", id.inner()),
+        Wire::Cell { id, .. } => format!("cell_{}", id.storage_key()),
         Wire::PrimaryPort { name, .. } => format!("port_{}", name),
         Wire::Constant { value } => format!("const_{}", value),
     };

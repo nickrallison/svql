@@ -50,7 +50,7 @@ impl<'a> CellRegistry<'a> {
             .enumerate()
             .map(|(idx, cell)| {
                 (
-                    cell.debug_index().inner() as usize,
+                    cell.debug_index().storage_key() as usize,
                     GraphNodeIdx::new(idx as u32),
                 )
             })

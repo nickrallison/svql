@@ -151,7 +151,7 @@ impl<'a> GraphIndex<'a> {
     /// Finds a node in the current graph by its physical ID.
     pub fn resolve_node(&self, physical: PhysicalCellId) -> Option<GraphNodeIdx> {
         // Here we access the internal int of physical only inside the safe boundary
-        let key = physical.inner() as usize;
+        let key = physical.storage_key() as usize;
         self.cell_registry.cell_id_map().get(&key).copied()
     }
 

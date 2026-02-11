@@ -145,8 +145,8 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     #[must_use]
     fn resolve(
         assignment: &SingleAssignment,
-        needle_index: &subgraph::GraphIndex<'_>,
-        haystack_index: &subgraph::GraphIndex<'_>,
+        needle_index: &GraphIndex<'_>,
+        haystack_index: &GraphIndex<'_>,
     ) -> EntryArray {
         let schema = Self::netlist_schema();
         let mut entries = vec![ColumnEntry::Metadata { id: None }; schema.defs.len()];
@@ -164,7 +164,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = schema.index_of(name).expect(&err_msg);
+                    let col_idx = schema.index_of(&name).expect(&err_msg);
                     entries[col_idx] = ColumnEntry::cell(Some(haystack_physical));
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
@@ -173,9 +173,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::MODULE_NAME,
                         Self::FILE_PATH
                     );
-                    let col_idx = schema.index_of(name).expect(&err_msg);
+                    let col_idx = schema.index_of(&name).expect(&err_msg);
                     let needle_output_driver_id: u32 =
-                        value_to_cell_id(output_value).expect("Output should have driver");
+                        value_to_cell_id(&output_value).expect("Output should have driver");
                     let haystack_output_driver = assignment
                         .needle_mapping()
                         .iter()
@@ -183,7 +183,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                             needle_index
                                 .get_cell_by_index(**n_idx)
                                 .debug_index()
-                                .inner()
+                                .storage_key()
                                 == needle_output_driver_id
                         })
                         .map(|(_n_idx, h_idx)| h_idx)
@@ -206,7 +206,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
                             needle_debug_id,
-                            haystack_physical.inner()
+                            haystack_physical.storage_key()
                         );
                     }
                 }
@@ -281,7 +281,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             let source_loc = haystack_container.as_ref().and_then(|container| {
                 container
                     .index()
-                    .get_cell_by_id(haystack_cell_id.inner() as usize)
+                    .get_cell_by_id(haystack_cell_id.storage_key() as usize)
                     .and_then(|cell_wrapper| cell_wrapper.get_source())
             });
 

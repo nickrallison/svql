@@ -32,7 +32,8 @@ impl PhysicalCellId {
         Self { inner: id }
     }
 
-    pub(crate) const fn inner(&self) -> u32 {
+    /// Access for table packing logic.
+    pub fn storage_key(&self) -> u32 {
         self.inner
     }
 }
@@ -40,13 +41,6 @@ impl PhysicalCellId {
 impl fmt::Display for PhysicalCellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "p{}", self.inner)
-    }
-}
-
-impl From<u32> for PhysicalCellId {
-    #[inline]
-    fn from(id: u32) -> Self {
-        Self { inner: id }
     }
 }
 
@@ -87,7 +81,6 @@ impl GraphNodeIdx {
         Self { inner: id }
     }
 
-    #[inline]
     pub fn as_usize(self) -> usize {
         self.inner as usize
     }

@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use crate::{
     prelude::*,
     dsl::selector::Selector,
-    session::{execution::join_planner::ConnectivityCache, schema::SlotIdx},
+    session::execution::join_planner::ConnectivityCache,
 };
 
 
@@ -556,7 +556,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             if let Some(mut sub_node) = row
                 .sub_any(sub.name)
                 .and_then(|sub_ref| store.get_from_tid(sub.type_id).map(|t| (sub_ref, t)))
-                .and_then(|(sub_ref, table)| table.row_to_report_node(sub_ref.as_usize(), store, driver, key))
+                .and_then(|(sub_ref, table)| table.row_to_report_node(sub_ref as usize, store, driver, key))
             {
                 sub_node.name = sub.name.to_string();
                 children.push(sub_node);
@@ -598,7 +598,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
             vec![ColumnEntry::Metadata { id: None }; Self::SUBMODULES.len() + Self::ALIASES.len()];
-        entries[sub_indices[join_idx]] = ColumnEntry::Sub { id: Some(SlotIdx::new(row_idx)) };
+        entries[sub_indices[join_idx]] = ColumnEntry::Sub { id: Some(row_idx) };
         EntryArray::new(entries)
     }
 
@@ -710,7 +710,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         valid_new_rows.into_iter().filter_map(move |new_row_idx| {
             let mut candidate = partial_entry.clone();
             candidate.entries[col_idx] = ColumnEntry::Sub {
-                id: Some(SlotIdx::new(new_row_idx)),
+                id: Some(new_row_idx),
             };
 
             // Still need to validate (handles CNF OR groups, custom filters, etc.)
@@ -781,10 +781,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             if let Some(index) = connectivity_cache.get(from_sub, to_sub, *cnf_idx) {
                 let valid_candidates = if *is_new_sub_from {
                     // New submodule is source, existing is target
-                    index.sources(existing_row.inner())
+                    index.sources(existing_row)
                 } else {
                     // Existing is source, new submodule is target
-                    index.targets(existing_row.inner())
+                    index.targets(existing_row)
                 };
 
                 if let Some(candidates) = valid_candidates {

@@ -29,7 +29,6 @@
 use std::sync::OnceLock;
 
 use crate::prelude::*;
-use crate::session::schema::SlotIdx;
 
 /// Trait for recursive/tree-structured patterns.
 ///
@@ -581,13 +580,13 @@ mod tests {
                     let mut arr = EntryArray::with_capacity(schema.defs.len());
 
                     arr.entries[base_idx] = ColumnEntry::Sub {
-                        id: Some(SlotIdx::new(e.base_idx)),
+                        id: Some(e.base_idx),
                     };
                     arr.entries[left_idx] = ColumnEntry::Sub {
-                        id: e.left_child.map(SlotIdx::new),
+                        id: e.left_child,
                     };
                     arr.entries[right_idx] = ColumnEntry::Sub {
-                        id: e.right_child.map(SlotIdx::new),
+                        id: e.right_child,
                     };
                     arr.entries[y_idx] = ColumnEntry::Wire {
                         value: Some(crate::wire::WireRef::Cell(e.y)),

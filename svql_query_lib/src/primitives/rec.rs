@@ -2,7 +2,6 @@ use std::sync::OnceLock;
 
 use crate::primitives::gates::*;
 use svql_query::prelude::*;
-use svql_query::session::schema::SlotIdx;
 
 /// A node in a recursive AND tree.
 ///
@@ -206,10 +205,10 @@ impl Recursive for RecAnd {
             .map(|e| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
                 arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(SlotIdx::new(e.base_idx)),
+                    id: Some(e.base_idx),
                 };
-                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child.map(SlotIdx::new) };
-                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child.map(SlotIdx::new) };
+                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
+                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
@@ -432,10 +431,10 @@ impl Recursive for RecOr {
             .map(|e| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
                 arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(SlotIdx::new(e.base_idx)),
+                    id: Some(e.base_idx),
                 };
-                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child.map(SlotIdx::new) };
-                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child.map(SlotIdx::new) };
+                arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
+                arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
                 arr.entries[y_idx] = ColumnEntry::Wire {
                     value: e.y.cell_id().map(svql_common::WireRef::Cell),
                 };
