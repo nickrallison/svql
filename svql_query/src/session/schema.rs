@@ -380,49 +380,55 @@ impl PortMap {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ColumnEntry {
-    /// Wire reference (cell, primary port, or constant)
-    Wire { value: Option<WireRef> },
-    /// Submodule column: stores row index in the submodule's table
-    Sub { id: Option<u32> },
-    /// Metadata column: stores auxiliary data
-    Metadata { id: Option<PhysicalCellId> },
+    /// No value stored (replaces Option::None)
+    Null,
+    /// A wire reference (Cell, Primary Port, or Constant)
+    Wire(WireRef),
+    /// A reference to a row in another table
+    Sub(u32),
+    /// Opaque metadata (e.g. depth, flags)
+    Metadata(PhysicalCellId),
 }
 
 impl ColumnEntry {
-    #[must_use]
+    /// Helper to extract u32 for backward compatibility/sorting
     pub fn as_u32(&self) -> Option<u32> {
         match self {
-            Self::Wire { value } => value
-                .as_ref()
-                .and_then(|wr| wr.as_cell())
-                .map(|cid| cid.storage_key()),
-            Self::Sub { id } => *id,
-            Self::Metadata { id } => id.map(|p| p.storage_key()),
+            Self::Sub(idx) => Some(*idx),
+            Self::Metadata(id) => Some(id.storage_key()),
+            Self::Wire(WireRef::Cell(id)) => Some(id.storage_key()),
+            _ => None,
         }
     }
 
     /// Create a cell wire entry
     #[must_use]
-    pub fn cell(id: Option<PhysicalCellId>) -> Self {
-        Self::Wire {
-            value: id.map(WireRef::Cell),
-        }
+    pub fn cell(id: PhysicalCellId) -> Self {
+        Self::Wire(WireRef::Cell(id))
     }
 
     /// Create a primary port entry
     #[must_use]
     pub fn primary_port(name: Arc<str>) -> Self {
-        Self::Wire {
-            value: Some(WireRef::PrimaryPort(name)),
-        }
+        Self::Wire(WireRef::PrimaryPort(name))
     }
 
     /// Create a constant entry
     #[must_use]
     pub const fn constant(value: bool) -> Self {
-        Self::Wire {
-            value: Some(WireRef::Constant(value)),
-        }
+        Self::Wire(WireRef::Constant(value))
+    }
+
+    /// Create a submodule entry
+    #[must_use]
+    pub fn sub(id: u32) -> Self {
+        Self::Sub(id)
+    }
+
+    /// Create a metadata entry
+    #[must_use]
+    pub fn metadata(id: PhysicalCellId) -> Self {
+        Self::Metadata(id)
     }
 }
 
@@ -442,7 +448,7 @@ impl EntryArray {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            entries: vec![ColumnEntry::Metadata { id: None }; capacity],
+            entries: vec![ColumnEntry::Null; capacity],
         }
     }
     pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
@@ -461,11 +467,9 @@ impl EntryArray {
             .iter()
             .enumerate()
             .filter_map(|(col_idx, entry)| match entry {
-                ColumnEntry::Wire {
-                    value: Some(wire_ref),
-                } => wire_ref.as_cell().map(|cid| (col_idx, cid.storage_key())),
-                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, *id)),
-                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, id.storage_key())),
+                ColumnEntry::Wire(WireRef::Cell(cid)) => Some((col_idx, cid.storage_key())),
+                ColumnEntry::Sub(slot_idx) => Some((col_idx, *slot_idx)),
+                ColumnEntry::Metadata(id) => Some((col_idx, id.storage_key())),
                 _ => None,
             })
             .collect();

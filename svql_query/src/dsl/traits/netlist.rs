@@ -149,7 +149,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         haystack_index: &GraphIndex<'_>,
     ) -> EntryArray {
         let schema = Self::netlist_schema();
-        let mut entries = vec![ColumnEntry::Metadata { id: None }; schema.defs.len()];
+        let mut entries = vec![ColumnEntry::Null; schema.defs.len()];
 
         for (n_node, h_node) in assignment.needle_mapping() {
             let needle_wrapper = needle_index.get_cell_by_index(*n_node);
@@ -165,7 +165,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::FILE_PATH
                     );
                     let col_idx = schema.index_of(&name).expect(&err_msg);
-                    entries[col_idx] = ColumnEntry::cell(Some(haystack_physical));
+                    entries[col_idx] = ColumnEntry::cell(haystack_physical);
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
                     let err_msg = format!(
@@ -189,9 +189,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    entries[col_idx] = ColumnEntry::cell(Some(
+                    entries[col_idx] = ColumnEntry::cell(
                         haystack_index.resolve_physical(*haystack_output_driver),
-                    ));
+                    );
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one
@@ -199,9 +199,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     let col_name = format!("__internal_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
-                        entries[col_idx] = ColumnEntry::Metadata {
-                            id: Some(haystack_physical),
-                        };
+                        entries[col_idx] = ColumnEntry::Metadata(haystack_physical);
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
@@ -273,7 +271,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
             // Get the haystack cell ID from the row
             let haystack_cell_id = match row.entry_array().entries.get(idx) {
-                Some(ColumnEntry::Metadata { id: Some(id) }) => *id,
+                Some(ColumnEntry::Metadata(id)) => *id,
                 _ => continue,
             };
 

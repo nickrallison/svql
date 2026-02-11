@@ -579,21 +579,17 @@ mod tests {
                 .map(|e| {
                     let mut arr = EntryArray::with_capacity(schema.defs.len());
 
-                    arr.entries[base_idx] = ColumnEntry::Sub {
-                        id: Some(e.base_idx),
-                    };
-                    arr.entries[left_idx] = ColumnEntry::Sub {
-                        id: e.left_child,
-                    };
-                    arr.entries[right_idx] = ColumnEntry::Sub {
-                        id: e.right_child,
-                    };
-                    arr.entries[y_idx] = ColumnEntry::Wire {
-                        value: Some(crate::wire::WireRef::Cell(e.y)),
-                    };
-                    arr.entries[depth_idx] = ColumnEntry::Metadata {
-                        id: Some(PhysicalCellId::new(e.depth)),
-                    };
+                    arr.entries[base_idx] = ColumnEntry::Sub(e.base_idx);
+                    arr.entries[left_idx] = e
+                        .left_child
+                        .map(ColumnEntry::Sub)
+                        .unwrap_or(ColumnEntry::Null);
+                    arr.entries[right_idx] = e
+                        .right_child
+                        .map(ColumnEntry::Sub)
+                        .unwrap_or(ColumnEntry::Null);
+                    arr.entries[y_idx] = ColumnEntry::Wire(crate::wire::WireRef::Cell(e.y));
+                    arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
 
                     arr
                 })

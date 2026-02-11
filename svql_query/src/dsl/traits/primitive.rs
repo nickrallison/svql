@@ -160,7 +160,7 @@ pub fn resolve_primitive_ports(
     let schema_size = schema.defs.len();
 
     // Initialize all entries as None
-    let mut entries = vec![ColumnEntry::Wire { value: None }; schema_size];
+    let mut entries = vec![ColumnEntry::Null; schema_size];
 
     // For each column in the schema, try to extract the corresponding port value
     for (idx, col_def) in schema.defs.iter().enumerate() {
@@ -181,9 +181,7 @@ pub fn resolve_primitive_ports(
             }
         };
 
-        entries[idx] = ColumnEntry::Wire {
-            value: wire_ref_opt,
-        };
+        entries[idx] = wire_ref_opt.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
     }
 
     EntryArray::new(entries)

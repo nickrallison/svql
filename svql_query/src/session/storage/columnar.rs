@@ -1,20 +1,18 @@
-//! Simple columnar storage for u32 data.
+//! Simple columnar storage for ColumnEntry data.
 //!
 //! This replaces the polars DataFrame with a simpler implementation
-//! that's sufficient for our use case of storing u32 values.
+//! that's sufficient for our use case of storing ColumnEntry values.
 
 use crate::prelude::*;
 
-/// A simple columnar storage structure for u32 data.
+/// A simple columnar storage structure for ColumnEntry data.
 ///
-/// Stores data in column-major order, where each column is a Vec<Option<u32>>.
+/// Stores data in column-major order, where each column is a Vec<ColumnEntry>.
 #[derive(Debug, Clone)]
 pub struct ColumnStore {
-    /// Column data: column name -> Vec<Option<u32>>
-    columns: HashMap<String, Vec<Option<u32>>>,
-    /// Number of rows in the table
+    /// Column data: column name -> Vec of typed entries
+    columns: HashMap<String, Vec<ColumnEntry>>,
     num_rows: usize,
-    /// Column names in order (for iteration)
     column_names: Vec<String>,
 }
 
@@ -37,7 +35,7 @@ impl ColumnStore {
     /// All columns must have the same length.
     pub fn from_columns(
         column_names: Vec<String>,
-        data: Vec<Vec<Option<u32>>>,
+        data: Vec<Vec<ColumnEntry>>,
     ) -> Result<Self, String> {
         if column_names.len() != data.len() {
             return Err(format!(
@@ -80,12 +78,12 @@ impl ColumnStore {
     }
 
     /// Get a column by name.
-    pub fn column(&self, name: &str) -> Option<&Vec<Option<u32>>> {
+    pub fn column(&self, name: &str) -> Option<&Vec<ColumnEntry>> {
         self.columns.get(name)
     }
 
     /// Get a mutable reference to a column by name.
-    pub fn column_mut(&mut self, name: &str) -> Option<&mut Vec<Option<u32>>> {
+    pub fn column_mut(&mut self, name: &str) -> Option<&mut Vec<ColumnEntry>> {
         self.columns.get_mut(name)
     }
 
@@ -94,12 +92,24 @@ impl ColumnStore {
         &self.column_names
     }
 
+    /// Appends a full row of entries to the store
+    pub fn push_row(&mut self, row: EntryArray) {
+        for (name, entry) in self.column_names.iter().zip(row.entries.into_iter()) {
+            self.columns.get_mut(name).unwrap().push(entry);
+        }
+        self.num_rows += 1;
+    }
+
+    pub fn get_cell(&self, col_name: &str, row_idx: usize) -> &ColumnEntry {
+        &self.columns[col_name][row_idx]
+    }
+
     /// Deduplicate rows based on all columns.
     ///
     /// Keeps the first occurrence of each unique row.
     pub fn deduplicate(&self) -> Self {
         let mut seen = HashSet::new();
-        let mut new_columns: HashMap<String, Vec<Option<u32>>> = self
+        let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self
             .column_names
             .iter()
             .map(|name| (name.clone(), Vec::new()))
@@ -112,7 +122,7 @@ impl ColumnStore {
             let mut row_sig = Vec::with_capacity(self.column_names.len());
             for col_name in &self.column_names {
                 if let Some(col) = self.columns.get(col_name) {
-                    row_sig.push(col[row_idx]);
+                    row_sig.push(&col[row_idx]);
                 }
             }
 
@@ -120,7 +130,10 @@ impl ColumnStore {
                 // This row is unique, keep it
                 for col_name in &self.column_names {
                     if let Some(col) = self.columns.get(col_name) {
-                        new_columns.get_mut(col_name).unwrap().push(col[row_idx]);
+                        new_columns
+                            .get_mut(col_name)
+                            .unwrap()
+                            .push(col[row_idx].clone());
                     }
                 }
                 new_row_count += 1;
@@ -139,7 +152,7 @@ impl ColumnStore {
     /// Keeps the first occurrence of each unique row.
     pub fn deduplicate_subset(&self, subset: &[String]) -> Self {
         let mut seen = HashSet::new();
-        let mut new_columns: HashMap<String, Vec<Option<u32>>> = self
+        let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self
             .column_names
             .iter()
             .map(|name| (name.clone(), Vec::new()))
@@ -152,7 +165,7 @@ impl ColumnStore {
             let mut row_sig = Vec::with_capacity(subset.len());
             for col_name in subset {
                 if let Some(col) = self.columns.get(col_name) {
-                    row_sig.push(col[row_idx]);
+                    row_sig.push(&col[row_idx]);
                 }
             }
 
@@ -160,7 +173,10 @@ impl ColumnStore {
                 // This row is unique based on subset, keep it
                 for col_name in &self.column_names {
                     if let Some(col) = self.columns.get(col_name) {
-                        new_columns.get_mut(col_name).unwrap().push(col[row_idx]);
+                        new_columns
+                            .get_mut(col_name)
+                            .unwrap()
+                            .push(col[row_idx].clone());
                     }
                 }
                 new_row_count += 1;
@@ -202,9 +218,11 @@ impl std::fmt::Display for ColumnStore {
                 write!(f, "│ {row_idx:>3} │")?;
                 for col_name in &self.column_names {
                     if let Some(col) = self.columns.get(col_name) {
-                        match col[row_idx] {
-                            Some(val) => write!(f, " {val:>8} │")?,
-                            None => write!(f, "     null │")?,
+                        match &col[row_idx] {
+                            ColumnEntry::Null => write!(f, "     null │")?,
+                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
+                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
                     }
                 }
@@ -216,9 +234,11 @@ impl std::fmt::Display for ColumnStore {
                 write!(f, "│ {row_idx:>3} │")?;
                 for col_name in &self.column_names {
                     if let Some(col) = self.columns.get(col_name) {
-                        match col[row_idx] {
-                            Some(val) => write!(f, " {val:>8} │")?,
-                            None => write!(f, "     null │")?,
+                        match &col[row_idx] {
+                            ColumnEntry::Null => write!(f, "     null │")?,
+                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
+                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
                     }
                 }
@@ -238,9 +258,11 @@ impl std::fmt::Display for ColumnStore {
                 write!(f, "│ {row_idx:>3} │")?;
                 for col_name in &self.column_names {
                     if let Some(col) = self.columns.get(col_name) {
-                        match col[row_idx] {
-                            Some(val) => write!(f, " {val:>8} │")?,
-                            None => write!(f, "     null │")?,
+                        match &col[row_idx] {
+                            ColumnEntry::Null => write!(f, "     null │")?,
+                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
+                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
                     }
                 }

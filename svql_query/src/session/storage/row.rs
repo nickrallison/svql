@@ -68,26 +68,21 @@ where
         let idx = T::schema().index_of(name)?;
         let col_def = T::schema().column(idx);
 
-        self.entry_array
-            .entries
-            .get(idx)
-            .and_then(|entry| match entry {
-                crate::session::ColumnEntry::Wire { value } => value.clone(),
-                _ => None,
-            })
-            .map(|wire_ref| Wire::from_ref(wire_ref, col_def.direction))
+        match &self.entry_array.entries[idx] {
+            ColumnEntry::Wire(wire_ref) => {
+                Some(Wire::from_ref(wire_ref.clone(), col_def.direction))
+            }
+            _ => None,
+        }
     }
 
     /// Get a submodule reference by name (type-erased)
     pub fn sub_any(&self, name: &str) -> Option<u32> {
         let idx = T::schema().index_of(name)?;
-        self.entry_array
-            .entries
-            .get(idx)
-            .and_then(|entry| match entry {
-                ColumnEntry::Sub { id } => *id,
-                _ => None,
-            })
+        match &self.entry_array.entries[idx] {
+            ColumnEntry::Sub(slot_idx) => Some(*slot_idx),
+            _ => None,
+        }
     }
 
     /// Get all internal cell mappings from metadata columns.
@@ -150,9 +145,8 @@ where
         // Head must be a submodule reference
         let (sub_row_idx, sub_type_id) = match &col_def.kind {
             crate::session::ColumnKind::Sub(tid) => {
-                let entry = self.entry_array.entries.get(idx)?;
-                match entry {
-                    crate::session::ColumnEntry::Sub { id: Some(id) } => (*id, *tid),
+                match &self.entry_array.entries[idx] {
+                    ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
                     _ => return None,
                 }
             }
@@ -173,13 +167,11 @@ where
     #[must_use]
     pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
         let idx = T::schema().index_of(name)?;
-        self.entry_array
-            .entries
-            .get(idx)
-            .and_then(|entry| match entry {
-                crate::session::ColumnEntry::Sub { id: Some(id), .. } => Some(Ref::new(*id)),
-                _ => None,
-            })
+        
+        match &self.entry_array.entries[idx] {
+            ColumnEntry::Sub(slot_idx) => Some(Ref::new(*slot_idx)),
+            _ => None,
+        }
     }
 
     // --- Builder methods (used by Table when constructing rows) ---
@@ -193,9 +185,7 @@ where
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        self.entry_array.entries[id] = crate::session::ColumnEntry::Wire {
-            value: Some(wire_ref),
-        };
+        self.entry_array.entries[id] = crate::session::ColumnEntry::Wire(wire_ref);
         Ok(self)
     }
 
@@ -215,7 +205,10 @@ where
         let id = T::schema()
             .index_of(name)
             .expect("Schema LUT missing sub column");
-        self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx };
+        self.entry_array.entries[id] = match idx {
+            Some(idx) => ColumnEntry::Sub(idx),
+            None => ColumnEntry::Null,
+        };
         self
     }
 
@@ -308,22 +301,14 @@ where
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
-                Some(crate::session::ColumnEntry::Wire {
-                    value: Some(wire_ref),
-                }) => match wire_ref {
+                Some(ColumnEntry::Wire(wire_ref)) => match wire_ref {
                     crate::wire::WireRef::Cell(id) => format!("cell({id})"),
                     crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
                     crate::wire::WireRef::Constant(val) => format!("const({})", val),
                 },
-                Some(crate::session::ColumnEntry::Wire { value: None }) => "wire=NULL".to_string(),
-                Some(crate::session::ColumnEntry::Sub { id: Some(id) }) => {
-                    format!("ref({id})")
-                }
-                Some(crate::session::ColumnEntry::Sub { id: None }) => "ref=NULL".to_string(),
-                Some(crate::session::ColumnEntry::Metadata { id: Some(id) }) => {
-                    format!("meta({id})")
-                }
-                Some(crate::session::ColumnEntry::Metadata { id: None }) => "meta=NULL".to_string(),
+                Some(ColumnEntry::Sub(slot_idx)) => format!("ref({})", slot_idx),
+                Some(ColumnEntry::Metadata(id)) => format!("meta({id})"),
+                Some(ColumnEntry::Null) => "NULL".to_string(),
                 None => "MISSING".to_string(),
             };
 

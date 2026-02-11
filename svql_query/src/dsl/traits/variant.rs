@@ -96,16 +96,14 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
                 // Initialize all wire entries to None
                 for i in 0..(2 + Self::COMMON_PORTS.len()) {
-                    entry.entries[i] = ColumnEntry::Wire { value: None };
+                    entry.entries[i] = ColumnEntry::Null;
                 }
 
                 // 1. Set discriminant
-                entry.entries[discrim_idx] = ColumnEntry::Metadata {
-                    id: Some(PhysicalCellId::new(variant_idx as u32)),
-                };
+                entry.entries[discrim_idx] = ColumnEntry::Metadata(PhysicalCellId::new(variant_idx as u32));
 
                 // 2. Set inner_ref (row index in the variant arm's table)
-                entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(row_idx) };
+                entry.entries[inner_ref_idx] = ColumnEntry::Sub(row_idx);
 
                 // 3. Map common ports from inner table using path resolution
                 for mapping in port_maps {
@@ -113,7 +111,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                         let wire_ref = table
                             .resolve_path(row_idx as usize, mapping.inner, ctx)
                             .map(crate::wire::WireRef::Cell);
-                        entry.entries[col_idx] = ColumnEntry::Wire { value: wire_ref };
+                        entry.entries[col_idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 

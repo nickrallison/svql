@@ -52,26 +52,11 @@ where
             .map(|c| c.name.to_string())
             .collect();
 
-        if rows.is_empty() {
-            let store = ColumnStore::new(column_names);
-            return Ok(Self {
-                store,
-                _marker: PhantomData,
-            });
+        let mut store = ColumnStore::new(column_names);
+
+        for row in rows {
+            store.push_row(row);
         }
-
-        let schema_size = T::schema().defs.len();
-        let mut columns_data = Vec::with_capacity(schema_size);
-
-        // 1. Handle structural columns from the RowMatch array
-        for i in 0..schema_size {
-            let series_data: Vec<Option<u32>> =
-                rows.iter().map(|r| r.entries[i].as_u32()).collect();
-            columns_data.push(series_data);
-        }
-
-        let store = ColumnStore::from_columns(column_names, columns_data)
-            .map_err(QueryError::ExecutionError)?;
 
         Ok(Self {
             store,
@@ -119,22 +104,8 @@ where
         &mut self.store
     }
 
-    pub fn get_entry(&self, row_idx: usize, col_name: &str) -> Option<ColumnEntry> {
-        let col = self.store.column(col_name)?;
-        let idx = T::schema().index_of(col_name)?;
-        let val = col.get(row_idx).copied().flatten();
-
-        match T::schema().column(idx).kind {
-            ColumnKind::Cell => Some(ColumnEntry::Wire {
-                value: val
-                    .map(|v| PhysicalCellId::new(v as u32))
-                    .map(crate::wire::WireRef::Cell),
-            }),
-            ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
-            ColumnKind::Metadata => Some(ColumnEntry::Metadata {
-                id: val.map(PhysicalCellId::new),
-            }),
-        }
+    pub fn get_entry(&self, row_idx: usize, col_name: &str) -> ColumnEntry {
+        self.store.get_cell(col_name, row_idx).clone()
     }
 
     /// Get a single row by index.
@@ -148,9 +119,9 @@ where
 
         let mut row = Row::new(row_idx);
 
-        // Extract wire and sub columns
+        // Extract entries directly from the store
         for (idx, col) in T::schema().columns().iter().enumerate() {
-            row.entry_array.entries[idx] = self.get_entry(row_idx_usize, col.name)?;
+            row.entry_array.entries[idx] = self.get_entry(row_idx_usize, col.name);
         }
 
         Some(row)
@@ -195,10 +166,11 @@ where
             let mut record = Vec::with_capacity(self.store.column_names().len());
             for col_name in self.store.column_names() {
                 if let Some(col) = self.store.column(col_name) {
-                    if let Some(Some(value)) = col.get(row_idx) {
-                        record.push(value.to_string());
-                    } else {
-                        record.push(String::new()); // NULL as empty string
+                    match &col[row_idx] {
+                        ColumnEntry::Null => record.push(String::new()),
+                        ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
+                        ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
+                        ColumnEntry::Metadata(id) => record.push(format!("{id}")),
                     }
                 }
             }
@@ -234,10 +206,11 @@ where
                 let mut record = Vec::with_capacity(self.store.column_names().len());
                 for col_name in self.store.column_names() {
                     if let Some(col) = self.store.column(col_name) {
-                        if let Some(Some(value)) = col.get(row_idx) {
-                            record.push(value.to_string());
-                        } else {
-                            record.push(String::new()); // NULL as empty string
+                        match &col[row_idx] {
+                            ColumnEntry::Null => record.push(String::new()),
+                            ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
+                            ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
+                            ColumnEntry::Metadata(id) => record.push(format!("{id}")),
                         }
                     }
                 }
@@ -274,19 +247,10 @@ where
 impl<T> std::fmt::Display for Table<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let type_name = std::any::type_name::<T>();
-        writeln!(
-            f,
-            "\n╔══════════════════════════════════════════════════════════════════════════════"
-        )?;
-        writeln!(f, "║ Table: {type_name}  ")?;
-        writeln!(f, "║ Rows: {}", self.store.height())?;
-        writeln!(
-            f,
-            "╚══════════════════════════════════════════════════════════════════════════════"
-        )?;
-
+        writeln!(f, "\nTable: {}", type_name)?;
+        writeln!(f, "Rows: {}", self.store.height())?;
+        writeln!(f, "Columns: {}", self.store.column_names().len())?;
         write!(f, "{}", self.store)?;
-
         Ok(())
     }
 }
@@ -362,11 +326,10 @@ where
             return None;
         }
 
-        let col = self.store.column(col_name)?;
-        col.get(row_idx)
-            .copied()
-            .flatten()
-            .map(|v| PhysicalCellId::new(v as u32))
+        match self.store.get_cell(col_name, row_idx) {
+            ColumnEntry::Wire(WireRef::Cell(cid)) => Some(*cid),
+            _ => None,
+        }
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
@@ -389,10 +352,10 @@ where
         let col_def = T::schema().column(col_idx);
         let target_type = col_def.as_submodule()?;
 
-        let col = self.store.column(col_name)?;
-        let val = col.get(row_idx).copied().flatten()?;
-
-        Some((val, target_type))
+        match self.store.get_cell(col_name, row_idx) {
+            ColumnEntry::Sub(slot_idx) => Some((*slot_idx, target_type)),
+            _ => None,
+        }
     }
 
     fn resolve_path(
@@ -420,8 +383,10 @@ where
         let sub_type_id = col_def.as_submodule()?;
 
         // Get the submodule row index directly from the column
-        let col = self.store.column(head)?;
-        let sub_row_idx = col.get(row_idx).copied().flatten()?;
+        let sub_row_idx = match self.store.get_cell(head, row_idx) {
+            ColumnEntry::Sub(slot_idx) => *slot_idx,
+            _ => return None,
+        };
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;

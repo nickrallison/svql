@@ -507,8 +507,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         // Check if the submodule reference is populated
         match &row.entry_array.entries[col_idx] {
-            ColumnEntry::Sub { id: Some(_) } => true,  // Submodule is joined ✓
-            ColumnEntry::Sub { id: None } => false,    // Submodule not joined yet
+            ColumnEntry::Sub(_) => true,  // Submodule is joined ✓
+            ColumnEntry::Null => false,    // Submodule not joined yet
             _ => false,
         }
     }
@@ -597,8 +597,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
-            vec![ColumnEntry::Metadata { id: None }; Self::SUBMODULES.len() + Self::ALIASES.len()];
-        entries[sub_indices[join_idx]] = ColumnEntry::Sub { id: Some(row_idx) };
+            vec![ColumnEntry::Null; Self::SUBMODULES.len() + Self::ALIASES.len()];
+        entries[sub_indices[join_idx]] = ColumnEntry::Sub(row_idx);
         EntryArray::new(entries)
     }
 
@@ -709,9 +709,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Only enumerate the valid candidates
         valid_new_rows.into_iter().filter_map(move |new_row_idx| {
             let mut candidate = partial_entry.clone();
-            candidate.entries[col_idx] = ColumnEntry::Sub {
-                id: Some(new_row_idx),
-            };
+            candidate.entries[col_idx] = ColumnEntry::Sub(new_row_idx);
 
             // Still need to validate (handles CNF OR groups, custom filters, etc.)
             let row = Row::<Self> {
@@ -766,7 +764,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             // Get the row index of the already-joined submodule
             let existing_col_idx = sub_indices[*existing_sub_idx];
             let existing_row = match partial_entry.entries[existing_col_idx] {
-                ColumnEntry::Sub { id: Some(row_idx) } => row_idx,
+                ColumnEntry::Sub(slot_idx) => slot_idx,
                 _ => continue,
             };
 
@@ -838,7 +836,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                             .map(crate::wire::WireRef::Cell);
 
                         if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
-                            entry.entries[idx] = ColumnEntry::Wire { value: wire_ref };
+                            entry.entries[idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                         }
                     }
 
@@ -865,7 +863,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                         .map(crate::wire::WireRef::Cell);
 
                     if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
-                        entry.entries[idx] = ColumnEntry::Wire { value: wire_ref };
+                        entry.entries[idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 

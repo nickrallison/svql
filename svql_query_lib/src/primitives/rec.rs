@@ -225,27 +225,19 @@ impl Recursive for RecAnd {
             .enumerate()
             .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-                arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(entry_index as u32),
-                };
-                arr.entries[left_idx] = ColumnEntry::Sub {
-                    id: e
-                        .left_child
-                        .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| idx as u32),
-                };
-                arr.entries[right_idx] = ColumnEntry::Sub {
-                    id: e
-                        .right_child
-                        .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| idx as u32),
-                };
-                arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: e.y.cell_id().map(svql_common::WireRef::Cell),
-                };
-                arr.entries[depth_idx] = ColumnEntry::Metadata {
-                    id: Some(PhysicalCellId::new(e.depth)),
-                };
+                arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                arr.entries[left_idx] = e
+                    .left_child
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .unwrap_or(ColumnEntry::Null);
+                arr.entries[right_idx] = e
+                    .right_child
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 arr
             })
             .collect();
@@ -484,27 +476,19 @@ impl Recursive for RecOr {
             .enumerate()
             .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-                arr.entries[base_idx] = ColumnEntry::Sub {
-                    id: Some(entry_index as u32),
-                };
-                arr.entries[left_idx] = ColumnEntry::Sub {
-                    id: e
-                        .left_child
-                        .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| idx as u32),
-                };
-                arr.entries[right_idx] = ColumnEntry::Sub {
-                    id: e
-                        .right_child
-                        .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| idx as u32),
-                };
-                arr.entries[y_idx] = ColumnEntry::Wire {
-                    value: e.y.cell_id().map(svql_common::WireRef::Cell),
-                };
-                arr.entries[depth_idx] = ColumnEntry::Metadata {
-                    id: Some(PhysicalCellId::new(e.depth)),
-                };
+                arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                arr.entries[left_idx] = e
+                    .left_child
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .unwrap_or(ColumnEntry::Null);
+                arr.entries[right_idx] = e
+                    .right_child
+                    .and_then(|node| node_to_entry.get(&node))
+                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 arr
             })
             .collect();
