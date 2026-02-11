@@ -1,7 +1,8 @@
 //! Cell definitions, wrappers, and type-safe identifiers for SVQL.
 //!
 //! This module provides the core cell types used across the SVQL project:
-//! - [`CellId`]: A lightweight index wrapper for cells within a graph.
+//! - [`PhysicalCellId`]: Persistent ID from the netlist source (e.g., debug_index from prjunnamed).
+//! - [`GraphNodeIdx`]: Local identifier within a specific GraphIndex array.
 //! - [`CellKind`]: Categorization of netlist primitives.
 //! - [`CellInfo`]: Metadata about a cell (id, kind, source location).
 //! - [`CellWrapper`]: A wrapper around a netlist cell with stable identity.
@@ -16,126 +17,101 @@ use std::sync::Arc;
 use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
 // ---------------------------------------------------------------------------
-// CellId
+// PhysicalCellId
 // ---------------------------------------------------------------------------
 
-/// A lightweight index wrapper for cells within a graph.
-///
-/// Wraps a `usize` to provide type safety so cell indices aren't confused
-/// with other numeric values.
+/// Persistent ID from the netlist source (e.g., debug_index from prjunnamed).
+/// This is used for storage in Tables and cross-referencing between queries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct CellId {
-    idx: usize,
-}
+pub struct PhysicalCellId(u32);
 
-impl CellId {
-    /// Creates a new `CellId` from a raw usize.
-    #[inline]
-    #[must_use]
-    pub const fn new(idx: usize) -> Self {
-        Self { idx }
+impl PhysicalCellId {
+    pub const fn new(id: u32) -> Self {
+        Self(id)
     }
 
-    /// Returns the raw index value.
-    #[inline]
-    #[must_use]
-    pub const fn index(&self) -> usize {
-        self.idx
-    }
-
-    /// Convert to u64 for compatibility with existing code.
-    #[inline]
-    #[must_use]
-    pub const fn as_u64(self) -> u64 {
-        self.idx as u64
-    }
-
-    /// Convert to usize for vector/slice indexing.
-    #[inline]
-    #[must_use]
-    pub const fn as_usize(self) -> usize {
-        self.idx
-    }
-
-    /// Create from u64.
-    #[inline]
-    #[must_use]
-    pub fn from_u64(id: u64) -> Self {
-        Self { idx: id as usize }
-    }
-
-    /// Create from usize.
-    #[inline]
-    #[must_use]
-    pub const fn from_usize(id: usize) -> Self {
-        Self { idx: id }
-    }
-
-    /// Get the raw u32 value (panics if > `u32::MAX` in debug builds).
-    #[inline]
-    #[must_use]
-    pub fn raw(self) -> u32 {
-        debug_assert!(
-            u32::try_from(self.idx).is_ok(),
-            "CellId overflow: {} > u32::MAX",
-            self.idx
-        );
-        self.idx as u32
+    pub const fn raw(self) -> u32 {
+        self.0
     }
 }
 
-impl fmt::Display for CellId {
+impl fmt::Display for PhysicalCellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "c{}", self.idx)
+        write!(f, "p{}", self.0)
     }
 }
 
-impl From<usize> for CellId {
-    #[inline]
-    fn from(idx: usize) -> Self {
-        Self { idx }
-    }
-}
-
-impl From<CellId> for usize {
-    #[inline]
-    fn from(id: CellId) -> Self {
-        id.idx
-    }
-}
-
-impl From<u32> for CellId {
+impl From<u32> for PhysicalCellId {
     #[inline]
     fn from(id: u32) -> Self {
-        Self { idx: id as usize }
+        Self(id)
     }
 }
 
-impl From<CellId> for u32 {
+impl From<PhysicalCellId> for u32 {
     #[inline]
-    fn from(id: CellId) -> Self {
-        id.idx as Self
+    fn from(id: PhysicalCellId) -> Self {
+        id.0
     }
 }
 
-impl From<CellId> for u64 {
+impl From<PhysicalCellId> for u64 {
     #[inline]
-    fn from(id: CellId) -> Self {
-        id.idx as Self
+    fn from(id: PhysicalCellId) -> Self {
+        id.0 as Self
     }
 }
 
-impl From<CellId> for i64 {
+impl From<PhysicalCellId> for i64 {
     #[inline]
-    fn from(id: CellId) -> Self {
-        id.idx as Self
+    fn from(id: PhysicalCellId) -> Self {
+        id.0 as Self
     }
 }
 
-impl Default for CellId {
+// ---------------------------------------------------------------------------
+// GraphNodeIdx
+// ---------------------------------------------------------------------------
+
+/// Local identifier within a specific GraphIndex array.
+/// Exclusively used inside the subgraph solver for performance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GraphNodeIdx(u32);
+
+impl GraphNodeIdx {
+    pub const fn new(id: u32) -> Self {
+        Self(id)
+    }
+
+    pub const fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl fmt::Display for GraphNodeIdx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "n{}", self.0)
+    }
+}
+
+impl From<usize> for GraphNodeIdx {
     #[inline]
-    fn default() -> Self {
-        Self { idx: 0 }
+    fn from(id: usize) -> Self {
+        Self(id as u32)
+    }
+}
+
+impl From<GraphNodeIdx> for usize {
+    #[inline]
+    fn from(id: GraphNodeIdx) -> Self {
+        id.0 as Self
+    }
+}
+
+impl From<GraphNodeIdx> for u32 {
+    #[inline]
+    fn from(id: GraphNodeIdx) -> Self {
+        id.0
     }
 }
 
@@ -335,7 +311,7 @@ impl SourceLine {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CellInfo {
     /// Unique identifier (`debug_index`) to allow equality checks
-    pub id: usize,
+    pub id: PhysicalCellId,
     /// The type of cell (AND, OR, DFF, etc.)
     pub kind: CellKind,
     /// Source code location
@@ -358,7 +334,7 @@ impl CellInfo {
 #[derive(Clone)]
 pub struct CellWrapper<'a> {
     cell: Cow<'a, Cell>,
-    debug_index: usize,
+    debug_index: PhysicalCellId,
     metadata: MetaItemRef<'a>,
 }
 
@@ -401,7 +377,7 @@ impl<'a> CellWrapper<'a> {
 
     /// Returns the unique debug index assigned by the netlist parser.
     #[must_use]
-    pub const fn debug_index(&self) -> usize {
+    pub const fn debug_index(&self) -> PhysicalCellId {
         self.debug_index
     }
 
@@ -488,7 +464,7 @@ impl<'a> From<CellRef<'a>> for CellWrapper<'a> {
     fn from(val: CellRef<'a>) -> Self {
         CellWrapper {
             cell: val.get(),
-            debug_index: val.debug_index(),
+            debug_index: PhysicalCellId::new(val.debug_index() as u32),
             metadata: val.metadata(),
         }
     }

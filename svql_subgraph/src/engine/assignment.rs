@@ -39,8 +39,8 @@ pub struct SingleAssignment {
 impl SingleAssignment {
     pub(super) fn new() -> Self {
         Self {
-            needle_to_haystack: HashMap::new(),
-            haystack_to_needle: HashMap::new(),
+            needle_to_haystack: HashMap::default(),
+            haystack_to_needle: HashMap::default(),
         }
     }
 
@@ -105,7 +105,7 @@ impl SingleAssignment {
         let mut sig: Vec<usize> = self
             .needle_to_haystack
             .values()
-            .map(|idx| idx.index())
+            .map(|idx| idx.as_usize())
             .collect();
         sig.sort_unstable();
         sig.dedup();
@@ -126,7 +126,7 @@ impl SingleAssignment {
                 let kind = needle_index.get_cell_by_index(**needle_idx).cell_type();
                 !matches!(kind, CellKind::Input | CellKind::Output)
             })
-            .map(|(_, haystack_idx)| haystack_idx.index())
+            .map(|(_, haystack_idx)| haystack_idx.as_usize())
             .collect();
         sig.sort_unstable();
 

@@ -14,8 +14,8 @@ impl IoMapping {
     #[must_use]
     pub fn build(
         cell_refs_topo: &[CellRef<'_>],
-        fanin_map: &HashMap<CellId, Vec<(CellId, usize)>>,
-        fanout_map: &HashMap<CellId, Vec<(CellId, usize)>>,
+        fanin_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
+        fanout_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
     ) -> Self {
         let input_fanout_by_name = Self::build_input_fanout_by_name(cell_refs_topo, fanout_map);
         let output_fanin_by_name = Self::build_output_fanin_by_name(cell_refs_topo, fanin_map);
@@ -28,12 +28,12 @@ impl IoMapping {
 
     fn build_input_fanout_by_name(
         cell_refs_topo: &[CellRef<'_>],
-        fanout_map: &HashMap<CellId, Vec<(CellId, usize)>>,
-    ) -> HashMap<String, Vec<(CellId, usize)>> {
+        fanout_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
+    ) -> HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         fanout_map
             .iter()
             .filter_map(|(cell_index, fanout_list)| {
-                if let Cell::Input(name, _) = cell_refs_topo[cell_index.index()].get().as_ref() {
+                if let Cell::Input(name, _) = cell_refs_topo[cell_index.as_usize()].get().as_ref() {
                     Some((name.clone(), fanout_list.clone()))
                 } else {
                     None
@@ -44,12 +44,12 @@ impl IoMapping {
 
     fn build_output_fanin_by_name(
         cell_refs_topo: &[CellRef<'_>],
-        fanin_map: &HashMap<CellId, Vec<(CellId, usize)>>,
-    ) -> HashMap<String, Vec<(CellId, usize)>> {
+        fanin_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
+    ) -> HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         fanin_map
             .iter()
             .filter_map(|(cell_index, fanin_list)| {
-                if let Cell::Output(name, _) = cell_refs_topo[cell_index.index()].get().as_ref() {
+                if let Cell::Output(name, _) = cell_refs_topo[cell_index.as_usize()].get().as_ref() {
                     Some((name.clone(), fanin_list.clone()))
                 } else {
                     None
@@ -59,12 +59,12 @@ impl IoMapping {
     }
 
     #[must_use]
-    pub const fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(CellId, usize)>> {
+    pub const fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         &self.input_fanout_by_name
     }
 
     #[must_use]
-    pub const fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(CellId, usize)>> {
+    pub const fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         &self.output_fanin_by_name
     }
 }

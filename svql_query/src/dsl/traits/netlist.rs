@@ -167,7 +167,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::FILE_PATH
                     );
                     let col_idx = schema.index_of(name).expect(&err_msg);
-                    row_match[col_idx] = Some(haystack_debug_index as u32);
+                    row_match[col_idx] = Some(haystack_debug_index.raw());
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
                     let err_msg = format!(
@@ -182,7 +182,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .needle_mapping()
                         .iter()
                         .find(|(n_idx, _h_idx)| {
-                            needle_index.get_cell_by_index(**n_idx).debug_index() as u32
+                            needle_index.get_cell_by_index(**n_idx).debug_index().raw()
                                 == needle_output_driver_id
                         })
                         .map(|(_n_idx, h_idx)| h_idx)
@@ -191,21 +191,22 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     row_match[col_idx] = Some(
                         haystack_index
                             .get_cell_by_index(*haystack_output_driver)
-                            .debug_index() as u32,
+                            .debug_index()
+                            .raw(),
                     );
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one
-                    let needle_debug_id = needle_cell_wrapper.debug_index();
+                    let needle_debug_id = needle_cell_wrapper.debug_index().raw();
                     let col_name = format!("__internal_cell_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
-                        row_match[col_idx] = Some(haystack_debug_index as u32);
+                        row_match[col_idx] = Some(haystack_debug_index.raw());
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
                             needle_debug_id,
-                            haystack_debug_index
+                            haystack_debug_index.raw()
                         );
                     }
                 }
@@ -221,7 +222,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                 match col_def.kind {
                     ColumnKind::Cell => ColumnEntry::Wire {
                         value: opt
-                            .map(|v| CellId::new(v as usize))
+                            .map(PhysicalCellId::new)
                             .map(crate::wire::WireRef::Cell),
                     },
                     ColumnKind::Metadata => ColumnEntry::Metadata { id: opt },

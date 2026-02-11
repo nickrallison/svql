@@ -220,4 +220,18 @@ impl Driver {
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
         self.registry.read().unwrap().clone()
     }
+
+    /// Retrieves source location logic using the stable PhysicalCellId.
+    pub fn get_cell_source(
+        &self,
+        key: &DriverKey,
+        physical: PhysicalCellId,
+    ) -> Option<SourceLocation> {
+        let registry = self.registry.read().ok()?;
+        let container = registry.get(key)?;
+        
+        // Translate physical back to local node to reach the cell wrapper
+        let node = container.index().resolve_node(physical)?;
+        container.index().get_cell_by_index(node).get_source()
+    }
 }

@@ -2,4 +2,4 @@
 //!
 //! All types are defined in [`svql_common::cell`] and re-exported here.
 
-pub use svql_common::cell::{CellId, CellInfo, CellKind, CellWrapper, SourceLine, SourceLocation};
+pub use svql_common::cell::{GraphNodeIdx as CellId, CellInfo, CellKind, CellWrapper, SourceLine, SourceLocation};

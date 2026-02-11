@@ -7,8 +7,8 @@ use std::sync::Arc;
 /// or a constant value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WireRef {
-    /// Wire driven by a cell output
-    Cell(CellId),
+    /// Reference via the stable physical ID
+    Cell(PhysicalCellId),
     /// Primary input/output port (module boundary)
     PrimaryPort(Arc<str>),
     /// Constant value (0 or 1)
@@ -34,7 +34,7 @@ impl WireRef {
 
     /// Get the cell ID if this is a cell reference
     #[must_use]
-    pub const fn as_cell(&self) -> Option<CellId> {
+    pub const fn as_cell(&self) -> Option<PhysicalCellId> {
         match self {
             Self::Cell(id) => Some(*id),
             _ => None,
@@ -50,7 +50,7 @@ impl WireRef {
 pub enum Wire {
     /// Cell-driven wire
     Cell {
-        id: CellId,
+        id: PhysicalCellId,
         direction: PortDirection,
     },
     /// Primary port at module boundary
@@ -65,7 +65,7 @@ pub enum Wire {
 impl Wire {
     /// Create a Wire from a cell ID and direction
     #[must_use]
-    pub const fn new(id: CellId, direction: PortDirection) -> Self {
+    pub const fn new(id: PhysicalCellId, direction: PortDirection) -> Self {
         Self::Cell { id, direction }
     }
 
@@ -77,7 +77,7 @@ impl Wire {
 
     /// Get the cell ID if this is a cell-driven wire
     #[must_use]
-    pub const fn cell_id(&self) -> Option<CellId> {
+    pub const fn cell_id(&self) -> Option<PhysicalCellId> {
         match self {
             Self::Cell { id, .. } => Some(*id),
             _ => None,
@@ -115,7 +115,7 @@ impl Wire {
     /// Use `cell_id()` for safe access.
     #[must_use]
     #[deprecated(note = "Use cell_id() instead")]
-    pub fn id(&self) -> CellId {
+    pub fn id(&self) -> PhysicalCellId {
         self.cell_id().expect("Wire is not a cell reference")
     }
 
@@ -123,9 +123,9 @@ impl Wire {
     /// Panics if not a cell reference.
     #[must_use]
     #[deprecated(note = "Use cell_id() instead")]
+    #[allow(deprecated)]
     pub fn as_u64(&self) -> u64 {
-        #[allow(deprecated)]
-        self.id().as_u64()
+        self.id().raw() as u64
     }
 }
 

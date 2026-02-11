@@ -147,9 +147,9 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     fn match_gate_cells(
         &self,
         assignment: SingleAssignment,
-        mut gate_queue: VecDeque<CellId>,
-        input_queue: VecDeque<CellId>,
-        output_queue: VecDeque<CellId>,
+        mut gate_queue: VecDeque<GraphNodeIdx>,
+        input_queue: VecDeque<GraphNodeIdx>,
+        output_queue: VecDeque<GraphNodeIdx>,
     ) -> Vec<SingleAssignment> {
         let total = self.branches_explored.fetch_add(1, Ordering::Relaxed);
         let is_root = assignment.is_empty();
@@ -245,8 +245,8 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     fn match_input_cells(
         &self,
         assignment: SingleAssignment,
-        mut input_queue: VecDeque<CellId>,
-        output_queue: VecDeque<CellId>,
+        mut input_queue: VecDeque<GraphNodeIdx>,
+        output_queue: VecDeque<GraphNodeIdx>,
     ) -> Vec<SingleAssignment> {
         let Some(current_needle) = input_queue.pop_front() else {
             return self.match_output_cells(assignment, output_queue);
@@ -290,7 +290,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     fn match_output_cells(
         &self,
         assignment: SingleAssignment,
-        mut output_queue: VecDeque<CellId>,
+        mut output_queue: VecDeque<GraphNodeIdx>,
     ) -> Vec<SingleAssignment> {
         let Some(current_needle) = output_queue.pop_front() else {
             self.matches_found.fetch_add(1, Ordering::Relaxed);
@@ -331,15 +331,15 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     /// Output cells in the pattern can match any logic gate in the haystack.
     fn find_candidates_for_output(
         &self,
-        needle_output: CellId,
+        needle_output: GraphNodeIdx,
         assignment: &SingleAssignment,
-    ) -> Vec<CellId> {
+    ) -> Vec<GraphNodeIdx> {
         let needle_fanin = self
             .needle_index
             .fanin_with_ports(needle_output)
             .unwrap_or_default();
 
-        let mapped_haystack_fanin: Vec<CellId> = needle_fanin
+        let mapped_haystack_fanin: Vec<GraphNodeIdx> = needle_fanin
             .iter()
             .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(*needle_pred))
             .collect();
@@ -347,7 +347,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
         if mapped_haystack_fanin.is_empty() {
             // If no fanin is mapped yet, allow matching to any logic gate
             return (0..self.haystack_index.num_cells())
-                .map(CellId::new)
+                .map(|i| GraphNodeIdx::new(i as u32))
                 .filter(|&idx| {
                     self.haystack_index
                         .get_cell_by_index(idx)
@@ -358,7 +358,7 @@ impl SubgraphMatcherCore<'_, '_, '_> {
                 .collect();
         }
 
-        let mut result: Option<HashSet<CellId>> = None;
+        let mut result: Option<HashSet<GraphNodeIdx>> = None;
         for haystack_pred in &mapped_haystack_fanin {
             let fanout = self.haystack_index.fanout_set(*haystack_pred);
             match &mut result {
@@ -378,16 +378,16 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     fn prepare_search_queues(
         &self,
     ) -> (
-        VecDeque<CellId>,
-        VecDeque<CellId>,
-        VecDeque<CellId>,
+        VecDeque<GraphNodeIdx>,
+        VecDeque<GraphNodeIdx>,
+        VecDeque<GraphNodeIdx>,
     ) {
         let mut inputs = VecDeque::new();
         let mut gates = VecDeque::new();
         let mut outputs = VecDeque::new();
 
         for i in (0..self.needle_index.num_cells()).rev() {
-            let idx = CellId::new(i);
+            let idx = GraphNodeIdx::new(i as u32);
             let cell = self.needle_index.get_cell_by_index(idx);
             match cell.cell_type() {
                 CellKind::Output => outputs.push_back(idx),
@@ -402,24 +402,24 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     /// Filters haystack cells based on type and fan-in constraints.
     fn find_candidates_for_cell(
         &self,
-        needle_cell: CellId,
+        needle_cell: GraphNodeIdx,
         assignment: &SingleAssignment,
-    ) -> Vec<CellId> {
+    ) -> Vec<GraphNodeIdx> {
         let kind = self.needle_index.get_cell_by_index(needle_cell).cell_type();
         let needle_fanin = self
             .needle_index
             .fanin_with_ports(needle_cell)
             .unwrap_or_default();
 
-        let mapped_haystack_fanin: Vec<CellId> = needle_fanin
+        let mapped_haystack_fanin: Vec<GraphNodeIdx> = needle_fanin
             .iter()
             .filter_map(|(needle_pred, _)| assignment.get_haystack_cell(*needle_pred))
             .collect();
 
-        let unfiltered: Vec<CellId> = if mapped_haystack_fanin.is_empty() {
+        let unfiltered: Vec<GraphNodeIdx> = if mapped_haystack_fanin.is_empty() {
             self.haystack_index.cells_of_type_indices(kind).to_vec()
         } else {
-            let mut result: Option<HashSet<CellId>> = None;
+            let mut result: Option<HashSet<GraphNodeIdx>> = None;
             for haystack_pred in &mapped_haystack_fanin {
                 let fanout = self.haystack_index.fanout_set(*haystack_pred);
                 match &mut result {
@@ -446,20 +446,20 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     /// Filters haystack cells for input ports based on fan-out connectivity.
     fn find_candidates_for_input(
         &self,
-        needle_input: CellId,
+        needle_input: GraphNodeIdx,
         assignment: &SingleAssignment,
-    ) -> Vec<CellId> {
+    ) -> Vec<GraphNodeIdx> {
         let needle_fanout = self
             .needle_index
             .fanout_with_ports(needle_input)
             .unwrap_or_default();
 
-        let mapped_haystack_fanout: Vec<CellId> = needle_fanout
+        let mapped_haystack_fanout: Vec<GraphNodeIdx> = needle_fanout
             .iter()
             .filter_map(|(needle_succ, _)| assignment.get_haystack_cell(*needle_succ))
             .collect();
 
-        let mut intersection: Option<HashSet<CellId>> = None;
+        let mut intersection: Option<HashSet<GraphNodeIdx>> = None;
         for haystack_succ in &mapped_haystack_fanout {
             let fanin = self.haystack_index.fanin_set(*haystack_succ);
             match &mut intersection {
