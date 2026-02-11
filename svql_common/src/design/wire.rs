@@ -125,7 +125,7 @@ impl Wire {
     #[deprecated(note = "Use cell_id() instead")]
     #[allow(deprecated)]
     pub fn as_u64(&self) -> u64 {
-        self.id().raw() as u64
+        u64::from(self.id())
     }
 }
 

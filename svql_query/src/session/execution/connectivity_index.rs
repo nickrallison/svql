@@ -46,7 +46,7 @@ impl BipartiteIndex {
 
                 // Check physical connectivity
                 match (&a_cell, &b_cell) {
-                    (Some(src), Some(dst)) if src.as_u64() == dst.as_u64() => {
+                    (Some(src), Some(dst)) if u64::from(*src) == u64::from(*dst) => {
                         forward.entry(a_idx).or_default().insert(b_idx);
                         reverse.entry(b_idx).or_default().insert(a_idx);
                         edge_count += 1;

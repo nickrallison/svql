@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 
 use super::columnar::ColumnStore;
 use crate::prelude::*;
+use crate::session::schema::SlotIdx;
 
 /// A typed wrapper around a columnar store for pattern match results.
 ///
@@ -130,8 +131,8 @@ where
                     .map(|v| PhysicalCellId::new(v as u32))
                     .map(crate::wire::WireRef::Cell),
             }),
-            ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
-            ColumnKind::Metadata => Some(ColumnEntry::Metadata { id: val }),
+            ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val.map(SlotIdx::new) }),
+            ColumnKind::Metadata => Some(ColumnEntry::Metadata { id: val.map(PhysicalCellId::new) }),
         }
     }
 

@@ -4,6 +4,7 @@
 //! wire references, submodule references, and metadata columns.
 
 use std::any::TypeId;
+use std::fmt;
 use std::sync::Arc;
 
 use crate::prelude::*;
@@ -377,23 +378,49 @@ impl PortMap {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SlotIdx(u32);
+
+impl SlotIdx {
+    pub const fn new(idx: u32) -> Self {
+        Self(idx)
+    }
+
+    pub(crate) const fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    pub(crate) const fn inner(&self) -> u32 {
+        self.0
+    }
+}
+
+impl fmt::Display for SlotIdx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "r{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ColumnEntry {
     /// Wire reference (cell, primary port, or constant)
     Wire { value: Option<WireRef> },
     /// Submodule column: stores row index in the submodule's table
-    Sub { id: Option<u32> },
+    Sub { id: Option<SlotIdx> },
     /// Metadata column: stores auxiliary data
-    Metadata { id: Option<u32> },
+    Metadata { id: Option<PhysicalCellId> },
 }
 
 impl ColumnEntry {
     #[must_use]
     pub fn as_u32(&self) -> Option<u32> {
         match self {
-            Self::Wire { value } => value.as_ref().and_then(|wr| wr.as_cell()).map(|cid| cid.raw()),
-            Self::Sub { id } => *id,
-            Self::Metadata { id } => *id,
+            Self::Wire { value } => value
+                .as_ref()
+                .and_then(|wr| wr.as_cell())
+                .map(|cid| cid.into()),
+            Self::Sub { id } => id.map(|s| s.0),
+            Self::Metadata { id } => id.map(|p| p.into()),
         }
     }
 
@@ -459,9 +486,9 @@ impl EntryArray {
             .filter_map(|(col_idx, entry)| match entry {
                 ColumnEntry::Wire {
                     value: Some(wire_ref),
-                } => wire_ref.as_cell().map(|cid| (col_idx, cid.raw())),
-                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, *id)),
-                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, *id)),
+                } => wire_ref.as_cell().map(|cid| (col_idx, cid.inner())),
+                ColumnEntry::Sub { id: Some(id) } => Some((col_idx, id.inner())),
+                ColumnEntry::Metadata { id: Some(id) } => Some((col_idx, id.inner())),
                 _ => None,
             })
             .collect();

@@ -23,56 +23,51 @@ use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 /// Persistent ID from the netlist source (e.g., debug_index from prjunnamed).
 /// This is used for storage in Tables and cross-referencing between queries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct PhysicalCellId(u32);
+pub struct PhysicalCellId {
+    inner: u32,
+}
 
 impl PhysicalCellId {
     pub const fn new(id: u32) -> Self {
-        Self(id)
+        Self { inner: id }
     }
 
-    pub const fn raw(self) -> u32 {
-        self.0
-    }
-
-    /// Convert to u64 for compatibility with existing code.
-    #[inline]
-    #[must_use]
-    pub const fn as_u64(self) -> u64 {
-        self.0 as u64
+    pub const fn inner(&self) -> u32 {
+        self.inner
     }
 }
 
 impl fmt::Display for PhysicalCellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "p{}", self.0)
+        write!(f, "p{}", self.inner)
     }
 }
 
 impl From<u32> for PhysicalCellId {
     #[inline]
     fn from(id: u32) -> Self {
-        Self(id)
+        Self { inner: id }
     }
 }
 
 impl From<PhysicalCellId> for u32 {
     #[inline]
     fn from(id: PhysicalCellId) -> Self {
-        id.0
+        id.inner
     }
 }
 
 impl From<PhysicalCellId> for u64 {
     #[inline]
     fn from(id: PhysicalCellId) -> Self {
-        id.0 as Self
+        id.inner as Self
     }
 }
 
 impl From<PhysicalCellId> for i64 {
     #[inline]
     fn from(id: PhysicalCellId) -> Self {
-        id.0 as Self
+        id.inner as Self
     }
 }
 
@@ -83,42 +78,45 @@ impl From<PhysicalCellId> for i64 {
 /// Local identifier within a specific GraphIndex array.
 /// Exclusively used inside the subgraph solver for performance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct GraphNodeIdx(u32);
+pub struct GraphNodeIdx {
+    inner: u32,
+}
 
 impl GraphNodeIdx {
     pub const fn new(id: u32) -> Self {
-        Self(id)
+        Self { inner: id }
     }
 
-    pub const fn as_usize(self) -> usize {
-        self.0 as usize
+    #[inline]
+    pub fn as_usize(self) -> usize {
+        self.inner as usize
     }
 }
 
 impl fmt::Display for GraphNodeIdx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "n{}", self.0)
+        write!(f, "n{}", self.inner)
     }
 }
 
 impl From<usize> for GraphNodeIdx {
     #[inline]
     fn from(id: usize) -> Self {
-        Self(id as u32)
+        Self { inner: id as u32 }
     }
 }
 
 impl From<GraphNodeIdx> for usize {
     #[inline]
     fn from(id: GraphNodeIdx) -> Self {
-        id.0 as Self
+        id.inner as Self
     }
 }
 
 impl From<GraphNodeIdx> for u32 {
     #[inline]
     fn from(id: GraphNodeIdx) -> Self {
-        id.0
+        id.inner
     }
 }
 

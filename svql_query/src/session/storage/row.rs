@@ -7,6 +7,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::prelude::*;
+use crate::session::schema::SlotIdx;
 
 /// An owned snapshot of a single row from a `Table<T>`.
 ///
@@ -79,7 +80,7 @@ where
     }
 
     /// Get a submodule reference by name (type-erased)
-    pub fn sub_any(&self, name: &str) -> Option<u32> {
+    pub fn sub_any(&self, name: &str) -> Option<SlotIdx> {
         let idx = T::schema().index_of(name)?;
         self.entry_array
             .entries
@@ -161,7 +162,7 @@ where
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        let cell_id = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
+        let cell_id = sub_table.resolve_path(sub_row_idx.as_usize(), selector.tail(), ctx)?;
 
         // Direction is lost through traversal
         Some(Wire::new(cell_id, PortDirection::None))
@@ -177,7 +178,7 @@ where
             .entries
             .get(idx)
             .and_then(|entry| match entry {
-                crate::session::ColumnEntry::Sub { id: Some(id), .. } => Some(Ref::new(*id)),
+                crate::session::ColumnEntry::Sub { id: Some(id), .. } => Some(Ref::new(id.inner())),
                 _ => None,
             })
     }
@@ -215,7 +216,7 @@ where
         let id = T::schema()
             .index_of(name)
             .expect("Schema LUT missing sub column");
-        self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx };
+        self.entry_array.entries[id] = crate::session::ColumnEntry::Sub { id: idx.map(SlotIdx::new) };
         self
     }
 

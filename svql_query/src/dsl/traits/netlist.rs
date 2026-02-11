@@ -180,7 +180,10 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .needle_mapping()
                         .iter()
                         .find(|(n_idx, _h_idx)| {
-                            needle_index.get_cell_by_index(**n_idx).debug_index().raw()
+                            needle_index
+                                .get_cell_by_index(**n_idx)
+                                .debug_index()
+                                .inner()
                                 == needle_output_driver_id
                         })
                         .map(|(_n_idx, h_idx)| h_idx)
@@ -192,18 +195,18 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one
-                    let needle_debug_id = needle_wrapper.debug_index().raw();
-                    let col_name = format!("__internal_cell_{}", needle_debug_id);
+                    let needle_debug_id = needle_wrapper.debug_index();
+                    let col_name = format!("__internal_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
                         entries[col_idx] = ColumnEntry::Metadata {
-                            id: Some(haystack_physical.raw()),
+                            id: Some(haystack_physical),
                         };
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
                             needle_debug_id,
-                            haystack_physical.raw()
+                            haystack_physical.inner()
                         );
                     }
                 }
@@ -278,7 +281,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             let source_loc = haystack_container.as_ref().and_then(|container| {
                 container
                     .index()
-                    .get_cell_by_id(haystack_cell_id as usize)
+                    .get_cell_by_id(haystack_cell_id.inner() as usize)
                     .and_then(|cell_wrapper| cell_wrapper.get_source())
             });
 

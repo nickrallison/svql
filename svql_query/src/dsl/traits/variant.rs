@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::session::schema::SlotIdx;
 
 /// Describes one variant arm for lookup during rehydration.
 ///
@@ -101,11 +102,11 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
                 // 1. Set discriminant
                 entry.entries[discrim_idx] = ColumnEntry::Metadata {
-                    id: Some(variant_idx as u32),
+                    id: Some(PhysicalCellId::new(variant_idx as u32)),
                 };
 
                 // 2. Set inner_ref (row index in the variant arm's table)
-                entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(row_idx) };
+                entry.entries[inner_ref_idx] = ColumnEntry::Sub { id: Some(SlotIdx::new(row_idx)) };
 
                 // 3. Map common ports from inner table using path resolution
                 for mapping in port_maps {

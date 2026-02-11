@@ -29,6 +29,7 @@
 use std::sync::OnceLock;
 
 use crate::prelude::*;
+use crate::session::schema::SlotIdx;
 
 /// Trait for recursive/tree-structured patterns.
 ///
@@ -301,7 +302,10 @@ where
     }
 
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
-        tracing::info!("[RECURSIVE] Starting recursive search for: {}", std::any::type_name::<T>());
+        tracing::info!(
+            "[RECURSIVE] Starting recursive search for: {}",
+            std::any::type_name::<T>()
+        );
         T::build_recursive(ctx)
     }
 
@@ -396,7 +400,7 @@ mod tests {
 
         fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
             tracing::info!("[RECURSIVE] Building recursive structure for RecAnd");
-            
+
             // 1. Get base pattern (AndGate) results
             tracing::debug!("[RECURSIVE] Retrieving base pattern table (AndGate)...");
             let base_table = ctx
@@ -408,8 +412,11 @@ mod tests {
                 .downcast_ref()
                 .ok_or_else(|| QueryError::missing_dep("AndGate (downcast failed)"))?;
 
-            tracing::info!("[RECURSIVE] Base pattern has {} AndGate instances", and_table.len());
-            
+            tracing::info!(
+                "[RECURSIVE] Base pattern has {} AndGate instances",
+                and_table.len()
+            );
+
             if and_table.is_empty() {
                 tracing::info!("[RECURSIVE] No base patterns found, returning empty table");
                 return Table::new(vec![]);
@@ -449,8 +456,11 @@ mod tests {
             for (idx, info) in gate_info.iter().enumerate() {
                 output_to_gate.insert(info.y, idx as u32);
             }
-            
-            tracing::debug!("[RECURSIVE] Built output-to-gate lookup with {} entries", output_to_gate.len());
+
+            tracing::debug!(
+                "[RECURSIVE] Built output-to-gate lookup with {} entries",
+                output_to_gate.len()
+            );
 
             // 3. Initialize: every AND gate starts as a leaf (depth=0)
             struct RecAndEntry {
@@ -479,8 +489,11 @@ mod tests {
                 .enumerate()
                 .map(|(idx, e)| (e.y, idx as u32))
                 .collect();
-            
-            tracing::debug!("[RECURSIVE] Initialized {} entries (all starting as leaves)", entries.len());
+
+            tracing::debug!(
+                "[RECURSIVE] Initialized {} entries (all starting as leaves)",
+                entries.len()
+            );
 
             // 4. Fixpoint iteration: link children and compute depths
             tracing::info!("[RECURSIVE] Starting fixpoint iteration to link children...");
@@ -530,15 +543,18 @@ mod tests {
                 }
             }
 
-            tracing::info!("[RECURSIVE] Fixpoint iteration converged after {} iterations", iterations);
-            
+            tracing::info!(
+                "[RECURSIVE] Fixpoint iteration converged after {} iterations",
+                iterations
+            );
+
             if iterations >= MAX_ITERATIONS {
                 tracing::warn!(
                     "RecAnd fixpoint did not converge after {} iterations",
                     MAX_ITERATIONS
                 );
             }
-            
+
             // Count nodes by depth
             let mut depth_counts: HashMap<u32, usize> = HashMap::new();
             for entry in &entries {
@@ -565,20 +581,29 @@ mod tests {
                     let mut arr = EntryArray::with_capacity(schema.defs.len());
 
                     arr.entries[base_idx] = ColumnEntry::Sub {
-                        id: Some(e.base_idx),
+                        id: Some(SlotIdx::new(e.base_idx)),
                     };
-                    arr.entries[left_idx] = ColumnEntry::Sub { id: e.left_child };
-                    arr.entries[right_idx] = ColumnEntry::Sub { id: e.right_child };
+                    arr.entries[left_idx] = ColumnEntry::Sub {
+                        id: e.left_child.map(SlotIdx::new),
+                    };
+                    arr.entries[right_idx] = ColumnEntry::Sub {
+                        id: e.right_child.map(SlotIdx::new),
+                    };
                     arr.entries[y_idx] = ColumnEntry::Wire {
                         value: Some(crate::wire::WireRef::Cell(e.y)),
                     };
-                    arr.entries[depth_idx] = ColumnEntry::Metadata { id: Some(e.depth) };
+                    arr.entries[depth_idx] = ColumnEntry::Metadata {
+                        id: Some(PhysicalCellId::new(e.depth)),
+                    };
 
                     arr
                 })
                 .collect();
 
-            tracing::info!("[RECURSIVE] Recursive structure built: {} total entries", row_entries.len());
+            tracing::info!(
+                "[RECURSIVE] Recursive structure built: {} total entries",
+                row_entries.len()
+            );
             Table::new(row_entries)
         }
 

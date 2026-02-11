@@ -150,10 +150,9 @@ impl<'a> GraphIndex<'a> {
 
     /// Finds a node in the current graph by its physical ID.
     pub fn resolve_node(&self, physical: PhysicalCellId) -> Option<GraphNodeIdx> {
-        self.cell_registry
-            .cell_id_map()
-            .get(&(physical.raw() as usize))
-            .copied()
+        // Here we access the internal int of physical only inside the safe boundary
+        let key = physical.inner() as usize;
+        self.cell_registry.cell_id_map().get(&key).copied()
     }
 
     // --- Job C: Capabilities (For Pruning) ---
