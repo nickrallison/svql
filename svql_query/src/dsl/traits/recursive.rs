@@ -397,11 +397,9 @@ mod tests {
             })
         }
 
-        fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
-            tracing::info!("[RECURSIVE] Building recursive structure for RecAnd");
+        // ── RecAnd::build_recursive ──────────────────────────────────────────
 
-            // 1. Get base pattern (AndGate) results
-            tracing::debug!("[RECURSIVE] Retrieving base pattern table (AndGate)...");
+        fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError> {
             let base_table = ctx
                 .get_any_table(std::any::TypeId::of::<AndGate>())
                 .ok_or_else(|| QueryError::missing_dep("AndGate"))?;
@@ -411,109 +409,102 @@ mod tests {
                 .downcast_ref()
                 .ok_or_else(|| QueryError::missing_dep("AndGate (downcast failed)"))?;
 
-            tracing::info!(
-                "[RECURSIVE] Base pattern has {} AndGate instances",
-                and_table.len()
-            );
-
             if and_table.is_empty() {
-                tracing::info!("[RECURSIVE] No base patterns found, returning empty table");
                 return Table::new(vec![]);
             }
 
-            // 2. Extract gate info and build output→gate lookup
+            let index = ctx.haystack_design().index();
+
+            // Get GraphNodeIdx for each gate's output
+            let nodes: Vec<GraphNodeIdx> = and_table
+                .rows()
+                .filter_map(|row| {
+                    row.wire("y")
+                        .and_then(|w| w.cell_id())
+                        .and_then(|id| index.resolve_node(id))
+                })
+                .collect();
+
+            if nodes.len() != and_table.len() {
+                return Err(QueryError::ExecutionError(
+                    "Some AndGate outputs could not be resolved to graph nodes".to_string(),
+                ));
+            }
+
+            // ── FIX: use `map` instead of `filter_map` ──
+            // Inputs are now Option<Wire> so rows with primary-port/constant
+            // inputs are kept, preserving the 1:1 correspondence with and_table.
             struct GateInfo {
-                a: PhysicalCellId,
-                b: PhysicalCellId,
-                y: PhysicalCellId,
+                a: Option<Wire>, // was: Wire (via filter_map)
+                b: Option<Wire>, // was: Wire (via filter_map)
+                y: Wire,
             }
 
             let gate_info: Vec<GateInfo> = and_table
                 .rows()
                 .map(|row| GateInfo {
-                    a: row
-                        .wire("a")
-                        .expect("AndGate must have 'a'")
-                        .cell_id()
-                        .expect("Wire must be a cell"),
-                    b: row
-                        .wire("b")
-                        .expect("AndGate must have 'b'")
-                        .cell_id()
-                        .expect("Wire must be a cell"),
-                    y: row
-                        .wire("y")
-                        .expect("AndGate must have 'y'")
-                        .cell_id()
-                        .expect("Wire must be a cell"),
+                    a: row.wire("a"), // None when input is a primary port / constant
+                    b: row.wire("b"),
+                    y: row.wire("y").expect("AndGate output 'y' must exist"),
                 })
                 .collect();
+            // gate_info[i]  ↔  and_table.row(i)  — always
 
-            // Map: output PhysicalCellId → AndGate row index
-            let mut output_to_gate: HashMap<PhysicalCellId, u32> =
-                HashMap::with_capacity(gate_info.len());
-            for (idx, info) in gate_info.iter().enumerate() {
-                output_to_gate.insert(info.y, idx as u32);
-            }
-
-            tracing::debug!(
-                "[RECURSIVE] Built output-to-gate lookup with {} entries",
-                output_to_gate.len()
-            );
-
-            // 3. Initialize: every AND gate starts as a leaf (depth=0)
             struct RecAndEntry {
-                base_idx: u32,
-                left_child: Option<u32>,
-                right_child: Option<u32>,
-                y: PhysicalCellId,
+                base_node: GraphNodeIdx,
+                left_child: Option<GraphNodeIdx>,
+                right_child: Option<GraphNodeIdx>,
+                y: Wire,
                 depth: u32,
             }
 
-            let mut entries: Vec<RecAndEntry> = gate_info
+            let mut entries: Vec<RecAndEntry> = nodes
                 .iter()
                 .enumerate()
-                .map(|(idx, info)| RecAndEntry {
-                    base_idx: idx as u32,
+                .map(|(idx, &node)| RecAndEntry {
+                    base_node: node,
                     left_child: None,
                     right_child: None,
-                    y: info.y,
+                    y: gate_info[idx].y.clone(),
                     depth: 0,
                 })
                 .collect();
 
-            // Map: output PhysicalCellId → RecAnd entry index (same as gate index initially)
-            let output_to_rec: HashMap<PhysicalCellId, u32> = entries
+            let output_to_rec: HashMap<PhysicalCellId, GraphNodeIdx> = entries
                 .iter()
-                .enumerate()
-                .map(|(idx, e)| (e.y, idx as u32))
+                .filter_map(|e| e.y.cell_id().map(|id| (id, e.base_node)))
                 .collect();
 
-            tracing::debug!(
-                "[RECURSIVE] Initialized {} entries (all starting as leaves)",
-                entries.len()
-            );
+            let node_to_entry: HashMap<GraphNodeIdx, usize> = nodes
+                .iter()
+                .enumerate()
+                .map(|(i, &node)| (node, i))
+                .collect();
 
-            // 4. Fixpoint iteration: link children and compute depths
-            tracing::info!("[RECURSIVE] Starting fixpoint iteration to link children...");
             let mut changed = true;
             let mut iterations = 0;
-            const MAX_ITERATIONS: usize = 1000; // Safety limit
+            const MAX_ITERATIONS: usize = 1000;
 
             while changed && iterations < MAX_ITERATIONS {
                 changed = false;
                 iterations += 1;
 
                 for i in 0..entries.len() {
-                    let base_idx = entries[i].base_idx as usize;
-                    let info = &gate_info[base_idx];
+                    let base_node = entries[i].base_node;
+                    let info = &gate_info[i];
 
-                    // Check if input A comes from another AND's output
-                    let new_left = output_to_rec.get(&info.a).copied();
-                    // Check if input B comes from another AND's output
-                    let new_right = output_to_rec.get(&info.b).copied();
+                    // ── FIX: chain through Option<Wire> ──
+                    let new_left = info
+                        .a
+                        .as_ref()
+                        .and_then(|w| w.cell_id())
+                        .and_then(|id| output_to_rec.get(&id).copied());
+                    let new_right = info
+                        .b
+                        .as_ref()
+                        .and_then(|w| w.cell_id())
+                        .and_then(|id| output_to_rec.get(&id).copied());
 
-                    // Detect changes
                     let children_changed =
                         new_left != entries[i].left_child || new_right != entries[i].right_child;
 
@@ -523,10 +514,13 @@ mod tests {
                         changed = true;
                     }
 
-                    // Recompute depth based on children
-                    let left_depth = new_left.map(|idx| entries[idx as usize].depth).unwrap_or(0);
+                    let left_depth = new_left
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| entries[idx].depth)
+                        .unwrap_or(0);
                     let right_depth = new_right
-                        .map(|idx| entries[idx as usize].depth)
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| entries[idx].depth)
                         .unwrap_or(0);
 
                     let new_depth = if new_left.is_some() || new_right.is_some() {
@@ -542,11 +536,6 @@ mod tests {
                 }
             }
 
-            tracing::info!(
-                "[RECURSIVE] Fixpoint iteration converged after {} iterations",
-                iterations
-            );
-
             if iterations >= MAX_ITERATIONS {
                 tracing::warn!(
                     "RecAnd fixpoint did not converge after {} iterations",
@@ -554,15 +543,7 @@ mod tests {
                 );
             }
 
-            // Count nodes by depth
-            let mut depth_counts: HashMap<u32, usize> = HashMap::new();
-            for entry in &entries {
-                *depth_counts.entry(entry.depth).or_insert(0) += 1;
-            }
-            tracing::debug!("[RECURSIVE] Depth distribution: {:?}", depth_counts);
-
-            // 5. Convert to EntryArray format
-            tracing::debug!("[RECURSIVE] Converting entries to table format...");
+            // EntryArray conversion — unchanged
             let schema = Self::recursive_schema();
             let base_idx = schema.index_of("base").expect("schema has 'base'");
             let left_idx = schema
@@ -576,29 +557,30 @@ mod tests {
 
             let row_entries: Vec<EntryArray> = entries
                 .iter()
-                .map(|e| {
+                .enumerate()
+                .map(|(entry_index, e)| {
                     let mut arr = EntryArray::with_capacity(schema.defs.len());
-
-                    arr.entries[base_idx] = ColumnEntry::Sub(e.base_idx);
+                    arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
                     arr.entries[left_idx] = e
                         .left_child
-                        .map(ColumnEntry::Sub)
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| ColumnEntry::Sub(idx as u32))
                         .unwrap_or(ColumnEntry::Null);
                     arr.entries[right_idx] = e
                         .right_child
-                        .map(ColumnEntry::Sub)
+                        .and_then(|node| node_to_entry.get(&node))
+                        .map(|&idx| ColumnEntry::Sub(idx as u32))
                         .unwrap_or(ColumnEntry::Null);
-                    arr.entries[y_idx] = ColumnEntry::Wire(crate::wire::WireRef::Cell(e.y));
+                    arr.entries[y_idx] =
+                        e.y.cell_id()
+                            .map(svql_common::WireRef::Cell)
+                            .map(ColumnEntry::Wire)
+                            .unwrap_or(ColumnEntry::Null);
                     arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
-
                     arr
                 })
                 .collect();
 
-            tracing::info!(
-                "[RECURSIVE] Recursive structure built: {} total entries",
-                row_entries.len()
-            );
             Table::new(row_entries)
         }
 
@@ -615,7 +597,7 @@ mod tests {
 
             let schema = Self::recursive_schema();
             let depth_idx = schema.index_of("depth")?;
-            let depth = row.entry_array.entries.get(depth_idx)?.as_u32()?;
+            let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
 
             Some(RecAnd {
                 base,
