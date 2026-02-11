@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::cell::CellId;
+use crate::cell::GraphNodeIdx;
 use dashmap::DashMap;
 use prjunnamed_netlist::{CellRef, Design};
-use svql_common::{GraphNodeIdx, HashMap, HashSet};
+use svql_common::*;
 
 type FaninMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
 type FanoutMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
@@ -31,7 +31,7 @@ impl ConnectivityGraph {
     pub fn build(
         design: &Design,
         cell_refs_topo: &[CellRef<'_>],
-        cell_id_map: &HashMap<usize, CellId>,
+        cell_id_map: &HashMap<usize, GraphNodeIdx>,
     ) -> Self {
         let (fanin_map, fanout_map) =
             Self::build_fanin_fanout_maps(design, cell_refs_topo, cell_id_map);
@@ -82,7 +82,7 @@ impl ConnectivityGraph {
     fn build_fanin_fanout_maps(
         design: &Design,
         cell_refs_topo: &[CellRef<'_>],
-        cell_id_map: &HashMap<usize, CellId>,
+        cell_id_map: &HashMap<usize, GraphNodeIdx>,
     ) -> (FaninMap, FanoutMap) {
         let mut fanout_map: FanoutMap = HashMap::default();
         let mut fanin_map: FaninMap = HashMap::default();

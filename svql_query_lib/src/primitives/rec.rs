@@ -97,7 +97,7 @@ impl Recursive for RecAnd {
             .collect();
         // gate_info[i]  ↔  and_table.row(i)  — always
 
-        let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
+        let mut output_to_gate: HashMap<PhysicalCellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
             if let Some(y_id) = info.y.cell_id() {
                 output_to_gate.insert(y_id, idx as u32);
@@ -124,7 +124,7 @@ impl Recursive for RecAnd {
             })
             .collect();
 
-        let output_to_rec: HashMap<CellId, u32> = entries
+        let output_to_rec: HashMap<PhysicalCellId, u32> = entries
             .iter()
             .enumerate()
             .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))
@@ -323,7 +323,7 @@ impl Recursive for RecOr {
             .collect();
         // gate_info[i]  ↔  or_table.row(i)  — always
 
-        let mut output_to_gate: HashMap<CellId, u32> = HashMap::with_capacity(gate_info.len());
+        let mut output_to_gate: HashMap<PhysicalCellId, u32> = HashMap::with_capacity(gate_info.len());
         for (idx, info) in gate_info.iter().enumerate() {
             if let Some(y_id) = info.y.cell_id() {
                 output_to_gate.insert(y_id, idx as u32);
@@ -350,7 +350,7 @@ impl Recursive for RecOr {
             })
             .collect();
 
-        let output_to_rec: HashMap<CellId, u32> = entries
+        let output_to_rec: HashMap<PhysicalCellId, u32> = entries
             .iter()
             .enumerate()
             .filter_map(|(idx, e)| e.y.cell_id().map(|id| (id, idx as u32)))

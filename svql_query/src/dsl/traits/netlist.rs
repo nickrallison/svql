@@ -101,7 +101,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         let mut internal_defs = Vec::new();
 
         for i in 0..index.num_cells() {
-            let cell_idx = CellId::new(i);
+            let cell_idx = GraphNodeIdx::new(i as u32);
             let cell_wrapper = index.get_cell_by_index(cell_idx);
             let kind = cell_wrapper.cell_type();
 
@@ -149,17 +149,15 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         haystack_index: &subgraph::GraphIndex<'_>,
     ) -> EntryArray {
         let schema = Self::netlist_schema();
-        let schema_size = schema.defs.len();
-        let mut row_match: Vec<Option<u32>> = vec![None; schema_size];
+        let mut entries = vec![ColumnEntry::Metadata { id: None }; schema.defs.len()];
 
-        for (needle_idx, haystack_idx) in assignment.needle_mapping() {
-            let needle_cell_wrapper = needle_index.get_cell_by_index(*needle_idx);
-            let needle_cell = needle_cell_wrapper.get();
-            let haystack_debug_index = haystack_index
-                .get_cell_by_index(*haystack_idx)
-                .debug_index();
+        for (n_node, h_node) in assignment.needle_mapping() {
+            let needle_wrapper = needle_index.get_cell_by_index(*n_node);
+            
+            // TRANSLATION: Map local search node to stable physical ID
+            let haystack_physical = haystack_index.resolve_physical(*h_node);
 
-            match needle_cell {
+            match needle_wrapper.get() {
                 prjunnamed_netlist::Cell::Input(name, _) => {
                     let err_msg = format!(
                         "Needle Cell name: {name} should exist in schema for: {} at {}",
@@ -167,7 +165,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         Self::FILE_PATH
                     );
                     let col_idx = schema.index_of(name).expect(&err_msg);
-                    row_match[col_idx] = Some(haystack_debug_index.raw());
+                    entries[col_idx] = ColumnEntry::cell(Some(haystack_physical));
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
                     let err_msg = format!(
@@ -188,49 +186,29 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    row_match[col_idx] = Some(
+                    entries[col_idx] = ColumnEntry::cell(Some(
                         haystack_index
-                            .get_cell_by_index(*haystack_output_driver)
-                            .debug_index()
-                            .raw(),
-                    );
+                            .resolve_physical(*haystack_output_driver)
+                    ));
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one
-                    let needle_debug_id = needle_cell_wrapper.debug_index().raw();
+                    let needle_debug_id = needle_wrapper.debug_index().raw();
                     let col_name = format!("__internal_cell_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
-                        row_match[col_idx] = Some(haystack_debug_index.raw());
+                        entries[col_idx] = ColumnEntry::Metadata { id: Some(haystack_physical.raw()) };
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
                             needle_debug_id,
-                            haystack_debug_index.raw()
+                            haystack_physical.raw()
                         );
                     }
                 }
             }
         }
-
-        // Convert to ColumnEntry format, respecting column kinds
-        let final_row_match: Vec<ColumnEntry> = row_match
-            .into_iter()
-            .enumerate()
-            .map(|(idx, opt)| {
-                let col_def = schema.column(idx);
-                match col_def.kind {
-                    ColumnKind::Cell => ColumnEntry::Wire {
-                        value: opt
-                            .map(PhysicalCellId::new)
-                            .map(crate::wire::WireRef::Cell),
-                    },
-                    ColumnKind::Metadata => ColumnEntry::Metadata { id: opt },
-                    _ => ColumnEntry::Metadata { id: None },
-                }
-            })
-            .collect();
-        EntryArray::new(final_row_match)
+        EntryArray::new(entries)
     }
 
     fn netlist_rehydrate(

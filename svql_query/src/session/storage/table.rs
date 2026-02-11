@@ -15,7 +15,7 @@ use crate::prelude::*;
 ///
 /// # Column Types
 ///
-/// - **Wire columns** (`ColumnKind::Wire`): Store as `u32` (`CellId::raw()`)
+/// - **Wire columns** (`ColumnKind::Wire`): Store as `u32` (`PhysicalCellId::raw()`)
 /// - **Sub columns** (`ColumnKind::Sub`): Store as `u32` (row index)
 /// - **Metadata columns**: Store as `u32`
 ///
@@ -127,7 +127,7 @@ where
         match T::schema().column(idx).kind {
             ColumnKind::Cell => Some(ColumnEntry::Wire {
                 value: val
-                    .map(|v| CellId::new(v as usize))
+                    .map(|v| PhysicalCellId::new(v as u32))
                     .map(crate::wire::WireRef::Cell),
             }),
             ColumnKind::Sub(_) => Some(ColumnEntry::Sub { id: val }),
@@ -321,7 +321,7 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)>;
 
     /// Get a cell ID by single column name (no path traversal).
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<crate::CellId>;
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<PhysicalCellId>;
 
     /// Resolve a selector path within a specific row to a cell ID
     fn resolve_path(
@@ -329,7 +329,7 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
         row_idx: usize,
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
-    ) -> Option<crate::CellId>;
+    ) -> Option<PhysicalCellId>;
 
     /// Export this table to a CSV file.
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError>;
@@ -351,7 +351,7 @@ where
         std::any::type_name::<T>()
     }
 
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<crate::CellId> {
+    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<PhysicalCellId> {
         // O(1) lookup
         let col_idx = T::schema().index_of(col_name)?;
 
@@ -364,7 +364,7 @@ where
         col.get(row_idx)
             .copied()
             .flatten()
-            .map(|v| crate::CellId::new(v as usize))
+            .map(|v| PhysicalCellId::new(v as u32))
     }
 
     fn pattern_type_id(&self) -> std::any::TypeId {
@@ -398,7 +398,7 @@ where
         row_idx: usize,
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
-    ) -> Option<crate::CellId> {
+    ) -> Option<PhysicalCellId> {
         // Optimized: avoid allocating full Row<T> by directly accessing columns
         if selector.is_empty() {
             return None;

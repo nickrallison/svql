@@ -123,10 +123,12 @@ pub fn wire_source_location(
     key: &DriverKey,
     config: &Config,
 ) -> Option<SourceLocation> {
-    let cell_id = wire.cell_id()?;
+    let physical_id = wire.cell_id()?;
     let design = driver.get_design(key, &config.haystack_options).ok()?;
-    let cell_wrapper = design.index().get_cell_by_id(cell_id.as_usize())?;
-    cell_wrapper.get_source()
+    
+    // Use Translation API to find the cell wrapper
+    let node = design.index().resolve_node(physical_id)?;
+    design.index().get_cell_by_index(node).get_source()
 }
 
 /// Create a report node for a wire field
@@ -143,7 +145,7 @@ pub fn wire_to_report_node(
             let design = driver.get_design(key, &config.haystack_options).ok();
             let cell_wrapper = design
                 .as_ref()
-                .and_then(|d| d.index().get_cell_by_id(id.as_usize()));
+                .and_then(|d| d.index().get_cell_by_id(id.raw() as usize));
 
             if let Some(cell) = cell_wrapper {
                 let kind = cell.cell_type();

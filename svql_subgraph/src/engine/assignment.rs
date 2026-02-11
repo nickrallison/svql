@@ -2,7 +2,7 @@
 
 use svql_common::*;
 
-use crate::cell::CellId;
+use crate::cell::GraphNodeIdx;
 
 /// A collection of mappings found during a search.
 #[derive(Clone, Debug, Default)]
@@ -31,9 +31,9 @@ impl AssignmentSet {
 #[derive(Clone, Debug, Default)]
 pub struct SingleAssignment {
     /// Pattern to Design cell index mapping
-    needle_to_haystack: HashMap<CellId, CellId>,
+    needle_to_haystack: HashMap<GraphNodeIdx, GraphNodeIdx>,
     /// Design to Pattern cell index mapping
-    haystack_to_needle: HashMap<CellId, Vec<CellId>>,
+    haystack_to_needle: HashMap<GraphNodeIdx, Vec<GraphNodeIdx>>,
 }
 
 impl SingleAssignment {
@@ -44,7 +44,7 @@ impl SingleAssignment {
         }
     }
 
-    pub(super) fn assign(&mut self, needle: CellId, haystack: CellId) {
+    pub(super) fn assign(&mut self, needle: GraphNodeIdx, haystack: GraphNodeIdx) {
         self.needle_to_haystack.insert(needle, haystack);
         self.haystack_to_needle
             .entry(haystack)
@@ -53,7 +53,7 @@ impl SingleAssignment {
     }
 
     #[allow(dead_code)]
-    pub(super) fn remove_by_needle(&mut self, needle: CellId) -> Option<CellId> {
+    pub(super) fn remove_by_needle(&mut self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
             self.haystack_to_needle.remove(&haystack_idx);
             return Some(haystack_idx);
@@ -62,12 +62,12 @@ impl SingleAssignment {
     }
 
     #[must_use]
-    pub fn get_haystack_cell(&self, needle: CellId) -> Option<CellId> {
+    pub fn get_haystack_cell(&self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         self.needle_to_haystack.get(&needle).copied()
     }
 
     #[must_use]
-    pub fn get_needle_cells(&self, haystack: CellId) -> &[CellId] {
+    pub fn get_needle_cells(&self, haystack: GraphNodeIdx) -> &[GraphNodeIdx] {
         self.haystack_to_needle
             .get(&haystack)
             .map_or(&[], |v| v.as_slice())
@@ -75,7 +75,7 @@ impl SingleAssignment {
 
     /// Returns true if the haystack cell is not yet assigned.
     #[must_use]
-    pub fn haystack_is_free(&self, haystack: CellId) -> bool {
+    pub fn haystack_is_free(&self, haystack: GraphNodeIdx) -> bool {
         !self.haystack_to_needle.contains_key(&haystack)
     }
 
@@ -92,12 +92,12 @@ impl SingleAssignment {
     }
 
     #[must_use]
-    pub const fn haystack_mapping(&self) -> &HashMap<CellId, Vec<CellId>> {
+    pub const fn haystack_mapping(&self) -> &HashMap<GraphNodeIdx, Vec<GraphNodeIdx>> {
         &self.haystack_to_needle
     }
 
     #[must_use]
-    pub const fn needle_mapping(&self) -> &HashMap<CellId, CellId> {
+    pub const fn needle_mapping(&self) -> &HashMap<GraphNodeIdx, GraphNodeIdx> {
         &self.needle_to_haystack
     }
 

@@ -32,7 +32,7 @@ fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
 fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
     // Try as cell first
     if let Ok(cell_idx) = net.as_cell_index() {
-        return Some(WireRef::Cell(CellId::new(cell_idx)));
+        return Some(WireRef::Cell(PhysicalCellId::new(cell_idx as u32)));
     }
 
     // If not a cell, assume it's an input port or constant
@@ -156,7 +156,7 @@ pub fn resolve_primitive_ports(
     debug_index: usize,
     schema: &PatternSchema,
 ) -> EntryArray {
-    let cell_id = CellId::from_usize(debug_index);
+    let cell_id = PhysicalCellId::new(debug_index as u32);
     let schema_size = schema.defs.len();
 
     // Initialize all entries as None
@@ -374,7 +374,7 @@ where
                         );
                         return None;
                     }
-                    Some(T::resolve(cell, cell_wrapper.debug_index()))
+                    Some(T::resolve(cell, cell_wrapper.debug_index().raw() as usize))
                 })
                 .collect();
 

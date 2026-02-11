@@ -1,13 +1,13 @@
-use crate::cell::CellId;
+use crate::cell::GraphNodeIdx;
 use prjunnamed_netlist::{Cell, CellRef};
 use svql_common::*;
 
 #[derive(Clone, Debug)]
 pub struct IoMapping {
     /// Maps input names to their fan-out cells
-    input_fanout_by_name: HashMap<String, Vec<(CellId, usize)>>,
+    input_fanout_by_name: HashMap<String, Vec<(GraphNodeIdx, usize)>>,
     /// Maps output names to their fan-in cells
-    output_fanin_by_name: HashMap<String, Vec<(CellId, usize)>>,
+    output_fanin_by_name: HashMap<String, Vec<(GraphNodeIdx, usize)>>,
 }
 
 impl IoMapping {

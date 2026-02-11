@@ -391,7 +391,7 @@ impl ColumnEntry {
     #[must_use]
     pub fn as_u32(&self) -> Option<u32> {
         match self {
-            Self::Wire { value } => value.as_ref().and_then(WireRef::as_cell).map(CellId::raw),
+            Self::Wire { value } => value.as_ref().and_then(|wr| wr.as_cell()).map(|cid| cid.raw()),
             Self::Sub { id } => *id,
             Self::Metadata { id } => *id,
         }
@@ -399,7 +399,7 @@ impl ColumnEntry {
 
     /// Create a cell wire entry
     #[must_use]
-    pub fn cell(id: Option<CellId>) -> Self {
+    pub fn cell(id: Option<PhysicalCellId>) -> Self {
         Self::Wire {
             value: id.map(WireRef::Cell),
         }

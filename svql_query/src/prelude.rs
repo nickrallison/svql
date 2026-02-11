@@ -35,7 +35,7 @@ pub use common::*;
 
 pub use subgraph::{
     AssignmentSet, SingleAssignment,
-    cell::{CellInfo, CellKind, SourceLocation},
+    cell::{CellKind, SourceLocation},
     index::graph_index::GraphIndex,
 };
 

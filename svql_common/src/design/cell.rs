@@ -33,6 +33,13 @@ impl PhysicalCellId {
     pub const fn raw(self) -> u32 {
         self.0
     }
+
+    /// Convert to u64 for compatibility with existing code.
+    #[inline]
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
+        self.0 as u64
+    }
 }
 
 impl fmt::Display for PhysicalCellId {
@@ -475,34 +482,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cell_id_creation() {
-        let id = CellId::new(42);
-        assert_eq!(id.index(), 42);
-        assert_eq!(id.as_u64(), 42);
+    fn test_graph_node_idx_creation() {
+        let id = GraphNodeIdx::new(42);
         assert_eq!(id.as_usize(), 42);
     }
 
     #[test]
-    fn test_cell_id_conversions() {
-        let id: CellId = 42usize.into();
+    fn test_graph_node_idx_conversions() {
+        let id: GraphNodeIdx = 42usize.into();
         let back: usize = id.into();
         assert_eq!(back, 42);
-
-        let u64_val: u64 = id.into();
-        assert_eq!(u64_val, 42);
     }
 
     #[test]
-    fn test_cell_id_display() {
-        let id = CellId::new(42);
-        assert_eq!(format!("{}", id), "c42");
-        assert_eq!(format!("{:?}", id), "CellId { idx: 42 }");
+    fn test_graph_node_idx_display() {
+        let id = GraphNodeIdx::new(42);
+        assert_eq!(format!("{}", id), "n42");
     }
 
     #[test]
-    fn test_cell_id_ordering() {
-        let id1 = CellId::new(1);
-        let id2 = CellId::new(2);
+    fn test_graph_node_idx_ordering() {
+        let id1 = GraphNodeIdx::new(1);
+        let id2 = GraphNodeIdx::new(2);
         assert!(id1 < id2);
         assert!(id2 > id1);
     }

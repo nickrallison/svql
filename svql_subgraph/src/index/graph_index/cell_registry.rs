@@ -1,4 +1,4 @@
-use crate::cell::{CellId, CellKind, CellWrapper};
+use crate::cell::{GraphNodeIdx, CellKind, CellWrapper};
 use prjunnamed_netlist::CellRef;
 use svql_common::*;
 
@@ -6,7 +6,7 @@ use svql_common::*;
 pub struct CellRegistry<'a> {
     /// Nodes in topological order (Name nodes filtered out)
     cells_topo: Vec<CellWrapper<'a>>,
-    /// Maps cell debug index to internal `CellId`
+    /// Maps cell debug index to internal `GraphNodeIdx`
     cell_id_map: HashMap<usize, GraphNodeIdx>,
     /// Maps cell types to lists of cell indices
     cell_type_indices: HashMap<CellKind, Vec<GraphNodeIdx>>,
@@ -44,11 +44,11 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
-    fn build_cell_id_map(cells_topo: &[CellWrapper<'a>]) -> HashMap<usize, CellId> {
+    fn build_cell_id_map(cells_topo: &[CellWrapper<'a>]) -> HashMap<usize, GraphNodeIdx> {
         cells_topo
             .iter()
             .enumerate()
-            .map(|(idx, cell)| (cell.debug_index().raw() as usize, CellId::new(idx as u32)))
+            .map(|(idx, cell)| (cell.debug_index().raw() as usize, GraphNodeIdx::new(idx as u32)))
             .collect()
     }
 

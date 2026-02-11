@@ -145,8 +145,7 @@ impl<'a> GraphIndex<'a> {
 
     /// Maps a local solver node to its stable physical ID.
     pub fn resolve_physical(&self, node: GraphNodeIdx) -> PhysicalCellId {
-        let wrapper = self.get_cell_by_index(node);
-        PhysicalCellId::new(wrapper.debug_index().raw())
+        self.get_cell_by_index(node).debug_index()
     }
 
     /// Finds a node in the current graph by its physical ID.

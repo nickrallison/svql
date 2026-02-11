@@ -51,7 +51,7 @@ fn check_fanin_has_not_gates(row: &Row<UnlockLogic>, ctx: &ExecutionContext) -> 
 
 fn check_tree_recursive(
     rec_or_ref: Ref<RecOr>,
-    not_id: CellId,
+    not_id: PhysicalCellId,
     rec_or_table: &Table<RecOr>,
     or_gate_table: &Table<OrGate>,
 ) -> bool {

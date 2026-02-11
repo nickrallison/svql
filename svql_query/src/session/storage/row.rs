@@ -19,7 +19,7 @@ where
 {
     /// Row index in the source table.
     pub(crate) idx: u32,
-    /// Wire columns: name → `CellId` (None if NULL).
+    /// Wire columns: name → `PhysicalCellId` (None if NULL).
     pub(crate) entry_array: EntryArray,
     /// Type marker.
     pub(crate) _marker: PhantomData<T>,
@@ -200,12 +200,12 @@ where
     }
 
     /// Set a wire column value with a cell ID (legacy method).
-    pub fn with_wire(self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
+    pub fn with_wire(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
     }
 
     /// Set a wire column to a cell ID.
-    pub fn with_cell(self, name: &'static str, cell_id: CellId) -> Result<Self, QueryError> {
+    pub fn with_cell(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
     }
 
