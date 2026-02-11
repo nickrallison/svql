@@ -32,7 +32,7 @@ impl PhysicalCellId {
         Self { inner: id }
     }
 
-    pub const fn inner(&self) -> u32 {
+    pub(crate) const fn inner(&self) -> u32 {
         self.inner
     }
 }
@@ -50,26 +50,26 @@ impl From<u32> for PhysicalCellId {
     }
 }
 
-impl From<PhysicalCellId> for u32 {
-    #[inline]
-    fn from(id: PhysicalCellId) -> Self {
-        id.inner
-    }
-}
+// impl From<PhysicalCellId> for u32 {
+//     #[inline]
+//     fn from(id: PhysicalCellId) -> Self {
+//         id.inner
+//     }
+// }
 
-impl From<PhysicalCellId> for u64 {
-    #[inline]
-    fn from(id: PhysicalCellId) -> Self {
-        id.inner as Self
-    }
-}
+// impl From<PhysicalCellId> for u64 {
+//     #[inline]
+//     fn from(id: PhysicalCellId) -> Self {
+//         id.inner as Self
+//     }
+// }
 
-impl From<PhysicalCellId> for i64 {
-    #[inline]
-    fn from(id: PhysicalCellId) -> Self {
-        id.inner as Self
-    }
-}
+// impl From<PhysicalCellId> for i64 {
+//     #[inline]
+//     fn from(id: PhysicalCellId) -> Self {
+//         id.inner as Self
+//     }
+// }
 
 // ---------------------------------------------------------------------------
 // GraphNodeIdx

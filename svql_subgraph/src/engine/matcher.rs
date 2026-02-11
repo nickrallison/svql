@@ -14,7 +14,6 @@ use svql_common::Config;
 use rayon::prelude::*;
 
 use super::assignment::{AssignmentSet, SingleAssignment};
-use crate::index::graph_index::GraphIndex;
 
 /// Entry point for subgraph isomorphism searches.
 #[allow(dead_code)]

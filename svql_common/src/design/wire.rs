@@ -111,22 +111,22 @@ impl Wire {
         matches!(self, Self::Cell { .. })
     }
 
-    /// Legacy compatibility: get underlying cell ID (panics if not a cell)
-    /// Use `cell_id()` for safe access.
-    #[must_use]
-    #[deprecated(note = "Use cell_id() instead")]
-    pub fn id(&self) -> PhysicalCellId {
-        self.cell_id().expect("Wire is not a cell reference")
-    }
+    // /// Legacy compatibility: get underlying cell ID (panics if not a cell)
+    // /// Use `cell_id()` for safe access.
+    // #[must_use]
+    // #[deprecated(note = "Use cell_id() instead")]
+    // pub fn id(&self) -> PhysicalCellId {
+    //     self.cell_id().expect("Wire is not a cell reference")
+    // }
 
-    /// Get the raw u64 value (for backward compatibility).
-    /// Panics if not a cell reference.
-    #[must_use]
-    #[deprecated(note = "Use cell_id() instead")]
-    #[allow(deprecated)]
-    pub fn as_u64(&self) -> u64 {
-        u64::from(self.id())
-    }
+    // /// Get the raw u64 value (for backward compatibility).
+    // /// Panics if not a cell reference.
+    // #[must_use]
+    // #[deprecated(note = "Use cell_id() instead")]
+    // #[allow(deprecated)]
+    // pub fn as_u64(&self) -> u64 {
+    //     u64::from(self.id())
+    // }
 }
 
 /// Defines the direction of a port column.

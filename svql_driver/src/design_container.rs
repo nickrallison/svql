@@ -5,7 +5,7 @@
 
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
-use svql_subgraph::index::graph_index::GraphIndex;
+use svql_common::GraphIndex;
 
 /// Self-referencing container for a design and its graph index.
 ///

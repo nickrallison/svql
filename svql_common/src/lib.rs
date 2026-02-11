@@ -11,9 +11,11 @@
 pub mod bridge;
 mod config;
 pub mod design;
+pub mod index;
 
 pub use crate::bridge::yosys::*;
 pub use crate::config::*;
 pub use crate::design::*;
+pub use crate::index::*;
 
 pub use gxhash::{HashMap, HashMapExt, HashSet, HashSetExt};

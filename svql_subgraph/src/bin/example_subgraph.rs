@@ -32,8 +32,8 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     );
 
     // Build indices for resolving GraphNodeIdx → CellWrapper
-    let needle_index = svql_subgraph::GraphIndex::build(&needle);
-    let haystack_index = svql_subgraph::GraphIndex::build(&design);
+    let needle_index = svql_common::GraphIndex::build(&needle);
+    let haystack_index = svql_common::GraphIndex::build(&design);
 
     for (match_idx, assignment) in assignment_set.items.iter().enumerate() {
         println!("--- Match {match_idx} ---");

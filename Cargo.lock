@@ -882,6 +882,7 @@ name = "svql_common"
 version = "0.1.0"
 dependencies = [
  "argparse",
+ "dashmap",
  "gxhash",
  "lazy_static",
  "prjunnamed-netlist",

@@ -114,10 +114,7 @@ impl SingleAssignment {
 
     /// Signature excluding I/O cells — requires the needle graph index to classify cells.
     #[must_use]
-    pub fn internal_signature(
-        &self,
-        needle_index: &crate::index::graph_index::GraphIndex<'_>,
-    ) -> Vec<usize> {
+    pub fn internal_signature(&self, needle_index: &svql_common::GraphIndex<'_>) -> Vec<usize> {
         use crate::cell::CellKind;
         let mut sig: Vec<usize> = self
             .needle_mapping()

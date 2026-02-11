@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::cell::GraphNodeIdx;
+use crate::*;
 use dashmap::DashMap;
 use prjunnamed_netlist::{CellRef, Design};
-use svql_common::*;
 
 type FaninMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
 type FanoutMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
@@ -151,7 +151,7 @@ impl ConnectivityGraph {
     pub fn fanout_indices_set(&self, cell_idx: GraphNodeIdx) -> &HashSet<GraphNodeIdx> {
         self.fanout_sets.get(&cell_idx).unwrap_or_else(|| {
             static EMPTY: std::sync::OnceLock<HashSet<GraphNodeIdx>> = std::sync::OnceLock::new();
-            EMPTY.get_or_init(|| HashSet::default())
+            EMPTY.get_or_init(HashSet::default)
         })
     }
 
@@ -159,7 +159,7 @@ impl ConnectivityGraph {
     pub fn fanin_indices_set(&self, cell_idx: GraphNodeIdx) -> &HashSet<GraphNodeIdx> {
         self.fanin_sets.get(&cell_idx).unwrap_or_else(|| {
             static EMPTY: std::sync::OnceLock<HashSet<GraphNodeIdx>> = std::sync::OnceLock::new();
-            EMPTY.get_or_init(|| HashSet::default())
+            EMPTY.get_or_init(HashSet::default)
         })
     }
 

@@ -15,8 +15,8 @@ pub use io_mapping::IoMapping;
 use tracing::info;
 
 use crate::cell::{CellKind, CellWrapper};
+use crate::*;
 use prjunnamed_netlist::{CellRef, Design};
-use svql_common::*;
 
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]

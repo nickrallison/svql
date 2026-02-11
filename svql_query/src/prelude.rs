@@ -36,7 +36,6 @@ pub use common::*;
 pub use subgraph::{
     AssignmentSet, SingleAssignment,
     cell::{CellKind, SourceLocation},
-    index::graph_index::GraphIndex,
 };
 
 pub use driver::{Driver, DriverKey};

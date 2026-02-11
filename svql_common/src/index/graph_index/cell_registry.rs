@@ -1,6 +1,6 @@
 use crate::cell::{CellKind, CellWrapper, GraphNodeIdx};
+use crate::*;
 use prjunnamed_netlist::CellRef;
-use svql_common::*;
 
 #[derive(Clone, Debug)]
 pub struct CellRegistry<'a> {

@@ -1,6 +1,6 @@
 use crate::cell::GraphNodeIdx;
+use crate::*;
 use prjunnamed_netlist::{Cell, CellRef};
-use svql_common::*;
 
 #[derive(Clone, Debug)]
 pub struct IoMapping {
