@@ -2,7 +2,7 @@ use crate::query_test;
 use svql_query::prelude::*;
 use svql_query_lib::security::cwe1234::unlock_logic::UnlockLogic;
 
-fn unlock_logic_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn unlock_logic_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
 }
 

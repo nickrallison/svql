@@ -2,7 +2,7 @@ use crate::query_test;
 use svql_query::prelude::*;
 use svql_query_lib::security::cwe1271::Cwe1271;
 
-fn cwe1271_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn cwe1271_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
 }
 

@@ -12,7 +12,7 @@ fn cwe1280_config(c: ConfigBuilder) -> ConfigBuilder {
 }
 
 /// Configuration for the GrantAccess atomic netlist component
-fn grant_access_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn grant_access_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::First)
         .pattern_vars_match_design_consts(true)
 }

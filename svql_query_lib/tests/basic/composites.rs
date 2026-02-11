@@ -4,7 +4,7 @@ use svql_query_lib::primitives::rec::RecOr;
 
 use crate::query_test;
 
-fn recursive_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn recursive_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
         .max_recursion_depth(Some(10))
 }

@@ -367,9 +367,9 @@ mod tests {
         /// Reference to the underlying AND gate at this node.
         pub base: Ref<AndGate>,
         /// Left subtree (None if input A is external/not from another AND).
-        pub left_child: Option<Ref<RecAnd>>,
+        pub left_child: Option<Ref<Self>>,
         /// Right subtree (None if input B is external/not from another AND).
-        pub right_child: Option<Ref<RecAnd>>,
+        pub right_child: Option<Ref<Self>>,
         /// Output wire of this node.
         pub y: Wire,
         /// Tree depth: 0 = leaf (no AND children), 1+ = has AND children.
@@ -490,7 +490,7 @@ mod tests {
                 iterations += 1;
 
                 for i in 0..entries.len() {
-                    let base_node = entries[i].base_node;
+                    let _base_node = entries[i].base_node;
                     let info = &gate_info[i];
 
                     // ── FIX: chain through Option<Wire> ──
@@ -591,15 +591,15 @@ mod tests {
             _key: &DriverKey,
         ) -> Option<Self> {
             let base: Ref<AndGate> = row.sub("base")?;
-            let left_child: Option<Ref<RecAnd>> = row.sub("left_child");
-            let right_child: Option<Ref<RecAnd>> = row.sub("right_child");
+            let left_child: Option<Ref<Self>> = row.sub("left_child");
+            let right_child: Option<Ref<Self>> = row.sub("right_child");
             let y = row.wire("y")?;
 
             let schema = Self::recursive_schema();
             let depth_idx = schema.index_of("depth")?;
             let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
 
-            Some(RecAnd {
+            Some(Self {
                 base,
                 left_child,
                 right_child,
