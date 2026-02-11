@@ -153,7 +153,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         for (n_node, h_node) in assignment.needle_mapping() {
             let needle_wrapper = needle_index.get_cell_by_index(*n_node);
-            
+
             // TRANSLATION: Map local search node to stable physical ID
             let haystack_physical = haystack_index.resolve_physical(*h_node);
 
@@ -187,8 +187,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .expect("Should find haystack driver for output");
 
                     entries[col_idx] = ColumnEntry::cell(Some(
-                        haystack_index
-                            .resolve_physical(*haystack_output_driver)
+                        haystack_index.resolve_physical(*haystack_output_driver),
                     ));
                 }
                 _ => {
@@ -197,7 +196,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     let col_name = format!("__internal_cell_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
-                        entries[col_idx] = ColumnEntry::Metadata { id: Some(haystack_physical.raw()) };
+                        entries[col_idx] = ColumnEntry::Metadata {
+                            id: Some(haystack_physical.raw()),
+                        };
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",

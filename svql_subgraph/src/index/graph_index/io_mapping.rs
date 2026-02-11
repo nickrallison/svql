@@ -49,7 +49,8 @@ impl IoMapping {
         fanin_map
             .iter()
             .filter_map(|(cell_index, fanin_list)| {
-                if let Cell::Output(name, _) = cell_refs_topo[cell_index.as_usize()].get().as_ref() {
+                if let Cell::Output(name, _) = cell_refs_topo[cell_index.as_usize()].get().as_ref()
+                {
                     Some((name.clone(), fanin_list.clone()))
                 } else {
                     None

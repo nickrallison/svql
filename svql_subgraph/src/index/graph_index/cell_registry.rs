@@ -1,4 +1,4 @@
-use crate::cell::{GraphNodeIdx, CellKind, CellWrapper};
+use crate::cell::{CellKind, CellWrapper, GraphNodeIdx};
 use prjunnamed_netlist::CellRef;
 use svql_common::*;
 
@@ -48,7 +48,12 @@ impl<'a> CellRegistry<'a> {
         cells_topo
             .iter()
             .enumerate()
-            .map(|(idx, cell)| (cell.debug_index().raw() as usize, GraphNodeIdx::new(idx as u32)))
+            .map(|(idx, cell)| {
+                (
+                    cell.debug_index().raw() as usize,
+                    GraphNodeIdx::new(idx as u32),
+                )
+            })
             .collect()
     }
 
