@@ -7,10 +7,10 @@ fn write_yosys_to_rtlil(
     rtlil_out: Option<&Path>,
 ) -> Result<(), Box<dyn core::error::Error>> {
     let yosys = which::which("yosys")?;
-    match rtlil_out {
-        Some(path) => yosys_module.write_rtlil_to_path(config, path, &yosys),
-        None => yosys_module.write_rtlil_to_stdout(config, &yosys),
-    }
+    rtlil_out.map_or_else(
+        || yosys_module.write_rtlil_to_stdout(config, &yosys),
+        |path| yosys_module.write_rtlil_to_path(config, path, &yosys),
+    )
 }
 
 // EXAMPLES:

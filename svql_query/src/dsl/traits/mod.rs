@@ -106,21 +106,17 @@ pub trait Pattern: Sized + Send + Sync {
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-        Self: Sized;
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Execute the search and return results as a Table.
-    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
-    where
-        Self: Send + Sync + Component + 'static;
+    fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>;
 
     /// Execute the search and return results as a boxed `AnyTable`.
     fn search_table_any(
         ctx: &ExecutionContext,
     ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
     where
-        Self: Send + Sync + Component + 'static,
+        Self: Component + 'static,
     {
         let table = Self::search_table(ctx)?;
         Ok(Box::new(table))
@@ -130,10 +126,7 @@ pub trait Pattern: Sized + Send + Sync {
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
-    ) -> Result<Store, QueryError>
-    where
-        Self: Send + Sync + 'static,
-    {
+    ) -> Result<Store, QueryError> {
         info!("═══════════════════════════════════════════════════════");
         info!(
             "Starting pattern search for: {}",
@@ -180,7 +173,7 @@ pub trait Pattern: Sized + Send + Sync {
     /// any referenced submodule rows in the store.
     fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
     where
-        Self: Component + Send + Sync + 'static;
+        Self: Component + 'static;
 
     /// Create a hierarchical report node from a match row.
     fn row_to_report_node(
@@ -190,12 +183,12 @@ pub trait Pattern: Sized + Send + Sync {
         key: &DriverKey,
     ) -> ReportNode
     where
-        Self: Component + Send + Sync + 'static;
+        Self: Component + 'static;
 
     /// Render a match row as a formatted string.
     fn render_row(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> String
     where
-        Self: Component + Send + Sync + 'static,
+        Self: Component + 'static,
     {
         Self::row_to_report_node(row, store, driver, key).render()
     }
@@ -253,9 +246,7 @@ pub trait PatternInternal<K>: Sized {
 
 impl<T> Pattern for T
 where
-    T: Component,
-    T: PatternInternal<T::Kind>,
-    T: Send + Sync + 'static,
+    T: Component + PatternInternal<T::Kind> + Send + Sync + 'static,
 {
     const DEFS: &'static [ColumnDef] = T::DEFS;
 

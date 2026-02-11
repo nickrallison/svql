@@ -144,12 +144,10 @@ where
 
         // Head must be a submodule reference
         let (sub_row_idx, sub_type_id) = match &col_def.kind {
-            crate::session::ColumnKind::Sub(tid) => {
-                match &self.entry_array.entries[idx] {
-                    ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
-                    _ => return None,
-                }
-            }
+            crate::session::ColumnKind::Sub(tid) => match &self.entry_array.entries[idx] {
+                ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
+                _ => return None,
+            },
             _ => return None,
         };
 
@@ -167,7 +165,7 @@ where
     #[must_use]
     pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
         let idx = T::schema().index_of(name)?;
-        
+
         match &self.entry_array.entries[idx] {
             ColumnEntry::Sub(slot_idx) => Some(Ref::new(*slot_idx)),
             _ => None,
@@ -190,12 +188,20 @@ where
     }
 
     /// Set a wire column value with a cell ID (legacy method).
-    pub fn with_wire(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+    pub fn with_wire(
+        self,
+        name: &'static str,
+        cell_id: PhysicalCellId,
+    ) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
     }
 
     /// Set a wire column to a cell ID.
-    pub fn with_cell(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+    pub fn with_cell(
+        self,
+        name: &'static str,
+        cell_id: PhysicalCellId,
+    ) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
     }
 
@@ -205,10 +211,7 @@ where
         let id = T::schema()
             .index_of(name)
             .expect("Schema LUT missing sub column");
-        self.entry_array.entries[id] = match idx {
-            Some(idx) => ColumnEntry::Sub(idx),
-            None => ColumnEntry::Null,
-        };
+        self.entry_array.entries[id] = idx.map_or(ColumnEntry::Null, ColumnEntry::Sub);
         self
     }
 

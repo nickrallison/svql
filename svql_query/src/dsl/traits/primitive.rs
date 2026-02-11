@@ -17,15 +17,11 @@ use svql_driver::{Driver, DriverKey};
 /// Helper to extract wire reference from a Value
 fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
     // Try to get the first net from the value
-    match value.iter().take(1).next() {
-        Some(net) => net_to_wire_ref(&net),
-        None => {
-            // No nets means it's likely a constant value
-            // For now, we'll treat empty values as constant false
-            // TODO: Better constant detection once prjunnamed_netlist API is clearer
-            Some(WireRef::Constant(false))
-        }
-    }
+    value
+        .iter()
+        .take(1)
+        .next()
+        .map_or(Some(WireRef::Constant(false)), |net| net_to_wire_ref(&net))
 }
 
 /// Helper to extract wire reference from a Net
@@ -128,15 +124,13 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
                     }
                 }
                 "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
-                    if let Some(net) = ff.clear.nets().first() {
+                    ff.clear.nets().first().and_then(|net| {
                         if net.is_cell() {
                             net_to_wire_ref(net)
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    }
+                    })
                 }
                 _ => None,
             }
@@ -181,7 +175,9 @@ pub fn resolve_primitive_ports(
             }
         };
 
-        entries[idx] = wire_ref_opt.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+        entries[idx] = wire_ref_opt
+            .map(ColumnEntry::Wire)
+            .unwrap_or(ColumnEntry::Null);
     }
 
     EntryArray::new(entries)
@@ -246,7 +242,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
         _key: &DriverKey,
     ) -> Option<Self>
     where
-        Self: Component + PatternInternal<kind::Primitive> + Send + Sync + 'static;
+        Self: Component + PatternInternal<kind::Primitive> + 'static;
 
     /// Create a hierarchical report node from a match row
     ///
@@ -372,7 +368,10 @@ where
                         );
                         return None;
                     }
-                    Some(T::resolve(cell, cell_wrapper.debug_index().storage_key() as usize))
+                    Some(T::resolve(
+                        cell,
+                        cell_wrapper.debug_index().storage_key() as usize,
+                    ))
                 })
                 .collect();
 

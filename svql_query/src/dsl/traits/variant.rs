@@ -65,14 +65,22 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
-        tracing::info!("[VARIANT] Starting variant concatenation for: {}", std::any::type_name::<Self>());
-        
+        tracing::info!(
+            "[VARIANT] Starting variant concatenation for: {}",
+            std::any::type_name::<Self>()
+        );
+
         let schema = Self::variant_schema();
         let mut all_entries = Vec::new();
-        
+
         tracing::debug!("[VARIANT] Number of variant arms: {}", Self::NUM_VARIANTS);
         for (i, table) in dep_tables.iter().enumerate() {
-            tracing::debug!("  [{}] {}: {} rows", i, Self::VARIANT_ARMS[i].type_name, table.len());
+            tracing::debug!(
+                "  [{}] {}: {} rows",
+                i,
+                Self::VARIANT_ARMS[i].type_name,
+                table.len()
+            );
         }
 
         // Column indices (cached once)
@@ -85,11 +93,20 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
         for (variant_idx, table) in dep_tables.iter().enumerate() {
             let variant_name = Self::VARIANT_ARMS[variant_idx].type_name;
-            tracing::debug!("[VARIANT] Processing variant arm {}/{}: {} ({} rows)", 
-                variant_idx + 1, Self::NUM_VARIANTS, variant_name, table.len());
-            
+            tracing::debug!(
+                "[VARIANT] Processing variant arm {}/{}: {} ({} rows)",
+                variant_idx + 1,
+                Self::NUM_VARIANTS,
+                variant_name,
+                table.len()
+            );
+
             let port_maps = Self::PORT_MAPPINGS[variant_idx];
-            tracing::trace!("[VARIANT] Port mappings for {}: {} mappings", variant_name, port_maps.len());
+            tracing::trace!(
+                "[VARIANT] Port mappings for {}: {} mappings",
+                variant_name,
+                port_maps.len()
+            );
 
             for row_idx in 0..table.len() as u32 {
                 let mut entry = EntryArray::with_capacity(2 + Self::COMMON_PORTS.len());
@@ -100,7 +117,8 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 }
 
                 // 1. Set discriminant
-                entry.entries[discrim_idx] = ColumnEntry::Metadata(PhysicalCellId::new(variant_idx as u32));
+                entry.entries[discrim_idx] =
+                    ColumnEntry::Metadata(PhysicalCellId::new(variant_idx as u32));
 
                 // 2. Set inner_ref (row index in the variant arm's table)
                 entry.entries[inner_ref_idx] = ColumnEntry::Sub(row_idx);
@@ -111,26 +129,37 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                         let wire_ref = table
                             .resolve_path(row_idx as usize, mapping.inner, ctx)
                             .map(crate::wire::WireRef::Cell);
-                        entry.entries[col_idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                        entry.entries[col_idx] =
+                            wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 
                 all_entries.push(entry);
             }
-            
-            tracing::debug!("[VARIANT] Processed {} rows from variant arm: {}", 
-                table.len(), variant_name);
+
+            tracing::debug!(
+                "[VARIANT] Processed {} rows from variant arm: {}",
+                table.len(),
+                variant_name
+            );
         }
 
         // Apply automatic deduplication
         let before_dedup = all_entries.len();
         Self::apply_deduplication(&mut all_entries);
         if before_dedup != all_entries.len() {
-            tracing::debug!("[VARIANT] Deduplication: {} -> {} entries ({} removed)", 
-                before_dedup, all_entries.len(), before_dedup - all_entries.len());
+            tracing::debug!(
+                "[VARIANT] Deduplication: {} -> {} entries ({} removed)",
+                before_dedup,
+                all_entries.len(),
+                before_dedup - all_entries.len()
+            );
         }
 
-        tracing::info!("[VARIANT] Variant concatenation complete: {} total matches", all_entries.len());
+        tracing::info!(
+            "[VARIANT] Variant concatenation complete: {} total matches",
+            all_entries.len()
+        );
         Table::new(all_entries)
     }
 
@@ -143,9 +172,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-        Self: Sized;
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     fn variant_rehydrate(
         row: &Row<Self>,
@@ -154,7 +181,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         key: &DriverKey,
     ) -> Option<Self>
     where
-        Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static;
+        Self: Component + PatternInternal<kind::Variant> + 'static;
 
     /// Create a hierarchical report node from a match row
     ///

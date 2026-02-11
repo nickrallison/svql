@@ -7,10 +7,9 @@ use prjunnamed_netlist::Value;
 use tracing::debug;
 
 fn value_to_cell_id(value: &Value) -> Option<u32> {
-    match value.as_net() {
-        Some(net) => net.as_cell_index().map(|idx| idx as u32).ok(),
-        None => None,
-    }
+    value
+        .as_net()
+        .and_then(|net| net.as_cell_index().map(|idx| idx as u32).ok())
 }
 
 /// Trait for netlist-based pattern components.
@@ -189,9 +188,8 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    entries[col_idx] = ColumnEntry::cell(
-                        haystack_index.resolve_physical(*haystack_output_driver),
-                    );
+                    entries[col_idx] =
+                        ColumnEntry::cell(haystack_index.resolve_physical(*haystack_output_driver));
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one

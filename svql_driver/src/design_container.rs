@@ -3,6 +3,8 @@
 //! A `DesignContainer` uses self-referencing to ensure the graph index
 //! and netlist remain consistent throughout their lifetimes.
 
+#![allow(clippy::future_not_send)]
+
 use ouroboros::self_referencing;
 use prjunnamed_netlist::Design;
 use svql_common::GraphIndex;

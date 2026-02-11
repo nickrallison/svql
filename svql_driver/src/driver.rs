@@ -227,9 +227,11 @@ impl Driver {
         key: &DriverKey,
         physical: PhysicalCellId,
     ) -> Option<SourceLocation> {
-        let registry = self.registry.read().ok()?;
-        let container = registry.get(key)?;
-        
+        let container = {
+            let registry = self.registry.read().ok()?;
+            registry.get(key)?.clone()
+        };
+
         // Translate physical back to local node to reach the cell wrapper
         let node = container.index().resolve_node(physical)?;
         container.index().get_cell_by_index(node).get_source()

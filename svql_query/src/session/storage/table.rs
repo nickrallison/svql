@@ -301,9 +301,9 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError>;
 }
 
-impl<T: Send + Sync + 'static> AnyTable for Table<T>
+impl<T> AnyTable for Table<T>
 where
-    T: Pattern + Component,
+    T: Pattern + Component + Send + Sync + 'static,
 {
     fn as_any(&self) -> &dyn std::any::Any {
         self
