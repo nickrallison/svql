@@ -60,7 +60,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 
         let needle_internal_mask = (0..needle_index.num_cells())
             .map(|i| {
-                let kind = needle_index.get_cell_by_index(GraphNodeIdx::new(i as u32)).cell_type();
+                let kind = needle_index
+                    .get_cell_by_index(GraphNodeIdx::new(i as u32))
+                    .cell_type();
                 !matches!(kind, CellKind::Input | CellKind::Output)
             })
             .collect();
@@ -97,7 +99,9 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
     ) -> AssignmentSet {
         let needle_internal_mask = (0..needle_index.num_cells())
             .map(|i| {
-                let kind = needle_index.get_cell_by_index(GraphNodeIdx::new(i as u32)).cell_type();
+                let kind = needle_index
+                    .get_cell_by_index(GraphNodeIdx::new(i as u32))
+                    .cell_type();
                 !matches!(kind, CellKind::Input | CellKind::Output)
             })
             .collect();
@@ -514,6 +518,17 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     /// Removes duplicate assignments automatically.
     fn apply_deduplication(&self, results: &mut Vec<SingleAssignment>) {
         let mut seen = HashSet::new();
-        results.retain(|assignment| seen.insert(assignment.signature()));
+        results.retain(|assignment| {
+            // Deduplicate based on the logic gates, ignoring which IO ports were matched
+            let sig = assignment.filtered_signature(&self.needle_internal_mask);
+
+            // If the pattern has NO internal cells (it's just a port-to-port match),
+            // fall back to the full signature so we don't delete everything.
+            if sig.is_empty() {
+                seen.insert(assignment.signature())
+            } else {
+                seen.insert(sig)
+            }
+        });
     }
 }

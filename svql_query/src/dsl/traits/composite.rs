@@ -58,11 +58,7 @@ fn estimate_selectivity_from_index(
     if a_table.is_empty() || b_table.is_empty() {
         return 0.0;
     }
-    if let Some(index) = connectivity_cache.get(from_sub, to_sub, cnf_idx) {
-        index.edge_count as f64 / (a_table.len() as f64 * b_table.len() as f64)
-    } else {
-        1.0 // Conservative: assume no filtering if index missing
-    }
+    connectivity_cache.get(from_sub, to_sub, cnf_idx).map_or(1.0, |index| index.edge_count as f64 / (a_table.len() as f64 * b_table.len() as f64))
 }
 
 /// Estimate how much filtering occurs when joining `new_idx` with already-joined submodules
@@ -590,9 +586,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-        Self: Sized;
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {

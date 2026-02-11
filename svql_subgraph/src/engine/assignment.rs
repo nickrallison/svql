@@ -113,7 +113,8 @@ impl SingleAssignment {
     }
 
     pub fn signature_with_mask(&self, mask: &[bool]) -> Vec<u32> {
-        self.needle_to_haystack.iter()
+        self.needle_to_haystack
+            .iter()
             .filter(|(n, _)| mask[n.as_usize()])
             .map(|(_, &h)| h.into()) // using From<GraphNodeIdx> for u32
             .collect()
@@ -136,6 +137,21 @@ impl SingleAssignment {
             return self.signature();
         }
 
+        sig
+    }
+
+    pub fn filtered_signature(&self, mask: &[bool]) -> Vec<usize> {
+        let mut sig: Vec<usize> = self
+            .needle_to_haystack
+            .iter()
+            .filter(|(n_idx, _)| {
+                // Only include the node if the mask says it's an internal logic gate
+                mask.get((n_idx).as_usize()).copied().unwrap_or(false)
+            })
+            .map(|(_, &h_idx)| h_idx.into())
+            .collect();
+
+        sig.sort_unstable();
         sig
     }
 }

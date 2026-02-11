@@ -1,7 +1,7 @@
 use svql_common::{ConfigBuilder, MatchLength};
 use svql_subgraph::query_test;
 
-fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
 }
 

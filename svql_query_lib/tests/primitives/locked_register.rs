@@ -3,7 +3,7 @@ use svql_query::prelude::*;
 use svql_query_lib::security::primitives::locked_register::{AsyncDffMuxEnable, LockedRegister};
 
 // Common config for CWE-1234 tests
-fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn cwe1234_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
 }
 

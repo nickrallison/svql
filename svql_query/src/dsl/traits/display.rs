@@ -53,21 +53,21 @@ impl ReportNode {
             "|-- "
         };
 
-        let type_info = if let Some(ref d) = self.details {
-            format!("({}: {})", self.type_name, d)
-        } else {
-            format!("({})", self.type_name)
-        };
+        let type_info = self.details.as_ref().map_or_else(
+            || format!("({})", self.type_name),
+            |d| format!("({}: {})", self.type_name, d),
+        );
 
-        let source_header = if let Some(source_loc) = &self.source_loc {
-            if !source_loc.lines.is_empty() {
-                format!(": {}:", source_loc.file)
-            } else {
-                "".to_string()
-            }
-        } else {
-            "".to_string()
-        };
+        let source_header = self.source_loc.as_ref().map_or_else(
+            || "".to_string(),
+            |source_loc| {
+                if !source_loc.lines.is_empty() {
+                    format!(": {}:", source_loc.file)
+                } else {
+                    "".to_string()
+                }
+            },
+        );
 
         f.push_str(&format!(
             "{}{}{} {}{}\n",

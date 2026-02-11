@@ -218,7 +218,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         _key: &DriverKey,
     ) -> Option<Self>
     where
-        Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static;
+        Self: Component + PatternInternal<kind::Netlist> + 'static;
 
     /// Create a hierarchical report node from a match row
     ///
