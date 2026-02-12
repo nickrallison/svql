@@ -7,7 +7,7 @@ use crate::prelude::*;
 
 /// A simple columnar storage structure for ColumnEntry data.
 ///
-/// Stores data in column-major order, where each column is a Vec<ColumnEntry>.
+/// Stores data in column-major order, where each column is a `Vec<ColumnEntry>`.
 #[derive(Debug, Clone)]
 pub struct ColumnStore {
     /// Column data: column name -> Vec of typed entries
