@@ -1,3 +1,8 @@
+//! Core logic for hierarchical query composition.
+//!
+//! Implements the incremental join algorithm and cost-based planner 
+//! used to resolve connections between multiple pattern instances.
+
 use std::marker::PhantomData;
 
 #[cfg(feature = "parallel")]

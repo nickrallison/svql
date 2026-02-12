@@ -1,3 +1,4 @@
+//! Models for registers with gating or locking enable signals.
 use svql_query::prelude::*;
 
 // 1. Define the primitive DFF with enable

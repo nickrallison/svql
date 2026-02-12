@@ -1,3 +1,5 @@
+//! CWE-1271: Uninitialized Value on Reset of Security Sensitive Register.
+
 use svql_query::prelude::*;
 
 svql_query::define_dff_primitive!(

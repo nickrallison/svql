@@ -1,4 +1,7 @@
-// svql_macros/src/variant.rs
+//! Procedural macro implementation for the `Variant` derive.
+//!
+//! Handles polymorphic pattern matching by unioning results from multiple
+//! sub-patterns sharing a common interface.
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;

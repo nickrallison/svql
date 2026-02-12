@@ -1,3 +1,5 @@
+//! Common traits and types for the svql_query crate.
+
 pub use itertools;
 pub use svql_common as common;
 pub use svql_driver as driver;

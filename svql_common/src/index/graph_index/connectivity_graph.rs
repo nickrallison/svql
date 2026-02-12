@@ -1,3 +1,8 @@
+//! Adjacency and topology tracking for hardware designs.
+//!
+//! Implements the connectivity graph used for fast fan-in/fan-out traversal
+//! and pre-computed set intersections during subgraph matching.
+
 use std::sync::Arc;
 
 use crate::cell::GraphNodeIdx;

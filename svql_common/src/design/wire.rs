@@ -1,3 +1,8 @@
+//! Wire and net abstractions for hardware connectivity.
+//!
+//! Provides types for representing physical wires, primary ports, 
+//! and constants, along with their relative directions (Input/Output).
+
 use crate::*;
 use std::sync::Arc;
 

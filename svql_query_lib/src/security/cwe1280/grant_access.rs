@@ -1,3 +1,5 @@
+//! Credential validation logic for access control modules.
+
 use svql_query::prelude::*;
 
 /// Pattern for a module that validates credentials and outputs a grant signal.

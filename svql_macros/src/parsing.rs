@@ -1,4 +1,7 @@
-// svql_macros/src/parsing.rs
+//! Shared parsing utilities for SVQL procedural macros.
+//!
+//! Provides helpers for extracting attributes, handling path selectors,
+//! and validating DSL syntax during compilation.
 
 use proc_macro2::TokenStream;
 use quote::quote;

@@ -93,6 +93,10 @@ impl ColumnStore {
     }
 
     /// Appends a full row of entries to the store
+    ///
+    /// # Panics
+    ///
+    /// Panics if the column name does not exist in the store schema.
     pub fn push_row(&mut self, row: EntryArray) {
         for (name, entry) in self.column_names.iter().zip(row.entries.into_iter()) {
             self.columns.get_mut(name).unwrap().push(entry);
@@ -108,6 +112,10 @@ impl ColumnStore {
     /// Deduplicate rows based on all columns.
     ///
     /// Keeps the first occurrence of each unique row.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the column name does not exist in the store schema.
     pub fn deduplicate(&self) -> Self {
         let mut seen = HashSet::new();
         let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self
@@ -147,7 +155,11 @@ impl ColumnStore {
             column_names: self.column_names.clone(),
         }
     }
-
+///
+    /// # Panics
+    ///
+    /// Panics if the column name does not exist in the store schema.
+    
     /// Deduplicate rows based on a subset of columns.
     ///
     /// Keeps the first occurrence of each unique row.

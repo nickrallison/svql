@@ -1,3 +1,5 @@
+//! Experimental pattern matching sequential-to-combinational flow.
+
 use crate::primitives::{AndGate, Sdffe};
 use svql_query::prelude::*;
 

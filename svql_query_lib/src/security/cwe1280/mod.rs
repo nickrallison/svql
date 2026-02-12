@@ -1,3 +1,5 @@
+//! CWE-1280: Access Control with Stale Access Check.
+
 /// Credentials validation logic for access control.
 pub mod grant_access;
 

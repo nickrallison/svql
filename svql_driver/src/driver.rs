@@ -171,6 +171,10 @@ impl Driver {
     ///
     /// Returns a `DriverError` if the design file is invalid, cannot be read,
     /// or if Yosys processing fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal design registry lock is poisoned.
     pub fn get_design(
         &self,
         key: &DriverKey,
@@ -216,6 +220,10 @@ impl Driver {
     }
 
     /// Returns a snapshot of all currently loaded designs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal design registry lock is poisoned.
     #[must_use]
     pub fn get_all_designs(&self) -> HashMap<DriverKey, Arc<DesignContainer>> {
         self.registry.read().unwrap().clone()

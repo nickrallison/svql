@@ -1,3 +1,5 @@
+//! CWE-1234: Internal or Debug Modes Allow Override of Locks.
+
 /// Logical structures facilitating the bypass of register locks.
 pub mod unlock_logic;
 

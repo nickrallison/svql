@@ -1,3 +1,5 @@
+//! Combinational logic patterns for bypass/unlock signals.
+
 use svql_query::prelude::*;
 
 use crate::{AndGate, NotGate, OrGate, primitives::rec::RecOr};

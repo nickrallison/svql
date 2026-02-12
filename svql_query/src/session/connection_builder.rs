@@ -1,3 +1,8 @@
+//! Type-safe utility for recording physical connections.
+//!
+//! Validates signal flow directions (Driver vs Sink) when establishing
+//! constraints between pattern components.
+
 use std::marker::PhantomData;
 
 use crate::prelude::*;

@@ -1,3 +1,8 @@
+//! Core logic for polymorphic pattern selection.
+//!
+//! Implements the concatenation and dispatch logic for patterns 
+//! that offer multiple alternative implementations.
+
 use crate::prelude::*;
 
 /// Describes one variant arm for lookup during rehydration.

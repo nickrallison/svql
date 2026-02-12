@@ -1,4 +1,7 @@
-// svql_query/src/session/join_planner.rs
+//! Cost-based execution planner for submodule joins.
+//!
+//! Analyzes connectivity constraints to determine an optimal 
+//! join order, minimizing the size of intermediate Cartesian products.
 
 use crate::prelude::*;
 use crate::session::PatternSchema;

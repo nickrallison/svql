@@ -1,3 +1,5 @@
+//! Implementations of recursive tree patterns for standard gates.
+
 use std::sync::OnceLock;
 
 use crate::primitives::gates::*;

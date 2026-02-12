@@ -1,3 +1,8 @@
+//! CLI argument parsing and configuration mapping.
+//!
+//! This module defines the command-line interface for the SVQL tool,
+//! handling design paths, module selection, and execution constraints.
+
 use clap::Parser;
 use svql_common::*;
 use svql_driver::DriverKey;

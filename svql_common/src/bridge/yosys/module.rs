@@ -11,19 +11,29 @@ use super::{DesignPath, ModuleConfig};
 /// Represents a specific module within a design file to be processed by Yosys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct YosysModule {
+    /// Categorized path to the design source.
     path: DesignPath,
+    /// Name of the module to extract.
     module: String,
 }
 
+/// Internal format identifier for Yosys export commands.
 #[derive(Debug, Clone, Copy)]
 enum OutputFormat {
+    /// Standard Yosys JSON netlist.
     Json,
+    /// Yosys RTL Intermediate Language.
     Rtlil,
 }
 
 impl YosysModule {
     /// Creates a new `YosysModule` reference.
     /// Resolves relative paths against the workspace root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the design path cannot be categorized or contains
+    /// invalid characters.
     pub fn new<P: AsRef<Path>, S: AsRef<str>>(
         path: P,
         module: S,
@@ -164,6 +174,11 @@ impl YosysModule {
 
     /// Imports the design into the internal netlist format by invoking Yosys.
     /// Automatically locates the yosys binary in the system PATH.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Yosys binary is missing, execution fails,
+    /// or the resulting output cannot be parsed.
     pub fn import_design(
         &self,
         module_config: &ModuleConfig,

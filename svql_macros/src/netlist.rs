@@ -1,4 +1,7 @@
-// svql_macros/src/netlist.rs
+//! Procedural macro implementation for the `Netlist` derive.
+//!
+//! Maps struct fields to external Verilog/JSON ports and generates
+//! the logic for structural subgraph isomorphism searches.
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;

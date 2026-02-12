@@ -1,4 +1,7 @@
-// svql_query/src/session/connectivity_index.rs
+//! Bipartite indexing for physical connection validation.
+//!
+//! Maps relationships between rows of different tables based on 
+//! wire connectivity to optimize join performance.
 
 use crate::prelude::*;
 

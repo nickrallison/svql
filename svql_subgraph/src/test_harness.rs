@@ -1,3 +1,5 @@
+//! Testing utilities for the atomic subgraph isomorphism kernel.
+
 #![allow(dead_code)]
 
 use std::sync::Once;

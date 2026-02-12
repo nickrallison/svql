@@ -1,3 +1,8 @@
+//! Registry for mapping physical cells to local graph indices.
+//!
+//! This module maintains the identity of cells across different query 
+//! phases and allows for O(1) lookups by cell kind or ID.
+
 use crate::cell::{CellKind, CellWrapper, GraphNodeIdx};
 use crate::*;
 use prjunnamed_netlist::CellRef;

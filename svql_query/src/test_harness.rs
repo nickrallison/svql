@@ -1,3 +1,8 @@
+//! Infrastructure for verifying pattern matching results.
+//!
+//! Provides macros and runner logic for asserting match counts 
+//! and rehydration correctness against known design fixtures.
+
 use std::fmt::Debug;
 use std::sync::{Arc, Once};
 use svql_driver::design_container::DesignContainer;

@@ -1,3 +1,5 @@
+//! Models for registers lacking proper reset or initialization.
+
 use svql_query::prelude::*;
 
 #[derive(Debug, Clone, Netlist)]

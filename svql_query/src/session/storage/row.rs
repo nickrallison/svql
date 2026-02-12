@@ -208,6 +208,10 @@ where
 
     /// Set a submodule column value (with optional index).
     #[must_use]
+    ///
+    /// # Panics
+    ///
+    /// Panics if the requested column name is missing from the pattern schema.
     pub fn with_sub(mut self, name: &'static str, idx: Option<u32>) -> Self {
         let id = T::schema()
             .index_of(name)
@@ -216,6 +220,10 @@ where
         self
     }
 
+    ///
+    /// # Panics
+    ///
+    /// Panics if the requested column name is missing from the pattern schema.
     /// Validate that a selector path exists in the schema.
     ///
     /// Returns `true` if the path is valid, `false` otherwise.

@@ -1,3 +1,8 @@
+//! Hierarchical path navigation for pattern fields.
+//!
+//! The `Selector` type allows queries to traverse through nested 
+//! submodules to target specific ports or internal signals.
+
 /// A path selector with generic lifetime for flexibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Selector<'a> {

@@ -1,3 +1,8 @@
+//! Thread-safe synchronization for query results.
+//!
+//! Provides the `TableSlot` mechanism used to ensure each pattern in 
+//! the execution plan is computed exactly once during parallel search.
+
 use crate::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
@@ -82,6 +87,10 @@ impl TableSlot {
     ///
     /// Used by threads that lost the CAS race.
     /// Blocks until another thread calls `set()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal synchronization lock is poisoned.
     pub fn wait(&self) -> Arc<dyn AnyTable + Send + Sync> {
         // Fast path: already filled (common case after first access)
         if let Some(arc) = self.data.get() {

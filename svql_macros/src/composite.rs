@@ -1,4 +1,8 @@
-// svql_macros/src/composite.rs
+//! Procedural macro implementation for the `Composite` derive.
+//!
+//! Handles the parsing of connectivity attributes and generates 
+//! code for joining submodule tables into hierarchical matches.
+
 #![allow(clippy::too_many_lines, clippy::unnecessary_wraps)]
 
 use proc_macro::TokenStream;
