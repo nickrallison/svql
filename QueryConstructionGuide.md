@@ -66,7 +66,6 @@ pub enum DffAny {
 
 ## 4. Recursive Patterns (Trees)
 Used for structures of indeterminate depth (e.g., OR-trees). These require a manual `Recursive` trait implementation. 
-- Matches are computed via fixpoint iteration.
 - Results represent the maximal tree rooted at each target cell.
 
 ## 5. Built-in Primitives

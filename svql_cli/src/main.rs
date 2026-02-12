@@ -14,7 +14,7 @@ mod args;
 use clap::Parser;
 use rayon::prelude::*;
 use svql_query::prelude::*;
-use svql_query_lib::security::cwe1234::Cwe1234;
+use svql_query_lib::security::{Cwe1280, cwe1234::Cwe1234};
 use tracing::info;
 
 use args::Args;
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<Cwe1280>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<Cwe1234>()
+        .get::<Cwe1280>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();
