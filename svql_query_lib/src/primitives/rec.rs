@@ -102,8 +102,11 @@ impl Recursive for RecAnd {
         // Inputs are now Option<Wire> so rows with primary-port/constant
         // inputs are kept, preserving the 1:1 correspondence with and_table.
         struct GateInfo {
+            /// Input wire 'a', None if it's a primary port or constant
             a: Option<Wire>, // was: Wire (via filter_map)
+            /// Input wire 'b', None if it's a primary port or constant
             b: Option<Wire>, // was: Wire (via filter_map)
+            /// Output wire 'y'
             y: Wire,
         }
 
@@ -118,10 +121,15 @@ impl Recursive for RecAnd {
         // gate_info[i]  ↔  and_table.row(i)  — always
 
         struct RecAndEntry {
+            /// The base graph node index
             base_node: GraphNodeIdx,
+            /// Left child node index, if any
             left_child: Option<GraphNodeIdx>,
+            /// Right child node index, if any
             right_child: Option<GraphNodeIdx>,
+            /// Output wire 'y'
             y: Wire,
+            /// Depth in the recursive structure
             depth: u32,
         }
 
@@ -238,7 +246,11 @@ impl Recursive for RecAnd {
                     .and_then(|node| node_to_entry.get(&node))
                     .map(|&idx| ColumnEntry::Sub(idx as u32))
                     .unwrap_or(ColumnEntry::Null);
-                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] =
+                    e.y.cell_id()
+                        .map(svql_common::WireRef::Cell)
+                        .map(ColumnEntry::Wire)
+                        .unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 arr
             })
@@ -354,8 +366,11 @@ impl Recursive for RecOr {
         // Inputs are now Option<Wire> so rows with primary-port/constant
         // inputs are kept, preserving the 1:1 correspondence with or_table.
         struct GateInfo {
+            /// Input wire 'a', None if it's a primary port or constant
             a: Option<Wire>, // was: Wire (via filter_map)
+            /// Input wire 'b', None if it's a primary port or constant
             b: Option<Wire>, // was: Wire (via filter_map)
+            /// Output wire 'y'
             y: Wire,
         }
 
@@ -370,10 +385,15 @@ impl Recursive for RecOr {
         // gate_info[i]  ↔  or_table.row(i)  — always
 
         struct RecOrEntry {
+            /// The base graph node index
             base_node: GraphNodeIdx,
+            /// Left child node index, if any
             left_child: Option<GraphNodeIdx>,
+            /// Right child node index, if any
             right_child: Option<GraphNodeIdx>,
+            /// Output wire 'y'
             y: Wire,
+            /// Depth in the recursive structure
             depth: u32,
         }
 
@@ -490,7 +510,11 @@ impl Recursive for RecOr {
                     .and_then(|node| node_to_entry.get(&node))
                     .map(|&idx| ColumnEntry::Sub(idx as u32))
                     .unwrap_or(ColumnEntry::Null);
-                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] =
+                    e.y.cell_id()
+                        .map(svql_common::WireRef::Cell)
+                        .map(ColumnEntry::Wire)
+                        .unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 arr
             })
