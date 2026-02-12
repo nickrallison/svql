@@ -1,6 +1,6 @@
 //! Primary I/O mapping for module boundaries.
 //!
-//! Manages the translation between named module ports and the 
+//! Manages the translation between named module ports and the
 //! internal logic cells that drive or are driven by them.
 
 use crate::cell::GraphNodeIdx;
