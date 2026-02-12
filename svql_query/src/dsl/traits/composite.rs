@@ -14,11 +14,14 @@ use crate::{
 /// Connection constraint (keeping existing struct, just updating signature)
 #[derive(Debug, Clone, Copy)]
 pub struct Connection {
+    /// Source endpoint of the connection.
     pub from: Endpoint,
+    /// Destination endpoint of the connection.
     pub to: Endpoint,
 }
 
 impl Connection {
+    /// Creates a single connection constraint between two selectors.
     #[must_use]
     pub const fn new(from: Selector<'static>, to: Selector<'static>) -> Self {
         Self {
@@ -28,8 +31,10 @@ impl Connection {
     }
 }
 
+/// A target within a pattern hierarchy (a specific submodule port).
 #[derive(Debug, Clone, Copy)]
 pub struct Endpoint {
+    /// The path navigation to the target cell.
     pub selector: Selector<'static>,
 }
 
@@ -209,6 +214,10 @@ fn compute_optimal_join_order<T: Composite>(
     order
 }
 
+/// A trait for hardware components composed of multiple sub-patterns.
+///
+/// Composites define a hierarchy of submodules and the logical or physical 
+/// connections between them.
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
     /// Submodule declarations (macro-generated)
     const SUBMODULES: &'static [Submodule];
@@ -582,12 +591,14 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         }
     }
 
+    /// Pre-loads composite sub-patterns into the driver.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Creates a boilerplate search entry for a single submodule.
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries =
@@ -596,6 +607,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         EntryArray::new(entries)
     }
 
+    /// Joins an existing matching set with a new submodule table using connectivity filters.
     fn join_and_filter(
         entries: Vec<EntryArray>,
         join_idx: usize,
@@ -803,11 +815,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         }
     }
 
+    /// Maps a selector string to its submodule index in the schema.
     fn resolve_submodule(selector: &Endpoint) -> Option<usize> {
         let head = selector.selector.head()?;
         Self::composite_schema().submodule_index(head)
     }
 
+    /// Binds submodule port values to parent alias fields.
     fn resolve_aliases(
         entries: Vec<EntryArray>,
         ctx: &ExecutionContext,

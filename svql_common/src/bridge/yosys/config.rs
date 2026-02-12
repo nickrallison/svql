@@ -24,45 +24,55 @@ pub struct ModuleConfig {
 }
 
 impl ModuleConfig {
+    /// Creates a new default configuration for Yosys module processing.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets whether to flatten the module hierarchy.
     #[must_use]
     pub const fn with_flatten(mut self, flatten: bool) -> Self {
         self.flatten = flatten;
         self
     }
 
+    /// Sets whether to run the `opt_clean` pass.
     #[must_use]
     pub const fn with_opt_clean(mut self, opt_clean: bool) -> Self {
         self.opt_clean = opt_clean;
         self
     }
 
+    /// Sets whether to run the `opt` pass.
     #[must_use]
     pub const fn with_opt(mut self, opt: bool) -> Self {
         self.opt = opt;
         self
     }
 
+    /// Adds a parameter override.
     #[must_use]
     pub fn with_param(mut self, param: &str, value: &str) -> Self {
         self.params.insert(param.to_owned(), value.to_owned());
         self
     }
 
+    /// Adds a custom Yosys step command.
     #[must_use]
     pub fn with_step(mut self, step: &str) -> Self {
         self.other_steps.push(step.to_owned());
         self
     }
+
+    /// Sets whether to use Verific for parsing.
     #[must_use]
     pub const fn with_verific(mut self, verific: bool) -> Self {
         self.verific = verific;
         self
     }
+
+    /// Sets whether to skip Yosys processing and load the raw JSON.
     #[must_use]
     pub const fn with_load_raw(mut self, load_raw: bool) -> Self {
         self.load_raw = load_raw;

@@ -35,6 +35,7 @@ pub enum ClaimResult<'a> {
 }
 
 impl TableSlot {
+    /// Creates a new empty slot for a result table.
     pub fn new() -> Self {
         Self {
             data: OnceLock::new(),

@@ -21,9 +21,11 @@
 extern crate self as svql_query;
 
 pub mod dsl;
+/// Common types and re-exports for building queries.
 pub mod prelude;
 pub mod session;
 
+/// Testing utilities and fixture orchestration.
 #[macro_use]
 pub mod test_harness;
 

@@ -19,6 +19,7 @@
 mod engine;
 mod utils;
 
+/// Infrastructure for testing pattern matching against known fixtures.
 pub mod test_harness;
 
 pub mod cell;

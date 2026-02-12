@@ -2,6 +2,7 @@ use crate::cell::{CellKind, CellWrapper, GraphNodeIdx};
 use crate::*;
 use prjunnamed_netlist::CellRef;
 
+/// Maintains a mapping of all cells in a design, keyed by their physical and graph IDs.
 #[derive(Clone, Debug)]
 pub struct CellRegistry<'a> {
     /// Nodes in topological order (Name nodes filtered out)
@@ -13,6 +14,7 @@ pub struct CellRegistry<'a> {
 }
 
 impl<'a> CellRegistry<'a> {
+    /// Builds a registry from a topologically ordered list of cell references.
     #[must_use]
     pub fn build(cell_refs_topo: &[CellRef<'a>]) -> Self {
         let cells_topo = Self::build_cells_topo(cell_refs_topo);
@@ -26,11 +28,13 @@ impl<'a> CellRegistry<'a> {
         }
     }
 
+    /// Returns the total number of cells in the registry.
     #[must_use]
     pub const fn len(&self) -> usize {
         self.cells_topo.len()
     }
 
+    /// Returns true if no cells are registered.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.cells_topo.is_empty()
@@ -71,6 +75,7 @@ impl<'a> CellRegistry<'a> {
         cell_type_indices
     }
 
+    /// Returns all indices of cells matching the provided type.
     #[must_use]
     pub fn cells_of_type_indices(&self, node_type: CellKind) -> &[GraphNodeIdx] {
         self.cell_type_indices
@@ -78,11 +83,13 @@ impl<'a> CellRegistry<'a> {
             .map_or(&[], std::vec::Vec::as_slice)
     }
 
+    /// Returns the translation map from physical debug IDs to local graph indices.
     #[must_use]
     pub const fn cell_id_map(&self) -> &HashMap<usize, GraphNodeIdx> {
         &self.cell_id_map
     }
 
+    /// Resolves a graph index to its corresponding cell wrapper.
     #[must_use]
     pub fn get_cell_by_index(&self, index: GraphNodeIdx) -> &CellWrapper<'a> {
         &self.cells_topo[index.as_usize()]

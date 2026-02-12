@@ -1,6 +1,7 @@
 //! Query execution planning and dispatch.
 
 mod connectivity_index;
+/// Cost-based planner for joining submodule results.
 pub mod join_planner;
 mod plan;
 mod slot;

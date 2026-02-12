@@ -121,22 +121,28 @@ impl<'a> GraphIndex<'a> {
 
     /// Returns a map of input port names to their fan-out cell indices.
     #[must_use]
-    pub const fn get_input_fanout_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
+    pub const fn get_input_fanout_by_name_indices(
+        &self,
+    ) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         self.io_mapping.input_fanout_by_name_map()
     }
 
     /// Returns a map of output port names to their fan-in cell indices.
     #[must_use]
-    pub const fn get_output_fanin_by_name_indices(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
+    pub const fn get_output_fanin_by_name_indices(
+        &self,
+    ) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         self.io_mapping.output_fanin_by_name_map()
     }
 
     // --- Job A: Fast Topology (For Solver) ---
 
+    /// Returns the immediate fan-out node indices for the specified node.
     pub fn fanout(&self, node: GraphNodeIdx) -> &[GraphNodeIdx] {
         self.connectivity.fanout_indices(node).unwrap_or(&[])
     }
 
+    /// Returns the immediate fan-in node indices for the specified node.
     pub fn fanin(&self, node: GraphNodeIdx) -> &[GraphNodeIdx] {
         self.connectivity.fanin_indices(node).unwrap_or(&[])
     }
@@ -157,10 +163,12 @@ impl<'a> GraphIndex<'a> {
 
     // --- Job C: Capabilities (For Pruning) ---
 
+    /// Returns the hardware primitive type of the specified node.
     pub fn node_kind(&self, node: GraphNodeIdx) -> CellKind {
         self.get_cell_by_index(node).cell_type()
     }
 
+    /// Returns all node indices in the graph that match the specified cell kind.
     pub fn candidates(&self, kind: CellKind) -> &[GraphNodeIdx] {
         self.cell_registry.cells_of_type_indices(kind)
     }

@@ -26,7 +26,12 @@ pub enum QueryError {
 
     /// Schema mismatch between expected and actual column types.
     #[error("Schema mismatch: expected {expected}, got {actual}")]
-    SchemaMismatch { expected: String, actual: String },
+    SchemaMismatch { 
+        /// The type or structure expected by the query.
+        expected: String, 
+        /// The type or structure found in the design.
+        actual: String 
+    },
 
     /// Schema mismatch between expected and actual column types.
     #[error("Schema didn't have: {0}")]
@@ -45,6 +50,7 @@ pub enum QueryError {
     #[error("Subgraph matching failed: {0}")]
     SubgraphMatch(String),
 
+    /// A generic error occurring during the execution of a search plan.
     #[error("Execution error: {0}")]
     ExecutionError(String),
 }

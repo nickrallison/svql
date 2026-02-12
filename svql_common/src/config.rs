@@ -75,6 +75,7 @@ pub struct ConfigBuilder {
     match_length: MatchLength,
     needle_options: ModuleConfig,
     haystack_options: ModuleConfig,
+    /// Whether logic variables in the pattern can match constant drivers (0/1) in the design.
     pub pattern_vars_match_design_consts: bool,
     max_recursion_depth: Option<usize>,
     parallel: bool,

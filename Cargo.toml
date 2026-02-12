@@ -93,6 +93,10 @@ yap = "0.12.0"
 [workspace.lints.rust]
 missing_docs = "warn"
 
+
+
+
+
 [workspace.lints.clippy]
 complexity = "deny"
 correctness = "deny"

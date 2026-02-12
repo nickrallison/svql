@@ -56,6 +56,7 @@ impl<'a> Selector<'a> {
 
 // Convenience for static selectors
 impl Selector<'static> {
+    /// Creates a path selector from a static slice of strings.
     #[must_use] 
     pub const fn static_path(path: &'static [&'static str]) -> Self {
         Self { path }

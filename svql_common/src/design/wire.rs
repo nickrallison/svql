@@ -48,18 +48,25 @@ impl WireRef {
 /// additional direction metadata from the schema.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Wire {
-    /// Cell-driven wire
+    /// Cell-driven wire.
     Cell {
+        /// The stable ID of the driving cell.
         id: PhysicalCellId,
+        /// The direction context of this wire relative to the field.
         direction: PortDirection,
     },
-    /// Primary port at module boundary
+    /// Primary port at module boundary.
     PrimaryPort {
+        /// Name of the top-level port.
         name: Arc<str>,
+        /// Direction of the port.
         direction: PortDirection,
     },
-    /// Constant value
-    Constant { value: bool },
+    /// Constant value.
+    Constant { 
+        /// Boolean representation (false=0, true=1).
+        value: bool 
+    },
 }
 
 impl Wire {

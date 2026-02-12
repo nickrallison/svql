@@ -8,6 +8,7 @@ use crate::SubgraphMatcher;
 
 static INIT: Once = Once::new();
 
+/// Configures logging for the test runner.
 pub fn setup_test_logging() {
     INIT.call_once(|| {
         let _ = tracing_subscriber::fmt()
@@ -17,12 +18,18 @@ pub fn setup_test_logging() {
     });
 }
 
+/// Specification for a subgraph matching integration test.
 #[derive(Default)]
 pub struct TestSpec<'a> {
+    /// File path to the haystack netlist.
     pub haystack_path: &'a str,
+    /// Name of the top module in the haystack.
     pub haystack_module: &'a str,
+    /// File path to the pattern (needle) netlist.
     pub needle_path: &'a str,
+    /// Name of the pattern module.
     pub needle_module: &'a str,
+    /// Number of distinct matches expected.
     pub expected_count: usize,
     /// Optional configuration builder to override defaults
     pub config_fn: Option<fn(ConfigBuilder) -> ConfigBuilder>,
@@ -78,6 +85,7 @@ pub fn run_query_test(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
+/// Defines a test case for subgraph matching.
 #[macro_export]
 macro_rules! query_test {
     (

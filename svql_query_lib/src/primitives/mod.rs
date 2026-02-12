@@ -5,6 +5,7 @@
 
 pub mod dff;
 pub mod gates;
+/// Recursive pattern implementations for tree structures.
 pub mod rec;
 
 // Re-export commonly used primitives

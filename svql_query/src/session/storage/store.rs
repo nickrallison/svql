@@ -111,6 +111,7 @@ impl Store {
     }
 
     #[must_use]
+    /// Retrieves a type-erased table using a raw `TypeId`.
     pub fn get_from_tid(&self, type_id: TypeId) -> Option<&(dyn AnyTable + Send + Sync)> {
         self.tables.get(&type_id).map(std::convert::AsRef::as_ref)
     }

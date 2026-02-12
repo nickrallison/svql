@@ -104,6 +104,7 @@ where
         &mut self.store
     }
 
+    /// Retrieves a specific entry from the table by row and column name.
     pub fn get_entry(&self, row_idx: usize, col_name: &str) -> ColumnEntry {
         self.store.get_cell(col_name, row_idx).clone()
     }

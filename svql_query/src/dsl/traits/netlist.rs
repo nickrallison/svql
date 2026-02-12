@@ -141,6 +141,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         DriverKey::new(Self::FILE_PATH, Self::MODULE_NAME.to_string())
     }
 
+    /// Resolves a hardware assignment into a columnar row entry.
     #[must_use]
     fn resolve(
         assignment: &SingleAssignment,
@@ -211,6 +212,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         EntryArray::new(entries)
     }
 
+    /// Rehydrates a storage row into a concrete Pattern struct.
     fn netlist_rehydrate(
         _row: &Row<Self>,
         _store: &Store,

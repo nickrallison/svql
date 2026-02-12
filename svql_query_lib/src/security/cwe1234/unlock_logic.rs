@@ -11,12 +11,16 @@ use crate::{AndGate, NotGate, OrGate, primitives::rec::RecOr};
 #[or_to(from = ["rec_or", "y"], to = [["top_and", "a"], ["top_and", "b"]])]
 #[filter(check_fanin_has_not_gates)]
 pub struct UnlockLogic {
+    /// Logical AND gate combining various lock signals.
     #[submodule]
     pub top_and: AndGate,
+    /// Discovered tree of OR gates checking for unlock conditions.
     #[submodule]
     pub rec_or: RecOr,
+    /// The specific inverter creating the bypass vulnerability.
     #[submodule]
     pub not_gate: NotGate,
+    /// The resulting unlock port wire.
     #[alias(output, target = ["top_and", "y"])]
     pub unlock: Wire,
 }

@@ -12,6 +12,7 @@ pub struct VariantArm {
     pub type_name: &'static str,
 }
 
+/// Defines an interface for patterns that support multiple concrete implementations.
 pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'static {
     /// Number of variant arms
     const NUM_VARIANTS: usize;
@@ -168,12 +169,14 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         crate::traits::apply_deduplication(entries);
     }
 
+    /// Pre-loads all possible variant designs into the driver.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Dispatches rehydration to the specific implementation matched in the row.
     fn variant_rehydrate(
         row: &Row<Self>,
         store: &Store,

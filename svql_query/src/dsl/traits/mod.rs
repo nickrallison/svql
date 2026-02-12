@@ -3,11 +3,13 @@
 //! Defines the interfaces that all netlists, composites, and variants must
 //! implement to participate in the SVQL query system.
 
+/// Hierarchical grouping patterns.
 pub mod composite;
 pub mod display;
 pub mod netlist;
 pub mod primitive;
 pub mod recursive;
+/// Choice-based implementation patterns.
 pub mod variant;
 
 // Re-export key traits
@@ -41,6 +43,7 @@ pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
     None
 }
 
+/// Executes a search function and returns the result as a type-erased table.
 pub fn search_table_any<T>(
     ctx: &ExecutionContext,
     search_table: fn(&ExecutionContext) -> Result<Table<T>, QueryError>,
@@ -102,6 +105,7 @@ pub trait Pattern: Sized + Send + Sync {
         std::any::type_name::<Self>()
     }
 
+    /// Loads designs into the driver cache before the search phase.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -122,6 +126,7 @@ pub trait Pattern: Sized + Send + Sync {
         Ok(Box::new(table))
     }
 
+    /// Entry point for plan execution.
     fn search(
         driver: &Driver,
         design_key: &DriverKey,
@@ -194,37 +199,51 @@ pub trait Pattern: Sized + Send + Sync {
     }
 }
 
+/// Identifies the fundamental implementation style of a hardware component.
 pub mod kind {
+    /// Matches an external netlist file.
     pub struct Netlist;
+    /// Matches a hierarchy of sub-patterns.
     pub struct Composite;
+    /// Matches one of multiple possible implementations.
     pub struct Variant;
+    /// Matches a direct cell kind in the design.
     pub struct Primitive;
+    /// Matches a self-referential tree structure.
     pub struct Recursive;
 }
 
+/// Basic hardware component trait for kind-specification.
 pub trait Component {
+    /// The Kind struct from the kind module.
     type Kind;
 }
 
+/// Trait implemented by logic defining how to execute a pattern Kind.
 pub trait PatternInternal<K>: Sized {
+    /// Initial definition list.
     const DEFS: &'static [ColumnDef];
-
+    /// Column count.
     const SCHEMA_SIZE: usize = Self::DEFS.len();
-
+    /// Execution metadata.
     const EXEC_INFO: &'static crate::session::ExecInfo;
 
+    /// Return the specific schema for this implementation.
     fn internal_schema() -> &'static crate::session::PatternSchema;
 
+    /// Pre-fetch required designs into the driver cache.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Primary search logic for the pattern Kind.
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
         Self: Send + Sync + 'static;
 
+    /// Reconstructs the rust struct from a type-erased row.
     fn internal_rehydrate(
         _row: &Row<Self>,
         _store: &Store,
@@ -234,6 +253,7 @@ pub trait PatternInternal<K>: Sized {
     where
         Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
 
+    /// Generates a report node from stored row data.
     fn internal_row_to_report_node(
         row: &Row<Self>,
         store: &Store,

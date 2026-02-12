@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::prelude::*;
 
+/// Utility for defining connectivity constraints between pattern components.
 pub struct ConnectionBuilder<'a, S> {
     _marker: PhantomData<&'a S>,
 }
@@ -13,6 +14,7 @@ impl<S> Default for ConnectionBuilder<'_, S> {
 }
 
 impl<S> ConnectionBuilder<'_, S> {
+    /// Creates a new connection builder.
     #[must_use] 
     pub const fn new() -> Self {
         Self {
@@ -20,6 +22,7 @@ impl<S> ConnectionBuilder<'_, S> {
         }
     }
 
+    /// Connects two wires and validates their directions are compatible.
     pub fn connect(&mut self, from: &Wire, to: &Wire) {
         // 1. Validate Directionality
 

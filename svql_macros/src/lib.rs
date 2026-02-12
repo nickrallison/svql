@@ -1,9 +1,7 @@
-// Procedural macros for SVQL pattern definitions.
-//
-// This crate provides three main derive macros for defining patterns:
-// - `Netlist`: For netlist-based (Verilog) components
-// - `Composite`: For composite patterns combining multiple components
-// - `Variant`: For variant patterns (enums with multiple implementations)
+//! Procedural macros for the SVQL pattern matching DSL.
+//!
+//! Provides derive macros for defining hardware patterns via Netlists (external files),
+//! Composites (hierarchical groupings), and Variants (polymorphic implementations).
 
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;

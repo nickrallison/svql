@@ -21,10 +21,15 @@ use super::slot::ClaimResult;
 /// They are provided by `Pattern::search()` implementations.
 pub type SearchFn = fn(&ExecutionContext) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>;
 
+/// Static metadata and search dispatch for a pattern type.
 pub struct ExecInfo {
+    /// Unique ID for the pattern type.
     pub type_id: std::any::TypeId,
+    /// Human-readable name of the pattern.
     pub type_name: &'static str,
+    /// The function that executes logic for this pattern.
     pub search_function: SearchFn,
+    /// Required sub-patterns that must execute first.
     pub nested_dependancies: &'static [&'static Self],
 }
 
@@ -112,6 +117,7 @@ impl std::fmt::Debug for ExecutionPlan {
 }
 
 impl ExecutionPlan {
+    /// Constructs a dependency-ordered execution plan starting from a root pattern.
     #[must_use]
     pub fn build(root: &super::ExecInfo) -> (Self, HashMap<TypeId, TableSlot>) {
         tracing::info!("Building execution plan for pattern: {}", root.type_name);
@@ -369,6 +375,7 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
+    /// Creates a new context with hardware design access and result slots.
     #[must_use]
     pub fn new(
         driver: Driver,

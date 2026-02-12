@@ -14,6 +14,7 @@ pub enum DesignPath {
 }
 
 impl DesignPath {
+    /// Categorizes a filesystem path based on its extension.
     pub fn new(path: PathBuf) -> Result<Self, String> {
         match path.extension().and_then(|s| s.to_str()) {
             Some("v") => Ok(Self::Verilog(path)),
@@ -26,14 +27,16 @@ impl DesignPath {
         }
     }
 
-    #[must_use] 
+    /// Returns a reference to the underlying path.
+    #[must_use]
     pub fn path(&self) -> &Path {
         match self {
             Self::Verilog(p) | Self::Rtlil(p) | Self::Json(p) => p,
         }
     }
 
-    #[must_use] 
+    /// Returns the Yosys command string used to read this file type.
+    #[must_use]
     pub const fn read_command(&self) -> &'static str {
         match self {
             Self::Verilog(_) => "read_verilog -sv",

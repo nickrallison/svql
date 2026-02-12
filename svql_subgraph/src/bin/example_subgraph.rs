@@ -1,3 +1,5 @@
+//! Demonstration binary for executing the core subgraph isomorphism matching against fixture designs.
+
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {

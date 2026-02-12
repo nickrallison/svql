@@ -28,6 +28,7 @@ pub struct PhysicalCellId {
 }
 
 impl PhysicalCellId {
+    /// Creates a new persistent cell ID from a raw integer.
     pub const fn new(id: u32) -> Self {
         Self { inner: id }
     }
@@ -77,10 +78,12 @@ pub struct GraphNodeIdx {
 }
 
 impl GraphNodeIdx {
+    /// Creates a new local graph index from a raw integer.
     pub const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
+    /// Returns the index as a usize for array access.
     pub const fn as_usize(self) -> usize {
         self.inner as usize
     }
@@ -120,40 +123,75 @@ impl From<GraphNodeIdx> for u32 {
 /// Categorizes netlist primitives into known types for matching.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CellKind {
+    /// Buffer / Identity gate.
     Buf,
+    /// Inverter gate.
     Not,
+    /// Logical AND gate.
     And,
+    /// Logical OR gate.
     Or,
+    /// Logical XOR gate.
     Xor,
+    /// Multiplexer.
     Mux,
+    /// Adder/Carry logic.
     Adc,
+    /// And-Inverter Graph node.
     Aig,
+    /// Equality comparator.
     Eq,
+    /// Unsigned Less-Than comparator.
     ULt,
+    /// Signed Less-Than comparator.
     SLt,
+    /// Shift left.
     Shl,
+    /// Unsigned shift right.
     UShr,
+    /// Signed shift right.
     SShr,
+    /// Logical shift right.
     XShr,
+    /// Multiplier.
     Mul,
+    /// Unsigned division.
     UDiv,
+    /// Unsigned modulo.
     UMod,
+    /// Signed division (truncating).
     SDivTrunc,
+    /// Signed division (flooring).
     SDivFloor,
+    /// Signed modulo (truncating).
     SModTrunc,
+    /// Signed modulo (flooring).
     SModFloor,
+    /// Match/Case logic.
     Match,
+    /// Assignment / Connection.
     Assign,
+    /// D-Latch with Set/Reset.
     DLatchSr,
+    /// Asynchronous D-Latch.
     ADLatch,
+    /// Flip-Flop (Sequential).
     Dff,
+    /// Memory/Array block.
     Memory,
+    /// IO Buffer.
     IoBuf,
+    /// Simulation/Synthesis Target.
     Target,
+    /// Other unmapped cell type.
     Other,
+    /// Module input port.
     Input,
+    /// Module output port.
     Output,
+    /// Name/Metadata node.
     Name,
+    /// Debugging/Attribute node.
     Debug,
 }
 
@@ -263,7 +301,9 @@ impl fmt::Display for CellKind {
 /// Represents a physical location in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceLocation {
+    /// The originating source file.
     pub file: Arc<str>,
+    /// The lines encompassing the hardware definition.
     pub lines: Vec<SourceLine>,
 }
 
@@ -282,8 +322,11 @@ impl SourceLocation {
 /// Represents a specific line and column range within a source file.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceLine {
+    /// 1-indexed line number.
     pub number: usize,
+    /// Character offset where the definition starts.
     pub start_column: usize,
+    /// Character offset where the definition ends.
     pub end_column: usize,
 }
 
@@ -306,13 +349,14 @@ impl SourceLine {
 // CellInfo
 // ---------------------------------------------------------------------------
 
+/// High-level metadata about a cell extracted from the netlist.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CellInfo {
-    /// Unique identifier (`debug_index`) to allow equality checks
+    /// Unique identifier to allow equality checks across design loads.
     pub id: PhysicalCellId,
-    /// The type of cell (AND, OR, DFF, etc.)
+    /// The primitive type of the cell.
     pub kind: CellKind,
-    /// Source code location
+    /// File and line information if available in the netlist.
     pub source_loc: Option<SourceLocation>,
 }
 
@@ -448,6 +492,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
+    /// Converts the wrapper and its specific metadata into a portable `CellInfo`.
     #[must_use]
     pub fn to_info(&self) -> CellInfo {
         CellInfo {

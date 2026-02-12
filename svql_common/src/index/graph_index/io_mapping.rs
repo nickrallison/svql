@@ -2,6 +2,7 @@ use crate::cell::GraphNodeIdx;
 use crate::*;
 use prjunnamed_netlist::{Cell, CellRef};
 
+/// Manages the connection between primary module ports and internal logic cells.
 #[derive(Clone, Debug)]
 pub struct IoMapping {
     /// Maps input names to their fan-out cells
@@ -11,6 +12,7 @@ pub struct IoMapping {
 }
 
 impl IoMapping {
+    /// Builds the I/O mapping by inspecting module boundaries and internal connectivity.
     #[must_use]
     pub fn build(
         cell_refs_topo: &[CellRef<'_>],
@@ -59,11 +61,13 @@ impl IoMapping {
             .collect()
     }
 
+    /// Access the map of input names to the internal cells they drive.
     #[must_use]
     pub const fn input_fanout_by_name_map(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         &self.input_fanout_by_name
     }
 
+    /// Access the map of output names to the internal cells that drive them.
     #[must_use]
     pub const fn output_fanin_by_name_map(&self) -> &HashMap<String, Vec<(GraphNodeIdx, usize)>> {
         &self.output_fanin_by_name

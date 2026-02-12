@@ -1,3 +1,5 @@
+//! Demonstration binary for the columnar DataFrame-style query API and join planner.
+
 use svql_query::{define_primitive, prelude::*};
 
 #[expect(unused)]
@@ -43,6 +45,7 @@ impl Component for AndGate {
 
 #[expect(unused)]
 #[derive(Debug, Clone)]
+/// A composite structure used to demonstrate join operations between two logic gates.
 pub struct And2Gates {
     and1: AndGate,
     and2: AndGate,

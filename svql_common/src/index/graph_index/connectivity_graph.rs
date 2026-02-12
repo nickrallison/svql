@@ -8,6 +8,7 @@ use prjunnamed_netlist::{CellRef, Design};
 type FaninMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
 type FanoutMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
 
+/// Stores adjacency information for the design graph, optimized for traversal.
 #[derive(Clone, Debug)]
 pub struct ConnectivityGraph {
     /// Maps each cell to its fan-in cells with port information
@@ -27,6 +28,7 @@ pub struct ConnectivityGraph {
 }
 
 impl ConnectivityGraph {
+    /// Builds the connectivity index using design cells and a translation map.
     #[must_use]
     pub fn build(
         design: &Design,
@@ -133,6 +135,7 @@ impl ConnectivityGraph {
             .collect()
     }
 
+    /// Returns the slice of fan-out indices for a specific node, if they exist.
     #[must_use]
     pub fn fanout_indices(&self, cell_idx: GraphNodeIdx) -> Option<&[GraphNodeIdx]> {
         self.fanout_indices
@@ -140,6 +143,7 @@ impl ConnectivityGraph {
             .map(std::vec::Vec::as_slice)
     }
 
+    /// Returns the slice of fan-in indices for a specific node, if they exist.
     #[must_use]
     pub fn fanin_indices(&self, cell_idx: GraphNodeIdx) -> Option<&[GraphNodeIdx]> {
         self.fanin_indices
@@ -147,6 +151,7 @@ impl ConnectivityGraph {
             .map(std::vec::Vec::as_slice)
     }
 
+    /// Returns the set of unique fan-out indices for a specific node.
     #[must_use]
     pub fn fanout_indices_set(&self, cell_idx: GraphNodeIdx) -> &HashSet<GraphNodeIdx> {
         self.fanout_sets.get(&cell_idx).unwrap_or_else(|| {
@@ -155,6 +160,7 @@ impl ConnectivityGraph {
         })
     }
 
+    /// Returns the set of unique fan-in indices for a specific node.
     #[must_use]
     pub fn fanin_indices_set(&self, cell_idx: GraphNodeIdx) -> &HashSet<GraphNodeIdx> {
         self.fanin_sets.get(&cell_idx).unwrap_or_else(|| {
@@ -175,11 +181,13 @@ impl ConnectivityGraph {
             .clone()
     }
 
+    /// Access the underlying fan-in mapping including pin metadata.
     #[must_use]
     pub const fn fanin_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
         &self.fanin_map
     }
 
+    /// Access the underlying fan-out mapping including pin metadata.
     #[must_use]
     pub const fn fanout_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
         &self.fanout_map

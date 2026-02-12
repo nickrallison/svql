@@ -108,6 +108,7 @@ impl PatternSchema {
         self.defs.get(index)
     }
 
+    /// Returns the index of a submodule within the compose target list.
     #[inline]
     #[must_use]
     pub fn submodule_index(&self, name: &str) -> Option<usize> {
@@ -273,6 +274,7 @@ impl ColumnDef {
         self
     }
 
+    /// Returns the target TypeId if this column represents a submodule.
     #[must_use]
     pub const fn as_submodule(&self) -> Option<TypeId> {
         match &self.kind {
@@ -282,14 +284,17 @@ impl ColumnDef {
     }
 }
 
-/// Port declaration for netlist and variant schemas
+/// Description of a pattern port.
 #[derive(Debug, Clone, Copy)]
 pub struct Port {
+    /// Name matching the netlist or alias.
     pub name: &'static str,
+    /// Flow direction.
     pub direction: PortDirection,
 }
 
 impl Port {
+    /// Declares an input port.
     #[must_use]
     pub const fn input(name: &'static str) -> Self {
         Self {
@@ -298,6 +303,7 @@ impl Port {
         }
     }
 
+    /// Declares an output port.
     #[must_use]
     pub const fn output(name: &'static str) -> Self {
         Self {
@@ -306,6 +312,7 @@ impl Port {
         }
     }
 
+    /// Declares an inout port.
     #[must_use]
     pub const fn inout(name: &'static str) -> Self {
         Self {
@@ -315,14 +322,17 @@ impl Port {
     }
 }
 
-/// Submodule declaration for composites
+/// Description of a nested submodule field.
 #[derive(Debug, Clone, Copy)]
 pub struct Submodule {
+    /// Field name in the struct.
     pub name: &'static str,
+    /// Type fingerprint.
     pub type_id: TypeId,
 }
 
 impl Submodule {
+    /// Creates a submodule declaration from a type.
     #[must_use]
     pub const fn of<T: 'static>(name: &'static str) -> Self {
         Self {
@@ -332,15 +342,19 @@ impl Submodule {
     }
 }
 
-/// Alias: exposes a submodule's port as this composite's port
+/// Exposes a submodule's port as a parent field.
 #[derive(Debug, Clone, Copy)]
 pub struct Alias {
+    /// The name of the alias field.
     pub port_name: &'static str,
+    /// The path selector targeting the submodule port.
     pub target: crate::selector::Selector<'static>,
+    /// The direction of the port.
     pub direction: PortDirection,
 }
 
 impl Alias {
+    /// Creates an input alias.
     #[must_use]
     pub const fn input(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
         Self {
@@ -350,6 +364,7 @@ impl Alias {
         }
     }
 
+    /// Creates an output alias.
     #[must_use]
     pub const fn output(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
         Self {
@@ -360,14 +375,17 @@ impl Alias {
     }
 }
 
-/// Port mapping for variants
+/// Defines the mapping from common variant ports to specific implementation paths.
 #[derive(Debug, Clone, Copy)]
 pub struct PortMap {
+    /// The name of the common interface port.
     pub common_port: &'static str,
+    /// Real path in the specific variant implementation.
     pub inner: crate::selector::Selector<'static>,
 }
 
 impl PortMap {
+    /// Creates a new port mapping.
     #[must_use]
     pub const fn new(common: &'static str, inner: crate::selector::Selector<'static>) -> Self {
         Self {
@@ -377,15 +395,16 @@ impl PortMap {
     }
 }
 
+/// A dynamic value type for columnar table storage.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ColumnEntry {
-    /// No value stored (replaces Option::None)
+    /// The cell or reference is missing or optional.
     Null,
-    /// A wire reference (Cell, Primary Port, or Constant)
+    /// A hardware wire entry.
     Wire(WireRef),
-    /// A reference to a row in another table
+    /// A row index referencing another table.
     Sub(u32),
-    /// Opaque metadata (e.g. depth, flags)
+    /// Pattern metadata.
     Metadata(PhysicalCellId),
 }
 
@@ -431,12 +450,15 @@ impl ColumnEntry {
     }
 }
 
+/// A fixed-size array of data representing one match result row.
 #[derive(Debug, Clone)]
 pub struct EntryArray {
+    /// Ordered list of data corresponding to the pattern's schema.
     pub entries: Vec<ColumnEntry>,
 }
 
 impl EntryArray {
+    /// Creates an empty array.
     #[must_use]
     pub const fn empty() -> Self {
         Self {
@@ -444,6 +466,7 @@ impl EntryArray {
         }
     }
 
+    /// Pre-allocates an array with specific capacity.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {

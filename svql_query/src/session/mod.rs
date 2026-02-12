@@ -12,6 +12,7 @@
 pub mod execution;
 pub mod storage;
 
+/// Logic for recording and validating connections between pattern fields.
 pub mod connection_builder;
 mod error;
 pub mod schema;

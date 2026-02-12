@@ -278,6 +278,7 @@ impl Recursive for RecAnd {
     }
 }
 
+/// A recursive tree formed of boolean OR gates.
 #[derive(Debug, Clone)]
 pub struct RecOr {
     /// Reference to the underlying AND gate at this node.

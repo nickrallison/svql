@@ -1,3 +1,5 @@
+//! Command-line utility for benchmarking and collecting matched pattern statistics over large designs.
+
 // use svql_query::prelude::*;
 
 // use argparse::{ArgumentParser, Store};

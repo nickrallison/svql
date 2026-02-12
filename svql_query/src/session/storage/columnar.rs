@@ -100,6 +100,7 @@ impl ColumnStore {
         self.num_rows += 1;
     }
 
+    /// Retrieves a single cell entry by column name and row index.
     pub fn get_cell(&self, col_name: &str, row_idx: usize) -> &ColumnEntry {
         &self.columns[col_name][row_idx]
     }

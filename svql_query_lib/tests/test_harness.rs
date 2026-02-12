@@ -1,3 +1,8 @@
+//! Integration test harness for SVQL pattern verification.
+//!
+//! Provides utilities for loading designs, executing queries via the
+//! DataFrame API, and asserting match counts.
+
 #![allow(dead_code)]
 
 use std::fmt::Debug;
@@ -7,6 +12,7 @@ use svql_query::{prelude::*, traits::Component};
 
 static INIT: Once = Once::new();
 
+/// Initializes the tracing subscriber for test output.
 pub fn setup_test_logging() {
     INIT.call_once(|| {
         let _ = tracing_subscriber::fmt()
@@ -16,16 +22,21 @@ pub fn setup_test_logging() {
     });
 }
 
+/// Configuration for a specific pattern matching test case.
 #[derive(Default)]
 pub struct TestSpec<'a> {
+    /// Path to the design file used as the search space.
     pub haystack_path: &'a str,
+    /// Top-level module name in the haystack.
     pub haystack_module: &'a str,
+    /// Number of matches expected for the test to pass.
     pub expected_count: usize,
-    /// Optional configuration builder to override defaults
+    /// Optional configuration builder to override defaults.
     pub config_fn: Option<fn(ConfigBuilder) -> ConfigBuilder>,
 }
 
 impl TestSpec<'_> {
+    /// Loads the design associated with this test spec using the driver.
     pub fn get_design(
         &self,
         driver: &Driver,
@@ -38,6 +49,7 @@ impl TestSpec<'_> {
         Ok(container)
     }
 
+    /// Generates the unique driver key for the haystack design.
     pub fn get_key(&self) -> DriverKey {
         DriverKey::new(self.haystack_path, self.haystack_module)
     }
@@ -137,6 +149,7 @@ where
     Ok(())
 }
 
+/// Helper macro to generate a boilerplate test case.
 #[macro_export]
 macro_rules! query_test {
     (

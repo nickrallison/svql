@@ -1,3 +1,5 @@
+//! Binary utility for inspecting the topological ordering of cells within a netlist.
+
 use prjunnamed_netlist::Cell;
 use std::borrow::Cow;
 use svql_common::YosysModule;

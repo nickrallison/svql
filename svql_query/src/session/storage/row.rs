@@ -53,6 +53,7 @@ where
         Ref::new(self.idx)
     }
 
+    /// Accesses the underlying fixed-size array of data for this row.
     #[inline]
     #[must_use]
     pub const fn entry_array(&self) -> &EntryArray {
@@ -269,6 +270,7 @@ where
         true
     }
 
+    /// Formats the row as a hierarchical string report.
     pub fn render(&self, store: &Store, driver: &Driver, key: &DriverKey) -> String
     where
         T: Pattern + svql_query::traits::Component + 'static,

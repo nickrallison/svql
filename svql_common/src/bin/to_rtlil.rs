@@ -1,3 +1,5 @@
+//! CLI utility to convert hardware netlists (Verilog/JSON) to RTLIL format via Yosys.
+
 use std::path::Path;
 use svql_common::{ModuleConfig, YosysModule};
 

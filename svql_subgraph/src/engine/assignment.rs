@@ -7,20 +7,24 @@ use crate::cell::GraphNodeIdx;
 /// A collection of mappings found during a search.
 #[derive(Clone, Debug, Default)]
 pub struct AssignmentSet {
+    /// The specific mappings found in the haystack.
     pub items: Vec<SingleAssignment>,
 }
 
 impl AssignmentSet {
+    /// Creates a set from a list of assignments.
     #[must_use]
     pub const fn new(items: Vec<SingleAssignment>) -> Self {
         Self { items }
     }
 
+    /// Returns true if no matches were found.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 
+    /// Returns the count of found matches.
     #[must_use]
     pub const fn len(&self) -> usize {
         self.items.len()
@@ -61,11 +65,13 @@ impl SingleAssignment {
         None
     }
 
+    /// Resolves a needle cell index to its matched haystack counterpart.
     #[must_use]
     pub fn get_haystack_cell(&self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         self.needle_to_haystack.get(&needle).copied()
     }
 
+    /// Returns all needle cells that map to a specific haystack cell.
     #[must_use]
     pub fn get_needle_cells(&self, haystack: GraphNodeIdx) -> &[GraphNodeIdx] {
         self.haystack_to_needle
@@ -79,23 +85,27 @@ impl SingleAssignment {
         !self.haystack_to_needle.contains_key(&haystack)
     }
 
+    /// Returns the number of assigned cells in this mapping.
     #[must_use]
     pub fn len(&self) -> usize {
         debug_assert_eq!(self.needle_to_haystack.len(), self.haystack_to_needle.len());
         self.needle_to_haystack.len()
     }
 
+    /// Returns true if no assignments have been made.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         debug_assert_eq!(self.needle_to_haystack.len(), self.haystack_to_needle.len());
         self.needle_to_haystack.is_empty()
     }
 
+    /// Access the raw haystack-to-needle mapping.
     #[must_use]
     pub const fn haystack_mapping(&self) -> &HashMap<GraphNodeIdx, Vec<GraphNodeIdx>> {
         &self.haystack_to_needle
     }
 
+    /// Access the raw needle-to-haystack mapping.
     #[must_use]
     pub const fn needle_mapping(&self) -> &HashMap<GraphNodeIdx, GraphNodeIdx> {
         &self.needle_to_haystack
@@ -112,6 +122,7 @@ impl SingleAssignment {
         sig
     }
 
+    /// Generates a bitmask-filtered signature for deduplication.
     pub fn signature_with_mask(&self, mask: &[bool]) -> Vec<u32> {
         self.needle_to_haystack
             .iter()
@@ -140,6 +151,7 @@ impl SingleAssignment {
         sig
     }
 
+    /// Generates a signature focusing only on filtered logic gates.
     pub fn filtered_signature(&self, mask: &[bool]) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .needle_to_haystack
