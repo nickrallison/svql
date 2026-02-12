@@ -1,6 +1,6 @@
 //! Thread-safe synchronization for query results.
 //!
-//! Provides the `TableSlot` mechanism used to ensure each pattern in 
+//! Provides the `TableSlot` mechanism used to ensure each pattern in
 //! the execution plan is computed exactly once during parallel search.
 
 use crate::prelude::*;
@@ -113,6 +113,10 @@ impl TableSlot {
     ///
     /// Called by the thread that won the CAS race.
     /// Wakes up all threads waiting in `wait()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal synchronization lock is poisoned.
     pub fn set(&self, value: Arc<dyn AnyTable + Send + Sync>) {
         // Store the data (OnceLock ensures single write)
         let _ = self.data.set(value);

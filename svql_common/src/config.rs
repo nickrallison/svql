@@ -72,12 +72,17 @@ impl Hash for Config {
 /// A builder pattern implementation for the `Config` struct.
 #[derive(Clone, Debug)]
 pub struct ConfigBuilder {
+    /// Strategy for how many matches to find.
     match_length: MatchLength,
+    /// Settings for pattern module ingestion.
     needle_options: ModuleConfig,
+    /// Settings for target module ingestion.
     haystack_options: ModuleConfig,
     /// Whether logic variables in the pattern can match constant drivers (0/1) in the design.
     pub pattern_vars_match_design_consts: bool,
+    /// Hard limit on search depth to prevent infinite recursion.
     max_recursion_depth: Option<usize>,
+    /// Enable multi-threaded search.
     parallel: bool,
 }
 

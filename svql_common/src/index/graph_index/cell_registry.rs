@@ -45,6 +45,7 @@ impl<'a> CellRegistry<'a> {
         self.cells_topo.is_empty()
     }
 
+    /// Wraps raw netlist cells into `CellWrapper` instances in topological order.
     fn build_cells_topo(cell_refs_topo: &[CellRef<'a>]) -> Vec<CellWrapper<'a>> {
         cell_refs_topo
             .iter()
@@ -53,6 +54,7 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
+    /// Creates a mapping from physical cell IDs to local graph node indices.
     fn build_cell_id_map(cells_topo: &[CellWrapper<'a>]) -> HashMap<usize, GraphNodeIdx> {
         cells_topo
             .iter()
@@ -66,6 +68,7 @@ impl<'a> CellRegistry<'a> {
             .collect()
     }
 
+    /// Group graph node indices by their functional cell type.
     fn build_cell_type_indices(
         cell_refs_topo: &[CellRef<'a>],
     ) -> HashMap<CellKind, Vec<GraphNodeIdx>> {

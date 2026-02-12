@@ -6,6 +6,7 @@
 /// A path selector with generic lifetime for flexibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Selector<'a> {
+    /// The ordered list of path segments.
     path: &'a [&'a str],
 }
 

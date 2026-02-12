@@ -24,6 +24,7 @@ use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 /// This is used for storage in Tables and cross-referencing between queries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PhysicalCellId {
+    /// The underlying raw integer ID.
     inner: u32,
 }
 
@@ -74,6 +75,7 @@ impl fmt::Display for PhysicalCellId {
 /// Exclusively used inside the subgraph solver for performance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GraphNodeIdx {
+    /// The underlying raw integer index.
     inner: u32,
 }
 
@@ -375,8 +377,11 @@ impl CellInfo {
 /// A wrapper around a netlist cell that provides stable identity and metadata access.
 #[derive(Clone)]
 pub struct CellWrapper<'a> {
+    /// The underlying netlist cell data.
     cell: Cow<'a, Cell>,
+    /// Persistent identifier for this cell in the design.
     debug_index: PhysicalCellId,
+    /// Reference to the cell's metadata if available.
     metadata: MetaItemRef<'a>,
 }
 

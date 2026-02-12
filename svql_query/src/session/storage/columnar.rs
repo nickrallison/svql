@@ -12,12 +12,15 @@ use crate::prelude::*;
 pub struct ColumnStore {
     /// Column data: column name -> Vec of typed entries
     columns: HashMap<String, Vec<ColumnEntry>>,
+    /// Number of rows in the store.
     num_rows: usize,
+    /// Ordered list of column names.
     column_names: Vec<String>,
 }
 
 impl ColumnStore {
     /// Create an empty ColumnStore with the given column names.
+    #[must_use]
     pub fn new(column_names: Vec<String>) -> Self {
         let mut columns = HashMap::with_capacity(column_names.len());
         for name in &column_names {
@@ -33,6 +36,11 @@ impl ColumnStore {
     /// Create a ColumnStore from column data.
     ///
     /// All columns must have the same length.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the number of column names does not match the data or
+    /// if columns have inconsistent lengths.
     pub fn from_columns(
         column_names: Vec<String>,
         data: Vec<Vec<ColumnEntry>>,
@@ -155,14 +163,14 @@ impl ColumnStore {
             column_names: self.column_names.clone(),
         }
     }
-///
-    /// # Panics
-    ///
-    /// Panics if the column name does not exist in the store schema.
-    
+
     /// Deduplicate rows based on a subset of columns.
     ///
     /// Keeps the first occurrence of each unique row.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the column name does not exist in the store schema.
     pub fn deduplicate_subset(&self, subset: &[String]) -> Self {
         let mut seen = HashSet::new();
         let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self

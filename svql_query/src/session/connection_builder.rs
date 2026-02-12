@@ -9,6 +9,7 @@ use crate::prelude::*;
 
 /// Utility for defining connectivity constraints between pattern components.
 pub struct ConnectionBuilder<'a, S> {
+    /// Phantom data to carry the relationship between 'a and S.
     _marker: PhantomData<&'a S>,
 }
 
@@ -28,6 +29,10 @@ impl<S> ConnectionBuilder<'_, S> {
     }
 
     /// Connects two wires and validates their directions are compatible.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either wire has an incompatible direction for source or target role.
     pub fn connect(&mut self, from: &Wire, to: &Wire) {
         // 1. Validate Directionality
 

@@ -21,8 +21,11 @@ use prjunnamed_netlist::{CellRef, Design};
 /// An index over a design graph providing fast access to connectivity and cell data.
 #[derive(Clone, Debug)]
 pub struct GraphIndex<'a> {
+    /// Registry of all cells in the design, with stable indices.
     cell_registry: CellRegistry<'a>,
+    /// Pre-computed adjacency lists and set intersections for fast traversal.
     connectivity: ConnectivityGraph,
+    /// Mappings between external I/O ports and internal drive logic.
     io_mapping: IoMapping,
 }
 

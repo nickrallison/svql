@@ -176,14 +176,13 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     /// 1. Get all base pattern matches from context
     /// 2. Build `output→row_index` lookup
     /// 3. Initialize all nodes as leaves (depth=0, no children)
-    /// 4. Fixpoint: for each node, check if inputs come from other nodes' outputs
-    /// 5. Update children and depths until no changes
+    /// 4. Fixpoint: for each node, check if inputs come from other nodes' outputs.
     ///
-    /// # Returns
+    /// Executes the fixed-point iteration to discover all instances of the recursive pattern.
     ///
-    /// A table where each row is a node in a recursive structure. Nodes that
-    /// are children of other nodes are still included as separate rows (they
-    /// can be filtered out post-hoc if only roots are desired).
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the seed search or join steps fail.
     fn build_recursive(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>;
 
     /// Rehydrate a row back into the concrete type.
@@ -195,6 +194,10 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     ) -> Option<Self>;
 
     /// Preload required designs into the driver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying netlist designs cannot be loaded.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,

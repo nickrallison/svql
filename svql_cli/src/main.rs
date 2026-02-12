@@ -6,6 +6,7 @@
 #![allow(unused_imports)]
 
 #[global_allocator]
+/// Global allocator using jemalloc for better performance in parallel workloads.
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod args;

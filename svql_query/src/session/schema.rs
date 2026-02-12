@@ -473,6 +473,7 @@ impl EntryArray {
             entries: vec![ColumnEntry::Null; capacity],
         }
     }
+    /// Creates a new entry array from a vector of entries.
     pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
         Self { entries }
     }

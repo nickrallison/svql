@@ -44,6 +44,10 @@ pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
 }
 
 /// Executes a search function and returns the result as a type-erased table.
+///
+/// # Errors
+///
+/// Returns a `QueryError` if the search fails.
 pub fn search_table_any<T>(
     ctx: &ExecutionContext,
     search_table: fn(&ExecutionContext) -> Result<Table<T>, QueryError>,
@@ -106,6 +110,10 @@ pub trait Pattern: Sized + Send + Sync {
     }
 
     /// Loads designs into the driver cache before the search phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if design loading fails.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -113,9 +121,17 @@ pub trait Pattern: Sized + Send + Sync {
     ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Execute the search and return results as a Table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the search fails.
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>;
 
     /// Execute the search and return results as a boxed `AnyTable`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the search fails.
     fn search_table_any(
         ctx: &ExecutionContext,
     ) -> Result<Box<dyn AnyTable + Send + Sync>, QueryError>
@@ -127,6 +143,10 @@ pub trait Pattern: Sized + Send + Sync {
     }
 
     /// Entry point for plan execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the search fails.
     fn search(
         driver: &Driver,
         design_key: &DriverKey,
@@ -232,6 +252,10 @@ pub trait PatternInternal<K>: Sized {
     fn internal_schema() -> &'static crate::session::PatternSchema;
 
     /// Pre-fetch required designs into the driver cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if pre-loading fails.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -239,6 +263,10 @@ pub trait PatternInternal<K>: Sized {
     ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Primary search logic for the pattern Kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the search fails.
     fn search_table(ctx: &ExecutionContext) -> Result<Table<Self>, QueryError>
     where
         Self: Send + Sync + 'static;

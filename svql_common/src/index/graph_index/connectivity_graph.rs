@@ -10,7 +10,9 @@ use crate::*;
 use dashmap::DashMap;
 use prjunnamed_netlist::{CellRef, Design};
 
+/// Mapping from a cell to its input neighbors and their port indices.
 type FaninMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
+/// Mapping from a cell to its output neighbors and their port indices.
 type FanoutMap = HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>;
 
 /// Stores adjacency information for the design graph, optimized for traversal.
@@ -60,6 +62,7 @@ impl ConnectivityGraph {
         }
     }
 
+    /// Calculates the intersection of all fan-outs for a given cell's fan-in neighbors.
     fn compute_single_intersect(&self, cell_idx: GraphNodeIdx) -> HashSet<GraphNodeIdx> {
         let Some(fanin_list) = self.fanin_map.get(&cell_idx) else {
             return HashSet::default();
@@ -86,6 +89,7 @@ impl ConnectivityGraph {
         result
     }
 
+    /// Iterates through the design and builds the bipartite adjacency maps.
     fn build_fanin_fanout_maps(
         design: &Design,
         cell_refs_topo: &[CellRef<'_>],
@@ -118,6 +122,7 @@ impl ConnectivityGraph {
         (fanin_map, fanout_map)
     }
 
+    /// Transforms adjacency lists into `HashSet` for fast existence checks.
     fn precompute_sets(
         map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
     ) -> HashMap<GraphNodeIdx, HashSet<GraphNodeIdx>> {
@@ -129,6 +134,7 @@ impl ConnectivityGraph {
             .collect()
     }
 
+    /// Transforms adjacency lists into sorted `Vec` (indices) for fast iteration.
     fn precompute_indices(
         map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
     ) -> HashMap<GraphNodeIdx, Vec<GraphNodeIdx>> {

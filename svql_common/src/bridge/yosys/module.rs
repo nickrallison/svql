@@ -188,6 +188,11 @@ impl YosysModule {
     }
 
     /// Imports the design using a specific Yosys binary path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Yosys binary is missing, execution fails,
+    /// or the resulting output cannot be parsed.
     pub fn import_design_yosys(
         &self,
         module_config: &ModuleConfig,
@@ -205,6 +210,11 @@ impl YosysModule {
     }
 
     /// Imports the design without any preprocessing by Yosys.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Yosys binary is missing, execution fails,
+    /// or the resulting output cannot be parsed.
     pub fn import_design_raw(
         &self,
     ) -> Result<prjunnamed_netlist::Design, Box<dyn core::error::Error>> {
@@ -229,6 +239,11 @@ impl YosysModule {
     }
 
     /// Writes the processed design in RTLIL format to the specified path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Yosys binary is missing, execution fails,
+    /// or the resulting output cannot be parsed.
     pub fn write_rtlil_to_path(
         &self,
         config: &ModuleConfig,
@@ -240,6 +255,11 @@ impl YosysModule {
     }
 
     /// Writes the processed design in RTLIL format to standard output.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Yosys binary is missing, execution fails,
+    /// or the resulting output cannot be parsed.
     pub fn write_rtlil_to_stdout(
         &self,
         config: &ModuleConfig,

@@ -57,6 +57,7 @@ fn resolve_submodule<T: Composite>(endpoint: &Endpoint) -> Option<usize> {
     T::composite_schema().submodule_index(head)
 }
 
+/// Heuristic estimation of join selectivity between two submodules based on pre-computed graph connectivity.
 fn estimate_selectivity_from_index(
     connectivity_cache: &ConnectivityCache,
     from_sub: usize,
@@ -270,7 +271,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         defs
     }
 
-    /// Compose submodule results into composite results
+    /// Compose submodule results into composite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the composition process fails or if required dependencies are missing.
     fn compose(
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
@@ -320,7 +325,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 .collect()
         } else {
             (0..first_table.len() as u32)
-                .into_iter()
                 .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
                 .collect()
         };
@@ -597,6 +601,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     }
 
     /// Pre-loads composite sub-patterns into the driver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the sub-patterns fail to load.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -827,6 +835,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     }
 
     /// Binds submodule port values to parent alias fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if a path resolution fails or an alias cannot be satisfied.
     fn resolve_aliases(
         entries: Vec<EntryArray>,
         ctx: &ExecutionContext,
@@ -967,6 +979,7 @@ where
 }
 
 #[allow(unused)]
+/// Internal unit tests for the `Composite` trait.
 pub(crate) mod test {
 
     use crate::{
@@ -989,15 +1002,21 @@ pub(crate) mod test {
     #[filter(|_row, _ctx| { 
         true
     })]
+    /// A test pattern representing two cascaded AND gates.
     pub struct And2Gates {
+        /// The first gate.
         #[submodule]
         pub and1: AndGate,
+        /// The second gate.
         #[submodule]
         pub and2: AndGate,
+        /// First input.
         #[alias(input, target = ["and1", "a"])]
         pub a: Wire,
+        /// Second input.
         #[alias(input, target = ["and1", "b"])]
         pub b: Wire,
+        /// Final output.
         #[alias(output, target = ["and2", "y"])]
         pub y: Wire,
     }
@@ -1010,11 +1029,17 @@ pub(crate) mod test {
     );
 
     #[derive(Debug, Clone)]
+    /// Manual implementation of a composite pattern for testing.
     pub struct ManualAnd2Gates {
+        /// First gate.
         pub and1: AndGate,
+        /// Second gate.
         pub and2: AndGate,
+        /// First interface input.
         pub a: Wire,
+        /// Second interface input.
         pub b: Wire,
+        /// Interface output.
         pub y: Wire,
     }
 

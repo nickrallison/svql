@@ -47,7 +47,7 @@ struct ExecutionNode {
 }
 
 impl ExecutionNode {
-    // /// Check if this node has already been executed.
+    /// Flatten and deduplicate the dependency tree into a linear list.
     fn flatten_deps(&self) -> Vec<Arc<Self>> {
         let mut seen: HashSet<TypeId> = HashSet::new();
         let mut result: Vec<Arc<Self>> = Vec::new();
@@ -68,6 +68,7 @@ impl ExecutionNode {
         result
     }
 
+    /// Construct an execution node and recursively build its dependencies from `ExecInfo`.
     fn from_dep(exec_info: &ExecInfo) -> Self {
         let mut deps = vec![];
         for nested in exec_info.nested_dependancies {
@@ -155,6 +156,14 @@ impl ExecutionPlan {
     /// * `driver` - The driver for design access
     /// * `key` - The driver key for the design to search
     /// * `config` - Execution configuration
+    /// * `slots` - Storage slots for tables
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if:
+    /// * The design fails to load.
+    /// * Any search function within the plan fails.
+    /// * Multi-threaded execution encounters a panic or synchronization error.
     pub fn execute(
         self,
         driver: &Driver,
@@ -228,7 +237,7 @@ impl ExecutionPlan {
         #[cfg(feature = "parallel")]
         self.nodes
             .par_iter()
-            .try_for_each(|node| ExecutionPlan::execute_node(node, ctx))?;
+            .try_for_each(|node| Self::execute_node(node, ctx))?;
 
         #[cfg(not(feature = "parallel"))]
         self.nodes
@@ -336,6 +345,10 @@ impl ExecutionPlan {
     }
 
     /// Convert the context into a Store after execution completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if any table is missing from the slots.
     pub fn try_into_store(self, ctx: &ExecutionContext) -> Result<Store, QueryError> {
         let mut store = Store::with_capacity(ctx.slots.len());
 
@@ -377,6 +390,7 @@ pub struct ExecutionContext {
 impl ExecutionContext {
     /// Creates a new context with hardware design access and result slots.
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(
         driver: Driver,
         design_key: DriverKey,

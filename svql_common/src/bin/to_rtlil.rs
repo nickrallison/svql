@@ -3,6 +3,11 @@
 use std::path::Path;
 use svql_common::{ModuleConfig, YosysModule};
 
+/// Invokes Yosys to process a design and output the resulting netlist in RTLIL format.
+///
+/// # Errors
+///
+/// Returns an error if the Yosys binary cannot be found or if the conversion process fails.
 fn write_yosys_to_rtlil(
     yosys_module: &YosysModule,
     config: &ModuleConfig,

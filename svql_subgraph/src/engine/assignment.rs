@@ -41,6 +41,7 @@ pub struct SingleAssignment {
 }
 
 impl SingleAssignment {
+    /// Creates a new, empty mapping between needle and haystack.
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: HashMap::default(),
@@ -48,6 +49,7 @@ impl SingleAssignment {
         }
     }
 
+    /// Record a match between a needle node and a haystack node.
     pub(super) fn assign(&mut self, needle: GraphNodeIdx, haystack: GraphNodeIdx) {
         self.needle_to_haystack.insert(needle, haystack);
         self.haystack_to_needle
@@ -56,6 +58,7 @@ impl SingleAssignment {
             .push(needle);
     }
 
+    /// Removes an assignment by its needle index.
     #[allow(dead_code)]
     pub(super) fn remove_by_needle(&mut self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
@@ -111,6 +114,7 @@ impl SingleAssignment {
         &self.needle_to_haystack
     }
 
+    /// Generates a sorted, unique list of haystack indices included in this match.
     pub(super) fn signature(&self) -> Vec<usize> {
         let mut sig: Vec<usize> = self
             .needle_to_haystack

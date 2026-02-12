@@ -166,6 +166,12 @@ impl Store {
     /// # Returns
     ///
     /// Returns the number of tables successfully exported, or an error if any export fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if:
+    /// * The output directory cannot be created.
+    /// * Any of the individual CSV exports fail.
     pub fn to_csv_dir<P: AsRef<std::path::Path>>(
         &self,
         output_dir: P,

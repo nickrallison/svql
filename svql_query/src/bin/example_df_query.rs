@@ -4,9 +4,13 @@ use svql_query::{define_primitive, prelude::*};
 
 #[expect(unused)]
 #[derive(Debug, Clone)]
+/// A simple pattern representing a single AND gate.
 struct AndGate {
+    /// Input pin A.
     a: Wire,
+    /// Input pin B.
     b: Wire,
+    /// Output pin Y.
     y: Wire,
 }
 
@@ -47,7 +51,9 @@ impl Component for AndGate {
 #[derive(Debug, Clone)]
 /// A composite structure used to demonstrate join operations between two logic gates.
 pub struct And2Gates {
+    /// The first AND gate.
     and1: AndGate,
+    /// The second AND gate.
     and2: AndGate,
 }
 

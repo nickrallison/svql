@@ -12,23 +12,31 @@ use crate::parsing::{Direction, PathSelector, find_attr};
 
 /// A common port declaration
 struct CommonPort {
+    /// Port identifier.
     name: String,
+    /// Connection direction.
     direction: Direction,
 }
 
 /// A port mapping from common port to inner path
 struct PortMapping {
+    /// Identifier of the interface port.
     common_port: String,
+    /// Internal path within the submodule.
     inner_path: PathSelector,
 }
 
 /// A variant arm with its type and port mappings
 struct VariantArm {
+    /// Variant name.
     name: Ident,
+    /// Associated type for this variant.
     inner_ty: syn::Type,
+    /// List of port mappings for this variant.
     mappings: Vec<PortMapping>,
 }
 
+/// Implementation of the `Variant` procedural macro.
 pub fn variant_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
@@ -219,6 +227,7 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Extracts the `#[variant_ports(...)]` container attribute.
 fn parse_variant_ports(input: &DeriveInput) -> Vec<CommonPort> {
     let attr = find_attr(&input.attrs, "variant_ports")
         .unwrap_or_else(|| abort!(input, "Missing #[variant_ports(...)] attribute"));
@@ -256,6 +265,7 @@ fn parse_variant_ports(input: &DeriveInput) -> Vec<CommonPort> {
     ports
 }
 
+/// Parses each enum variant and its associated `#[map(...)]` attributes.
 fn parse_variant_arms(
     variants: &syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
 ) -> Vec<VariantArm> {
@@ -289,6 +299,7 @@ fn parse_variant_arms(
     arms
 }
 
+/// Parses a `#[map(...)]` attribute into a list of `PortMapping` structs.
 fn parse_port_mappings(attr: &syn::Attribute) -> Vec<PortMapping> {
     let mut mappings = Vec::new();
 

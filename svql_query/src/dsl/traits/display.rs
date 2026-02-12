@@ -37,6 +37,7 @@ impl ReportNode {
         output
     }
 
+    /// Internal depth-first traversal for generating the tree string.
     fn render_recursive(
         &self,
         f: &mut String,
@@ -110,6 +111,7 @@ impl ReportNode {
     }
 }
 
+/// Helper to read all lines from a file on disk.
 fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);

@@ -63,6 +63,10 @@ pub use dsl::traits;
 /// let store = run_query::<Cwe1234>(&driver, &key, &config)?;
 /// let results = store.get::<Cwe1234>().unwrap();
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the query execution fails.
 pub fn run_query<P>(
     driver: &Driver,
     key: &DriverKey,

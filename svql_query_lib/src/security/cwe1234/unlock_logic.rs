@@ -55,6 +55,7 @@ fn check_fanin_has_not_gates(row: &Row<UnlockLogic>, ctx: &ExecutionContext) -> 
     check_tree_recursive(rec_or_ref, not_out.cell_id().expect("NOT output must be a cell"), rec_or_table, or_gate_table)
 }
 
+/// Recursively check the OR-tree structure for CWE-1234.
 fn check_tree_recursive(
     rec_or_ref: Ref<RecOr>,
     not_id: PhysicalCellId,

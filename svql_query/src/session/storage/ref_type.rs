@@ -28,7 +28,9 @@ use svql_common::*;
 /// and only exists for compile-time type checking.
 #[repr(transparent)]
 pub struct Ref<T> {
+    /// The row index in the target table.
     index: u32,
+    /// Phantom data to carry the type information for T.
     _marker: PhantomData<fn() -> T>,
 }
 

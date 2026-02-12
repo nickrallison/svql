@@ -18,30 +18,49 @@ use super::assignment::{AssignmentSet, SingleAssignment};
 /// Entry point for subgraph isomorphism searches.
 #[allow(dead_code)]
 pub struct SubgraphMatcher<'needle, 'haystack, 'cfg> {
+    /// The pattern design to search for.
     needle: &'needle Design,
+    /// The target design to search within.
     haystack: &'haystack Design,
+    /// Fast-access index for the pattern.
     needle_index: GraphIndex<'needle>,
+    /// Fast-access index for the target.
     haystack_index: GraphIndex<'haystack>,
+    /// Search constraints and execution parameters.
     pub(crate) config: &'cfg Config,
+    /// Display name for the pattern module.
     needle_name: String,
+    /// Display name for the target module.
     haystack_name: String,
 }
 
 /// Core implementation of the subgraph matching algorithm with progress tracking.
 pub struct SubgraphMatcherCore<'needle, 'haystack, 'cfg> {
+    /// The pattern design being searched for.
     pub(crate) needle: &'needle Design,
+    /// The target design being searched within.
     pub(crate) haystack: &'haystack Design,
+    /// Pre-built graph index for the pattern.
     pub(crate) needle_index: &'cfg GraphIndex<'needle>,
+    /// Pre-built graph index for the target.
     pub(crate) haystack_index: &'cfg GraphIndex<'haystack>,
+    /// Search parameters and constraints.
     pub(crate) config: &'cfg Config,
+    /// Identifier for the pattern module.
     pub(crate) needle_name: String,
+    /// Identifier for the target module.
     pub(crate) haystack_name: String,
+    /// Counter for total backtracking branches visited.
     pub(crate) branches_explored: AtomicUsize,
+    /// Current number of active parallel branches.
     pub(crate) active_branches: AtomicUsize,
+    /// Total number of valid matches discovered.
     pub(crate) matches_found: AtomicUsize,
+    /// Total number of seed candidates for the first node.
     pub(crate) initial_candidates_total: AtomicUsize,
+    /// Number of seed candidates already fully explored.
     pub(crate) initial_candidates_done: AtomicUsize,
-    /// Pre-computed bitmask of which needle nodes are internal (not I/O)
+    /// Pre-computed bitmask of which needle nodes are internal (not I/O).
     pub(crate) needle_internal_mask: Vec<bool>,
 }
 

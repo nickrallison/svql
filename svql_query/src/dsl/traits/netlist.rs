@@ -6,6 +6,7 @@ use crate::prelude::*;
 use prjunnamed_netlist::Value;
 use tracing::debug;
 
+/// Extracts a physical cell ID from a netlist value.
 fn value_to_cell_id(value: &Value) -> Option<u32> {
     value
         .as_net()
@@ -80,6 +81,10 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     /// Discovers internal logic gates in the needle design and creates
     /// metadata columns for them. This allows storing the haystack cell IDs
     /// for internal cells in the result table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the design cannot be loaded or indexed.
     fn discover_internal_cells() -> Result<Vec<ColumnDef>, Box<dyn std::error::Error>> {
         let ym = YosysModule::new(Self::FILE_PATH, Self::MODULE_NAME)?;
 
@@ -457,6 +462,7 @@ where
 }
 
 #[allow(unused)]
+/// Internal unit tests for the `Netlist` trait.
 pub(crate) mod test {
 
     use crate::Wire;
@@ -470,11 +476,15 @@ pub(crate) mod test {
         file = "examples/fixtures/basic/and/verilog/and_gate.v",
         module = "and_gate"
     )]
+    /// A test pattern representing a single AND gate.
     pub struct AndGate {
+        /// First input.
         #[port(input)]
         pub a: Wire,
+        /// Second input.
         #[port(input)]
         pub b: Wire,
+        /// Output.
         #[port(output)]
         pub y: Wire,
     }
@@ -489,9 +499,13 @@ pub(crate) mod test {
     // --- Reference Implementation (Manual) ---
 
     #[derive(Debug, Clone)]
+    /// Manual implementation of a netlist pattern for testing.
     pub struct ManualAndGate {
+        /// First input.
         pub a: Wire,
+        /// Second input.
         pub b: Wire,
+        /// Output.
         pub y: Wire,
     }
 

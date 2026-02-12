@@ -12,17 +12,23 @@ use crate::parsing::{Direction, find_attr, get_string_value};
 
 /// Parsed netlist attribute data
 struct NetlistAttr {
+    /// Path to the design source file.
     file: String,
+    /// Name of the module within the source file.
     module: String,
 }
 
 /// Parsed port field data
 struct PortField {
+    /// Field identifier.
     name: syn::Ident,
+    /// Port direction (Input, Output, etc.).
     direction: Direction,
+    /// Optional override for the port name in the source.
     rename: Option<String>,
 }
 
+/// Implementation of the `Netlist` procedural macro.
 pub fn netlist_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
@@ -151,6 +157,7 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Extracts the `#[netlist(...)]` container attribute.
 fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
     let attr = find_attr(&input.attrs, "netlist").unwrap_or_else(|| {
         abort!(
@@ -194,6 +201,7 @@ fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
     }
 }
 
+/// Identifies fields marked with `#[port(...)]` and extracts their connectivity requirements.
 fn parse_port_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<PortField> {
@@ -229,6 +237,7 @@ fn parse_port_fields(
     ports
 }
 
+/// Parses a single `#[port(...)]` field attribute.
 fn parse_port_attr(attr: &syn::Attribute) -> (Direction, Option<String>) {
     let mut direction = None;
     let mut rename = None;

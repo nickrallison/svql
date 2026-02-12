@@ -33,6 +33,7 @@ impl IoMapping {
         }
     }
 
+    /// Extracts mappings from input port names to the internal cells they directly drive.
     fn build_input_fanout_by_name(
         cell_refs_topo: &[CellRef<'_>],
         fanout_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,
@@ -49,6 +50,7 @@ impl IoMapping {
             .collect()
     }
 
+    /// Extracts mappings from output port names to the internal cells that drive them.
     fn build_output_fanin_by_name(
         cell_refs_topo: &[CellRef<'_>],
         fanin_map: &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>>,

@@ -16,12 +16,15 @@ use crate::parsing::{Direction, PathSelector, find_all_attrs, find_attr, parse_n
 
 /// A single connection constraint
 struct Connection {
+    /// The source port/wire in the connection.
     from: PathSelector,
+    /// The destination port/wire in the connection.
     to: PathSelector,
 }
 
 /// An OR group of connections (at least one must be satisfied)
 struct OrGroup {
+    /// List of alternative connections.
     connections: Vec<Connection>,
 }
 
@@ -33,17 +36,23 @@ struct Filter {
 
 /// Parsed submodule field
 struct SubmoduleField {
+    /// Field identifier.
     name: syn::Ident,
+    /// Field type.
     ty: syn::Type,
 }
 
 /// Parsed alias field
 struct AliasField {
+    /// Field identifier.
     name: syn::Ident,
+    /// Port direction.
     direction: Direction,
+    /// Path to the target wire or port.
     target: PathSelector,
 }
 
+/// Implementation of the `Composite` procedural macro.
 pub fn composite_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
@@ -257,6 +266,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Extracts all `OR` connection groups defined on the struct attributes.
 fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     let mut groups = Vec::new();
 
@@ -293,6 +303,7 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     groups
 }
 
+/// Parses a single `#[connection(...)]` attribute into a `Connection` struct.
 fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     let mut from = None;
     let mut to = None;
@@ -318,6 +329,7 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     }
 }
 
+/// Parses an `#[or_to(...)]` attribute into an `OrGroup`.
 fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from = None;
     let mut to_options: Vec<PathSelector> = Vec::new();
@@ -351,6 +363,7 @@ fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Parses an `#[or_from(...)]` attribute into an `OrGroup`.
 fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from_options: Vec<PathSelector> = Vec::new();
     let mut to = None;
@@ -384,6 +397,7 @@ fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Parses an `#[or_group(...)]` attribute into an `OrGroup`.
 fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut connections = Vec::new();
 
@@ -434,6 +448,7 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Extracts all custom logic filter attributes from the struct.
 fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
     let mut filters = Vec::new();
 
@@ -447,6 +462,7 @@ fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
     filters
 }
 
+/// Parses a `#[filter(...)]` attribute into a `Filter` struct.
 fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
     // The attribute can be either:
     // #[filter(check_fanin_has_not_gates)]  <- function path
@@ -478,6 +494,7 @@ fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
     Some(Filter { expr })
 }
 
+/// Identifies fields marked with `#[submodule]` which represent nested pattern components.
 fn parse_submodule_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<SubmoduleField> {
@@ -499,6 +516,7 @@ fn parse_submodule_fields(
     submodules
 }
 
+/// Identifies fields marked with `#[alias]` which export internal wires to the composite interface.
 fn parse_alias_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<AliasField> {

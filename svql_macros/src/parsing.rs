@@ -10,6 +10,7 @@ use syn::{Error, Expr, ExprArray, ExprLit, Lit, MetaNameValue, Result};
 /// A path selector like `["and1", "y"]`
 #[derive(Debug, Clone)]
 pub struct PathSelector {
+    /// The individual components of the hierarchical path.
     pub segments: Vec<String>,
 }
 
@@ -42,12 +43,16 @@ impl PathSelector {
 /// Direction for ports
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
+    /// Signal flows into the component.
     Input,
+    /// Signal flows out of the component.
     Output,
+    /// Bidirectional signal.
     Inout,
 }
 
 impl Direction {
+    /// Generates code that calls the appropriate `Port` constructor for this direction.
     pub fn as_port_constructor(self) -> TokenStream {
         match self {
             Self::Input => quote! { svql_query::session::Port::input },

@@ -67,6 +67,12 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     /// This is the core operation for variants - it unions the results from
     /// each inner type, mapping their ports to the common interface and
     /// tracking which arm each row came from via the discriminant.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if:
+    /// * The variant schema is missing critical column definitions (e.g., "discriminant").
+    /// * A variant arm's port mapping fails to resolve.
     fn concatenate(
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
@@ -175,6 +181,10 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     }
 
     /// Pre-loads all possible variant designs into the driver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the underlying variants fail to preload.
     fn preload_driver(
         driver: &Driver,
         design_key: &DriverKey,
@@ -321,6 +331,7 @@ where
     }
 }
 
+/// Test utilities and examples for variants.
 #[allow(unused)]
 mod test {
 
@@ -340,11 +351,14 @@ mod test {
 
     use svql_query::query_test;
 
+    /// A polymorphic pattern representing either an `AndGate` or `And2Gates`.
     #[derive(Debug, Clone, Variant)]
     #[variant_ports(input(a), input(b), output(y))]
     pub enum AndOrAnd2 {
+        /// Direct match on a single AND gate.
         #[map(a = ["a"], b = ["b"], y = ["y"])]
         AndGate(AndGate),
+        /// Match on a composite structure of two AND gates.
         #[map(a = ["a"], b = ["b"], y = ["y"])]
         And2Gates(And2Gates),
     }
@@ -356,9 +370,12 @@ mod test {
         expect: 5  // 3 AndGate + 2 And2Gates
     );
 
+    /// Manually implemented variant for testing.
     #[derive(Debug, Clone)]
     pub enum ManualAndOrAnd2 {
+        /// Direct match on a single AND gate.
         AndGate(AndGate),
+        /// Match on a composite structure of two AND gates.
         And2Gates(And2Gates),
     }
 

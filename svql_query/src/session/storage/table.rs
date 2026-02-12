@@ -42,6 +42,10 @@ where
     /// Create a table from a pre-collected set of row matches.
     ///
     /// This is efficient as it performs a single allocation per column.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the row data is inconsistent (currently always returns `Ok`).
     pub fn new(rows: Vec<EntryArray>) -> Result<Self, QueryError>
     where
         T: Pattern,
@@ -65,6 +69,10 @@ where
     }
 
     /// Deduplicate rows in the table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if reconstruction of the table fails.
     pub fn deduplicate(&self) -> Result<Self, QueryError> {
         let subset: Vec<String> = T::schema()
             .columns()
@@ -150,6 +158,13 @@ where
     /// let table = store.get::<MyPattern>().unwrap();
     /// table.to_csv("results/my_pattern.csv")?;
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if:
+    /// * The file cannot be created.
+    /// * Writing to the CSV file fails.
+    /// * Flushing the writer fails.
     pub fn to_csv<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), QueryError> {
         let mut writer = csv::Writer::from_path(path).map_err(|e| {
             QueryError::ExecutionError(format!("Failed to create CSV writer: {}", e))
@@ -190,6 +205,10 @@ where
     /// Export this table to a CSV string.
     ///
     /// Returns the CSV as a String instead of writing to a file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if formatting the string fails.
     pub fn to_csv_string(&self) -> Result<String, QueryError> {
         let mut buffer = Vec::new();
         {
@@ -299,6 +318,10 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     ) -> Option<PhysicalCellId>;
 
     /// Export this table to a CSV file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the CSV export fails.
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError>;
 }
 

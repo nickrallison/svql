@@ -8,6 +8,7 @@ use svql_common::{Config, ConfigBuilder, YosysModule};
 
 use crate::SubgraphMatcher;
 
+/// Global initialization flag for logging.
 static INIT: Once = Once::new();
 
 /// Configures logging for the test runner.
@@ -39,6 +40,11 @@ pub struct TestSpec<'a> {
 
 /// Run a query test using the new DataFrame API (ExecutionPlan + Store).
 /// This uses the new `run_query` function which works for all pattern types.
+///
+/// # Errors
+///
+/// Returns an error if the design cannot be loaded or if there is a mismatch
+/// between the expected and actual number of matches.
 #[track_caller]
 pub fn run_query_test(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>> {
     setup_test_logging();

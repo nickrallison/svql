@@ -10,6 +10,7 @@ use std::sync::{Arc, Once};
 use svql_driver::design_container::DesignContainer;
 use svql_query::{prelude::*, traits::Component};
 
+/// OnceLock to ensure logging is initialized only once.
 static INIT: Once = Once::new();
 
 /// Initializes the tracing subscriber for test output.
@@ -37,6 +38,10 @@ pub struct TestSpec<'a> {
 
 impl TestSpec<'_> {
     /// Loads the design associated with this test spec using the driver.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the design cannot be loaded.
     pub fn get_design(
         &self,
         driver: &Driver,
@@ -57,6 +62,14 @@ impl TestSpec<'_> {
 
 /// Run a query test using the new DataFrame API (ExecutionPlan + Store).
 /// This uses the new `run_query` function which works for all pattern types.
+///
+/// # Errors
+///
+/// Returns an error if the query execution fails.
+///
+/// # Panics
+///
+/// Panics if the results table is missing from the store or if a row fails to rehydrate.
 #[track_caller]
 pub fn run_query_test<P>(spec: TestSpec) -> Result<(), Box<dyn std::error::Error>>
 where
