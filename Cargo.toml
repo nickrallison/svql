@@ -90,6 +90,9 @@ walkdir = "2.5.0"
 which = "8.0.0"
 yap = "0.12.0"
 
+[workspace.lints.rust]
+missing_docs = "warn"
+
 [workspace.lints.clippy]
 complexity = "deny"
 correctness = "deny"
