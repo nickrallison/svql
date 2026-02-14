@@ -7,7 +7,7 @@ use crate::prelude::*;
 
 /// A simple columnar storage structure for ColumnEntry data.
 ///
-/// Stores data in column-major order, where each column is a Vec<ColumnEntry>.
+/// Stores data in column-major order, where each column is a `Vec<ColumnEntry>`.
 #[derive(Debug, Clone)]
 pub struct ColumnStore {
     /// Column data: column name -> Vec of typed entries
@@ -218,79 +218,75 @@ impl std::fmt::Display for ColumnStore {
             return writeln!(f, "Empty table");
         }
 
-        // Write header
-        write!(f, "│ row │")?;
-        for name in &self.column_names {
-            write!(f, " {name:>8} │")?;
+        // Helper to format entries consistently for width calculation and printing
+        let format_entry = |entry: &ColumnEntry| -> String {
+            match entry {
+                ColumnEntry::Null => "null".to_string(),
+                ColumnEntry::Wire(wire_ref) => format!("{wire_ref}"),
+                ColumnEntry::Sub(idx) => idx.to_string(),
+                ColumnEntry::Metadata(id) => id.to_string(),
+            }
+        };
+
+        // 1. Precompute widths
+        let mut col_widths: Vec<usize> = self.column_names.iter().map(|n| n.len()).collect();
+        let row_label_width = self.num_rows.to_string().len().max(3);
+
+        // Scan all rows to find the maximum width per column
+        for row_idx in 0..self.num_rows {
+            for (i, col_name) in self.column_names.iter().enumerate() {
+                let entry = &self.columns[col_name][row_idx];
+                let entry_str = format_entry(entry);
+                col_widths[i] = col_widths[i].max(entry_str.len());
+            }
+        }
+
+        // 2. Draw Header
+        write!(f, "│ {:>width$} │", "row", width = row_label_width)?;
+        for (i, name) in self.column_names.iter().enumerate() {
+            write!(f, " {:^width$} │", name, width = col_widths[i])?;
         }
         writeln!(f)?;
 
-        // Write separator
-        write!(f, "├─────┤")?;
-        for _ in &self.column_names {
-            write!(f, "──────────┤")?;
+        // 3. Draw Separator
+        write!(f, "├{:─^width$}┼", "─", width = row_label_width + 2)?;
+        for (i, _) in self.column_names.iter().enumerate() {
+            write!(f, "{:─^width$}┼", "─", width = col_widths[i] + 2)?;
         }
         writeln!(f)?;
 
-        // Write data rows - show first 5 and last 5 if more than 10 rows
+        // 4. Draw Rows
+        let print_row = |f: &mut std::fmt::Formatter<'_>, row_idx: usize| -> std::fmt::Result {
+            write!(f, "│ {:>width$} │", row_idx, width = row_label_width)?;
+            for (i, col_name) in self.column_names.iter().enumerate() {
+                let entry = &self.columns[col_name][row_idx];
+                let entry_str = format_entry(entry);
+                write!(f, " {:>width$} │", entry_str, width = col_widths[i])?;
+            }
+            writeln!(f)
+        };
+
         if self.num_rows <= 10 {
-            // Show all rows if 10 or fewer
             for row_idx in 0..self.num_rows {
-                write!(f, "│ {row_idx:>3} │")?;
-                for col_name in &self.column_names {
-                    if let Some(col) = self.columns.get(col_name) {
-                        match &col[row_idx] {
-                            ColumnEntry::Null => write!(f, "     null │")?,
-                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
-                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
-                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
-                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
-                        }
-                    }
-                }
-                writeln!(f)?;
+                print_row(f, row_idx)?;
             }
         } else {
-            // Show first 5 rows
+            // First 5 rows
             for row_idx in 0..5 {
-                write!(f, "│ {row_idx:>3} │")?;
-                for col_name in &self.column_names {
-                    if let Some(col) = self.columns.get(col_name) {
-                        match &col[row_idx] {
-                            ColumnEntry::Null => write!(f, "     null │")?,
-                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
-                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
-                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
-                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
-                        }
-                    }
-                }
-                writeln!(f)?;
+                print_row(f, row_idx)?;
             }
 
-            // Show ellipsis
-            write!(f, "│ ... │")?;
-            for _ in &self.column_names {
-                write!(f, "      ... │")?;
+            // Ellipsis
+            write!(f, "│ {:>width$} │", "...", width = row_label_width)?;
+            for (i, _) in self.column_names.iter().enumerate() {
+                write!(f, " {:>width$} │", "...", width = col_widths[i])?;
             }
             writeln!(f)?;
             writeln!(f, "... {} more rows", self.num_rows - 10)?;
 
-            // Show last 5 rows
+            // Last 5 rows
             for row_idx in (self.num_rows - 5)..self.num_rows {
-                write!(f, "│ {row_idx:>3} │")?;
-                for col_name in &self.column_names {
-                    if let Some(col) = self.columns.get(col_name) {
-                        match &col[row_idx] {
-                            ColumnEntry::Null => write!(f, "     null │")?,
-                            ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
-                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
-                            ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
-                            ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
-                        }
-                    }
-                }
-                writeln!(f)?;
+                print_row(f, row_idx)?;
             }
         }
 

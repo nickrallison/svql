@@ -121,7 +121,7 @@ impl PatternSchema {
 pub enum ColumnKind {
     /// A wire reference (`CellId`) pointing into the design.
     Cell,
-    /// A submodule reference (Ref<T>) pointing into another pattern table.
+    /// A submodule reference (`Ref<T>`) pointing into another pattern table.
     /// For self-referential types (like `RecOr` trees), use `Sub(TypeId::of::<Self>())`.
     Sub(TypeId),
     /// Metadata column (e.g., depth, flags) - not a reference to other data.

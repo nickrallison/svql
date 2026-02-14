@@ -47,6 +47,16 @@ impl WireRef {
     }
 }
 
+impl std::fmt::Display for WireRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cell(id) => write!(f, "Cell({id})"),
+            Self::PrimaryPort(name) => write!(f, "PrimaryPort({name})"),
+            Self::Constant(value) => write!(f, "Constant({value})"),
+        }
+    }
+}
+
 /// A wire with contextual direction information.
 ///
 /// This is the wire type exposed to queries. It wraps a `WireRef` with
@@ -72,6 +82,16 @@ pub enum Wire {
         /// Boolean representation (false=0, true=1).
         value: bool,
     },
+}
+
+impl std::fmt::Display for Wire {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cell { id, direction } => write!(f, "Cell({id}, {direction})"),
+            Self::PrimaryPort { name, direction } => write!(f, "PrimaryPort({name}, {direction})"),
+            Self::Constant { value } => write!(f, "Constant({value})"),
+        }
+    }
 }
 
 impl Wire {
@@ -122,23 +142,6 @@ impl Wire {
     pub const fn is_cell(&self) -> bool {
         matches!(self, Self::Cell { .. })
     }
-
-    // /// Legacy compatibility: get underlying cell ID (panics if not a cell)
-    // /// Use `cell_id()` for safe access.
-    // #[must_use]
-    // #[deprecated(note = "Use cell_id() instead")]
-    // pub fn id(&self) -> PhysicalCellId {
-    //     self.cell_id().expect("Wire is not a cell reference")
-    // }
-
-    // /// Get the raw u64 value (for backward compatibility).
-    // /// Panics if not a cell reference.
-    // #[must_use]
-    // #[deprecated(note = "Use cell_id() instead")]
-    // #[allow(deprecated)]
-    // pub fn as_u64(&self) -> u64 {
-    //     u64::from(self.id())
-    // }
 }
 
 /// Defines the direction of a port column.

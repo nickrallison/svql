@@ -125,8 +125,11 @@ impl Recursive for RecAnd {
         // Inputs are now Option<Wire> so rows with primary-port/constant
         // inputs are kept, preserving the 1:1 correspondence with and_table.
         struct GateInfo {
+            /// Input wire 'a', None if it's a primary port or constant
             a: Option<Wire>, // was: Wire (via filter_map)
+            /// Input wire 'b', None if it's a primary port or constant
             b: Option<Wire>, // was: Wire (via filter_map)
+            /// Output wire 'y'
             y: Wire,
         }
 
@@ -141,10 +144,15 @@ impl Recursive for RecAnd {
         // gate_info[i]  ↔  and_table.row(i)  — always
 
         struct RecAndEntry {
+            /// The base graph node index
             base_node: GraphNodeIdx,
+            /// Left child node index, if any
             left_child: Option<GraphNodeIdx>,
+            /// Right child node index, if any
             right_child: Option<GraphNodeIdx>,
+            /// Output wire 'y'
             y: Wire,
+            /// Depth in the recursive structure
             depth: u32,
             /// Leaf input wires (inputs not from other AND gates)
             leaf_inputs: Vec<Wire>,
@@ -456,8 +464,11 @@ impl Recursive for RecOr {
         // Inputs are now Option<Wire> so rows with primary-port/constant
         // inputs are kept, preserving the 1:1 correspondence with or_table.
         struct GateInfo {
+            /// Input wire 'a', None if it's a primary port or constant
             a: Option<Wire>, // was: Wire (via filter_map)
+            /// Input wire 'b', None if it's a primary port or constant
             b: Option<Wire>, // was: Wire (via filter_map)
+            /// Output wire 'y'
             y: Wire,
         }
 
@@ -472,10 +483,15 @@ impl Recursive for RecOr {
         // gate_info[i]  ↔  or_table.row(i)  — always
 
         struct RecOrEntry {
+            /// The base graph node index
             base_node: GraphNodeIdx,
+            /// Left child node index, if any
             left_child: Option<GraphNodeIdx>,
+            /// Right child node index, if any
             right_child: Option<GraphNodeIdx>,
+            /// Output wire 'y'
             y: Wire,
+            /// Depth in the recursive structure
             depth: u32,
             /// Leaf input wires (inputs not from other OR gates)
             leaf_inputs: Vec<Wire>,

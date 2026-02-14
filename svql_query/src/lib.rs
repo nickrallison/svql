@@ -15,8 +15,6 @@
 //! 6. Patterns can render results for detailed reporting
 
 #![feature(const_type_name)]
-#![feature(const_cmp)]
-#![feature(const_trait_impl)]
 
 extern crate self as svql_query;
 

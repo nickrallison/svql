@@ -8,7 +8,7 @@ SVQL uses a DataFrame-style architecture:
 - **Patterns**: Rust structs using derive macros.
 - **Store**: Central repository for all session results.
 - **Tables**: Columnar storage for specific pattern types.
-- **Rows**: snapshots of individual matches.
+- **Rows**: Snapshots of individual matches.
 
 ## Query Library
 SVQL provides patterns for detecting Common Weakness Enumerations (CWEs).
@@ -57,7 +57,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
-
-## Implementation Notes
-- **Join Optimization**: Uses a Bipartite Index and cost-based planner to minimize Cartesian products.
-- **Recursive Matching**: Employs fixpoint iteration for tree structures of arbitrary depth.
