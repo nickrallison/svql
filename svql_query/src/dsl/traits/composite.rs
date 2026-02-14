@@ -15,6 +15,14 @@ use crate::{
     session::execution::join_planner::ConnectivityCache,
 };
 
+/// The kind of connection constraint.
+#[derive(Debug, Clone, Copy)]
+pub enum ConnectionKind {
+    /// Exact connection: source wire must equal target wire.
+    Exact,
+    /// Set membership: source wire must be present in target WireArray.
+    AnyInSet,
+}
 
 /// Connection constraint (keeping existing struct, just updating signature)
 #[derive(Debug, Clone, Copy)]
@@ -23,6 +31,8 @@ pub struct Connection {
     pub from: Endpoint,
     /// Destination endpoint of the connection.
     pub to: Endpoint,
+    /// The kind of connection constraint.
+    pub kind: ConnectionKind,
 }
 
 impl Connection {
@@ -32,6 +42,18 @@ impl Connection {
         Self {
             from: Endpoint { selector: from },
             to: Endpoint { selector: to },
+            kind: ConnectionKind::Exact,
+        }
+    }
+
+    /// Creates a set-membership connection constraint.
+    /// The source wire must be present in the target WireArray.
+    #[must_use]
+    pub const fn any_in_set(from: Selector<'static>, to: Selector<'static>) -> Self {
+        Self {
+            from: Endpoint { selector: from },
+            to: Endpoint { selector: to },
+            kind: ConnectionKind::AnyInSet,
         }
     }
 }
@@ -436,43 +458,92 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 }
 
                 // CONNECTIVITY VALIDATION (both sides are resolvable)
-                let src_wire = row.resolve(conn.from.selector, ctx);
-                let dst_wire = row.resolve(conn.to.selector, ctx);
+                match conn.kind {
+                    ConnectionKind::Exact => {
+                        // Exact connection: source wire must equal target wire
+                        let src_wire = row.resolve(conn.from.selector, ctx);
+                        let dst_wire = row.resolve(conn.to.selector, ctx);
 
-                match (src_wire, dst_wire) {
-                    (Some(s), Some(d)) if s.cell_id() == d.cell_id() => {
-                        tracing::trace!(
-                            "[{}] Connection {:?} → {:?} satisfied (cell {:?})",
-                            std::any::type_name::<Self>(),
-                            conn.from.selector.path(),
-                            conn.to.selector.path(),
-                            s.cell_id()
-                        );
-                        group_satisfied = true;
-                        break; // This alternative worked
+                        match (src_wire, dst_wire) {
+                            (Some(s), Some(d)) if s.cell_id() == d.cell_id() => {
+                                tracing::trace!(
+                                    "[{}] Connection {:?} → {:?} satisfied (cell {:?})",
+                                    std::any::type_name::<Self>(),
+                                    conn.from.selector.path(),
+                                    conn.to.selector.path(),
+                                    s.cell_id()
+                                );
+                                group_satisfied = true;
+                                break; // This alternative worked
+                            }
+                            (None, _) | (_, None) => {
+                                // Wire resolved to None despite submodule being joined
+                                // Could be NULL wire (nullable port) or traversal failure
+                                tracing::trace!(
+                                    "[{}] Connection {:?} → {:?} resolved to None (nullable port or traversal failed)",
+                                    std::any::type_name::<Self>(),
+                                    conn.from.selector.path(),
+                                    conn.to.selector.path()
+                                );
+                                continue; // Try next alternative
+                            }
+                            (Some(s), Some(d)) => {
+                                // Different cell IDs - not connected
+                                tracing::trace!(
+                                    "[{}] Connection {:?} → {:?} failed: different cells ({:?} != {:?})",
+                                    std::any::type_name::<Self>(),
+                                    conn.from.selector.path(),
+                                    conn.to.selector.path(),
+                                    s.cell_id(),
+                                    d.cell_id()
+                                );
+                                continue; // Try next alternative
+                            }
+                        }
                     }
-                    (None, _) | (_, None) => {
-                        // Wire resolved to None despite submodule being joined
-                        // Could be NULL wire (nullable port) or traversal failure
-                        tracing::trace!(
-                            "[{}] Connection {:?} → {:?} resolved to None (nullable port or traversal failed)",
-                            std::any::type_name::<Self>(),
-                            conn.from.selector.path(),
-                            conn.to.selector.path()
-                        );
-                        continue; // Try next alternative
-                    }
-                    (Some(s), Some(d)) => {
-                        // Different cell IDs - not connected
-                        tracing::trace!(
-                            "[{}] Connection {:?} → {:?} failed: different cells ({:?} != {:?})",
-                            std::any::type_name::<Self>(),
-                            conn.from.selector.path(),
-                            conn.to.selector.path(),
-                            s.cell_id(),
-                            d.cell_id()
-                        );
-                        continue; // Try next alternative
+                    ConnectionKind::AnyInSet => {
+                        // Set membership: source wire must be in target WireArray
+                        let src_wire = row.resolve(conn.from.selector, ctx);
+                        let dst_bundle = row.resolve_bundle(conn.to.selector, ctx);
+
+                        match (src_wire, dst_bundle) {
+                            (Some(src), Some(bundle)) => {
+                                let src_id = src.cell_id();
+                                // Check if src is in the bundle
+                                let found = bundle.iter().any(|w| w.cell_id() == src_id);
+                                if found {
+                                    tracing::trace!(
+                                        "[{}] ConnectAny {:?} → {:?} satisfied (cell {:?} in bundle of {} wires)",
+                                        std::any::type_name::<Self>(),
+                                        conn.from.selector.path(),
+                                        conn.to.selector.path(),
+                                        src_id,
+                                        bundle.len()
+                                    );
+                                    group_satisfied = true;
+                                    break;
+                                } else {
+                                    tracing::trace!(
+                                        "[{}] ConnectAny {:?} → {:?} failed: cell {:?} not in bundle of {} wires",
+                                        std::any::type_name::<Self>(),
+                                        conn.from.selector.path(),
+                                        conn.to.selector.path(),
+                                        src_id,
+                                        bundle.len()
+                                    );
+                                    continue; // Try next alternative
+                                }
+                            }
+                            (None, _) | (_, None) => {
+                                tracing::trace!(
+                                    "[{}] ConnectAny {:?} → {:?} resolved to None",
+                                    std::any::type_name::<Self>(),
+                                    conn.from.selector.path(),
+                                    conn.to.selector.path()
+                                );
+                                continue; // Try next alternative
+                            }
+                        }
                     }
                 }
             }

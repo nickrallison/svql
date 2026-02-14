@@ -4,6 +4,7 @@
 //! wire connectivity to optimize join performance.
 
 use crate::prelude::*;
+use crate::dsl::traits::composite::ConnectionKind;
 
 
 /// Maps relationships between two pattern tables based on a connection.
@@ -38,23 +39,48 @@ impl BipartiteIndex {
         let mut reverse: HashMap<u32, HashSet<u32>> = HashMap::new();
         let mut edge_count = 0;
 
-        // Iterate all (A, B) pairs - this is the O(|A| × |B|) work
-        for a_idx in 0..a_table.len() as u32 {
-            for b_idx in 0..b_table.len() as u32 {
-                // Resolve both endpoints relative to the submodule
-                let a_cell =
-                    a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx);
-                let b_cell =
-                    b_table.resolve_path(b_idx as usize, connection.to.selector.tail(), ctx);
+        match connection.kind {
+            ConnectionKind::Exact => {
+                // Exact connection: source wire must equal target wire
+                for a_idx in 0..a_table.len() as u32 {
+                    for b_idx in 0..b_table.len() as u32 {
+                        let a_cell =
+                            a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx);
+                        let b_cell =
+                            b_table.resolve_path(b_idx as usize, connection.to.selector.tail(), ctx);
 
-                // Check physical connectivity
-                match (&a_cell, &b_cell) {
-                    (Some(src), Some(dst)) if src.storage_key() == dst.storage_key() => {
-                        forward.entry(a_idx).or_default().insert(b_idx);
-                        reverse.entry(b_idx).or_default().insert(a_idx);
-                        edge_count += 1;
+                        match (&a_cell, &b_cell) {
+                            (Some(src), Some(dst)) if src.storage_key() == dst.storage_key() => {
+                                forward.entry(a_idx).or_default().insert(b_idx);
+                                reverse.entry(b_idx).or_default().insert(a_idx);
+                                edge_count += 1;
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
+                }
+            }
+            ConnectionKind::AnyInSet => {
+                // Set membership: source wire must be in target WireArray
+                for a_idx in 0..a_table.len() as u32 {
+                    for b_idx in 0..b_table.len() as u32 {
+                        let a_cell =
+                            a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx);
+                        let b_bundle =
+                            b_table.resolve_bundle_path(b_idx as usize, connection.to.selector.tail(), ctx);
+
+                        match (&a_cell, &b_bundle) {
+                            (Some(src), Some(bundle)) => {
+                                // Check if src is in the bundle
+                                if bundle.iter().any(|w| w.cell_id() == Some(*src)) {
+                                    forward.entry(a_idx).or_default().insert(b_idx);
+                                    reverse.entry(b_idx).or_default().insert(a_idx);
+                                    edge_count += 1;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
         }
@@ -64,7 +90,7 @@ impl BipartiteIndex {
             a_table.len(),
             b_table.len(),
             edge_count,
-            100.0 * edge_count as f64 / (a_table.len() * b_table.len()) as f64
+            100.0 * edge_count as f64 / (a_table.len() * b_table.len()).max(1) as f64
         );
 
         Self {

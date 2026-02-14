@@ -77,6 +77,26 @@ where
         }
     }
 
+    /// Get a bundle of wires by column name.
+    ///
+    /// Returns `None` if the column doesn't exist or is not a WireArray.
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    #[inline]
+    #[must_use]
+    pub fn wire_bundle(&self, name: &str) -> Option<Vec<Wire>> {
+        let idx = T::schema().index_of(name)?;
+        let col_def = T::schema().column(idx);
+
+        match &self.entry_array.entries[idx] {
+            ColumnEntry::WireArray(wire_refs) => {
+                Some(wire_refs.iter().map(|wr| {
+                    Wire::from_ref(wr.clone(), col_def.direction)
+                }).collect())
+            }
+            _ => None,
+        }
+    }
+
     /// Get a submodule reference by name (type-erased)
     pub fn sub_any(&self, name: &str) -> Option<u32> {
         let idx = T::schema().index_of(name)?;
@@ -160,6 +180,44 @@ where
         Some(Wire::new(cell_id, PortDirection::None))
     }
 
+    /// Resolve a path to a wire bundle using a Selector.
+    ///
+    /// Returns `None` if the path doesn't resolve to a WireArray column.
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    #[must_use]
+    pub fn resolve_bundle(
+        &self,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
+    ) -> Option<Vec<Wire>> {
+        if selector.is_empty() {
+            return None;
+        }
+
+        // Single segment: direct lookup
+        if selector.len() == 1 {
+            return self.wire_bundle(selector.head()?);
+        }
+
+        // Multi-segment: traverse through submodules
+        let head = selector.head()?;
+        let idx = T::schema().index_of(head)?;
+        let col_def = T::schema().column(idx);
+
+        // Head must be a submodule reference
+        let (sub_row_idx, sub_type_id) = match &col_def.kind {
+            crate::session::ColumnKind::Sub(tid) => match &self.entry_array.entries[idx] {
+                ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
+                _ => return None,
+            },
+            _ => return None,
+        };
+
+        // Get the submodule's table and continue resolution
+        let sub_table = ctx.get_any_table(sub_type_id)?;
+        sub_table.resolve_bundle_path(sub_row_idx as usize, selector.tail(), ctx)
+    }
+
     /// Get a submodule reference by column name.
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
@@ -216,6 +274,23 @@ where
         cell_id: PhysicalCellId,
     ) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
+    }
+
+    /// Set a wire array column value.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `QueryError` if the column name does not exist in the schema.
+    pub fn with_wire_array(
+        mut self,
+        name: &'static str,
+        wires: Vec<crate::wire::WireRef>,
+    ) -> Result<Self, QueryError> {
+        let id = T::schema()
+            .index_of(name)
+            .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
+        self.entry_array.entries[id] = ColumnEntry::WireArray(wires);
+        Ok(self)
     }
 
     /// Set a submodule column value (with optional index).
@@ -331,6 +406,14 @@ where
                     crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
                     crate::wire::WireRef::Constant(val) => format!("const({})", val),
                 },
+                Some(ColumnEntry::WireArray(wires)) => {
+                    let wire_strs: Vec<String> = wires.iter().map(|w| match w {
+                        crate::wire::WireRef::Cell(id) => format!("cell({id})"),
+                        crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
+                        crate::wire::WireRef::Constant(val) => format!("const({})", val),
+                    }).collect();
+                    format!("[{}]", wire_strs.join(", "))
+                }
                 Some(ColumnEntry::Sub(slot_idx)) => format!("ref({})", slot_idx),
                 Some(ColumnEntry::Metadata(id)) => format!("meta({id})"),
                 Some(ColumnEntry::Null) => "NULL".to_string(),

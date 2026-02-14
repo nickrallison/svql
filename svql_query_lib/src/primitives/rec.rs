@@ -42,6 +42,9 @@ pub struct RecAnd {
     /// Tree depth: 0 = leaf (no AND children), 1+ = has AND children.
     /// Represents the maximum depth of any child subtree plus 1.
     pub depth: u32,
+    /// All leaf input wires of this subtree (inputs that are NOT from other AND gates).
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    pub leaf_inputs: Vec<Wire>,
 }
 
 impl Component for RecAnd {
@@ -54,6 +57,26 @@ impl Recursive for RecAnd {
     const PORTS: &'static [Port] = &[Port::output("y")];
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
+
+    /// Override schema to include leaf_inputs column
+    fn recursive_to_defs() -> Vec<ColumnDef> {
+        let mut defs = vec![
+            ColumnDef::sub::<Self::Base>("base"),
+            ColumnDef::sub_nullable::<Self>("left_child"),
+            ColumnDef::sub_nullable::<Self>("right_child"),
+        ];
+
+        defs.extend(
+            Self::PORTS.iter().map(|p| {
+                ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction)
+            }),
+        );
+
+        defs.push(ColumnDef::metadata("depth"));
+        defs.push(ColumnDef::wire_array("leaf_inputs"));
+
+        defs
+    }
 
     fn recursive_schema() -> &'static PatternSchema {
         static SCHEMA: OnceLock<PatternSchema> = OnceLock::new();
@@ -123,6 +146,8 @@ impl Recursive for RecAnd {
             right_child: Option<GraphNodeIdx>,
             y: Wire,
             depth: u32,
+            /// Leaf input wires (inputs not from other AND gates)
+            leaf_inputs: Vec<Wire>,
         }
 
         let mut entries: Vec<RecAndEntry> = nodes
@@ -134,6 +159,7 @@ impl Recursive for RecAnd {
                 right_child: None,
                 y: gate_info[idx].y.clone(),
                 depth: 0,
+                leaf_inputs: Vec::new(),
             })
             .collect();
 
@@ -200,6 +226,41 @@ impl Recursive for RecAnd {
                     entries[i].depth = new_depth;
                     changed = true;
                 }
+
+                // Compute leaf_inputs: collect inputs that are NOT from other AND gates
+                let mut new_leaf_inputs = Vec::new();
+
+                // Check left input
+                if let Some(left_node) = new_left {
+                    // Has left child - inherit its leaf inputs
+                    if let Some(&left_idx) = node_to_entry.get(&left_node) {
+                        new_leaf_inputs.extend(entries[left_idx].leaf_inputs.clone());
+                    }
+                } else {
+                    // No left child - this is a leaf input
+                    if let Some(a) = &info.a {
+                        new_leaf_inputs.push(a.clone());
+                    }
+                }
+
+                // Check right input
+                if let Some(right_node) = new_right {
+                    // Has right child - inherit its leaf inputs
+                    if let Some(&right_idx) = node_to_entry.get(&right_node) {
+                        new_leaf_inputs.extend(entries[right_idx].leaf_inputs.clone());
+                    }
+                } else {
+                    // No right child - this is a leaf input
+                    if let Some(b) = &info.b {
+                        new_leaf_inputs.push(b.clone());
+                    }
+                }
+
+                // Update if changed
+                if new_leaf_inputs != entries[i].leaf_inputs {
+                    entries[i].leaf_inputs = new_leaf_inputs;
+                    changed = true;
+                }
             }
         }
 
@@ -221,6 +282,7 @@ impl Recursive for RecAnd {
             .expect("schema has 'right_child'");
         let y_idx = schema.index_of("y").expect("schema has 'y'");
         let depth_idx = schema.index_of("depth").expect("schema has 'depth'");
+        let leaf_inputs_idx = schema.index_of("leaf_inputs").expect("schema has 'leaf_inputs'");
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
@@ -240,6 +302,12 @@ impl Recursive for RecAnd {
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                // Store leaf_inputs as WireArray
+                arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(
+                    e.leaf_inputs.iter()
+                        .filter_map(|w| w.cell_id().map(svql_common::WireRef::Cell))
+                        .collect()
+                );
                 arr
             })
             .collect();
@@ -261,6 +329,9 @@ impl Recursive for RecAnd {
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
         let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
+        
+        // Get leaf_inputs from WireArray column
+        let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
 
         Some(Self {
             base,
@@ -268,6 +339,7 @@ impl Recursive for RecAnd {
             right_child,
             y,
             depth,
+            leaf_inputs,
         })
     }
 
@@ -294,6 +366,9 @@ pub struct RecOr {
     /// Tree depth: 0 = leaf (no AND children), 1+ = has AND children.
     /// Represents the maximum depth of any child subtree plus 1.
     pub depth: u32,
+    /// All leaf input wires of this subtree (inputs that are NOT from other OR gates).
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    pub leaf_inputs: Vec<Wire>,
 }
 
 impl Component for RecOr {
@@ -306,6 +381,26 @@ impl Recursive for RecOr {
     const PORTS: &'static [Port] = &[Port::output("y")];
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<OrGate as Pattern>::EXEC_INFO];
+
+    /// Override schema to include leaf_inputs column
+    fn recursive_to_defs() -> Vec<ColumnDef> {
+        let mut defs = vec![
+            ColumnDef::sub::<Self::Base>("base"),
+            ColumnDef::sub_nullable::<Self>("left_child"),
+            ColumnDef::sub_nullable::<Self>("right_child"),
+        ];
+
+        defs.extend(
+            Self::PORTS.iter().map(|p| {
+                ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction)
+            }),
+        );
+
+        defs.push(ColumnDef::metadata("depth"));
+        defs.push(ColumnDef::wire_array("leaf_inputs"));
+
+        defs
+    }
 
     fn recursive_schema() -> &'static PatternSchema {
         static SCHEMA: OnceLock<PatternSchema> = OnceLock::new();
@@ -375,6 +470,8 @@ impl Recursive for RecOr {
             right_child: Option<GraphNodeIdx>,
             y: Wire,
             depth: u32,
+            /// Leaf input wires (inputs not from other OR gates)
+            leaf_inputs: Vec<Wire>,
         }
 
         let mut entries: Vec<RecOrEntry> = nodes
@@ -386,6 +483,7 @@ impl Recursive for RecOr {
                 right_child: None,
                 y: gate_info[idx].y.clone(),
                 depth: 0,
+                leaf_inputs: Vec::new(),
             })
             .collect();
 
@@ -452,6 +550,41 @@ impl Recursive for RecOr {
                     entries[i].depth = new_depth;
                     changed = true;
                 }
+
+                // Compute leaf_inputs: collect inputs that are NOT from other OR gates
+                let mut new_leaf_inputs = Vec::new();
+
+                // Check left input
+                if let Some(left_node) = new_left {
+                    // Has left child - inherit its leaf inputs
+                    if let Some(&left_idx) = node_to_entry.get(&left_node) {
+                        new_leaf_inputs.extend(entries[left_idx].leaf_inputs.clone());
+                    }
+                } else {
+                    // No left child - this is a leaf input
+                    if let Some(a) = &info.a {
+                        new_leaf_inputs.push(a.clone());
+                    }
+                }
+
+                // Check right input
+                if let Some(right_node) = new_right {
+                    // Has right child - inherit its leaf inputs
+                    if let Some(&right_idx) = node_to_entry.get(&right_node) {
+                        new_leaf_inputs.extend(entries[right_idx].leaf_inputs.clone());
+                    }
+                } else {
+                    // No right child - this is a leaf input
+                    if let Some(b) = &info.b {
+                        new_leaf_inputs.push(b.clone());
+                    }
+                }
+
+                // Update if changed
+                if new_leaf_inputs != entries[i].leaf_inputs {
+                    entries[i].leaf_inputs = new_leaf_inputs;
+                    changed = true;
+                }
             }
         }
 
@@ -473,6 +606,7 @@ impl Recursive for RecOr {
             .expect("schema has 'right_child'");
         let y_idx = schema.index_of("y").expect("schema has 'y'");
         let depth_idx = schema.index_of("depth").expect("schema has 'depth'");
+        let leaf_inputs_idx = schema.index_of("leaf_inputs").expect("schema has 'leaf_inputs'");
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
@@ -492,6 +626,12 @@ impl Recursive for RecOr {
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                // Store leaf_inputs as WireArray
+                arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(
+                    e.leaf_inputs.iter()
+                        .filter_map(|w| w.cell_id().map(svql_common::WireRef::Cell))
+                        .collect()
+                );
                 arr
             })
             .collect();
@@ -513,6 +653,9 @@ impl Recursive for RecOr {
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
         let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
+        
+        // Get leaf_inputs from WireArray column
+        let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
 
         Some(Self {
             base,
@@ -520,6 +663,7 @@ impl Recursive for RecOr {
             right_child,
             y,
             depth,
+            leaf_inputs,
         })
     }
 

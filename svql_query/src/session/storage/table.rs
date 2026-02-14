@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 
 use super::columnar::ColumnStore;
 use crate::prelude::*;
+use crate::wire::Wire;
 
 /// A typed wrapper around a columnar store for pattern match results.
 ///
@@ -185,6 +186,10 @@ where
                     match &col[row_idx] {
                         ColumnEntry::Null => record.push(String::new()),
                         ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
+                        ColumnEntry::WireArray(wires) => {
+                            let wire_strs: Vec<String> = wires.iter().map(|w| format!("{w:?}")).collect();
+                            record.push(format!("[{}]", wire_strs.join(", ")));
+                        }
                         ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
                         ColumnEntry::Metadata(id) => record.push(format!("{id}")),
                     }
@@ -229,6 +234,10 @@ where
                         match &col[row_idx] {
                             ColumnEntry::Null => record.push(String::new()),
                             ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
+                            ColumnEntry::WireArray(wires) => {
+                                let wire_strs: Vec<String> = wires.iter().map(|w| format!("{w:?}")).collect();
+                                record.push(format!("[{}]", wire_strs.join(", ")));
+                            }
                             ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
                             ColumnEntry::Metadata(id) => record.push(format!("{id}")),
                         }
@@ -316,6 +325,15 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<PhysicalCellId>;
+
+    /// Resolve a selector path within a specific row to a wire bundle.
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    fn resolve_bundle_path(
+        &self,
+        row_idx: usize,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
+    ) -> Option<Vec<Wire>>;
 
     /// Export this table to a CSV file.
     ///
@@ -415,6 +433,54 @@ where
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
         sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
+    }
+
+    fn resolve_bundle_path(
+        &self,
+        row_idx: usize,
+        selector: crate::dsl::selector::Selector<'_>,
+        ctx: &crate::session::ExecutionContext,
+    ) -> Option<Vec<Wire>> {
+        if selector.is_empty() {
+            return None;
+        }
+
+        // Single segment: direct wire bundle lookup
+        if selector.len() == 1 {
+            let col_name = selector.head()?;
+            let col_idx = T::schema().index_of(col_name)?;
+            
+            // Check if it's a WireArray column
+            if !T::schema().column(col_idx).kind.is_wire_array() {
+                return None;
+            }
+
+            return match self.store.get_cell(col_name, row_idx) {
+                ColumnEntry::WireArray(wire_refs) => {
+                    let direction = T::schema().column(col_idx).direction;
+                    Some(wire_refs.iter().map(|wr| Wire::from_ref(wr.clone(), direction)).collect())
+                }
+                _ => None,
+            };
+        }
+
+        // Multi-segment: traverse through submodules
+        let head = selector.head()?;
+        let col_idx = T::schema().index_of(head)?;
+        let col_def = T::schema().column(col_idx);
+
+        // Head must be a submodule reference
+        let sub_type_id = col_def.as_submodule()?;
+
+        // Get the submodule row index directly from the column
+        let sub_row_idx = match self.store.get_cell(head, row_idx) {
+            ColumnEntry::Sub(slot_idx) => *slot_idx,
+            _ => return None,
+        };
+
+        // Get the submodule's table and continue resolution
+        let sub_table = ctx.get_any_table(sub_type_id)?;
+        sub_table.resolve_bundle_path(sub_row_idx as usize, selector.tail(), ctx)
     }
 
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError> {

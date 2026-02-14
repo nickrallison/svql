@@ -20,6 +20,14 @@ struct Connection {
     from: PathSelector,
     /// The destination port/wire in the connection.
     to: PathSelector,
+    /// The kind of connection (None = Exact, Some = specified kind)
+    kind: Option<ConnectionKind>,
+}
+
+/// Connection kind for set-based connectivity
+enum ConnectionKind {
+    /// Set membership: A in Set(B) where B is a WireArray
+    AnyInSet,
 }
 
 /// An OR group of connections (at least one must be satisfied)
@@ -124,8 +132,13 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 .map(|conn| {
                     let from = conn.from.to_selector_tokens();
                     let to = conn.to.to_selector_tokens();
-                    quote! {
-                        svql_query::traits::composite::Connection::new(#from, #to)
+                    match &conn.kind {
+                        Some(ConnectionKind::AnyInSet) => quote! {
+                            svql_query::traits::composite::Connection::any_in_set(#from, #to)
+                        },
+                        None => quote! {
+                            svql_query::traits::composite::Connection::new(#from, #to)
+                        },
                     }
                 })
                 .collect();
@@ -271,6 +284,7 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     let mut groups = Vec::new();
 
     // Parse #[connection(from = [...], to = [...])] - single required connection
+    // Also supports #[connection(from = [...], to = [...], kind = "any")] for set membership
     for attr in find_all_attrs(&input.attrs, "connection") {
         if let Some(conn) = parse_single_connection(attr) {
             groups.push(OrGroup {
@@ -304,9 +318,11 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
 }
 
 /// Parses a single `#[connection(...)]` attribute into a `Connection` struct.
+/// Supports optional `kind = "any"` parameter for set membership connections.
 fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     let mut from = None;
     let mut to = None;
+    let mut kind = None;
 
     let _ = attr.parse_nested_meta(|meta| {
         if meta.path.is_ident("from") {
@@ -315,14 +331,24 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
         } else if meta.path.is_ident("to") {
             let value: ExprArray = meta.value()?.parse()?;
             to = Some(PathSelector::from_expr_array(&value)?);
+        } else if meta.path.is_ident("kind") {
+            let value: syn::Lit = meta.value()?.parse()?;
+            if let syn::Lit::Str(lit_str) = value {
+                let kind_str = lit_str.value();
+                if kind_str == "any" {
+                    kind = Some(ConnectionKind::AnyInSet);
+                } else {
+                    abort!(attr, "connection kind must be 'any', got '{}'", kind_str);
+                }
+            }
         } else {
-            return Err(meta.error("Expected 'from' or 'to'"));
+            return Err(meta.error("Expected 'from', 'to', or 'kind'"));
         }
         Ok(())
     });
 
     match (from, to) {
-        (Some(f), Some(t)) => Some(Connection { from: f, to: t }),
+        (Some(f), Some(t)) => Some(Connection { from: f, to: t, kind }),
         _ => {
             abort!(attr, "connection attribute requires both 'from' and 'to'");
         }
@@ -357,6 +383,7 @@ fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
         .map(|to| Connection {
             from: from.clone(),
             to,
+            kind: None,
         })
         .collect();
 
@@ -391,6 +418,7 @@ fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
         .map(|from| Connection {
             from,
             to: to.clone(),
+            kind: None,
         })
         .collect();
 
@@ -435,7 +463,7 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
             }
 
             if let (Some(f), Some(t)) = (from, to) {
-                connections.push(Connection { from: f, to: t });
+                connections.push(Connection { from: f, to: t, kind: None });
             }
         }
         Ok(())

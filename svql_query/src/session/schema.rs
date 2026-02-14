@@ -126,6 +126,9 @@ pub enum ColumnKind {
     Sub(TypeId),
     /// Metadata column (e.g., depth, flags) - not a reference to other data.
     Metadata,
+    /// A bundle of wire references (e.g., all leaf inputs to a logic cone).
+    /// Used for set-based connectivity checking with `#[connect_any]`.
+    WireArray,
 }
 
 impl ColumnKind {
@@ -151,6 +154,12 @@ impl ColumnKind {
     #[must_use]
     pub const fn is_metadata(&self) -> bool {
         matches!(self, Self::Metadata)
+    }
+
+    /// Check if this is a wire array column.
+    #[must_use]
+    pub const fn is_wire_array(&self) -> bool {
+        matches!(self, Self::WireArray)
     }
 
     /// Get the target `TypeId` for a Sub column, if applicable.
@@ -229,6 +238,28 @@ impl ColumnDef {
             name,
             kind: ColumnKind::Metadata,
             nullable: false,
+            direction: PortDirection::None,
+        }
+    }
+
+    /// Create a wire array column (for bundled wires / set-based connectivity).
+    #[must_use]
+    pub const fn wire_array(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: ColumnKind::WireArray,
+            nullable: false,
+            direction: PortDirection::None,
+        }
+    }
+
+    /// Create a nullable wire array column.
+    #[must_use]
+    pub const fn wire_array_nullable(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: ColumnKind::WireArray,
+            nullable: true,
             direction: PortDirection::None,
         }
     }
@@ -406,6 +437,8 @@ pub enum ColumnEntry {
     Sub(u32),
     /// Pattern metadata.
     Metadata(PhysicalCellId),
+    /// A bundle of wire references (for set-based connectivity).
+    WireArray(Vec<WireRef>),
 }
 
 impl ColumnEntry {
@@ -447,6 +480,12 @@ impl ColumnEntry {
     #[must_use]
     pub const fn metadata(id: PhysicalCellId) -> Self {
         Self::Metadata(id)
+    }
+
+    /// Create a wire array entry
+    #[must_use]
+    pub fn wire_array(wires: Vec<WireRef>) -> Self {
+        Self::WireArray(wires)
     }
 }
 
@@ -491,6 +530,13 @@ impl EntryArray {
             .enumerate()
             .filter_map(|(col_idx, entry)| match entry {
                 ColumnEntry::Wire(WireRef::Cell(cid)) => Some((col_idx, cid.storage_key())),
+                ColumnEntry::WireArray(wires) => {
+                    // Include all wires in the array in the signature
+                    wires.iter().filter_map(|w| match w {
+                        WireRef::Cell(cid) => Some((col_idx, cid.storage_key())),
+                        _ => None,
+                    }).next()
+                }
                 ColumnEntry::Sub(slot_idx) => Some((col_idx, *slot_idx)),
                 ColumnEntry::Metadata(id) => Some((col_idx, id.storage_key())),
                 _ => None,

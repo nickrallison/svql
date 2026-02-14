@@ -242,6 +242,7 @@ impl std::fmt::Display for ColumnStore {
                         match &col[row_idx] {
                             ColumnEntry::Null => write!(f, "     null │")?,
                             ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
                             ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
                             ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
@@ -258,6 +259,7 @@ impl std::fmt::Display for ColumnStore {
                         match &col[row_idx] {
                             ColumnEntry::Null => write!(f, "     null │")?,
                             ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
                             ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
                             ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
@@ -282,6 +284,7 @@ impl std::fmt::Display for ColumnStore {
                         match &col[row_idx] {
                             ColumnEntry::Null => write!(f, "     null │")?,
                             ColumnEntry::Wire(wire_ref) => write!(f, " {wire_ref:?} │")?,
+                            ColumnEntry::WireArray(wires) => write!(f, " [{}w] │", wires.len())?,
                             ColumnEntry::Sub(slot_idx) => write!(f, " {slot_idx:>8} │")?,
                             ColumnEntry::Metadata(id) => write!(f, " {id:>8} │")?,
                         }
