@@ -1,6 +1,6 @@
 //! Core logic for hierarchical query composition.
 //!
-//! Implements the incremental join algorithm and cost-based planner 
+//! Implements the incremental join algorithm and cost-based planner
 //! used to resolve connections between multiple pattern instances.
 
 use std::marker::PhantomData;
@@ -8,11 +8,8 @@ use std::marker::PhantomData;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-
 use crate::{
-    prelude::*,
-    dsl::selector::Selector,
-    session::execution::join_planner::ConnectivityCache,
+    dsl::selector::Selector, prelude::*, session::execution::join_planner::ConnectivityCache,
 };
 
 /// The kind of connection constraint.
@@ -91,7 +88,11 @@ fn estimate_selectivity_from_index(
     if a_table.is_empty() || b_table.is_empty() {
         return 0.0;
     }
-    connectivity_cache.get(from_sub, to_sub, cnf_idx).map_or(1.0, |index| index.edge_count as f64 / (a_table.len() as f64 * b_table.len() as f64))
+    connectivity_cache
+        .get(from_sub, to_sub, cnf_idx)
+        .map_or(1.0, |index| {
+            index.edge_count as f64 / (a_table.len() as f64 * b_table.len() as f64)
+        })
 }
 
 /// Estimate how much filtering occurs when joining `new_idx` with already-joined submodules
@@ -117,25 +118,27 @@ fn estimate_combined_selectivity<T: Composite>(
             let involves_joined = from_sub.is_some_and(|i| joined.contains(&i))
                 || to_sub.is_some_and(|i| joined.contains(&i));
 
-            if involves_new && involves_joined && let (Some(from), Some(to)) = (from_sub, to_sub) {
-                    let sel = estimate_selectivity_from_index(
-                        connectivity_cache,
-                        from,
-                        to,
-                        cnf_idx,
-                        dep_tables[from],
-                        dep_tables[to],
-                    );
+            if involves_new
+                && involves_joined
+                && let (Some(from), Some(to)) = (from_sub, to_sub)
+            {
+                let sel = estimate_selectivity_from_index(
+                    connectivity_cache,
+                    from,
+                    to,
+                    cnf_idx,
+                    dep_tables[from],
+                    dep_tables[to],
+                );
 
-                    // Pessimistic bound for OR group: use the maximum selectivity (least filtering)
-                    if !group_has_relevant_conn {
-                        max_group_selectivity = sel;
-                        group_has_relevant_conn = true;
-                    } else {
-                        max_group_selectivity = f64::max(max_group_selectivity, sel);
-                    }
+                // Pessimistic bound for OR group: use the maximum selectivity (least filtering)
+                if !group_has_relevant_conn {
+                    max_group_selectivity = sel;
+                    group_has_relevant_conn = true;
+                } else {
+                    max_group_selectivity = f64::max(max_group_selectivity, sel);
                 }
-            
+            }
         }
 
         if group_has_relevant_conn {
@@ -244,7 +247,7 @@ fn compute_optimal_join_order<T: Composite>(
 
 /// A trait for hardware components composed of multiple sub-patterns.
 ///
-/// Composites define a hierarchy of submodules and the logical or physical 
+/// Composites define a hierarchy of submodules and the logical or physical
 /// connections between them.
 pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + 'static {
     /// Submodule declarations (macro-generated)
@@ -302,23 +305,33 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         ctx: &ExecutionContext,
         dep_tables: &[&(dyn AnyTable + Send + Sync)],
     ) -> Result<Table<Self>, QueryError> {
-        tracing::info!("[COMPOSITE] Starting composition for: {}", std::any::type_name::<Self>());
-        
+        tracing::info!(
+            "[COMPOSITE] Starting composition for: {}",
+            std::any::type_name::<Self>()
+        );
+
         let schema = Self::composite_schema();
         let sub_indices = &schema.submodules;
-        
+
         tracing::debug!("[COMPOSITE] Submodule count: {}", sub_indices.len());
         for (i, &col_idx) in sub_indices.iter().enumerate() {
             let col = schema.column(col_idx);
-            tracing::debug!("  [{}] {} (nullable: {}): {} rows", 
-                i, col.name, col.nullable, dep_tables[i].len());
+            tracing::debug!(
+                "  [{}] {} (nullable: {}): {} rows",
+                i,
+                col.name,
+                col.nullable,
+                dep_tables[i].len()
+            );
         }
 
         // Early exit for empty required tables
         for (i, &col_idx) in sub_indices.iter().enumerate() {
             if dep_tables[i].is_empty() && !schema.column(col_idx).nullable {
-                tracing::info!("[COMPOSITE] Early exit: required submodule '{}' has no matches", 
-                    schema.column(col_idx).name);
+                tracing::info!(
+                    "[COMPOSITE] Early exit: required submodule '{}' has no matches",
+                    schema.column(col_idx).name
+                );
                 return Table::new(vec![]);
             }
         }
@@ -327,17 +340,17 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let connectivity_cache = ConnectivityCache::build::<Self>(dep_tables, ctx);
 
         // Incremental join with filtering (Optimization 2: Intelligent Join Ordering)
-        let join_order = compute_optimal_join_order::<Self>(
-            dep_tables,
-            &Self::CONNECTIONS,
-            &connectivity_cache,
-        );
+        let join_order =
+            compute_optimal_join_order::<Self>(dep_tables, &Self::CONNECTIONS, &connectivity_cache);
         tracing::debug!("[COMPOSITE] Join order: {:?}", join_order);
 
         let first_idx = join_order[0];
         let first_table = dep_tables[first_idx];
-        tracing::info!("[COMPOSITE] Starting with {} entries from first table: {}", 
-            first_table.len(), schema.column(sub_indices[first_idx]).name);
+        tracing::info!(
+            "[COMPOSITE] Starting with {} entries from first table: {}",
+            first_table.len(),
+            schema.column(sub_indices[first_idx]).name
+        );
 
         #[cfg(feature = "parallel")]
         let mut entries: Vec<EntryArray> = if ctx.config().parallel {
@@ -357,13 +370,18 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             .collect();
 
         tracing::debug!("[COMPOSITE] Initial entries created: {}", entries.len());
-        
+
         for (join_step, &join_idx) in join_order[1..].iter().enumerate() {
             let table = dep_tables[join_idx];
             let table_name = schema.column(sub_indices[join_idx]).name;
-            tracing::info!("[COMPOSITE] Join step {}/{}: joining with {} ({} rows)", 
-                join_step + 1, join_order.len() - 1, table_name, table.len());
-            
+            tracing::info!(
+                "[COMPOSITE] Join step {}/{}: joining with {} ({} rows)",
+                join_step + 1,
+                join_order.len() - 1,
+                table_name,
+                table.len()
+            );
+
             let before_join = entries.len();
             entries = Self::join_and_filter(
                 entries,
@@ -373,9 +391,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 ctx,
                 &connectivity_cache,
             );
-            
-            tracing::debug!("[COMPOSITE] After join: {} -> {} entries ({} filtered out)", 
-                before_join, entries.len(), before_join.saturating_sub(entries.len()));
+
+            tracing::debug!(
+                "[COMPOSITE] After join: {} -> {} entries ({} filtered out)",
+                before_join,
+                entries.len(),
+                before_join.saturating_sub(entries.len())
+            );
 
             if entries.is_empty() {
                 tracing::info!("[COMPOSITE] Join resulted in no matches, stopping early");
@@ -386,17 +408,27 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Resolve aliases
         tracing::debug!("[COMPOSITE] Resolving {} aliases...", Self::ALIASES.len());
         let mut final_entries = Self::resolve_aliases(entries, ctx)?;
-        tracing::debug!("[COMPOSITE] Aliases resolved: {} entries", final_entries.len());
+        tracing::debug!(
+            "[COMPOSITE] Aliases resolved: {} entries",
+            final_entries.len()
+        );
 
         // Apply automatic deduplication
         let before_dedup = final_entries.len();
         Self::apply_deduplication(&mut final_entries);
         if before_dedup != final_entries.len() {
-            tracing::debug!("[COMPOSITE] Deduplication: {} -> {} entries ({} removed)", 
-                before_dedup, final_entries.len(), before_dedup - final_entries.len());
+            tracing::debug!(
+                "[COMPOSITE] Deduplication: {} -> {} entries ({} removed)",
+                before_dedup,
+                final_entries.len(),
+                before_dedup - final_entries.len()
+            );
         }
 
-        tracing::info!("[COMPOSITE] Composition complete: {} total matches", final_entries.len());
+        tracing::info!(
+            "[COMPOSITE] Composition complete: {} total matches",
+            final_entries.len()
+        );
         Table::new(final_entries)
     }
 
@@ -415,10 +447,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Use the cached haystack design from context instead of calling get_design
         let design = ctx.haystack_design();
         let _graph = design.index();
-        
+
         let num_groups = Self::CONNECTIONS.connections.len();
-        tracing::trace!("[COMPOSITE] Validating {} connection groups for {}", 
-            num_groups, std::any::type_name::<Self>());
+        tracing::trace!(
+            "[COMPOSITE] Validating {} connection groups for {}",
+            num_groups,
+            std::any::type_name::<Self>()
+        );
 
         // Check each CNF group (conjunction of disjunctions)
         for (group_idx, group) in Self::CONNECTIONS.connections.iter().enumerate() {
@@ -562,8 +597,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         true
     }
 
-        /// Check if a selector path can be fully resolved given the current row state.
-    /// 
+    /// Check if a selector path can be fully resolved given the current row state.
+    ///
     /// Returns `false` if the path traverses through a NULL submodule reference,
     /// meaning we can't validate this connection yet (submodule not joined).
     fn is_selector_resolvable(row: &Row<Self>, selector: Selector<'_>) -> bool {
@@ -592,12 +627,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         // Check if the submodule reference is populated
         match &row.entry_array.entries[col_idx] {
-            ColumnEntry::Sub(_) => true,  // Submodule is joined ✓
-            ColumnEntry::Null => false,    // Submodule not joined yet
+            ColumnEntry::Sub(_) => true, // Submodule is joined ✓
+            ColumnEntry::Null => false,  // Submodule not joined yet
             _ => false,
         }
     }
-
 
     /// Validate (calls both connection and custom validation)
     fn validate(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
@@ -641,7 +675,9 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             if let Some(mut sub_node) = row
                 .sub_any(sub.name)
                 .and_then(|sub_ref| store.get_from_tid(sub.type_id).map(|t| (sub_ref, t)))
-                .and_then(|(sub_ref, table)| table.row_to_report_node(sub_ref as usize, store, driver, key))
+                .and_then(|(sub_ref, table)| {
+                    table.row_to_report_node(sub_ref as usize, store, driver, key)
+                })
             {
                 sub_node.name = sub.name.to_string();
                 children.push(sub_node);
@@ -685,8 +721,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
     /// Creates a boilerplate search entry for a single submodule.
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
-        let mut entries =
-            vec![ColumnEntry::Null; Self::SUBMODULES.len() + Self::ALIASES.len()];
+        let mut entries = vec![ColumnEntry::Null; Self::SUBMODULES.len() + Self::ALIASES.len()];
         entries[sub_indices[join_idx]] = ColumnEntry::Sub(row_idx);
         EntryArray::new(entries)
     }
@@ -932,7 +967,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                             .map(crate::wire::WireRef::Cell);
 
                         if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
-                            entry.entries[idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                            entry.entries[idx] =
+                                wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                         }
                     }
 
@@ -959,7 +995,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                         .map(crate::wire::WireRef::Cell);
 
                     if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
-                        entry.entries[idx] = wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                        entry.entries[idx] =
+                            wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 
@@ -1053,9 +1090,7 @@ where
 /// Internal unit tests for the `Composite` trait.
 pub(crate) mod test {
 
-    use crate::{
-        traits::{Netlist, Pattern},
-    };
+    use crate::traits::{Netlist, Pattern};
 
     use super::{
         Alias, Component, Composite, Connection, Connections, Driver, DriverKey, ExecInfo, Row,
@@ -1070,9 +1105,9 @@ pub(crate) mod test {
 
     #[derive(Debug, Clone, Composite)]
     #[or_to(from = ["and1", "y"], to = [["and2", "a"], ["and2", "b"]])]
-    #[filter(|_row, _ctx| { 
-        true
-    })]
+    // #[filter(|_row, _ctx| {
+    //     true
+    // })]
     /// A test pattern representing two cascaded AND gates.
     pub struct And2Gates {
         /// The first gate.

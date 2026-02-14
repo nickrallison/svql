@@ -3,8 +3,8 @@
 /// Logical structures facilitating the bypass of register locks.
 pub mod unlock_logic;
 
-use svql_query::prelude::*;
 use crate::security::primitives::locked_register::LockedRegister;
+use svql_query::prelude::*;
 use unlock_logic::UnlockLogic;
 
 /// Top-level pattern for CWE-1234.

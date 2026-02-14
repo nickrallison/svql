@@ -1,6 +1,6 @@
 //! Procedural macro implementation for the `Composite` derive.
 //!
-//! Handles the parsing of connectivity attributes and generates 
+//! Handles the parsing of connectivity attributes and generates
 //! code for joining submodule tables into hierarchical matches.
 
 #![allow(clippy::too_many_lines, clippy::unnecessary_wraps)]
@@ -348,7 +348,11 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     });
 
     match (from, to) {
-        (Some(f), Some(t)) => Some(Connection { from: f, to: t, kind }),
+        (Some(f), Some(t)) => Some(Connection {
+            from: f,
+            to: t,
+            kind,
+        }),
         _ => {
             abort!(attr, "connection attribute requires both 'from' and 'to'");
         }
@@ -463,7 +467,11 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
             }
 
             if let (Some(f), Some(t)) = (from, to) {
-                connections.push(Connection { from: f, to: t, kind: None });
+                connections.push(Connection {
+                    from: f,
+                    to: t,
+                    kind: None,
+                });
             }
         }
         Ok(())

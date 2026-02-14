@@ -1,6 +1,6 @@
 //! Core logic for polymorphic pattern selection.
 //!
-//! Implements the concatenation and dispatch logic for patterns 
+//! Implements the concatenation and dispatch logic for patterns
 //! that offer multiple alternative implementations.
 
 use crate::prelude::*;

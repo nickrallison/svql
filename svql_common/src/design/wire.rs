@@ -1,6 +1,6 @@
 //! Wire and net abstractions for hardware connectivity.
 //!
-//! Provides types for representing physical wires, primary ports, 
+//! Provides types for representing physical wires, primary ports,
 //! and constants, along with their relative directions (Input/Output).
 
 use crate::*;
@@ -68,9 +68,9 @@ pub enum Wire {
         direction: PortDirection,
     },
     /// Constant value.
-    Constant { 
+    Constant {
         /// Boolean representation (false=0, true=1).
-        value: bool 
+        value: bool,
     },
 }
 

@@ -88,11 +88,12 @@ where
         let col_def = T::schema().column(idx);
 
         match &self.entry_array.entries[idx] {
-            ColumnEntry::WireArray(wire_refs) => {
-                Some(wire_refs.iter().map(|wr| {
-                    Wire::from_ref(wr.clone(), col_def.direction)
-                }).collect())
-            }
+            ColumnEntry::WireArray(wire_refs) => Some(
+                wire_refs
+                    .iter()
+                    .map(|wr| Wire::from_ref(wr.clone(), col_def.direction))
+                    .collect(),
+            ),
             _ => None,
         }
     }
@@ -407,11 +408,14 @@ where
                     crate::wire::WireRef::Constant(val) => format!("const({})", val),
                 },
                 Some(ColumnEntry::WireArray(wires)) => {
-                    let wire_strs: Vec<String> = wires.iter().map(|w| match w {
-                        crate::wire::WireRef::Cell(id) => format!("cell({id})"),
-                        crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
-                        crate::wire::WireRef::Constant(val) => format!("const({})", val),
-                    }).collect();
+                    let wire_strs: Vec<String> = wires
+                        .iter()
+                        .map(|w| match w {
+                            crate::wire::WireRef::Cell(id) => format!("cell({id})"),
+                            crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
+                            crate::wire::WireRef::Constant(val) => format!("const({})", val),
+                        })
+                        .collect();
                     format!("[{}]", wire_strs.join(", "))
                 }
                 Some(ColumnEntry::Sub(slot_idx)) => format!("ref({})", slot_idx),

@@ -18,7 +18,7 @@ impl DesignPath {
     ///
     /// # Errors
     ///
-    /// Returns an error string if the file extension is missing or not 
+    /// Returns an error string if the file extension is missing or not
     /// recognized as a supported design format (.v, .il, .json).
     pub fn new(path: PathBuf) -> Result<Self, String> {
         match path.extension().and_then(|s| s.to_str()) {

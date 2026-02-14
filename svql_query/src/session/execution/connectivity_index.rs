@@ -1,11 +1,10 @@
 //! Bipartite indexing for physical connection validation.
 //!
-//! Maps relationships between rows of different tables based on 
+//! Maps relationships between rows of different tables based on
 //! wire connectivity to optimize join performance.
 
-use crate::prelude::*;
 use crate::dsl::traits::composite::ConnectionKind;
-
+use crate::prelude::*;
 
 /// Maps relationships between two pattern tables based on a connection.
 ///
@@ -44,10 +43,16 @@ impl BipartiteIndex {
                 // Exact connection: source wire must equal target wire
                 for a_idx in 0..a_table.len() as u32 {
                     for b_idx in 0..b_table.len() as u32 {
-                        let a_cell =
-                            a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx);
-                        let b_cell =
-                            b_table.resolve_path(b_idx as usize, connection.to.selector.tail(), ctx);
+                        let a_cell = a_table.resolve_path(
+                            a_idx as usize,
+                            connection.from.selector.tail(),
+                            ctx,
+                        );
+                        let b_cell = b_table.resolve_path(
+                            b_idx as usize,
+                            connection.to.selector.tail(),
+                            ctx,
+                        );
 
                         match (&a_cell, &b_cell) {
                             (Some(src), Some(dst)) if src.storage_key() == dst.storage_key() => {
@@ -64,10 +69,16 @@ impl BipartiteIndex {
                 // Set membership: source wire must be in target WireArray
                 for a_idx in 0..a_table.len() as u32 {
                     for b_idx in 0..b_table.len() as u32 {
-                        let a_cell =
-                            a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx);
-                        let b_bundle =
-                            b_table.resolve_bundle_path(b_idx as usize, connection.to.selector.tail(), ctx);
+                        let a_cell = a_table.resolve_path(
+                            a_idx as usize,
+                            connection.from.selector.tail(),
+                            ctx,
+                        );
+                        let b_bundle = b_table.resolve_bundle_path(
+                            b_idx as usize,
+                            connection.to.selector.tail(),
+                            ctx,
+                        );
 
                         match (&a_cell, &b_bundle) {
                             (Some(src), Some(bundle)) => {

@@ -26,11 +26,11 @@ pub enum QueryError {
 
     /// Schema mismatch between expected and actual column types.
     #[error("Schema mismatch: expected {expected}, got {actual}")]
-    SchemaMismatch { 
+    SchemaMismatch {
         /// The type or structure expected by the query.
-        expected: String, 
+        expected: String,
         /// The type or structure found in the design.
-        actual: String 
+        actual: String,
     },
 
     /// Schema mismatch between expected and actual column types.
@@ -54,7 +54,6 @@ pub enum QueryError {
     #[error("Execution error: {0}")]
     ExecutionError(String),
 }
-
 
 impl QueryError {
     /// Create a design load error.

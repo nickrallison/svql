@@ -3,8 +3,8 @@
 //! This module implements the logic to check if a candidate cell in the haystack
 //! satisfies the connectivity requirements of the needle cell.
 
-use crate::SubgraphMatcherCore;
 use super::assignment::SingleAssignment;
+use crate::SubgraphMatcherCore;
 use crate::cell::GraphNodeIdx;
 use prjunnamed_netlist::{Cell, FlipFlop, Net, Value};
 

@@ -1,6 +1,6 @@
 //! Infrastructure for verifying pattern matching results.
 //!
-//! Provides macros and runner logic for asserting match counts 
+//! Provides macros and runner logic for asserting match counts
 //! and rehydration correctness against known design fixtures.
 
 use std::fmt::Debug;
@@ -52,13 +52,12 @@ impl TestSpec<'_> {
         Ok(container)
     }
 
-    #[must_use] 
+    #[must_use]
     /// Generates the driver key for the haystack design.
     pub fn get_key(&self) -> DriverKey {
         DriverKey::new(self.haystack_path, self.haystack_module)
     }
 }
-
 
 /// Run a query test using the new `DataFrame` API (`ExecutionPlan` + Store).
 /// This uses the new `run_query` function which works for all pattern types.

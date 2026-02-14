@@ -532,10 +532,13 @@ impl EntryArray {
                 ColumnEntry::Wire(WireRef::Cell(cid)) => Some((col_idx, cid.storage_key())),
                 ColumnEntry::WireArray(wires) => {
                     // Include all wires in the array in the signature
-                    wires.iter().filter_map(|w| match w {
-                        WireRef::Cell(cid) => Some((col_idx, cid.storage_key())),
-                        _ => None,
-                    }).next()
+                    wires
+                        .iter()
+                        .filter_map(|w| match w {
+                            WireRef::Cell(cid) => Some((col_idx, cid.storage_key())),
+                            _ => None,
+                        })
+                        .next()
                 }
                 ColumnEntry::Sub(slot_idx) => Some((col_idx, *slot_idx)),
                 ColumnEntry::Metadata(id) => Some((col_idx, id.storage_key())),

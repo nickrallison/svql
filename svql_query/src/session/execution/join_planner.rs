@@ -1,13 +1,12 @@
 //! Cost-based execution planner for submodule joins.
 //!
-//! Analyzes connectivity constraints to determine an optimal 
+//! Analyzes connectivity constraints to determine an optimal
 //! join order, minimizing the size of intermediate Cartesian products.
 
-use crate::prelude::*;
-use crate::session::PatternSchema;
 use super::connectivity_index::BipartiteIndex;
 use crate::dsl::traits::composite::Endpoint;
-
+use crate::prelude::*;
+use crate::session::PatternSchema;
 
 /// Precomputed connectivity indices for all connections in a pattern.
 pub struct ConnectivityCache {

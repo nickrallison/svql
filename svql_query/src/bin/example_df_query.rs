@@ -137,7 +137,9 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         .map_err(|e| QueryError::design_load(e.to_string()))?;
 
     for i in 0..container.index().num_cells() {
-        let cell = container.index().get_cell_by_index(GraphNodeIdx::new(i as u32));
+        let cell = container
+            .index()
+            .get_cell_by_index(GraphNodeIdx::new(i as u32));
         println!("Cell: {cell:#?}");
     }
 

@@ -282,7 +282,9 @@ impl Recursive for RecAnd {
             .expect("schema has 'right_child'");
         let y_idx = schema.index_of("y").expect("schema has 'y'");
         let depth_idx = schema.index_of("depth").expect("schema has 'depth'");
-        let leaf_inputs_idx = schema.index_of("leaf_inputs").expect("schema has 'leaf_inputs'");
+        let leaf_inputs_idx = schema
+            .index_of("leaf_inputs")
+            .expect("schema has 'leaf_inputs'");
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
@@ -300,13 +302,18 @@ impl Recursive for RecAnd {
                     .and_then(|node| node_to_entry.get(&node))
                     .map(|&idx| ColumnEntry::Sub(idx as u32))
                     .unwrap_or(ColumnEntry::Null);
-                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] =
+                    e.y.cell_id()
+                        .map(svql_common::WireRef::Cell)
+                        .map(ColumnEntry::Wire)
+                        .unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 // Store leaf_inputs as WireArray
                 arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(
-                    e.leaf_inputs.iter()
+                    e.leaf_inputs
+                        .iter()
                         .filter_map(|w| w.cell_id().map(svql_common::WireRef::Cell))
-                        .collect()
+                        .collect(),
                 );
                 arr
             })
@@ -329,7 +336,7 @@ impl Recursive for RecAnd {
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
         let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
-        
+
         // Get leaf_inputs from WireArray column
         let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
 
@@ -606,7 +613,9 @@ impl Recursive for RecOr {
             .expect("schema has 'right_child'");
         let y_idx = schema.index_of("y").expect("schema has 'y'");
         let depth_idx = schema.index_of("depth").expect("schema has 'depth'");
-        let leaf_inputs_idx = schema.index_of("leaf_inputs").expect("schema has 'leaf_inputs'");
+        let leaf_inputs_idx = schema
+            .index_of("leaf_inputs")
+            .expect("schema has 'leaf_inputs'");
 
         let row_entries: Vec<EntryArray> = entries
             .iter()
@@ -624,13 +633,18 @@ impl Recursive for RecOr {
                     .and_then(|node| node_to_entry.get(&node))
                     .map(|&idx| ColumnEntry::Sub(idx as u32))
                     .unwrap_or(ColumnEntry::Null);
-                arr.entries[y_idx] = e.y.cell_id().map(svql_common::WireRef::Cell).map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                arr.entries[y_idx] =
+                    e.y.cell_id()
+                        .map(svql_common::WireRef::Cell)
+                        .map(ColumnEntry::Wire)
+                        .unwrap_or(ColumnEntry::Null);
                 arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                 // Store leaf_inputs as WireArray
                 arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(
-                    e.leaf_inputs.iter()
+                    e.leaf_inputs
+                        .iter()
                         .filter_map(|w| w.cell_id().map(svql_common::WireRef::Cell))
-                        .collect()
+                        .collect(),
                 );
                 arr
             })
@@ -653,7 +667,7 @@ impl Recursive for RecOr {
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
         let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
-        
+
         // Get leaf_inputs from WireArray column
         let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
 

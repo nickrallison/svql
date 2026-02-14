@@ -187,7 +187,8 @@ where
                         ColumnEntry::Null => record.push(String::new()),
                         ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
                         ColumnEntry::WireArray(wires) => {
-                            let wire_strs: Vec<String> = wires.iter().map(|w| format!("{w:?}")).collect();
+                            let wire_strs: Vec<String> =
+                                wires.iter().map(|w| format!("{w:?}")).collect();
                             record.push(format!("[{}]", wire_strs.join(", ")));
                         }
                         ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
@@ -235,7 +236,8 @@ where
                             ColumnEntry::Null => record.push(String::new()),
                             ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
                             ColumnEntry::WireArray(wires) => {
-                                let wire_strs: Vec<String> = wires.iter().map(|w| format!("{w:?}")).collect();
+                                let wire_strs: Vec<String> =
+                                    wires.iter().map(|w| format!("{w:?}")).collect();
                                 record.push(format!("[{}]", wire_strs.join(", ")));
                             }
                             ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
@@ -449,7 +451,7 @@ where
         if selector.len() == 1 {
             let col_name = selector.head()?;
             let col_idx = T::schema().index_of(col_name)?;
-            
+
             // Check if it's a WireArray column
             if !T::schema().column(col_idx).kind.is_wire_array() {
                 return None;
@@ -458,7 +460,12 @@ where
             return match self.store.get_cell(col_name, row_idx) {
                 ColumnEntry::WireArray(wire_refs) => {
                     let direction = T::schema().column(col_idx).direction;
-                    Some(wire_refs.iter().map(|wr| Wire::from_ref(wr.clone(), direction)).collect())
+                    Some(
+                        wire_refs
+                            .iter()
+                            .map(|wr| Wire::from_ref(wr.clone(), direction))
+                            .collect(),
+                    )
                 }
                 _ => None,
             };

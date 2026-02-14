@@ -1,6 +1,6 @@
 //! Integration tests for detecting specific locked register patterns.
-//! 
-//! Verifies that the subgraph core can identify various bypassed 
+//!
+//! Verifies that the subgraph core can identify various bypassed
 //! clock-enable and reset-mux implementations.
 
 use svql_common::{ConfigBuilder, MatchLength};

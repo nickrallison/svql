@@ -7,13 +7,12 @@
 //! This module provides the infrastructure. The actual `search` function
 //! pointers are provided by the `Pattern` trait implementations.
 
-
 use std::any::TypeId;
 use std::hash::Hash;
 use std::sync::Arc;
 
-use crate::prelude::*;
 use super::slot::ClaimResult;
+use crate::prelude::*;
 
 /// Type alias for a search function.
 ///
