@@ -6,6 +6,7 @@ use core::{
 };
 
 use crate::ModuleConfig;
+use contracts::*;
 
 /// Configuration parameters for the subgraph matching engine.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -102,6 +103,7 @@ impl Default for ConfigBuilder {
 impl ConfigBuilder {
     /// Sets the match length requirement.
     #[must_use]
+    #[ensures(ret.match_length == value)]
     pub const fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
         self
@@ -109,6 +111,7 @@ impl ConfigBuilder {
 
     /// Sets the Yosys configuration for the needle and forces flattening.
     #[must_use]
+    #[ensures(ret.needle_options.flatten)]
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
@@ -128,6 +131,16 @@ impl ConfigBuilder {
         self.needle_options
             .params
             .insert(param.to_owned(), value.to_owned());
+        self
+    }
+
+    /// Sets a parameter for the needle module. Able to be used in a const context
+    #[must_use]
+    pub const fn needle_const_params(
+        mut self,
+        params: &'static [(&'static str, &'static str)],
+    ) -> Self {
+        self.needle_options.const_params = params;
         self
     }
 
@@ -154,6 +167,16 @@ impl ConfigBuilder {
         self
     }
 
+    /// Sets a parameter for the haystack module. Able to be used in a const context
+    #[must_use]
+    pub const fn haystack_const_params(
+        mut self,
+        params: &'static [(&'static str, &'static str)],
+    ) -> Self {
+        self.haystack_options.const_params = params;
+        self
+    }
+
     /// Enables or disables the `opt_clean` pass for the haystack.
     #[must_use]
     pub fn haystack_opt_clean(mut self, opt_clean: bool) -> Self {
@@ -170,6 +193,7 @@ impl ConfigBuilder {
 
     /// Configures whether pattern variables can match design constants.
     #[must_use]
+    #[ensures(ret.pattern_vars_match_design_consts == allow)]
     pub const fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
@@ -177,6 +201,7 @@ impl ConfigBuilder {
 
     /// Sets the maximum recursion depth for the search algorithm.
     #[must_use]
+    #[ensures(ret.max_recursion_depth == depth)]
     pub const fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
         self.max_recursion_depth = depth;
         self
@@ -184,6 +209,7 @@ impl ConfigBuilder {
 
     /// Sets whether to run the search in parallel.
     #[must_use]
+    #[ensures(ret.parallel == parallel)]
     pub const fn parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
@@ -205,7 +231,8 @@ impl ConfigBuilder {
 /// Defines matching strategies for pattern searches.
 ///
 /// Different strategies control how much of the pattern must match the target design.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Hash)]
+#[derive_const(PartialEq, Eq)]
 pub enum MatchLength {
     /// Stop after the first valid match is found.
     /// Fastest execution but only finds one result.

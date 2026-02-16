@@ -9,6 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tracing::{debug, info};
+use contracts::*;
 
 use svql_common::*;
 use svql_common::{DesignPath, YosysModule};
@@ -55,6 +56,7 @@ impl Driver {
     /// # Errors
     ///
     /// Returns `DriverError::YosysNotFound` if the yosys executable cannot be located in PATH.
+    #[requires(root.as_ref().exists())]
     pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, DriverError> {
         let yosys = which::which("yosys").map_err(|e| DriverError::YosysNotFound(e.to_string()))?;
 
@@ -63,6 +65,12 @@ impl Driver {
             yosys_path: yosys,
             root_path: std::fs::canonicalize(root.as_ref())?,
         })
+    }
+
+    /// Returns the root directory used for path resolution.
+    #[must_use]
+    pub fn root_path(&self) -> &Path {
+        &self.root_path
     }
 
     /// Updates the path to the Yosys executable.
@@ -105,6 +113,8 @@ impl Driver {
     /// # Errors
     ///
     /// Returns `DriverError::YosysNotFound` if the yosys binary path does not exist.
+    #[requires(root.as_ref().exists())]
+    #[requires(yosys.as_ref().exists())]
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -125,7 +135,8 @@ impl Driver {
     }
 
     /// Converts a relative or absolute path to an absolute path.
-    fn resolve_path(&self, design_path: &Path) -> PathBuf {
+    #[must_use]
+    pub fn resolve_path(&self, design_path: &Path) -> PathBuf {
         if design_path.is_absolute() {
             design_path.to_path_buf()
         } else {
@@ -175,6 +186,7 @@ impl Driver {
     /// # Panics
     ///
     /// Panics if the internal design registry lock is poisoned.
+    #[ensures(ret.is_ok() -> self.check_registry(key).is_some())]
     pub fn get_design(
         &self,
         key: &DriverKey,

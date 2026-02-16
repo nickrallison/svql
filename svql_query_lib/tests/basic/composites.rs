@@ -9,10 +9,10 @@ const fn recursive_config(c: ConfigBuilder) -> ConfigBuilder {
         .max_recursion_depth(Some(10))
 }
 
-fn recursive_parametrized_config(c: ConfigBuilder) -> ConfigBuilder {
+const fn recursive_parametrized_config(c: ConfigBuilder) -> ConfigBuilder {
     c.match_length(MatchLength::NeedleSubsetHaystack)
         .max_recursion_depth(Some(10))
-        .haystack_param("N", "128")
+        .haystack_const_params(&[("N", "128")])
 }
 
 // --- Recursive AND Tests ---

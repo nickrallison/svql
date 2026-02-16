@@ -5,6 +5,7 @@
 
 use crate::*;
 use std::sync::Arc;
+use contracts::*;
 
 /// Core wire reference type that can be stored in tables.
 ///
@@ -33,12 +34,14 @@ impl WireRef {
 
     /// Check if this is a cell reference
     #[must_use]
+    #[ensures(ret == matches!(self, Self::Cell(_)))]
     pub const fn is_cell(&self) -> bool {
         matches!(self, Self::Cell(_))
     }
 
     /// Get the cell ID if this is a cell reference
     #[must_use]
+    #[ensures(ret.is_some() == self.is_cell())]
     pub const fn as_cell(&self) -> Option<PhysicalCellId> {
         match self {
             Self::Cell(id) => Some(*id),

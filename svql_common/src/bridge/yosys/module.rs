@@ -7,6 +7,7 @@ use std::{
 };
 
 use super::{DesignPath, ModuleConfig};
+use contracts::*;
 
 /// Represents a specific module within a design file to be processed by Yosys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -34,6 +35,8 @@ impl YosysModule {
     ///
     /// Returns an error if the design path cannot be categorized or contains
     /// invalid characters.
+    #[requires(path.as_ref().to_str().is_some())]
+    #[ensures(ret.is_ok() -> ret.as_ref().unwrap().module_name() == module.as_ref())]
     pub fn new<P: AsRef<Path>, S: AsRef<str>>(
         path: P,
         module: S,
@@ -96,6 +99,16 @@ impl YosysModule {
         args.push(format!("hierarchy -top {}", self.module_name()));
 
         for (param, value) in &config.params {
+            args.push("-p".to_owned());
+            args.push(format!(
+                "chparam -set {} {} {}",
+                param,
+                value,
+                self.module_name()
+            ));
+        }
+
+        for (param, value) in config.const_params.iter() {
             args.push("-p".to_owned());
             args.push(format!(
                 "chparam -set {} {} {}",

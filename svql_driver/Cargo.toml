@@ -12,6 +12,7 @@ svql_common.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
+contracts.workspace = true
 regex.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true

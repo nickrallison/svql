@@ -8,6 +8,8 @@
 //! The types defined here form the bridge between high-level pattern queries
 //! and low-level netlist data structures.
 
+#![feature(derive_const, const_cmp, const_trait_impl)]
+
 pub mod bridge;
 mod config;
 pub mod design;

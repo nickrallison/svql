@@ -80,16 +80,13 @@ impl BipartiteIndex {
                             ctx,
                         );
 
-                        match (&a_cell, &b_bundle) {
-                            (Some(src), Some(bundle)) => {
-                                // Check if src is in the bundle
-                                if bundle.iter().any(|w| w.cell_id() == Some(*src)) {
-                                    forward.entry(a_idx).or_default().insert(b_idx);
-                                    reverse.entry(b_idx).or_default().insert(a_idx);
-                                    edge_count += 1;
-                                }
+                        if let (Some(src), Some(bundle)) = (&a_cell, &b_bundle) {
+                            // Check if src is in the bundle
+                            if bundle.iter().any(|w| w.cell_id() == Some(*src)) {
+                                forward.entry(a_idx).or_default().insert(b_idx);
+                                reverse.entry(b_idx).or_default().insert(a_idx);
+                                edge_count += 1;
                             }
-                            _ => {}
                         }
                     }
                 }

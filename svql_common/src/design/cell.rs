@@ -13,6 +13,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use contracts::*;
 
 use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
@@ -30,11 +31,13 @@ pub struct PhysicalCellId {
 
 impl PhysicalCellId {
     /// Creates a new persistent cell ID from a raw integer.
+    #[ensures(ret.inner == id)]
     pub const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
     /// Access for table packing logic.
+    #[ensures(ret == self.inner)]
     pub const fn storage_key(&self) -> u32 {
         self.inner
     }
@@ -81,11 +84,13 @@ pub struct GraphNodeIdx {
 
 impl GraphNodeIdx {
     /// Creates a new local graph index from a raw integer.
+    #[ensures(ret.inner == id)]
     pub const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
     /// Returns the index as a usize for array access.
+    #[ensures(ret == self.inner as usize)]
     pub const fn as_usize(self) -> usize {
         self.inner as usize
     }

@@ -30,19 +30,6 @@ pub fn apply_deduplication(entries: &mut Vec<EntryArray>) {
     entries.retain(|entry| seen.insert(entry.signature()));
 }
 
-/// Returns the column index for a given column name in the schema.
-// #[must_use]
-// pub const fn schema_lut(name: &str, schema: &[ColumnDef]) -> Option<usize> {
-//     let mut i = 0;
-//     while i < schema.len() {
-//         if schema[i].name == name {
-//             return Some(i);
-//         }
-//         i += 1;
-//     }
-//     None
-// }
-
 /// Executes a search function and returns the result as a type-erased table.
 ///
 /// # Errors

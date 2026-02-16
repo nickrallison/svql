@@ -17,6 +17,7 @@ prjunnamed-yosys_json.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
+contracts.workspace = true
 gxhash = { workspace = true }
 dashmap = { workspace = true }
 argparse = { workspace = true }
@@ -25,6 +26,11 @@ regex = { workspace = true }
 tempfile = { workspace = true }
 tracing = { workspace = true }
 which = { workspace = true }
+
+[dev-dependencies]
+rstest.workspace = true
+quickcheck.workspace = true
+tracing-subscriber.workspace = true
 
 [[bin]]
 name = "to_rtlil"

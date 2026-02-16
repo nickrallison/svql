@@ -4,6 +4,7 @@
 //! and pre-computed set intersections during subgraph matching.
 
 use std::sync::Arc;
+use contracts::*;
 
 use crate::cell::GraphNodeIdx;
 use crate::*;
@@ -34,6 +35,27 @@ pub struct ConnectivityGraph {
     intersect_fanout_of_fanin: Arc<DashMap<GraphNodeIdx, Arc<HashSet<GraphNodeIdx>>>>,
 }
 
+impl ConnectivityGraph {
+    /// Returns true if fan-in and fan-out are symmetric.
+    fn is_symmetric(&self) -> bool {
+        for (cell_idx, fanout_list) in &self.fanout_map {
+            for (target, _) in fanout_list {
+                // If A is in B's fanout, B should be in A's fanin
+                if let Some(fanin) = self.fanin_map.get(target) {
+                    if !fanin.iter().any(|(src, _): &(GraphNodeIdx, usize)| src == cell_idx) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+#[invariant(self.fanin_map.len() == self.fanout_map.len())]
+#[invariant(self.is_symmetric())]
 impl ConnectivityGraph {
     /// Builds the connectivity index using design cells and a translation map.
     #[must_use]
@@ -97,6 +119,12 @@ impl ConnectivityGraph {
     ) -> (FaninMap, FanoutMap) {
         let mut fanout_map: FanoutMap = HashMap::default();
         let mut fanin_map: FaninMap = HashMap::default();
+
+        // Initialize maps for all cells to ensure equal lengths and satisfy invariants
+        for &idx in cell_id_map.values() {
+            fanout_map.insert(idx, Vec::new());
+            fanin_map.insert(idx, Vec::new());
+        }
 
         for sink_ref in cell_refs_topo.iter() {
             let sink_idx = *cell_id_map
@@ -194,13 +222,13 @@ impl ConnectivityGraph {
 
     /// Access the underlying fan-in mapping including pin metadata.
     #[must_use]
-    pub const fn fanin_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
+    pub fn fanin_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
         &self.fanin_map
     }
 
     /// Access the underlying fan-out mapping including pin metadata.
     #[must_use]
-    pub const fn fanout_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
+    pub fn fanout_map(&self) -> &HashMap<GraphNodeIdx, Vec<(GraphNodeIdx, usize)>> {
         &self.fanout_map
     }
 }

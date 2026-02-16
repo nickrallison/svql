@@ -4,6 +4,7 @@
 //! Keys are used to index designs in the driver's cache to avoid redundant reloading.
 
 use std::path::{Path, PathBuf};
+use contracts::*;
 
 /// Unique identifier for a hardware design.
 ///
@@ -24,10 +25,11 @@ impl DriverKey {
     ///
     /// * `path` - File path to the design
     /// * `module_name` - Name of the top-level module
+    #[requires(!module_name.as_ref().is_empty())]
     pub fn new<P, S>(path: P, module_name: S) -> Self
     where
         P: Into<PathBuf>,
-        S: Into<String>,
+        S: AsRef<str> + Into<String>,
     {
         Self {
             path: path.into(),

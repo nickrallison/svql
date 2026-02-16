@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use super::columnar::ColumnStore;
 use crate::prelude::*;
 use crate::wire::Wire;
+use contracts::*;
 
 /// A typed wrapper around a columnar store for pattern match results.
 ///
@@ -97,8 +98,9 @@ where
 
     /// Check if the table is empty.
     #[inline]
+    #[ensures(ret == (self.len() == 0))]
     pub const fn is_empty(&self) -> bool {
-        self.store.height() == 0
+        self.len() == 0
     }
 
     /// Get a reference to the underlying columnar store for bulk operations.
@@ -114,6 +116,7 @@ where
     }
 
     /// Retrieves a specific entry from the table by row and column name.
+    #[requires(row_idx < self.len())]
     pub fn get_entry(&self, row_idx: usize, col_name: &str) -> ColumnEntry {
         self.store.get_cell(col_name, row_idx).clone()
     }
@@ -121,6 +124,7 @@ where
     /// Get a single row by index.
     ///
     /// Returns `None` if the index is out of bounds.
+    #[ensures(ret.is_some() == ((row_idx as usize) < self.len()))]
     pub fn row(&self, row_idx: u32) -> Option<Row<T>> {
         let row_idx_usize = row_idx as usize;
         if row_idx_usize >= self.store.height() {
@@ -481,13 +485,13 @@ where
 
         // Get the submodule row index directly from the column
         let sub_row_idx = match self.store.get_cell(head, row_idx) {
-            ColumnEntry::Sub(slot_idx) => *slot_idx,
+            ColumnEntry::Sub(slot_idx) => slot_idx,
             _ => return None,
         };
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        sub_table.resolve_bundle_path(sub_row_idx as usize, selector.tail(), ctx)
+        sub_table.resolve_bundle_path((*sub_row_idx) as usize, selector.tail(), ctx)
     }
 
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError> {

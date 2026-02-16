@@ -1,6 +1,7 @@
 //! Configuration for Yosys module processing.
 
 use crate::*;
+use contracts::*;
 use core::hash::{Hash, Hasher};
 
 /// Configuration options for processing a Yosys module.
@@ -15,6 +16,8 @@ pub struct ModuleConfig {
     pub opt: bool,
     /// Parameters to set on the module.
     pub params: HashMap<String, String>,
+    /// Parameters to be set on the module compatable with const functions
+    pub const_params: &'static [(&'static str, &'static str)],
     /// Additional Yosys commands to run.
     pub other_steps: Vec<String>,
     /// Whether to use Verific for parsing.
@@ -32,27 +35,31 @@ impl ModuleConfig {
 
     /// Sets whether to flatten the module hierarchy.
     #[must_use]
-    pub const fn with_flatten(mut self, flatten: bool) -> Self {
+    #[ensures(ret.flatten == flatten)]
+    pub fn with_flatten(mut self, flatten: bool) -> Self {
         self.flatten = flatten;
         self
     }
 
     /// Sets whether to run the `opt_clean` pass.
     #[must_use]
-    pub const fn with_opt_clean(mut self, opt_clean: bool) -> Self {
+    #[ensures(ret.opt_clean == opt_clean)]
+    pub fn with_opt_clean(mut self, opt_clean: bool) -> Self {
         self.opt_clean = opt_clean;
         self
     }
 
     /// Sets whether to run the `opt` pass.
     #[must_use]
-    pub const fn with_opt(mut self, opt: bool) -> Self {
+    #[ensures(ret.opt == opt)]
+    pub fn with_opt(mut self, opt: bool) -> Self {
         self.opt = opt;
         self
     }
 
     /// Adds a parameter override.
     #[must_use]
+    #[ensures(ret.params.get(param) == Some(&value.to_string()))]
     pub fn with_param(mut self, param: &str, value: &str) -> Self {
         self.params.insert(param.to_owned(), value.to_owned());
         self
@@ -60,6 +67,7 @@ impl ModuleConfig {
 
     /// Adds a custom Yosys step command.
     #[must_use]
+    #[ensures(ret.other_steps.last() == Some(&step.to_string()))]
     pub fn with_step(mut self, step: &str) -> Self {
         self.other_steps.push(step.to_owned());
         self
@@ -67,14 +75,16 @@ impl ModuleConfig {
 
     /// Sets whether to use Verific for parsing.
     #[must_use]
-    pub const fn with_verific(mut self, verific: bool) -> Self {
+    #[ensures(ret.verific == verific)]
+    pub fn with_verific(mut self, verific: bool) -> Self {
         self.verific = verific;
         self
     }
 
     /// Sets whether to skip Yosys processing and load the raw JSON.
     #[must_use]
-    pub const fn with_load_raw(mut self, load_raw: bool) -> Self {
+    #[ensures(ret.load_raw == load_raw)]
+    pub fn with_load_raw(mut self, load_raw: bool) -> Self {
         self.load_raw = load_raw;
         self
     }

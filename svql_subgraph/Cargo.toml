@@ -16,17 +16,10 @@ svql_common.workspace = true
 ###############
 # OTHER LIBRARIES
 ###############
+contracts.workspace = true
 regex.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
-
-[dev-dependencies]
-svql_common.workspace = true
-svql_driver.workspace = true
-lazy_static.workspace = true
-rstest.workspace = true
-tracing-subscriber.workspace = true
-
 
 [dependencies]
 ###############
@@ -54,6 +47,12 @@ contracts.workspace = true
 itertools.workspace = true
 rayon = { workspace = true, optional = true }
 
+[dev-dependencies]
+svql_common.workspace = true
+svql_driver.workspace = true
+lazy_static.workspace = true
+rstest.workspace = true
+tracing-subscriber.workspace = true
 
 [features]
 default = []

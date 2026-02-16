@@ -4,6 +4,7 @@
 //! that's sufficient for our use case of storing ColumnEntry values.
 
 use crate::prelude::*;
+use contracts::*;
 
 /// A simple columnar storage structure for ColumnEntry data.
 ///
@@ -19,8 +20,28 @@ pub struct ColumnStore {
 }
 
 impl ColumnStore {
+    /// Get a mutable reference to a column by name.
+    pub fn column_mut(&mut self, name: &str) -> Option<&mut Vec<ColumnEntry>> {
+        self.columns.get_mut(name)
+    }
+}
+
+impl ColumnStore {
+    /// Validates the internal state of the columnar store.
+    ///
+    /// Ensures all columns have the same length and match the expected
+    /// row count of the store.
+    fn is_valid_state(&self) -> bool {
+        self.columns.values().all(|col| col.len() == self.num_rows)
+            && self
+                .column_names
+                .iter()
+                .all(|name| self.columns.contains_key(name))
+    }
+
     /// Create an empty ColumnStore with the given column names.
     #[must_use]
+    #[ensures(ret.is_valid_state())]
     pub fn new(column_names: Vec<String>) -> Self {
         let mut columns = HashMap::with_capacity(column_names.len());
         for name in &column_names {
@@ -41,6 +62,7 @@ impl ColumnStore {
     ///
     /// Returns an error if the number of column names does not match the data or
     /// if columns have inconsistent lengths.
+    #[ensures(ret.as_ref().is_ok_and(|s| s.is_valid_state()))]
     pub fn from_columns(
         column_names: Vec<String>,
         data: Vec<Vec<ColumnEntry>>,
@@ -90,11 +112,6 @@ impl ColumnStore {
         self.columns.get(name)
     }
 
-    /// Get a mutable reference to a column by name.
-    pub fn column_mut(&mut self, name: &str) -> Option<&mut Vec<ColumnEntry>> {
-        self.columns.get_mut(name)
-    }
-
     /// Get the column names in order.
     pub fn column_names(&self) -> &[String] {
         &self.column_names
@@ -105,6 +122,7 @@ impl ColumnStore {
     /// # Panics
     ///
     /// Panics if the column name does not exist in the store schema.
+    #[ensures(self.is_valid_state())]
     pub fn push_row(&mut self, row: EntryArray) {
         for (name, entry) in self.column_names.iter().zip(row.entries.into_iter()) {
             self.columns.get_mut(name).unwrap().push(entry);
@@ -125,11 +143,11 @@ impl ColumnStore {
     ///
     /// Panics if the column name does not exist in the store schema.
     pub fn deduplicate(&self) -> Self {
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::<Vec<&ColumnEntry>>::new();
         let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self
             .column_names
             .iter()
-            .map(|name| (name.clone(), Vec::new()))
+            .map(|name: &String| (name.clone(), Vec::<ColumnEntry>::new()))
             .collect();
 
         let mut new_row_count = 0;
@@ -172,11 +190,11 @@ impl ColumnStore {
     ///
     /// Panics if the column name does not exist in the store schema.
     pub fn deduplicate_subset(&self, subset: &[String]) -> Self {
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::<Vec<&ColumnEntry>>::new();
         let mut new_columns: HashMap<String, Vec<ColumnEntry>> = self
             .column_names
             .iter()
-            .map(|name| (name.clone(), Vec::new()))
+            .map(|name: &String| (name.clone(), Vec::<ColumnEntry>::new()))
             .collect();
 
         let mut new_row_count = 0;
@@ -223,13 +241,15 @@ impl std::fmt::Display for ColumnStore {
             match entry {
                 ColumnEntry::Null => "null".to_string(),
                 ColumnEntry::Wire(wire_ref) => format!("{wire_ref}"),
+                ColumnEntry::WireArray(wires) => format!("[{}]", wires.len()),
                 ColumnEntry::Sub(idx) => idx.to_string(),
                 ColumnEntry::Metadata(id) => id.to_string(),
             }
         };
 
         // 1. Precompute widths
-        let mut col_widths: Vec<usize> = self.column_names.iter().map(|n| n.len()).collect();
+        let mut col_widths: Vec<usize> =
+            self.column_names.iter().map(|n: &String| n.len()).collect();
         let row_label_width = self.num_rows.to_string().len().max(3);
 
         // Scan all rows to find the maximum width per column

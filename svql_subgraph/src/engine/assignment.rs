@@ -1,5 +1,6 @@
 //! Mapping between needle and haystack cells.
 
+use contracts::*;
 use svql_common::*;
 
 use crate::cell::GraphNodeIdx;
@@ -41,7 +42,29 @@ pub struct SingleAssignment {
 }
 
 impl SingleAssignment {
+    /// Checks if the mapping is internally consistent.
+    ///
+    /// Verifies that the needle-to-haystack and haystack-to-needle maps
+    /// maintain a valid bijective relationship.
+    pub fn is_consistent(&self) -> bool {
+        let total_needle_mappings: usize = self.haystack_to_needle.values().map(|v| v.len()).sum();
+        if total_needle_mappings != self.needle_to_haystack.len() {
+            return false;
+        }
+        for (needle, haystack) in &self.needle_to_haystack {
+            if !self
+                .haystack_to_needle
+                .get(haystack)
+                .is_some_and(|v| v.contains(needle))
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Creates a new, empty mapping between needle and haystack.
+    #[ensures(ret.is_consistent())]
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: HashMap::default(),
@@ -50,6 +73,7 @@ impl SingleAssignment {
     }
 
     /// Record a match between a needle node and a haystack node.
+    #[ensures(self.is_consistent())]
     pub(super) fn assign(&mut self, needle: GraphNodeIdx, haystack: GraphNodeIdx) {
         self.needle_to_haystack.insert(needle, haystack);
         self.haystack_to_needle
@@ -60,9 +84,15 @@ impl SingleAssignment {
 
     /// Removes an assignment by its needle index.
     #[allow(dead_code)]
+    #[ensures(self.is_consistent())]
     pub(super) fn remove_by_needle(&mut self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
-            self.haystack_to_needle.remove(&haystack_idx);
+            if let Some(needles) = self.haystack_to_needle.get_mut(&haystack_idx) {
+                needles.retain(|&n| n != needle);
+                if needles.is_empty() {
+                    self.haystack_to_needle.remove(&haystack_idx);
+                }
+            }
             return Some(haystack_idx);
         }
         None
@@ -91,7 +121,6 @@ impl SingleAssignment {
     /// Returns the number of assigned cells in this mapping.
     #[must_use]
     pub fn len(&self) -> usize {
-        debug_assert_eq!(self.needle_to_haystack.len(), self.haystack_to_needle.len());
         self.needle_to_haystack.len()
     }
 
@@ -169,5 +198,57 @@ impl SingleAssignment {
 
         sig.sort_unstable();
         sig
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_assignment_consistency() {
+        let mut assignment = SingleAssignment::new();
+        let n1 = GraphNodeIdx::new(1);
+        let h1 = GraphNodeIdx::new(10);
+
+        assignment.assign(n1, h1);
+        assert_eq!(assignment.len(), 1);
+        assert_eq!(assignment.get_haystack_cell(n1), Some(h1));
+        assert_eq!(assignment.get_needle_cells(h1), &[n1]);
+    }
+
+    #[test]
+    fn test_assignment_multiple_needle_to_same_haystack() {
+        let mut assignment = SingleAssignment::new();
+        let n1 = GraphNodeIdx::new(1);
+        let n2 = GraphNodeIdx::new(2);
+        let h1 = GraphNodeIdx::new(10);
+
+        assignment.assign(n1, h1);
+        assignment.assign(n2, h1);
+
+        // len() should be the number of needle cells assigned
+        assert_eq!(assignment.len(), 2);
+        assert_eq!(assignment.get_haystack_cell(n1), Some(h1));
+        assert_eq!(assignment.get_haystack_cell(n2), Some(h1));
+
+        let needle_cells = assignment.get_needle_cells(h1);
+        assert_eq!(needle_cells.len(), 2);
+        assert!(needle_cells.contains(&n1));
+        assert!(needle_cells.contains(&n2));
+    }
+
+    #[test]
+    fn test_assignment_remove() {
+        let mut assignment = SingleAssignment::new();
+        let n1 = GraphNodeIdx::new(1);
+        let h1 = GraphNodeIdx::new(10);
+
+        assignment.assign(n1, h1);
+        assert_eq!(assignment.len(), 1);
+
+        assignment.remove_by_needle(n1);
+        assert_eq!(assignment.len(), 0);
+        assert!(assignment.is_empty());
     }
 }
