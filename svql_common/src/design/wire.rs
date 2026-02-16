@@ -4,8 +4,8 @@
 //! and constants, along with their relative directions (Input/Output).
 
 use crate::*;
-use std::sync::Arc;
 use contracts::*;
+use std::sync::Arc;
 
 /// Core wire reference type that can be stored in tables.
 ///
@@ -167,6 +167,56 @@ impl std::fmt::Display for PortDirection {
             Self::Input => write!(f, "Input"),
             Self::Output => write!(f, "Output"),
             Self::Inout => write!(f, "Inout"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
+    use std::sync::Arc;
+
+    #[derive(Clone, Debug)]
+    struct ArbitraryWireRef(WireRef);
+
+    impl Arbitrary for ArbitraryWireRef {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let variant = u8::arbitrary(g) % 3;
+            let wire = match variant {
+                0 => WireRef::Cell(PhysicalCellId::new(u32::arbitrary(g))),
+                1 => WireRef::PrimaryPort(Arc::from(String::arbitrary(g).as_str())),
+                _ => WireRef::Constant(bool::arbitrary(g)),
+            };
+            Self(wire)
+        }
+    }
+
+    #[derive(Clone, Debug, Copy)]
+    struct ArbitraryPortDirection(PortDirection);
+
+    impl Arbitrary for ArbitraryPortDirection {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let variants = [
+                PortDirection::None,
+                PortDirection::Input,
+                PortDirection::Output,
+                PortDirection::Inout,
+            ];
+            Self(*g.choose(&variants).unwrap())
+        }
+    }
+
+    quickcheck! {
+        fn prop_wire_direction_preserved(wr: ArbitraryWireRef, dir: ArbitraryPortDirection) -> bool {
+            let wire = wr.0.to_wire(dir.0);
+            wire.direction() == Some(dir.0) || matches!(wire, Wire::Constant { .. })
+        }
+
+        fn prop_wire_cell_id_consistency(wr: ArbitraryWireRef) -> bool {
+            let is_cell = matches!(wr.0, WireRef::Cell(_));
+            let wire = wr.0.to_wire(PortDirection::None);
+            wire.cell_id().is_some() == is_cell
         }
     }
 }

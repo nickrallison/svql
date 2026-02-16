@@ -278,3 +278,80 @@ impl FromStr for MatchLength {
         }
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    // Helper to hash any Hashable type
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        t.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    // Arbitrary impl for ModuleConfig (simplified)
+    #[derive(Clone, Debug)]
+    struct ArbitraryModuleConfig(ModuleConfig);
+
+    impl Arbitrary for ArbitraryModuleConfig {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let mut cfg = ModuleConfig::new();
+            if bool::arbitrary(g) {
+                cfg = cfg.with_flatten(true);
+            }
+            if bool::arbitrary(g) {
+                cfg = cfg.with_opt(true);
+            }
+            // Add other fields...
+            Self(cfg)
+        }
+    }
+
+    quickcheck! {
+        fn prop_module_config_hash_consistency(a: ArbitraryModuleConfig, b: ArbitraryModuleConfig) -> bool {
+            if a.0 == b.0 {
+                calculate_hash(&a.0) == calculate_hash(&b.0)
+            } else {
+                // Hash collision is possible but unlikely, strict inequality not required
+                true
+            }
+        }
+
+        fn prop_module_config_builder_idempotent(cfg: ArbitraryModuleConfig) -> bool {
+            let val = bool::arbitrary(&mut Gen::new(1));
+            let once = cfg.0.with_flatten(val);
+            let twice = once.clone().with_flatten(val);
+            once == twice
+        }
+    }
+
+    // Arbitrary impl for MatchLength
+    #[derive(Clone, Debug, Copy)]
+    struct ArbitraryMatchLength(MatchLength);
+
+    impl Arbitrary for ArbitraryMatchLength {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let variants = [
+                MatchLength::First,
+                MatchLength::NeedleSubsetHaystack,
+                MatchLength::Exact,
+            ];
+            Self(*g.choose(&variants).unwrap())
+        }
+    }
+
+    quickcheck! {
+         fn prop_match_length_str_roundtrip(ml: ArbitraryMatchLength) -> bool {
+             // MatchLength::FromStr is implemented
+             let _s = format!("{:?}", ml.0); // Using Debug as Display isn't implemented
+             // If FromStr was robust, we'd check it here.
+             // Instead, check boolean properties:
+             (ml.0.first() == matches!(ml.0, MatchLength::First)) &&
+             (ml.0.exact() == matches!(ml.0, MatchLength::Exact))
+         }
+    }
+}

@@ -75,6 +75,7 @@ impl SingleAssignment {
     /// Record a match between a needle node and a haystack node.
     #[ensures(self.is_consistent())]
     pub(super) fn assign(&mut self, needle: GraphNodeIdx, haystack: GraphNodeIdx) {
+        self.remove_by_needle(needle);
         self.needle_to_haystack.insert(needle, haystack);
         self.haystack_to_needle
             .entry(haystack)
@@ -250,5 +251,67 @@ mod tests {
         assignment.remove_by_needle(n1);
         assert_eq!(assignment.len(), 0);
         assert!(assignment.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
+
+    #[derive(Clone, Debug)]
+    struct ArbitraryAssignmentOp {
+        needle: GraphNodeIdx,
+        haystack: GraphNodeIdx,
+        is_remove: bool, // If true, we try to remove; if false, we assign
+    }
+
+    impl Arbitrary for ArbitraryAssignmentOp {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self {
+                needle: GraphNodeIdx::new(u32::arbitrary(g) % 100),
+                haystack: GraphNodeIdx::new(u32::arbitrary(g) % 100),
+                is_remove: bool::arbitrary(g),
+            }
+        }
+    }
+
+    // Stateful property test: apply a list of ops, check invariant at the end
+    quickcheck! {
+        fn prop_assignment_ops_maintain_consistency(ops: Vec<ArbitraryAssignmentOp>) -> bool {
+            let mut assignment = SingleAssignment::new();
+            
+            for op in ops {
+                if op.is_remove {
+                    assignment.remove_by_needle(op.needle);
+                } else {
+                    assignment.assign(op.needle, op.haystack);
+                }
+                
+                // Check invariant after every step
+                if !assignment.is_consistent() {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn prop_assignment_bijection(ops: Vec<ArbitraryAssignmentOp>) -> bool {
+            let mut assignment = SingleAssignment::new();
+            for op in ops {
+                if !op.is_remove {
+                    assignment.assign(op.needle, op.haystack);
+                }
+            }
+
+            // Check bijection property
+            for (n, h) in assignment.needle_mapping() {
+                let needles = assignment.get_needle_cells(*h);
+                if !needles.contains(n) {
+                    return false;
+                }
+            }
+            true
+        }
     }
 }

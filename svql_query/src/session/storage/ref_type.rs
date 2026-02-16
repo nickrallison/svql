@@ -237,3 +237,32 @@ mod tests {
         assert!(b > a);
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
+
+    struct DummyTypeA;
+    struct DummyTypeB;
+
+    #[derive(Clone, Debug)]
+    struct ArbitraryRef(Ref<DummyTypeA>);
+
+    impl Arbitrary for ArbitraryRef {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self(Ref::new(u32::arbitrary(g)))
+        }
+    }
+
+    quickcheck! {
+        fn prop_ref_index_roundtrip(r: ArbitraryRef) -> bool {
+            r.0.index() == u32::from(r.0)
+        }
+
+        fn prop_ref_cast_preserves_index(r: ArbitraryRef) -> bool {
+            let casted: Ref<DummyTypeB> = r.0.cast();
+            casted.index() == r.0.index()
+        }
+    }
+}

@@ -8,12 +8,12 @@
 //! - [`CellWrapper`]: A wrapper around a netlist cell with stable identity.
 //! - [`SourceLocation`] / [`SourceLine`]: Source code location information.
 
+use contracts::*;
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use contracts::*;
 
 use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
@@ -552,5 +552,58 @@ mod tests {
         let id2 = GraphNodeIdx::new(2);
         assert!(id1 < id2);
         assert!(id2 > id1);
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
+
+    // -- PhysicalCellId --
+
+    #[derive(Clone, Debug)]
+    struct ArbitraryPhysicalCellId(PhysicalCellId);
+
+    impl Arbitrary for ArbitraryPhysicalCellId {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self(PhysicalCellId::new(u32::arbitrary(g)))
+        }
+    }
+
+    quickcheck! {
+        fn prop_physical_id_roundtrip(id: ArbitraryPhysicalCellId) -> bool {
+            let raw = id.0.storage_key();
+            PhysicalCellId::new(raw) == id.0
+        }
+
+        fn prop_physical_id_ordering(a: ArbitraryPhysicalCellId, b: ArbitraryPhysicalCellId) -> bool {
+            a.0.cmp(&b.0) == a.0.storage_key().cmp(&b.0.storage_key())
+        }
+    }
+
+    // -- GraphNodeIdx --
+
+    #[derive(Clone, Debug)]
+    struct ArbitraryGraphNodeIdx(GraphNodeIdx);
+
+    impl Arbitrary for ArbitraryGraphNodeIdx {
+        fn arbitrary(g: &mut Gen) -> Self {
+            // Limit size to avoid overflow in usize conversion on 32-bit targets if necessary
+            let val = u32::arbitrary(g) % 100_000;
+            Self(GraphNodeIdx::new(val))
+        }
+    }
+
+    quickcheck! {
+        fn prop_graph_idx_roundtrip(idx: ArbitraryGraphNodeIdx) -> bool {
+            let raw: u32 = idx.0.into();
+            GraphNodeIdx::new(raw) == idx.0
+        }
+
+        fn prop_graph_idx_usize_conversion(idx: ArbitraryGraphNodeIdx) -> bool {
+            let as_usize: usize = idx.0.as_usize();
+            GraphNodeIdx::from(as_usize) == idx.0
+        }
     }
 }
