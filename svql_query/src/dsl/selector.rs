@@ -83,7 +83,7 @@ mod property_tests {
     // We can use a fixed set of static strings for generation.
     lazy_static! {
         static ref STATIC_STRINGS: Vec<&'static str> =
-            { vec!["a", "b", "c", "clk", "q", "d", "submod", "port"] };
+            vec!["a", "b", "c", "clk", "q", "d", "submod", "port"];
     }
 
     impl Arbitrary for ArbitrarySelector {
