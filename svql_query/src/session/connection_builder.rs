@@ -55,12 +55,12 @@ impl<S> ConnectionBuilder<'_, S> {
 
         let valid_source = matches!(
             from.direction(),
-            Some(PortDirection::Output) | Some(PortDirection::Input)
+            PortDirection::Output | PortDirection::Input
         );
         if !valid_source {
             // Inout is also valid source?
             assert!(
-                from.direction() == Some(PortDirection::Inout),
+                from.direction() == PortDirection::Inout,
                 "Source wire (id {:?}) has invalid direction {:?} for source",
                 from.cell_id(),
                 from.direction()
@@ -73,12 +73,12 @@ impl<S> ConnectionBuilder<'_, S> {
 
         let valid_target = matches!(
             to.direction(),
-            Some(PortDirection::Input) | Some(PortDirection::Output)
+            PortDirection::Input | PortDirection::Output
         );
         if !valid_target {
             // Inout is also valid target?
             assert!(
-                to.direction() == Some(PortDirection::Inout),
+                to.direction() == PortDirection::Inout,
                 "Target wire (id {:?}) has invalid direction {:?} for target",
                 to.cell_id(),
                 to.direction()
@@ -136,11 +136,11 @@ impl<S> ConnectionBuilder<'_, S> {
         // For now, I will allow the connection if directions are vaguely compatible (not None).
 
         assert!(
-            from.direction() != Some(PortDirection::None),
+            from.direction() != PortDirection::None,
             "Source wire has no direction"
         );
         assert!(
-            to.direction() != Some(PortDirection::None),
+            to.direction() != PortDirection::None,
             "Target wire has no direction"
         );
 

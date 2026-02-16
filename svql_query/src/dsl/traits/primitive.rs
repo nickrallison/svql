@@ -14,36 +14,36 @@ use svql_driver::{Driver, DriverKey};
 
 // svql_query/src/traits/primitive.rs
 
-/// Helper to extract wire reference from a Value
-fn value_to_wire_ref(value: &prjunnamed_netlist::Value) -> Option<WireRef> {
-    // Try to get the first net from the value
+/// Helper to extract all nets from a Value
+fn value_to_nets(value: &prjunnamed_netlist::Value) -> Vec<WireRef> {
     value
         .iter()
-        .take(1)
-        .next()
-        .map_or(Some(WireRef::Constant(false)), |net| net_to_wire_ref(&net))
+        .filter_map(|net| {
+            if let Ok(idx) = net.as_cell_index() {
+                Some(WireRef::Net(idx as u32))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
-/// Helper to extract wire reference from a Net
-fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
-    // Try as cell first
-    if let Ok(cell_idx) = net.as_cell_index() {
-        return Some(WireRef::Cell(PhysicalCellId::new(cell_idx as u32)));
-    }
+/// Helper to determine output nets of a cell
+fn get_output_nets(cell: &prjunnamed_netlist::Cell, debug_index: usize) -> Vec<WireRef> {
+    // For DFFs, output width matches data width
+    let width = match cell {
+        prjunnamed_netlist::Cell::Dff(ff) => ff.data.len(),
+        // For gates, usually 1-bit output
+        _ => 1,
+    };
 
-    // If not a cell, assume it's an input port or constant
-    // For now, we'll create a synthetic name based on the net
-    // TODO: Investigate if there's a way to get the actual input name from the net
-    Some(WireRef::PrimaryPort(Arc::from(format!("net_{:?}", net))))
-}
-
-/// Helper to extract wire reference from a ControlNet
-fn control_net_to_wire_ref(cnet: &prjunnamed_netlist::ControlNet) -> Option<WireRef> {
-    net_to_wire_ref(&cnet.net())
+    (0..width)
+        .map(|i| WireRef::Net((debug_index + i) as u32))
+        .collect()
 }
 
 /// Extract the wire reference for a specific input port by name from a cell.
-fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Option<WireRef> {
+fn extract_input_nets(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Vec<WireRef> {
     use prjunnamed_netlist::Cell;
 
     match cell {
@@ -61,83 +61,78 @@ fn extract_input_port(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Optio
         | Cell::SDivFloor(a, b)
         | Cell::SModTrunc(a, b)
         | Cell::SModFloor(a, b) => match port_name {
-            "a" => value_to_wire_ref(a),
-            "b" => value_to_wire_ref(b),
-            _ => None,
+            "a" => value_to_nets(a),
+            "b" => value_to_nets(b),
+            _ => vec![],
         },
 
         // 1-input gates
         Cell::Not(a) | Cell::Buf(a) => match port_name {
-            "a" => value_to_wire_ref(a),
-            _ => None,
+            "a" => value_to_nets(a),
+            _ => vec![],
         },
 
         // Mux: (sel, a, b)
         Cell::Mux(s, a, b) => match port_name {
-            "sel" => net_to_wire_ref(s),
-            "a" => value_to_wire_ref(a),
-            "b" => value_to_wire_ref(b),
-            _ => None,
+            "sel" => net_to_wire_ref(s).into_iter().collect(),
+            "a" => value_to_nets(a),
+            "b" => value_to_nets(b),
+            _ => vec![],
         },
 
         // Adc: (a, b, carry_in)
         Cell::Adc(a, b, ci) => match port_name {
-            "a" => value_to_wire_ref(a),
-            "b" => value_to_wire_ref(b),
-            "carry_in" | "cin" | "ci" => net_to_wire_ref(ci),
-            _ => None,
+            "a" => value_to_nets(a),
+            "b" => value_to_nets(b),
+            "carry_in" | "cin" | "ci" => net_to_wire_ref(ci).into_iter().collect(),
+            _ => vec![],
         },
 
         // AIG: (a, b) - both are ControlNets
         Cell::Aig(a, b) => match port_name {
-            "a" => control_net_to_wire_ref(a),
-            "b" => control_net_to_wire_ref(b),
-            _ => None,
+            "a" => net_to_wire_ref(&a.net()).into_iter().collect(),
+            "b" => net_to_wire_ref(&b.net()).into_iter().collect(),
+            _ => vec![],
         },
 
         // Shift operations
         Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
             match port_name {
-                "a" => value_to_wire_ref(a),
-                "b" => value_to_wire_ref(b),
-                _ => None,
+                "a" => value_to_nets(a),
+                "b" => value_to_nets(b),
+                _ => vec![],
             }
         }
 
-        Cell::Dff(ff) => {
-            match port_name {
-                "clk" => net_to_wire_ref(&ff.clock.net()),
-                "d" | "data_in" => value_to_wire_ref(&ff.data),
-                // Handle various names for enable
-                "en" | "enable" | "write_en" => {
-                    if ff.enable.net().is_cell() {
-                        net_to_wire_ref(&ff.enable.net())
-                    } else {
-                        None
-                    }
-                }
-                "reset" | "rst" | "srst" => {
-                    if ff.reset.net().is_cell() {
-                        net_to_wire_ref(&ff.reset.net())
-                    } else {
-                        None
-                    }
-                }
-                "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
-                    ff.clear.nets().first().and_then(|net| {
-                        if net.is_cell() {
-                            net_to_wire_ref(net)
-                        } else {
-                            None
-                        }
-                    })
-                }
-                _ => None,
+        Cell::Dff(ff) => match port_name {
+            "clk" => net_to_wire_ref(&ff.clock.net()).into_iter().collect(),
+            "d" | "data_in" => value_to_nets(&ff.data),
+            // Handle various names for enable
+            "en" | "enable" | "write_en" => net_to_wire_ref(&ff.enable.net()).into_iter().collect(),
+            "reset" | "rst" | "srst" => net_to_wire_ref(&ff.reset.net()).into_iter().collect(),
+            "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => ff
+                .clear
+                .nets()
+                .first()
+                .and_then(net_to_wire_ref)
+                .into_iter()
+                .collect(),
+            _ => vec![],
+        },
+
+        _ => vec![],
+    }
+}
+
+fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
+    match net {
+        _ => {
+            if let Ok(idx) = net.as_cell_index() {
+                Some(WireRef::Net(idx as u32))
+            } else {
+                None
             }
         }
-
-        // Add memory and other complex cells as needed
-        _ => None,
     }
 }
 
@@ -150,7 +145,6 @@ pub fn resolve_primitive_ports(
     debug_index: usize,
     schema: &PatternSchema,
 ) -> EntryArray {
-    let cell_id = PhysicalCellId::new(debug_index as u32);
     let schema_size = schema.defs.len();
 
     // Initialize all entries as None
@@ -160,28 +154,24 @@ pub fn resolve_primitive_ports(
     for (idx, col_def) in schema.defs.iter().enumerate() {
         let port_name = col_def.name;
 
-        let wire_ref_opt = match col_def.direction {
+        match col_def.direction {
             PortDirection::Output => {
-                // Output port typically maps to the cell itself
-                Some(WireRef::Cell(cell_id))
+                let nets = get_output_nets(cell, debug_index);
+                entries[idx] = ColumnEntry::Wire(Wire::new(nets, PortDirection::Output));
             }
             PortDirection::Input | PortDirection::Inout => {
-                // Extract input value (might be cell, port, or constant)
-                extract_input_port(cell, port_name)
+                let nets = extract_input_nets(cell, port_name);
+                if !nets.is_empty() {
+                    entries[idx] = ColumnEntry::Wire(Wire::new(nets, col_def.direction));
+                }
             }
-            PortDirection::None => {
-                // Non-port column (shouldn't happen in primitives), skip
-                None
-            }
+            PortDirection::None => {}
         };
-
-        entries[idx] = wire_ref_opt
-            .map(ColumnEntry::Wire)
-            .unwrap_or(ColumnEntry::Null);
     }
 
     EntryArray::new(entries)
 }
+
 
 /// Trait for primitive hardware components that match against cell types.
 ///
@@ -221,7 +211,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
-            .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction))
+            .map(|p| ColumnDef::new(p.name, ColumnKind::Wire, false).with_direction(p.direction))
             .collect()
     }
 

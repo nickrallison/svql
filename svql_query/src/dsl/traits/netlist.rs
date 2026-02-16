@@ -72,7 +72,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     fn ports_to_defs() -> Vec<ColumnDef> {
         Self::PORTS
             .iter()
-            .map(|p| ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction))
+            .map(|p| ColumnDef::new(p.name, ColumnKind::Wire, false).with_direction(p.direction))
             .collect()
     }
 

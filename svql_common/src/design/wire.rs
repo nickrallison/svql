@@ -7,44 +7,28 @@ use crate::*;
 use contracts::*;
 use std::sync::Arc;
 
-/// Core wire reference type that can be stored in tables.
-///
-/// This enum can represent a wire driven by a cell output, a primary input/output port,
-/// or a constant value.
+/// A reference to a single net in the design.
+/// This is the atomic unit of connectivity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WireRef {
-    /// Reference via the stable physical ID
-    Cell(PhysicalCellId),
-    /// Primary input/output port (module boundary)
-    PrimaryPort(Arc<str>),
-    /// Constant value (0 or 1)
+    /// A specific net index (bit).
+    Net(u32),
+    /// A constant value (0 or 1).
     Constant(bool),
 }
 
 impl WireRef {
-    /// Convert to a contextual Wire with direction information
+    /// Check if this is a net reference
     #[must_use]
-    pub fn to_wire(self, direction: PortDirection) -> Wire {
-        match self {
-            Self::Cell(id) => Wire::Cell { id, direction },
-            Self::PrimaryPort(name) => Wire::PrimaryPort { name, direction },
-            Self::Constant(value) => Wire::Constant { value },
-        }
+    pub const fn is_net(&self) -> bool {
+        matches!(self, Self::Net(_))
     }
 
-    /// Check if this is a cell reference
+    /// Get the net index if this is a net reference
     #[must_use]
-    #[ensures(ret == matches!(self, Self::Cell(_)))]
-    pub const fn is_cell(&self) -> bool {
-        matches!(self, Self::Cell(_))
-    }
-
-    /// Get the cell ID if this is a cell reference
-    #[must_use]
-    #[ensures(ret.is_some() == self.is_cell())]
-    pub const fn as_cell(&self) -> Option<PhysicalCellId> {
+    pub const fn as_net(&self) -> Option<u32> {
         match self {
-            Self::Cell(id) => Some(*id),
+            Self::Net(idx) => Some(*idx),
             _ => None,
         }
     }
@@ -53,97 +37,92 @@ impl WireRef {
 impl std::fmt::Display for WireRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Cell(id) => write!(f, "Cell({id})"),
-            Self::PrimaryPort(name) => write!(f, "PrimaryPort({name})"),
-            Self::Constant(value) => write!(f, "Constant({value})"),
+            Self::Net(idx) => write!(f, "Net({})", idx),
+            Self::Constant(value) => write!(f, "{}", if *value { "1'b1" } else { "1'b0" }),
         }
     }
 }
 
-/// A wire with contextual direction information.
-///
-/// This is the wire type exposed to queries. It wraps a `WireRef` with
-/// additional direction metadata from the schema.
+/// A signal in the design, composed of one or more WireRefs (nets).
+/// This represents a bus or a single-bit wire.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Wire {
-    /// Cell-driven wire.
-    Cell {
-        /// The stable ID of the driving cell.
-        id: PhysicalCellId,
-        /// The direction context of this wire relative to the field.
-        direction: PortDirection,
-    },
-    /// Primary port at module boundary.
-    PrimaryPort {
-        /// Name of the top-level port.
-        name: Arc<str>,
-        /// Direction of the port.
-        direction: PortDirection,
-    },
-    /// Constant value.
-    Constant {
-        /// Boolean representation (false=0, true=1).
-        value: bool,
-    },
+pub struct Wire {
+    /// The nets making up this wire.
+    nets: Vec<WireRef>,
+    /// Direction relative to the pattern port.
+    direction: PortDirection,
 }
 
 impl std::fmt::Display for Wire {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Cell { id, direction } => write!(f, "Cell({id}, {direction})"),
-            Self::PrimaryPort { name, direction } => write!(f, "PrimaryPort({name}, {direction})"),
-            Self::Constant { value } => write!(f, "Constant({value})"),
+        if self.nets.is_empty() {
+            return write!(f, "empty");
         }
+
+        if self.nets.len() == 1 {
+            return write!(f, "{}", self.nets[0]);
+        }
+
+        write!(f, "{{")?;
+        for (i, r) in self.nets.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", r)?;
+        }
+        write!(f, "}}")
     }
 }
 
 impl Wire {
-    /// Create a Wire from a cell ID and direction
-    #[must_use]
-    pub const fn new(id: PhysicalCellId, direction: PortDirection) -> Self {
-        Self::Cell { id, direction }
+    pub fn new(nets: Vec<WireRef>, direction: PortDirection) -> Self {
+        Self { nets, direction }
     }
 
-    /// Create a Wire from a `WireRef` and direction
-    #[must_use]
-    pub fn from_ref(wire_ref: WireRef, direction: PortDirection) -> Self {
-        wire_ref.to_wire(direction)
-    }
-
-    /// Get the cell ID if this is a cell-driven wire
-    #[must_use]
-    pub const fn cell_id(&self) -> Option<PhysicalCellId> {
-        match self {
-            Self::Cell { id, .. } => Some(*id),
-            _ => None,
+    pub fn single(net: u32, direction: PortDirection) -> Self {
+        Self {
+            nets: vec![WireRef::Net(net)],
+            direction,
         }
     }
 
-    /// Get the direction (None for constants)
-    #[must_use]
-    pub const fn direction(&self) -> Option<PortDirection> {
-        match self {
-            Self::Cell { direction, .. } | Self::PrimaryPort { direction, .. } => Some(*direction),
-            Self::Constant { .. } => None,
+    pub fn constant(value: bool, direction: PortDirection) -> Self {
+        Self {
+            nets: vec![WireRef::Constant(value)],
+            direction,
         }
+    }
+
+    pub fn direction(&self) -> PortDirection {
+        self.direction
+    }
+
+    pub fn nets(&self) -> &[WireRef] {
+        &self.nets
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nets.is_empty()
+    }
+
+    // Helper to check if this wire drives another wire (intersection of nets)
+    pub fn drives(&self, other: &Wire) -> bool {
+        self.nets.iter().any(|n| other.nets.contains(n))
     }
 
     /// Check if this is a constant
     #[must_use]
-    pub const fn is_constant(&self) -> bool {
-        matches!(self, Self::Constant { .. })
+    pub fn is_constant(&self) -> bool {
+        self.nets.iter().all(|n| matches!(n, WireRef::Constant(_)))
     }
 
-    /// Check if this is a primary port
+    /// Helper to get the first net as a cell ID (for compatibility with 1-bit primitives)
     #[must_use]
-    pub const fn is_primary_port(&self) -> bool {
-        matches!(self, Self::PrimaryPort { .. })
-    }
-
-    /// Check if this is a cell
-    #[must_use]
-    pub const fn is_cell(&self) -> bool {
-        matches!(self, Self::Cell { .. })
+    pub fn cell_id(&self) -> Option<PhysicalCellId> {
+        self.nets()
+            .first()
+            .and_then(|n| n.as_net())
+            .map(PhysicalCellId::new)
     }
 }
 
@@ -182,10 +161,9 @@ mod property_tests {
 
     impl Arbitrary for ArbitraryWireRef {
         fn arbitrary(g: &mut Gen) -> Self {
-            let variant = u8::arbitrary(g) % 3;
+            let variant = u8::arbitrary(g) % 2;
             let wire = match variant {
-                0 => WireRef::Cell(PhysicalCellId::new(u32::arbitrary(g))),
-                1 => WireRef::PrimaryPort(Arc::from(String::arbitrary(g).as_str())),
+                0 => WireRef::Net(u32::arbitrary(g)),
                 _ => WireRef::Constant(bool::arbitrary(g)),
             };
             Self(wire)
@@ -209,14 +187,14 @@ mod property_tests {
 
     quickcheck! {
         fn prop_wire_direction_preserved(wr: ArbitraryWireRef, dir: ArbitraryPortDirection) -> bool {
-            let wire = wr.0.to_wire(dir.0);
-            wire.direction() == Some(dir.0) || matches!(wire, Wire::Constant { .. })
+            let wire = Wire::new(vec![wr.0.clone()], dir.0);
+            wire.direction() == dir.0
         }
 
-        fn prop_wire_cell_id_consistency(wr: ArbitraryWireRef) -> bool {
-            let is_cell = matches!(wr.0, WireRef::Cell(_));
-            let wire = wr.0.to_wire(PortDirection::None);
-            wire.cell_id().is_some() == is_cell
+        fn prop_wire_net_consistency(wr: ArbitraryWireRef) -> bool {
+            let is_net = matches!(wr.0, WireRef::Net(_));
+            let wire = Wire::new(vec![wr.0.clone()], PortDirection::None);
+            wire.nets().first().map(|n| n.is_net()).unwrap_or(false) == is_net
         }
     }
 }

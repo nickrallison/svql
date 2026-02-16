@@ -160,7 +160,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
 
         defs.extend(
             Self::PORTS.iter().map(|p| {
-                ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction)
+                ColumnDef::new(p.name, ColumnKind::Wire, false).with_direction(p.direction)
             }),
         );
 
@@ -574,11 +574,7 @@ mod tests {
                         .and_then(|node| node_to_entry.get(&node))
                         .map(|&idx| ColumnEntry::Sub(idx as u32))
                         .unwrap_or(ColumnEntry::Null);
-                    arr.entries[y_idx] =
-                        e.y.cell_id()
-                            .map(svql_common::WireRef::Cell)
-                            .map(ColumnEntry::Wire)
-                            .unwrap_or(ColumnEntry::Null);
+                    arr.entries[y_idx] = ColumnEntry::Wire(e.y.clone());
                     arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
                     arr
                 })

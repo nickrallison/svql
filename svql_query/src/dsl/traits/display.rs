@@ -142,73 +142,76 @@ pub fn wire_to_report_node(
     key: &DriverKey,
     config: &Config,
 ) -> ReportNode {
-    match wire {
-        Wire::Cell { id, .. } => {
-            let design = driver.get_design(key, &config.haystack_options).ok();
-            let cell_wrapper = design
-                .as_ref()
-                .and_then(|d| d.index().get_cell_by_id(id.storage_key() as usize));
+    if let Some(id) = wire.cell_id() {
+        let design = driver.get_design(key, &config.haystack_options).ok();
+        let cell_wrapper = design
+            .as_ref()
+            .and_then(|d| d.index().get_cell_by_id(id.storage_key() as usize));
 
-            if let Some(cell) = cell_wrapper {
-                let kind = cell.cell_type();
-                if kind.is_input() {
-                    let port_name = cell.input_name().unwrap_or("<unnamed>");
-                    return ReportNode {
-                        name: name.to_string(),
-                        type_name: format!("{:?}", direction),
-                        details: Some(format!("Port: {}", port_name)),
-                        source_loc: None,
-                        children: vec![],
-                    };
-                } else if kind.is_output() {
-                    let port_name = cell.output_name().unwrap_or("<unnamed>");
-                    return ReportNode {
-                        name: name.to_string(),
-                        type_name: format!("{:?}", direction),
-                        details: Some(format!("Port: {}", port_name)),
-                        source_loc: None,
-                        children: vec![],
-                    };
-                }
-                // Regular cell — try to get source
-                let source_loc = cell.get_source();
-                ReportNode {
+        if let Some(cell) = cell_wrapper {
+            let kind = cell.cell_type();
+            if kind.is_input() {
+                let port_name = cell.input_name().unwrap_or("<unnamed>");
+                return ReportNode {
                     name: name.to_string(),
                     type_name: format!("{:?}", direction),
-                    details: Some(format!("CellId: {}", id.storage_key())),
-                    source_loc,
-                    children: vec![],
-                }
-            } else {
-                // Cell not found in design — just show the raw id
-                ReportNode {
-                    name: name.to_string(),
-                    type_name: format!("{:?}", direction),
-                    details: Some(format!("CellId: {}", id.storage_key())),
+                    details: Some(format!("Port: {}", port_name)),
                     source_loc: None,
                     children: vec![],
-                }
+                };
+            } else if kind.is_output() {
+                let port_name = cell.output_name().unwrap_or("<unnamed>");
+                return ReportNode {
+                    name: name.to_string(),
+                    type_name: format!("{:?}", direction),
+                    details: Some(format!("Port: {}", port_name)),
+                    source_loc: None,
+                    children: vec![],
+                };
+            }
+            // Regular cell — try to get source
+            let source_loc = cell.get_source();
+            ReportNode {
+                name: name.to_string(),
+                type_name: format!("{:?}", direction),
+                details: Some(format!("CellId: {}", id.storage_key())),
+                source_loc,
+                children: vec![],
+            }
+        } else {
+            // Cell not found in design — just show the raw id
+            ReportNode {
+                name: name.to_string(),
+                type_name: format!("{:?}", direction),
+                details: Some(format!("CellId: {}", id.storage_key())),
+                source_loc: None,
+                children: vec![],
             }
         }
-        Wire::PrimaryPort {
-            name: port_name,
-            direction: port_dir,
-        } => ReportNode {
-            name: name.to_string(),
-            type_name: format!("{:?}", direction),
-            details: Some(format!("Port ({}): {}", port_dir, port_name)),
-            source_loc: None,
-            children: vec![],
-        },
-        Wire::Constant { value } => ReportNode {
+    } else if wire.is_constant() {
+        let value = wire
+            .nets()
+            .first()
+            .map(|n| matches!(n, WireRef::Constant(true)))
+            .unwrap_or(false);
+        ReportNode {
             name: name.to_string(),
             type_name: format!("{:?}", direction),
             details: Some(format!("Const: {}", value)),
             source_loc: None,
             children: vec![],
-        },
+        }
+    } else {
+        ReportNode {
+            name: name.to_string(),
+            type_name: format!("{:?}", direction),
+            details: Some(format!("Wire (nets={:?})", wire.nets())),
+            source_loc: None,
+            children: vec![],
+        }
     }
 }
+
 
 /// Information about a wire in a match row.
 ///
@@ -281,10 +284,17 @@ pub fn render_wire_compact<T: Pattern + Component>(
     let config = Config::default();
     let source_loc = wire_source_location(&wire, driver, key, &config);
 
-    let type_info = match &wire {
-        Wire::Cell { id, .. } => format!("cell_{}", id.storage_key()),
-        Wire::PrimaryPort { name, .. } => format!("port_{}", name),
-        Wire::Constant { value } => format!("const_{}", value),
+    let type_info = if let Some(id) = wire.cell_id() {
+        format!("cell_{}", id.storage_key())
+    } else if wire.is_constant() {
+        let value = wire
+            .nets()
+            .first()
+            .map(|n| matches!(n, WireRef::Constant(true)))
+            .unwrap_or(false);
+        format!("const_{}", value)
+    } else {
+        format!("wire_n{}", wire.nets().len())
     };
 
     let location = source_loc

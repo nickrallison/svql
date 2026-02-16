@@ -288,7 +288,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         for alias in Self::ALIASES {
             defs.push(
-                ColumnDef::new(alias.port_name, ColumnKind::Cell, false)
+                ColumnDef::new(alias.port_name, ColumnKind::Wire, false)
                     .with_direction(alias.direction),
             );
         }
@@ -495,18 +495,17 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 // CONNECTIVITY VALIDATION (both sides are resolvable)
                 match conn.kind {
                     ConnectionKind::Exact => {
-                        // Exact connection: source wire must equal target wire
+                        // Exact connection: source wire must drive target wire (intersection of nets)
                         let src_wire = row.resolve(conn.from.selector, ctx);
                         let dst_wire = row.resolve(conn.to.selector, ctx);
 
                         match (src_wire, dst_wire) {
-                            (Some(s), Some(d)) if s.cell_id() == d.cell_id() => {
+                            (Some(s), Some(d)) if s.drives(&d) => {
                                 tracing::trace!(
-                                    "[{}] Connection {:?} → {:?} satisfied (cell {:?})",
+                                    "[{}] Connection {:?} → {:?} satisfied",
                                     std::any::type_name::<Self>(),
                                     conn.from.selector.path(),
-                                    conn.to.selector.path(),
-                                    s.cell_id()
+                                    conn.to.selector.path()
                                 );
                                 group_satisfied = true;
                                 break; // This alternative worked
@@ -522,15 +521,13 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                                 );
                                 continue; // Try next alternative
                             }
-                            (Some(s), Some(d)) => {
-                                // Different cell IDs - not connected
+                            (Some(_s), Some(_d)) => {
+                                // Not connected
                                 tracing::trace!(
-                                    "[{}] Connection {:?} → {:?} failed: different cells ({:?} != {:?})",
+                                    "[{}] Connection {:?} → {:?} failed: not connected",
                                     std::any::type_name::<Self>(),
                                     conn.from.selector.path(),
-                                    conn.to.selector.path(),
-                                    s.cell_id(),
-                                    d.cell_id()
+                                    conn.to.selector.path()
                                 );
                                 continue; // Try next alternative
                             }
@@ -543,27 +540,25 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
                         match (src_wire, dst_bundle) {
                             (Some(src), Some(bundle)) => {
-                                let src_id = src.cell_id();
-                                // Check if src is in the bundle
-                                let found = bundle.iter().any(|w| w.cell_id() == src_id);
+                                // Check if src drives any wire in the bundle
+                                let found = bundle.iter().any(|w| src.drives(w));
                                 if found {
                                     tracing::trace!(
-                                        "[{}] ConnectAny {:?} → {:?} satisfied (cell {:?} in bundle of {} wires)",
+                                        "[{}] ConnectAny {:?} → {:?} satisfied (found in bundle of {} wires)",
                                         std::any::type_name::<Self>(),
                                         conn.from.selector.path(),
                                         conn.to.selector.path(),
-                                        src_id,
                                         bundle.len()
                                     );
                                     group_satisfied = true;
                                     break;
                                 } else {
                                     tracing::trace!(
-                                        "[{}] ConnectAny {:?} → {:?} failed: cell {:?} not in bundle of {} wires",
+                                        "[{}] ConnectAny {:?} → {:?} failed: wire {} not in bundle of {} wires",
                                         std::any::type_name::<Self>(),
                                         conn.from.selector.path(),
                                         conn.to.selector.path(),
-                                        src_id,
+                                        src,
                                         bundle.len()
                                     );
                                     continue; // Try next alternative
@@ -961,14 +956,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                     };
 
                     for alias in Self::ALIASES {
-                        let wire_ref = row
-                            .resolve(alias.target, ctx)
-                            .and_then(|w| w.cell_id())
-                            .map(crate::wire::WireRef::Cell);
+                        let wire = row.resolve(alias.target, ctx);
 
                         if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
                             entry.entries[idx] =
-                                wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                                wire.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                         }
                     }
 
@@ -989,14 +981,11 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 };
 
                 for alias in Self::ALIASES {
-                    let wire_ref = row
-                        .resolve(alias.target, ctx)
-                        .and_then(|w| w.cell_id())
-                        .map(crate::wire::WireRef::Cell);
+                    let wire = row.resolve(alias.target, ctx);
 
                     if let Some(idx) = Self::composite_schema().index_of(alias.port_name) {
                         entry.entries[idx] =
-                            wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                            wire.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 

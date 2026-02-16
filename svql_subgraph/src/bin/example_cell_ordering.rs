@@ -6,8 +6,8 @@ use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let design_module: YosysModule = YosysModule::new(
-        "examples/patterns/security/access_control/locked_reg/rtlil/async_en.il",
-        "async_en",
+        "examples/fixtures/security/cdc/cdc_multi_bit_violation.v",
+        "cdc_multi_bit_violation",
     )?;
 
     let design = design_module.import_design(&svql_common::ModuleConfig::default())?;

@@ -55,7 +55,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
 
         defs.extend(
             Self::COMMON_PORTS.iter().map(|p| {
-                ColumnDef::new(p.name, ColumnKind::Cell, false).with_direction(p.direction)
+                ColumnDef::new(p.name, ColumnKind::Wire, false).with_direction(p.direction)
             }),
         );
 
@@ -138,11 +138,9 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
                 // 3. Map common ports from inner table using path resolution
                 for mapping in port_maps {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
-                        let wire_ref = table
-                            .resolve_path(row_idx as usize, mapping.inner, ctx)
-                            .map(crate::wire::WireRef::Cell);
+                        let wire = table.resolve_path(row_idx as usize, mapping.inner, ctx);
                         entry.entries[col_idx] =
-                            wire_ref.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                            wire.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 

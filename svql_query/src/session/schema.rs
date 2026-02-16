@@ -123,8 +123,8 @@ impl PatternSchema {
 /// The kind of data stored in a column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnKind {
-    /// A wire reference (`CellId`) pointing into the design.
-    Cell,
+    /// A wire bundle pointing into the design.
+    Wire,
     /// A submodule reference (`Ref<T>`) pointing into another pattern table.
     /// For self-referential types (like `RecOr` trees), use `Sub(TypeId::of::<Self>())`.
     Sub(TypeId),
@@ -145,7 +145,7 @@ impl ColumnKind {
     /// Check if this is a wire column.
     #[must_use]
     pub const fn is_wire(&self) -> bool {
-        matches!(self, Self::Cell)
+        matches!(self, Self::Wire)
     }
 
     /// Check if this is a submodule reference column.
@@ -196,7 +196,7 @@ impl ColumnDef {
     pub const fn input(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Cell,
+            kind: ColumnKind::Wire,
             nullable: false,
             direction: PortDirection::Input,
         }
@@ -207,7 +207,7 @@ impl ColumnDef {
     pub const fn output(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Cell,
+            kind: ColumnKind::Wire,
             nullable: false,
             direction: PortDirection::Output,
         }
@@ -218,7 +218,7 @@ impl ColumnDef {
     pub const fn wire(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Cell,
+            kind: ColumnKind::Wire,
             nullable: false,
             direction: PortDirection::None,
         }
@@ -229,7 +229,7 @@ impl ColumnDef {
     pub const fn wire_nullable(name: &'static str) -> Self {
         Self {
             name,
-            kind: ColumnKind::Cell,
+            kind: ColumnKind::Wire,
             nullable: true,
             direction: PortDirection::None,
         }
@@ -435,43 +435,48 @@ impl PortMap {
 pub enum ColumnEntry {
     /// The cell or reference is missing or optional.
     Null,
-    /// A hardware wire entry.
-    Wire(WireRef),
+    /// A wire (bundle of nets).
+    Wire(Wire),
     /// A row index referencing another table.
     Sub(u32),
     /// Pattern metadata.
     Metadata(PhysicalCellId),
-    /// A bundle of wire references (for set-based connectivity).
-    WireArray(Vec<WireRef>),
+    /// A bundle of wires (e.g., list of leaf inputs).
+    WireArray(Vec<Wire>),
 }
 
 impl ColumnEntry {
     /// Helper to extract u32 for backward compatibility/sorting
-    pub const fn as_u32(&self) -> Option<u32> {
+    pub fn as_u32(&self) -> Option<u32> {
         match self {
             Self::Sub(idx) => Some(*idx),
             Self::Metadata(id) => Some(id.storage_key()),
-            Self::Wire(WireRef::Cell(id)) => Some(id.storage_key()),
+            Self::Wire(wire) => wire.nets().first().and_then(|n| n.as_net()),
             _ => None,
         }
     }
 
-    /// Create a cell wire entry
+    /// Create a wire entry
     #[must_use]
-    pub const fn cell(id: PhysicalCellId) -> Self {
-        Self::Wire(WireRef::Cell(id))
+    pub fn wire(nets: Vec<WireRef>, direction: PortDirection) -> Self {
+        Self::Wire(Wire::new(nets, direction))
     }
 
-    /// Create a primary port entry
+    /// Create a single net wire entry
     #[must_use]
-    pub const fn primary_port(name: Arc<str>) -> Self {
-        Self::Wire(WireRef::PrimaryPort(name))
+    pub fn single_net(net: u32, direction: PortDirection) -> Self {
+        Self::Wire(Wire::single(net, direction))
     }
 
     /// Create a constant entry
     #[must_use]
-    pub const fn constant(value: bool) -> Self {
-        Self::Wire(WireRef::Constant(value))
+    pub fn constant(value: bool, direction: PortDirection) -> Self {
+        Self::Wire(Wire::constant(value, direction))
+    }
+
+    /// Create a wire column from a physical cell ID (legacy).
+    pub fn cell(id: PhysicalCellId) -> Self {
+        Self::Wire(Wire::single(id.storage_key(), PortDirection::None))
     }
 
     /// Create a submodule entry
@@ -488,7 +493,7 @@ impl ColumnEntry {
 
     /// Create a wire array entry
     #[must_use]
-    pub const fn wire_array(wires: Vec<WireRef>) -> Self {
+    pub fn wire_array(wires: Vec<Wire>) -> Self {
         Self::WireArray(wires)
     }
 }
@@ -533,15 +538,12 @@ impl EntryArray {
             .iter()
             .enumerate()
             .filter_map(|(col_idx, entry)| match entry {
-                ColumnEntry::Wire(WireRef::Cell(cid)) => Some((col_idx, cid.storage_key())),
+                ColumnEntry::Wire(wire) => wire.cell_id().map(|id| (col_idx, id.storage_key())),
                 ColumnEntry::WireArray(wires) => {
                     // Include all wires in the array in the signature
                     wires
                         .iter()
-                        .filter_map(|w| match w {
-                            WireRef::Cell(cid) => Some((col_idx, cid.storage_key())),
-                            _ => None,
-                        })
+                        .filter_map(|w| w.cell_id().map(|id| (col_idx, id.storage_key())))
                         .next()
                 }
                 ColumnEntry::Sub(slot_idx) => Some((col_idx, *slot_idx)),

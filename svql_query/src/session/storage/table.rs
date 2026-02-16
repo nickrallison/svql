@@ -321,16 +321,16 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     /// Get a submodule reference (Row Index + `TypeId`) for a given column.
     fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)>;
 
-    /// Get a cell ID by single column name (no path traversal).
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<PhysicalCellId>;
+    /// Get a wire by single column name (no path traversal).
+    fn get_wire(&self, row_idx: usize, col_name: &str) -> Option<Wire>;
 
-    /// Resolve a selector path within a specific row to a cell ID
+    /// Resolve a selector path within a specific row to a wire
     fn resolve_path(
         &self,
         row_idx: usize,
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
-    ) -> Option<PhysicalCellId>;
+    ) -> Option<Wire>;
 
     /// Resolve a selector path within a specific row to a wire bundle.
     /// Used for set-based connectivity checking with `#[connect_any]`.
@@ -365,17 +365,17 @@ where
         std::any::type_name::<T>()
     }
 
-    fn get_cell_id(&self, row_idx: usize, col_name: &str) -> Option<PhysicalCellId> {
+    fn get_wire(&self, row_idx: usize, col_name: &str) -> Option<Wire> {
         // O(1) lookup
         let col_idx = T::schema().index_of(col_name)?;
 
-        // Check if it is actually a cell column
+        // Check if it is actually a wire column
         if !T::schema().column(col_idx).kind.is_wire() {
             return None;
         }
 
         match self.store.get_cell(col_name, row_idx) {
-            ColumnEntry::Wire(WireRef::Cell(cid)) => Some(*cid),
+            ColumnEntry::Wire(wire) => Some(wire.clone()),
             _ => None,
         }
     }
@@ -411,7 +411,7 @@ where
         row_idx: usize,
         selector: crate::dsl::selector::Selector<'_>,
         ctx: &crate::session::ExecutionContext,
-    ) -> Option<PhysicalCellId> {
+    ) -> Option<Wire> {
         // Optimized: avoid allocating full Row<T> by directly accessing columns
         if selector.is_empty() {
             return None;
@@ -419,7 +419,7 @@ where
 
         // Single segment: direct wire lookup
         if selector.len() == 1 {
-            return self.get_cell_id(row_idx, selector.head()?);
+            return self.get_wire(row_idx, selector.head()?);
         }
 
         // Multi-segment: traverse through submodules
@@ -462,15 +462,7 @@ where
             }
 
             return match self.store.get_cell(col_name, row_idx) {
-                ColumnEntry::WireArray(wire_refs) => {
-                    let direction = T::schema().column(col_idx).direction;
-                    Some(
-                        wire_refs
-                            .iter()
-                            .map(|wr| Wire::from_ref(wr.clone(), direction))
-                            .collect(),
-                    )
-                }
+                ColumnEntry::WireArray(wires) => Some(wires.clone()),
                 _ => None,
             };
         }

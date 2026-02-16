@@ -55,7 +55,7 @@ impl BipartiteIndex {
                         );
 
                         match (&a_cell, &b_cell) {
-                            (Some(src), Some(dst)) if src.storage_key() == dst.storage_key() => {
+                            (Some(src), Some(dst)) if src.drives(dst) => {
                                 forward.entry(a_idx).or_default().insert(b_idx);
                                 reverse.entry(b_idx).or_default().insert(a_idx);
                                 edge_count += 1;
@@ -82,7 +82,7 @@ impl BipartiteIndex {
 
                         if let (Some(src), Some(bundle)) = (&a_cell, &b_bundle) {
                             // Check if src is in the bundle
-                            if bundle.iter().any(|w| w.cell_id() == Some(*src)) {
+                            if bundle.iter().any(|w| src.drives(w)) {
                                 forward.entry(a_idx).or_default().insert(b_idx);
                                 reverse.entry(b_idx).or_default().insert(a_idx);
                                 edge_count += 1;

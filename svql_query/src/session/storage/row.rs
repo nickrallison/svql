@@ -60,19 +60,16 @@ where
         &self.entry_array
     }
 
-    /// Get a wire reference by column name.
+    /// Get a wire by column name.
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
     #[inline]
     #[must_use]
     pub fn wire(&self, name: &str) -> Option<Wire> {
         let idx = T::schema().index_of(name)?;
-        let col_def = T::schema().column(idx);
 
         match &self.entry_array.entries[idx] {
-            ColumnEntry::Wire(wire_ref) => {
-                Some(Wire::from_ref(wire_ref.clone(), col_def.direction))
-            }
+            ColumnEntry::Wire(wire) => Some(wire.clone()),
             _ => None,
         }
     }
@@ -85,15 +82,9 @@ where
     #[must_use]
     pub fn wire_bundle(&self, name: &str) -> Option<Vec<Wire>> {
         let idx = T::schema().index_of(name)?;
-        let col_def = T::schema().column(idx);
 
         match &self.entry_array.entries[idx] {
-            ColumnEntry::WireArray(wire_refs) => Some(
-                wire_refs
-                    .iter()
-                    .map(|wr| Wire::from_ref(wr.clone(), col_def.direction))
-                    .collect(),
-            ),
+            ColumnEntry::WireArray(wires) => Some(wires.clone()),
             _ => None,
         }
     }
@@ -175,10 +166,10 @@ where
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        let cell_id = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
+        let wire = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
 
         // Direction is lost through traversal
-        Some(Wire::new(cell_id, PortDirection::None))
+        Some(Wire::new(wire.nets().to_vec(), PortDirection::None))
     }
 
     /// Resolve a path to a wire bundle using a Selector.
@@ -247,7 +238,9 @@ where
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        self.entry_array.entries[id] = crate::session::ColumnEntry::Wire(wire_ref);
+        let col_def = T::schema().column(id);
+        self.entry_array.entries[id] =
+            crate::session::ColumnEntry::wire(vec![wire_ref], col_def.direction);
         Ok(self)
     }
 
@@ -256,12 +249,8 @@ where
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_wire(
-        self,
-        name: &'static str,
-        cell_id: PhysicalCellId,
-    ) -> Result<Self, QueryError> {
-        self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
+    pub fn with_wire(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+        self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
     }
 
     /// Set a wire column to a cell ID.
@@ -269,12 +258,8 @@ where
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_cell(
-        self,
-        name: &'static str,
-        cell_id: PhysicalCellId,
-    ) -> Result<Self, QueryError> {
-        self.with_wire_ref(name, crate::wire::WireRef::Cell(cell_id))
+    pub fn with_cell(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+        self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
     }
 
     /// Set a wire array column value.
@@ -285,7 +270,7 @@ where
     pub fn with_wire_array(
         mut self,
         name: &'static str,
-        wires: Vec<crate::wire::WireRef>,
+        wires: Vec<Wire>,
     ) -> Result<Self, QueryError> {
         let id = T::schema()
             .index_of(name)
@@ -402,20 +387,9 @@ where
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
-                Some(ColumnEntry::Wire(wire_ref)) => match wire_ref {
-                    crate::wire::WireRef::Cell(id) => format!("cell({id})"),
-                    crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
-                    crate::wire::WireRef::Constant(val) => format!("const({})", val),
-                },
+                Some(ColumnEntry::Wire(wire)) => format!("{}", wire),
                 Some(ColumnEntry::WireArray(wires)) => {
-                    let wire_strs: Vec<String> = wires
-                        .iter()
-                        .map(|w| match w {
-                            crate::wire::WireRef::Cell(id) => format!("cell({id})"),
-                            crate::wire::WireRef::PrimaryPort(name) => format!("port({})", name),
-                            crate::wire::WireRef::Constant(val) => format!("const({})", val),
-                        })
-                        .collect();
+                    let wire_strs: Vec<String> = wires.iter().map(|w| format!("{}", w)).collect();
                     format!("[{}]", wire_strs.join(", "))
                 }
                 Some(ColumnEntry::Sub(slot_idx)) => format!("ref({})", slot_idx),
