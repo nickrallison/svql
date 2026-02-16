@@ -249,7 +249,11 @@ where
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_wire(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+    pub fn with_wire(
+        self,
+        name: &'static str,
+        cell_id: PhysicalCellId,
+    ) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
     }
 
@@ -258,7 +262,11 @@ where
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_cell(self, name: &'static str, cell_id: PhysicalCellId) -> Result<Self, QueryError> {
+    pub fn with_cell(
+        self,
+        name: &'static str,
+        cell_id: PhysicalCellId,
+    ) -> Result<Self, QueryError> {
         self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
     }
 

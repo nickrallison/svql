@@ -3,8 +3,8 @@
 //! A `DriverKey` uniquely identifies a design by its file path and top-level module name.
 //! Keys are used to index designs in the driver's cache to avoid redundant reloading.
 
-use std::path::{Path, PathBuf};
 use contracts::*;
+use std::path::{Path, PathBuf};
 
 /// Unique identifier for a hardware design.
 ///

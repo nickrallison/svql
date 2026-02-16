@@ -6,10 +6,10 @@
 //! - Creating graph indices for subgraph matching
 //! - Providing access to loaded designs through design containers
 
+use contracts::*;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tracing::{debug, info};
-use contracts::*;
 
 use svql_common::*;
 use svql_common::{DesignPath, YosysModule};

@@ -212,7 +212,6 @@ pub fn wire_to_report_node(
     }
 }
 
-
 /// Information about a wire in a match row.
 ///
 /// Returned by `get_wire_info()` for programmatic access to wire details.

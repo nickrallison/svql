@@ -71,10 +71,7 @@ impl<S> ConnectionBuilder<'_, S> {
         // - Submodule Input (Direction::Input)
         // - Parent Output (Direction::Output)
 
-        let valid_target = matches!(
-            to.direction(),
-            PortDirection::Input | PortDirection::Output
-        );
+        let valid_target = matches!(to.direction(), PortDirection::Input | PortDirection::Output);
         if !valid_target {
             // Inout is also valid target?
             assert!(

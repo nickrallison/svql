@@ -17,7 +17,10 @@ use svql_driver::{Driver, DriverKey};
 fn value_to_nets(value: &prjunnamed_netlist::Value) -> Vec<WireRef> {
     value
         .iter()
-        .filter_map(|net| net.as_cell_index().map_or(None, |idx| Some(WireRef::Net(idx as u32))))
+        .filter_map(|net| {
+            net.as_cell_index()
+                .map_or(None, |idx| Some(WireRef::Net(idx as u32)))
+        })
         .collect()
 }
 

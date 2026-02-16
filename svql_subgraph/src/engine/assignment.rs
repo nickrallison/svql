@@ -280,14 +280,14 @@ mod property_tests {
     quickcheck! {
         fn prop_assignment_ops_maintain_consistency(ops: Vec<ArbitraryAssignmentOp>) -> bool {
             let mut assignment = SingleAssignment::new();
-            
+
             for op in ops {
                 if op.is_remove {
                     assignment.remove_by_needle(op.needle);
                 } else {
                     assignment.assign(op.needle, op.haystack);
                 }
-                
+
                 // Check invariant after every step
                 if !assignment.is_consistent() {
                     return false;

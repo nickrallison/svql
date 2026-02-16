@@ -72,8 +72,8 @@ impl Selector<'static> {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use quickcheck::{Arbitrary, Gen, quickcheck};
     use lazy_static::lazy_static;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
 
     #[derive(Clone, Debug)]
     struct ArbitrarySelector(Selector<'static>);
@@ -82,9 +82,8 @@ mod property_tests {
     // This is tricky because we need to generate static strings.
     // We can use a fixed set of static strings for generation.
     lazy_static! {
-        static ref STATIC_STRINGS: Vec<&'static str> = {
-            vec!["a", "b", "c", "clk", "q", "d", "submod", "port"]
-        };
+        static ref STATIC_STRINGS: Vec<&'static str> =
+            { vec!["a", "b", "c", "clk", "q", "d", "submod", "port"] };
     }
 
     impl Arbitrary for ArbitrarySelector {
@@ -93,12 +92,12 @@ mod property_tests {
             let segments: Vec<&'static str> = (0..len)
                 .map(|_| *g.choose(&STATIC_STRINGS[..]).unwrap())
                 .collect();
-            
+
             // Leak the vec to get 'static lifetime for the test run
             // Or just use Selector::static_path with a leaked box
             let boxed: Box<[&'static str]> = segments.into_boxed_slice();
             let static_ref: &'static [&'static str] = Box::leak(boxed);
-            
+
             Self(Selector::new(static_ref))
         }
     }
@@ -110,13 +109,13 @@ mod property_tests {
             } else {
                 let _head = s.0.head().unwrap();
                 let tail = s.0.tail();
-                
+
                 // Reconstruct check (conceptually)
                 // Since we can't easily concat slices, check properties
                 s.0.len() == tail.len() + 1
             }
         }
-        
+
         fn prop_selector_len(s: ArbitrarySelector) -> bool {
             s.0.len() == s.0.path().len()
         }

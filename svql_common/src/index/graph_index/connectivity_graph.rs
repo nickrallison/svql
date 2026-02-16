@@ -3,8 +3,8 @@
 //! Implements the connectivity graph used for fast fan-in/fan-out traversal
 //! and pre-computed set intersections during subgraph matching.
 
-use std::sync::Arc;
 use contracts::*;
+use std::sync::Arc;
 
 use crate::cell::GraphNodeIdx;
 use crate::*;
@@ -42,7 +42,10 @@ impl ConnectivityGraph {
             for (target, _) in fanout_list {
                 // If A is in B's fanout, B should be in A's fanin
                 if let Some(fanin) = self.fanin_map.get(target) {
-                    if !fanin.iter().any(|(src, _): &(GraphNodeIdx, usize)| src == cell_idx) {
+                    if !fanin
+                        .iter()
+                        .any(|(src, _): &(GraphNodeIdx, usize)| src == cell_idx)
+                    {
                         return false;
                     }
                 } else {
