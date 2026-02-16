@@ -4,7 +4,6 @@
 //! wire references, submodule references, and metadata columns.
 
 use std::any::TypeId;
-use std::sync::Arc;
 
 use crate::prelude::*;
 use contracts::*;
@@ -458,7 +457,7 @@ impl ColumnEntry {
 
     /// Create a wire entry
     #[must_use]
-    pub fn wire(nets: Vec<WireRef>, direction: PortDirection) -> Self {
+    pub const fn wire(nets: Vec<WireRef>, direction: PortDirection) -> Self {
         Self::Wire(Wire::new(nets, direction))
     }
 
@@ -493,7 +492,7 @@ impl ColumnEntry {
 
     /// Create a wire array entry
     #[must_use]
-    pub fn wire_array(wires: Vec<Wire>) -> Self {
+    pub const fn wire_array(wires: Vec<Wire>) -> Self {
         Self::WireArray(wires)
     }
 }

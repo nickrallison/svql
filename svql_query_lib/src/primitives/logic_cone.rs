@@ -282,6 +282,11 @@ impl Recursive for LogicCone {
 
 impl LogicCone {
     /// Computes the total size of this logic cone (number of nodes).
+    ///
+    /// # Panics
+    ///
+    /// Panics if a child entry cannot be resolved from the store, or if
+    /// recursive rehydration fails.
     pub fn size(self, store: &Store, driver: &Driver, key: &DriverKey) -> usize {
         1 + self
             .children
@@ -289,12 +294,11 @@ impl LogicCone {
             .flatten()
             .map(|c| {
                 let row = store
-                    .resolve::<LogicCone>(*c)
+                    .resolve::<Self>(*c)
                     .expect("Child entry should be resolvable");
                 let rehydrate = Self::recursive_rehydrate(&row, store, driver, key)
                     .expect("Rehydration should succeed");
-                let recursive = rehydrate.size(store, driver, key);
-                recursive
+                rehydrate.size(store, driver, key)
             })
             .sum::<usize>()
     }

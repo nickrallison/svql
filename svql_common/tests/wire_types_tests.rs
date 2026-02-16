@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 #![allow(clippy::missing_docs_in_private_items)]
 
-use std::sync::Arc;
 use svql_common::{PhysicalCellId, PortDirection, Wire, WireRef};
 
 mod common;

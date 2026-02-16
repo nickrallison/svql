@@ -284,18 +284,21 @@ pub fn render_wire_compact<T: Pattern + Component>(
     let config = Config::default();
     let source_loc = wire_source_location(&wire, driver, key, &config);
 
-    let type_info = if let Some(id) = wire.cell_id() {
-        format!("cell_{}", id.storage_key())
-    } else if wire.is_constant() {
-        let value = wire
-            .nets()
-            .first()
-            .map(|n| matches!(n, WireRef::Constant(true)))
-            .unwrap_or(false);
-        format!("const_{}", value)
-    } else {
-        format!("wire_n{}", wire.nets().len())
-    };
+    let type_info = wire.cell_id().map_or_else(
+        || {
+            if wire.is_constant() {
+                let value = wire
+                    .nets()
+                    .first()
+                    .map(|n| matches!(n, WireRef::Constant(true)))
+                    .unwrap_or(false);
+                format!("const_{}", value)
+            } else {
+                format!("wire_n{}", wire.nets().len())
+            }
+        },
+        |id| format!("cell_{}", id.storage_key()),
+    );
 
     let location = source_loc
         .and_then(|loc| {

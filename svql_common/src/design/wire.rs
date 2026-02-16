@@ -4,8 +4,6 @@
 //! and constants, along with their relative directions (Input/Output).
 
 use crate::*;
-use contracts::*;
-use std::sync::Arc;
 
 /// A reference to a single net in the design.
 /// This is the atomic unit of connectivity.
@@ -75,10 +73,12 @@ impl std::fmt::Display for Wire {
 }
 
 impl Wire {
-    pub fn new(nets: Vec<WireRef>, direction: PortDirection) -> Self {
+    /// Create a new wire from a vector of nets and a direction.
+    pub const fn new(nets: Vec<WireRef>, direction: PortDirection) -> Self {
         Self { nets, direction }
     }
 
+    /// Create a single-bit wire.
     pub fn single(net: u32, direction: PortDirection) -> Self {
         Self {
             nets: vec![WireRef::Net(net)],
@@ -86,6 +86,7 @@ impl Wire {
         }
     }
 
+    /// Create a constant wire.
     pub fn constant(value: bool, direction: PortDirection) -> Self {
         Self {
             nets: vec![WireRef::Constant(value)],
@@ -93,20 +94,27 @@ impl Wire {
         }
     }
 
-    pub fn direction(&self) -> PortDirection {
+    /// Get the direction of the wire.
+    #[must_use]
+    pub const fn direction(&self) -> PortDirection {
         self.direction
     }
 
+    /// Get the nets that make up this wire.
+    #[must_use]
     pub fn nets(&self) -> &[WireRef] {
         &self.nets
     }
 
-    pub fn is_empty(&self) -> bool {
+    /// Check if the wire has no nets.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.nets.is_empty()
     }
 
-    // Helper to check if this wire drives another wire (intersection of nets)
-    pub fn drives(&self, other: &Wire) -> bool {
+    /// Helper to check if this wire drives another wire (intersection of nets)
+    #[must_use]
+    pub fn drives(&self, other: &Self) -> bool {
         self.nets.iter().any(|n| other.nets.contains(n))
     }
 
@@ -154,7 +162,6 @@ impl std::fmt::Display for PortDirection {
 mod property_tests {
     use super::*;
     use quickcheck::{Arbitrary, Gen, quickcheck};
-    use std::sync::Arc;
 
     #[derive(Clone, Debug)]
     struct ArbitraryWireRef(WireRef);
@@ -187,13 +194,13 @@ mod property_tests {
 
     quickcheck! {
         fn prop_wire_direction_preserved(wr: ArbitraryWireRef, dir: ArbitraryPortDirection) -> bool {
-            let wire = Wire::new(vec![wr.0.clone()], dir.0);
+            let wire = Wire::new(vec![wr.0], dir.0);
             wire.direction() == dir.0
         }
 
         fn prop_wire_net_consistency(wr: ArbitraryWireRef) -> bool {
             let is_net = matches!(wr.0, WireRef::Net(_));
-            let wire = Wire::new(vec![wr.0.clone()], PortDirection::None);
+            let wire = Wire::new(vec![wr.0], PortDirection::None);
             wire.nets().first().map(|n| n.is_net()).unwrap_or(false) == is_net
         }
     }

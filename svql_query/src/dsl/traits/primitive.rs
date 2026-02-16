@@ -9,7 +9,6 @@ use crate::{
     traits::{Component, PatternInternal, kind, search_table_any},
     wire::WireRef,
 };
-use std::sync::Arc;
 use svql_driver::{Driver, DriverKey};
 
 // svql_query/src/traits/primitive.rs
@@ -18,13 +17,7 @@ use svql_driver::{Driver, DriverKey};
 fn value_to_nets(value: &prjunnamed_netlist::Value) -> Vec<WireRef> {
     value
         .iter()
-        .filter_map(|net| {
-            if let Ok(idx) = net.as_cell_index() {
-                Some(WireRef::Net(idx as u32))
-            } else {
-                None
-            }
-        })
+        .filter_map(|net| net.as_cell_index().map_or(None, |idx| Some(WireRef::Net(idx as u32))))
         .collect()
 }
 
@@ -124,16 +117,10 @@ fn extract_input_nets(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Vec<W
     }
 }
 
+/// Convert a netlist net to a wire reference.
 fn net_to_wire_ref(net: &prjunnamed_netlist::Net) -> Option<WireRef> {
-    match net {
-        _ => {
-            if let Ok(idx) = net.as_cell_index() {
-                Some(WireRef::Net(idx as u32))
-            } else {
-                None
-            }
-        }
-    }
+    net.as_cell_index()
+        .map_or(None, |idx| Some(WireRef::Net(idx as u32)))
 }
 
 /// Resolve primitive ports by extracting inputs from the cell structure.
@@ -171,7 +158,6 @@ pub fn resolve_primitive_ports(
 
     EntryArray::new(entries)
 }
-
 
 /// Trait for primitive hardware components that match against cell types.
 ///
