@@ -4,8 +4,6 @@
 
 use crate::prelude::*;
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
 /// A node in a hierarchical match report
@@ -109,13 +107,6 @@ impl ReportNode {
             child.render_recursive(f, new_prefix, last_child, false, cache);
         }
     }
-}
-
-/// Helper to read all lines from a file on disk.
-fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    reader.lines().collect()
 }
 
 /// Get source location for a wire if it references a cell

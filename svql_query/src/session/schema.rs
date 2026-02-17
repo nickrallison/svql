@@ -318,44 +318,6 @@ impl ColumnDef {
     }
 }
 
-/// Description of a pattern port declaration.
-#[derive(Debug, Clone, Copy)]
-pub struct PortDecl {
-    /// Name matching the netlist or alias.
-    pub name: &'static str,
-    /// Flow direction.
-    pub direction: PortDirection,
-}
-
-impl PortDecl {
-    /// Declares an input port.
-    #[must_use]
-    pub const fn input(name: &'static str) -> Self {
-        Self {
-            name,
-            direction: PortDirection::Input,
-        }
-    }
-
-    /// Declares an output port.
-    #[must_use]
-    pub const fn output(name: &'static str) -> Self {
-        Self {
-            name,
-            direction: PortDirection::Output,
-        }
-    }
-
-    /// Declares an inout port.
-    #[must_use]
-    pub const fn inout(name: &'static str) -> Self {
-        Self {
-            name,
-            direction: PortDirection::Inout,
-        }
-    }
-}
-
 /// Description of a nested submodule field.
 #[derive(Debug, Clone, Copy)]
 pub struct Submodule {
@@ -382,7 +344,7 @@ pub struct Alias {
     /// The name of the alias field.
     pub port_name: &'static str,
     /// The path selector targeting the submodule port.
-    pub target: crate::selector::Selector<'static>,
+    pub target: Selector<'static>,
     /// The direction of the port.
     pub direction: PortDirection,
 }
@@ -390,7 +352,7 @@ pub struct Alias {
 impl Alias {
     /// Creates an input alias.
     #[must_use]
-    pub const fn input(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
+    pub const fn input(name: &'static str, target: Selector<'static>) -> Self {
         Self {
             port_name: name,
             target,
@@ -400,7 +362,7 @@ impl Alias {
 
     /// Creates an output alias.
     #[must_use]
-    pub const fn output(name: &'static str, target: crate::selector::Selector<'static>) -> Self {
+    pub const fn output(name: &'static str, target: Selector<'static>) -> Self {
         Self {
             port_name: name,
             target,
@@ -415,13 +377,13 @@ pub struct PortMap {
     /// The name of the common interface port.
     pub common_port: &'static str,
     /// Real path in the specific variant implementation.
-    pub inner: crate::selector::Selector<'static>,
+    pub inner: Selector<'static>,
 }
 
 impl PortMap {
     /// Creates a new port mapping.
     #[must_use]
-    pub const fn new(common: &'static str, inner: crate::selector::Selector<'static>) -> Self {
+    pub const fn new(common: &'static str, inner: Selector<'static>) -> Self {
         Self {
             common_port: common,
             inner,

@@ -2,6 +2,7 @@ use crate::HashSet;
 use crate::design::cell::PhysicalCellId;
 use prjunnamed_netlist::{Net, Trit, Value};
 use std::fmt;
+use std::ops::RangeBounds;
 
 /// A bundle of one or more nets representing a hardware signal.
 /// This type does not carry direction information; use `Port` for that.
@@ -25,6 +26,14 @@ impl Wire {
     #[must_use]
     pub fn constant(trit: Trit) -> Self {
         Self(Value::from(trit))
+    }
+
+    pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
+        Self(self.0.slice(range))
+    }
+
+    pub fn concat(&self, other: &Self) -> Self {
+        Self(self.0.concat(other.0.clone()))
     }
 
     /// Returns true if the wire consists entirely of constant bits (0, 1, or X).
@@ -70,6 +79,20 @@ impl Wire {
     /// Access the underlying Value
     pub const fn value(&self) -> &Value {
         &self.0
+    }
+}
+
+impl FromIterator<Net> for Wire {
+    fn from_iter<T: IntoIterator<Item = Net>>(iter: T) -> Self {
+        Self(Value::from_iter(iter))
+    }
+}
+
+impl IntoIterator for Wire {
+    type Item = Net;
+    type IntoIter = <prjunnamed_netlist::Value as std::iter::IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -119,6 +142,27 @@ pub enum PortDirection {
     Output,
     /// Bidirectional port.
     Inout,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PortDecl {
+    pub name: &'static str,
+    pub direction: PortDirection,
+}
+
+impl PortDecl {
+    pub const fn input(name: &'static str) -> Self {
+        Self {
+            name,
+            direction: PortDirection::Input,
+        }
+    }
+    pub const fn output(name: &'static str) -> Self {
+        Self {
+            name,
+            direction: PortDirection::Output,
+        }
+    }
 }
 
 impl fmt::Display for PortDirection {

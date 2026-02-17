@@ -7,6 +7,7 @@ use std::any::TypeId;
 use std::sync::Arc;
 
 use crate::prelude::*;
+use svql_common::util;
 
 /// Central storage for all pattern result tables.
 ///
@@ -187,8 +188,7 @@ impl Store {
         for type_id in self.type_ids() {
             if let Some(table) = self.get_any(type_id) {
                 // Sanitize the type name to create a valid filename
-                let type_name = table.type_name();
-                let filename = sanitize_type_name_for_filename(type_name);
+                let filename = util::sanitize_type_name(table.type_name());
                 let file_path = output_path.join(format!("{}.csv", filename));
 
                 table.to_csv(&file_path)?;
@@ -198,19 +198,6 @@ impl Store {
 
         Ok(count)
     }
-}
-
-/// Convert a Rust type name to a safe filename.
-///
-/// Replaces `::` with `_` and removes angle brackets and other special characters.
-fn sanitize_type_name_for_filename(type_name: &str) -> String {
-    type_name
-        .replace("::", "_")
-        .replace(['<', '>', ','], "_")
-        .replace(' ', "")
-        .replace("__", "_")
-        .trim_matches('_')
-        .to_string()
 }
 
 impl Default for Store {

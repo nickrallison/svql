@@ -3,7 +3,7 @@ use std::fmt;
 
 use prjunnamed_netlist::{Cell, CellRef, MetaItem, MetaItemRef, SourcePosition};
 
-use crate::{CellKind, PhysicalCellId, SourceLine, SourceLocation};
+use crate::{CellKind, PhysicalCellId, SourceLine, SourceLocation, Wire};
 
 // /// A wrapper around a netlist cell that provides stable identity and metadata access.
 // #[derive(Clone)]
@@ -262,6 +262,56 @@ impl<'a> CellWrapper<'a> {
                 0
             },
         }
+    }
+
+    pub fn input_wire(&self, port_name: &str) -> Option<Wire> {
+        use prjunnamed_netlist::Cell;
+        let cell = self.get();
+
+        let val = match cell.as_ref() {
+            Cell::And(a, b)
+            | Cell::Or(a, b)
+            | Cell::Xor(a, b)
+            | Cell::Eq(a, b)
+            | Cell::ULt(a, b)
+            | Cell::SLt(a, b)
+            | Cell::Mul(a, b) => match port_name {
+                "a" => a,
+                "b" => b,
+                _ => return None,
+            },
+            Cell::Not(a) | Cell::Buf(a) => match port_name {
+                "a" => a,
+                _ => return None,
+            },
+            Cell::Mux(s, a, b) => match port_name {
+                "sel" => return Some(Wire::single(*s)),
+                "a" => a,
+                "b" => b,
+                _ => return None,
+            },
+            Cell::Dff(ff) => match port_name {
+                "clk" => return Some(Wire::single(ff.clock.net())),
+                "d" | "data_in" => &ff.data,
+                "en" | "enable" => return Some(Wire::single(ff.enable.net())),
+                "reset" | "rst" => return Some(Wire::single(ff.reset.net())),
+                _ => return None,
+            },
+            _ => return None,
+        };
+
+        Some(Wire(val.clone()))
+    }
+
+    pub fn output_wire(&self) -> Wire {
+        let width = match self.get().as_ref() {
+            prjunnamed_netlist::Cell::Dff(ff) => ff.data.len(),
+            _ => 1,
+        };
+        let base = self.debug_index().storage_key() as usize;
+        (0..width)
+            .map(|i| prjunnamed_netlist::Net::from_cell_index(base + i))
+            .collect()
     }
 }
 

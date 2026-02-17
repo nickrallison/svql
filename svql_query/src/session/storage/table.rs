@@ -328,7 +328,7 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Wire>;
 
@@ -337,7 +337,7 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn resolve_bundle_path(
         &self,
         row_idx: usize,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Vec<Wire>>;
 
@@ -409,7 +409,7 @@ where
     fn resolve_path(
         &self,
         row_idx: usize,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Wire> {
         // Optimized: avoid allocating full Row<T> by directly accessing columns
@@ -444,7 +444,7 @@ where
     fn resolve_bundle_path(
         &self,
         row_idx: usize,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Vec<Wire>> {
         if selector.is_empty() {

@@ -336,7 +336,6 @@ mod test {
     use crate::{
         Wire,
         prelude::PortDecl,
-        selector::Selector,
         session::ExecInfo,
         traits::{Netlist, Pattern, composite::Composite},
     };
@@ -348,6 +347,7 @@ mod test {
     use crate::traits::composite::test::And2Gates;
     use crate::traits::netlist::test::AndGate;
 
+    use svql_common::Selector;
     use svql_query::query_test;
 
     /// A polymorphic pattern representing either an `AndGate` or `And2Gates`.

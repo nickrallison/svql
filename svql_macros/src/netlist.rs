@@ -86,7 +86,7 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
             const MODULE_NAME: &'static str = #module_name;
             const FILE_PATH: &'static str = #file_path;
 
-            const PORTS: &'static [svql_query::session::PortDecl] = &[
+            const PORTS: &'static [svql_common::PortDecl] = &[
                 #(#port_entries),*
             ];
 

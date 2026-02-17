@@ -1,5 +1,12 @@
+use std::fs::File;
 use std::hash::Hash;
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
+
+pub fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
+    let file = File::open(path)?;
+    BufReader::new(file).lines().collect::<Result<_, _>>()
+}
 
 /// Represents a physical location in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

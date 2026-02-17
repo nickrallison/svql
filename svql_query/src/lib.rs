@@ -33,7 +33,6 @@ pub use svql_common as common;
 pub use svql_common::Wire;
 pub use svql_driver as driver;
 
-pub use dsl::selector;
 pub use dsl::traits;
 
 /// Executes a pattern query against a design.

@@ -5,134 +5,10 @@
 
 use crate::{
     prelude::*,
-    session::{ColumnEntry, EntryArray, ExecutionContext, PortDecl, QueryError, Row, Store, Table},
+    session::{ColumnEntry, EntryArray, ExecutionContext, QueryError, Row, Store, Table},
     traits::{Component, PatternInternal, kind, search_table_any},
 };
-use prjunnamed_netlist::Value;
 use svql_driver::{Driver, DriverKey};
-
-// svql_query/src/traits/primitive.rs
-
-/// Helper to determine output wire of a cell
-fn get_output_wire(cell: &prjunnamed_netlist::Cell, debug_index: usize) -> Wire {
-    // For DFFs, output width matches data width
-    let width = match cell {
-        prjunnamed_netlist::Cell::Dff(ff) => ff.data.len(),
-        // For gates, usually 1-bit output
-        _ => 1,
-    };
-
-    let nets: Vec<prjunnamed_netlist::Net> = (0..width)
-        .map(|i| prjunnamed_netlist::Net::from_cell_index(debug_index + i))
-        .collect();
-
-    Wire::new(Value::from(nets))
-}
-
-/// Extract the wire reference for a specific input port by name from a cell.
-fn extract_input_wire(cell: &prjunnamed_netlist::Cell, port_name: &str) -> Option<Wire> {
-    use prjunnamed_netlist::Cell;
-
-    let val = match cell {
-        // 2-input gates
-        Cell::And(a, b)
-        | Cell::Or(a, b)
-        | Cell::Xor(a, b)
-        | Cell::Eq(a, b)
-        | Cell::ULt(a, b)
-        | Cell::SLt(a, b)
-        | Cell::Mul(a, b)
-        | Cell::UDiv(a, b)
-        | Cell::UMod(a, b)
-        | Cell::SDivTrunc(a, b)
-        | Cell::SDivFloor(a, b)
-        | Cell::SModTrunc(a, b)
-        | Cell::SModFloor(a, b) => match port_name {
-            "a" => a,
-            "b" => b,
-            _ => return None,
-        },
-
-        // 1-input gates
-        Cell::Not(a) | Cell::Buf(a) => match port_name {
-            "a" => a,
-            _ => return None,
-        },
-
-        // Mux: (sel, a, b)
-        Cell::Mux(s, a, b) => match port_name {
-            "sel" => return Some(Wire::single(*s)),
-            "a" => a,
-            "b" => b,
-            _ => return None,
-        },
-
-        // Adc: (a, b, carry_in)
-        Cell::Adc(a, b, ci) => match port_name {
-            "a" => a,
-            "b" => b,
-            "carry_in" | "cin" | "ci" => return Some(Wire::single(*ci)),
-            _ => return None,
-        },
-
-        // AIG-like nets (ControlNet)
-        Cell::Aig(a, b) => match port_name {
-            "a" => return Some(Wire::single(a.net())),
-            "b" => return Some(Wire::single(b.net())),
-            _ => return None,
-        },
-
-        // Shift operations
-        Cell::Shl(a, b, _) | Cell::UShr(a, b, _) | Cell::SShr(a, b, _) | Cell::XShr(a, b, _) => {
-            match port_name {
-                "a" => a,
-                "b" => b,
-                _ => return None,
-            }
-        }
-
-        Cell::Dff(ff) => match port_name {
-            "clk" => return Some(Wire::single(ff.clock.net())),
-            "d" | "data_in" => &ff.data,
-            // Handle various names for enable
-            "en" | "enable" | "write_en" => return Some(Wire::single(ff.enable.net())),
-            "reset" | "rst" | "srst" => return Some(Wire::single(ff.reset.net())),
-            "reset_n" | "rst_n" | "clear" | "arst" | "arst_n" => {
-                return ff.clear.nets().first().map(|n| Wire::single(*n));
-            }
-            _ => return None,
-        },
-
-        _ => return None,
-    };
-
-    Some(Wire(val.clone()))
-}
-
-/// Resolve primitive ports by extracting inputs from the cell structure.
-pub fn resolve_primitive_ports(
-    cell: &prjunnamed_netlist::Cell,
-    debug_index: usize,
-    schema: &PatternSchema,
-) -> EntryArray {
-    let mut entries = vec![ColumnEntry::Null; schema.defs.len()];
-
-    for (idx, col_def) in schema.defs.iter().enumerate() {
-        match col_def.direction {
-            PortDirection::Output => {
-                let wire = get_output_wire(cell, debug_index);
-                entries[idx] = ColumnEntry::Wire(wire);
-            }
-            PortDirection::Input | PortDirection::Inout => {
-                if let Some(wire) = extract_input_wire(cell, col_def.name) {
-                    entries[idx] = ColumnEntry::Wire(wire);
-                }
-            }
-            _ => {}
-        }
-    }
-    EntryArray::new(entries)
-}
 
 /// Trait for primitive hardware components that match against cell types.
 ///
@@ -181,8 +57,23 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
     /// Default implementation handles common gate patterns automatically.
     /// Override this for special cases (e.g., DFFs with named ports).
     #[must_use]
-    fn resolve(cell: &prjunnamed_netlist::Cell, debug_index: usize) -> EntryArray {
-        resolve_primitive_ports(cell, debug_index, Self::primitive_schema())
+    fn resolve(wrapper: &CellWrapper<'_>) -> EntryArray {
+        let schema = Self::primitive_schema();
+        let mut entries = vec![ColumnEntry::Null; schema.defs.len()];
+
+        for (idx, col_def) in schema.defs.iter().enumerate() {
+            let entry = match col_def.direction {
+                PortDirection::Output => Some(ColumnEntry::Wire(wrapper.output_wire())),
+                PortDirection::Input | PortDirection::Inout => {
+                    wrapper.input_wire(col_def.name).map(ColumnEntry::Wire)
+                }
+                _ => None,
+            };
+            if let Some(e) = entry {
+                entries[idx] = e;
+            }
+        }
+        EntryArray::new(entries)
     }
 
     /// Rehydrate from row.
@@ -319,10 +210,7 @@ where
                         );
                         return None;
                     }
-                    Some(T::resolve(
-                        cell.as_ref(),
-                        cell_wrapper.debug_index().storage_key() as usize,
-                    ))
+                    Some(T::resolve(cell_wrapper))
                 })
                 .collect();
 
@@ -389,8 +277,8 @@ macro_rules! define_primitive {
             const CELL_KIND: CellKind =
                CellKind::$cell_kind;
 
-            const PORTS: &'static [$crate::session::PortDecl] = &[
-                $($crate::session::PortDecl::$direction(stringify!($port))),*
+            const PORTS: &'static [svql_common::PortDecl] = &[
+                $(svql_common::PortDecl::$direction(stringify!($port))),*
             ];
 
             fn primitive_schema() -> &'static $crate::session::PatternSchema {
@@ -470,8 +358,8 @@ macro_rules! define_dff_primitive {
             const CELL_KIND: CellKind =
                 CellKind::Dff;
 
-            const PORTS: &'static [$crate::session::PortDecl] = &[
-                $($crate::session::PortDecl::$direction(stringify!($port))),*
+            const PORTS: &'static [svql_common::PortDecl] = &[
+                $(svql_common::PortDecl::$direction(stringify!($port))),*
             ];
 
             fn cell_filter(cell: &prjunnamed_netlist::Cell) -> bool {

@@ -10,7 +10,7 @@ pub use crate::run_query;
 
 pub use crate::session::{
     Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, EntryArray, ExecInfo, ExecutionContext,
-    ExecutionPlan, PatternSchema, PortDecl, PortMap, QueryError, Ref, Row, SearchFn, Store,
+    ExecutionPlan, PatternSchema, PortMap, QueryError, Ref, Row, SearchFn, Store,
     Submodule, Table,
 };
 
@@ -30,8 +30,6 @@ pub use crate::dsl::traits::{
     search_table_any,
     variant::Variant,
 };
-
-pub use crate::selector::Selector;
 
 pub use common::*;
 

@@ -14,6 +14,7 @@ pub mod bridge;
 mod config;
 pub mod design;
 pub mod index;
+pub mod util;
 
 pub use crate::bridge::yosys::*;
 pub use crate::config::*;

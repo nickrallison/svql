@@ -151,7 +151,7 @@ pub fn variant_impl(item: TokenStream) -> TokenStream {
         impl #impl_generics svql_query::traits::variant::Variant for #name #ty_generics #where_clause {
             const NUM_VARIANTS: usize = #num_variants;
 
-            const COMMON_PORTS: &'static [svql_query::session::PortDecl] = &[
+            const COMMON_PORTS: &'static [svql_common::PortDecl] = &[
                 #(#port_entries),*
             ];
 

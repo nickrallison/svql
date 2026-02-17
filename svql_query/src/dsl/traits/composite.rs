@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use rayon::prelude::*;
 
 use crate::{
-    dsl::selector::Selector, prelude::*, session::execution::join_planner::ConnectivityCache,
+    prelude::*, session::execution::join_planner::ConnectivityCache,
 };
 
 /// The kind of connection constraint.

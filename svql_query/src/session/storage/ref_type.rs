@@ -118,11 +118,8 @@ impl<T> Ref<T> {
 
 impl<T> fmt::Debug for Ref<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Include type name in debug output for clarity
-        let type_name = std::any::type_name::<T>();
-        // Shorten the type name to just the final component
-        let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
-        write!(f, "Ref<{}>({})", short_name, self.index)
+        let name = util::short_type_name(std::any::type_name::<T>());
+        write!(f, "Ref<{}>({})", name, self.index)
     }
 }
 

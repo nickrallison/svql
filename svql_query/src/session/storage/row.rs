@@ -154,7 +154,7 @@ where
     #[must_use]
     pub fn resolve(
         &self,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Wire> {
         if selector.is_empty() {
@@ -192,7 +192,7 @@ where
     #[must_use]
     pub fn resolve_bundle(
         &self,
-        selector: crate::dsl::selector::Selector<'_>,
+        selector: Selector<'_>,
         ctx: &crate::session::ExecutionContext,
     ) -> Option<Vec<Wire>> {
         if selector.is_empty() {
@@ -307,7 +307,7 @@ where
     /// # Panics
     ///
     /// Panics if the requested column name is missing from the pattern schema.
-    pub fn validate_selector_path(selector: crate::selector::Selector<'_>) -> bool {
+    pub fn validate_selector_path(selector: Selector<'_>) -> bool {
         if selector.is_empty() {
             tracing::warn!(
                 "[{}] Connection uses empty selector path",
