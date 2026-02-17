@@ -35,7 +35,7 @@ impl PathSelector {
     pub fn to_selector_tokens(&self) -> TokenStream {
         let segments: Vec<_> = self.segments.iter().map(|s| quote! { #s }).collect();
         quote! {
-            svql_common::Selector::static_path(&[#(#segments),*])
+            svql_query::common::Selector::static_path(&[#(#segments),*])
         }
     }
 }
@@ -55,9 +55,9 @@ impl Direction {
     /// Generates code that calls the appropriate `PortDecl` constructor for this direction.
     pub fn as_port_constructor(&self) -> TokenStream {
         match self {
-            Self::Input => quote! { svql_common::PortDecl::input },
-            Self::Output => quote! { svql_common::PortDecl::output },
-            Self::Inout => quote! { svql_common::PortDecl::inout },
+            Self::Input => quote! { svql_query::common::PortDecl::input },
+            Self::Output => quote! { svql_query::common::PortDecl::output },
+            Self::Inout => quote! { svql_query::common::PortDecl::inout },
         }
     }
 }
