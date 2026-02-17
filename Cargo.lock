@@ -605,7 +605,7 @@ dependencies = [
 [[package]]
 name = "prjunnamed-netlist"
 version = "0.1.0"
-source = "git+https://github.com/nickrallison/prjunnamed?branch=dev#ee32b3b29048c698460bf6eb1b61f1895c661485"
+source = "git+https://github.com/nickrallison/prjunnamed?rev=2d8829bf6df1215aa471064033ea7f8084b8d701#2d8829bf6df1215aa471064033ea7f8084b8d701"
 dependencies = [
  "indexmap",
  "yap",
@@ -614,7 +614,7 @@ dependencies = [
 [[package]]
 name = "prjunnamed-yosys_json"
 version = "0.1.0"
-source = "git+https://github.com/nickrallison/prjunnamed?branch=dev#ee32b3b29048c698460bf6eb1b61f1895c661485"
+source = "git+https://github.com/nickrallison/prjunnamed?rev=2d8829bf6df1215aa471064033ea7f8084b8d701#2d8829bf6df1215aa471064033ea7f8084b8d701"
 dependencies = [
  "jzon",
  "prjunnamed-netlist",

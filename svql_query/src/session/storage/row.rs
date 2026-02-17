@@ -67,11 +67,27 @@ where
     #[must_use]
     pub fn wire(&self, name: &str) -> Option<Wire> {
         let idx = T::schema().index_of(name)?;
-
         match &self.entry_array.entries[idx] {
             ColumnEntry::Wire(wire) => Some(wire.clone()),
             _ => None,
         }
+    }
+
+    /// Get a port (wire + direction) by column name.
+    ///
+    /// Looks up the direction from the schema.
+    #[inline]
+    #[must_use]
+    pub fn port(&self, name: &str) -> Option<Port> {
+        let idx = T::schema().index_of(name)?;
+        let col_def = T::schema().column(idx);
+
+        let wire = match &self.entry_array.entries[idx] {
+            ColumnEntry::Wire(w) => w.clone(),
+            _ => return None,
+        };
+
+        Some(Port::new(wire, col_def.direction))
     }
 
     /// Get a bundle of wires by column name.
@@ -166,10 +182,7 @@ where
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        let wire = sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)?;
-
-        // Direction is lost through traversal
-        Some(Wire::new(wire.nets().to_vec(), PortDirection::None))
+        sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
     }
 
     /// Resolve a path to a wire bundle using a Selector.
@@ -225,39 +238,24 @@ where
 
     // --- Builder methods (used by Table when constructing rows) ---
 
-    /// Set a wire column value using a WireRef.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_wire_ref(
-        mut self,
-        name: &'static str,
-        wire_ref: crate::wire::WireRef,
-    ) -> Result<Self, QueryError> {
-        let id = T::schema()
-            .index_of(name)
-            .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        let col_def = T::schema().column(id);
-        self.entry_array.entries[id] =
-            crate::session::ColumnEntry::wire(vec![wire_ref], col_def.direction);
-        Ok(self)
-    }
-
-    /// Set a wire column value with a cell ID (legacy method).
+    /// Set a wire column value.
     ///
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
     pub fn with_wire(
-        self,
+        mut self,
         name: &'static str,
-        cell_id: PhysicalCellId,
+        wire: Wire,
     ) -> Result<Self, QueryError> {
-        self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
+        let id = T::schema()
+            .index_of(name)
+            .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
+        self.entry_array.entries[id] = ColumnEntry::Wire(wire);
+        Ok(self)
     }
 
-    /// Set a wire column to a cell ID.
+    /// Set a wire column value with a cell ID.
     ///
     /// # Errors
     ///
@@ -267,7 +265,7 @@ where
         name: &'static str,
         cell_id: PhysicalCellId,
     ) -> Result<Self, QueryError> {
-        self.with_wire_ref(name, crate::wire::WireRef::Net(cell_id.storage_key()))
+        self.with_wire(name, Wire::from(cell_id))
     }
 
     /// Set a wire array column value.

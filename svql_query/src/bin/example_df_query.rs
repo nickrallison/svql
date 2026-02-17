@@ -18,7 +18,8 @@ impl Netlist for AndGate {
     const MODULE_NAME: &'static str = "and_gate";
     const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
 
-    const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
+    const PORTS: &'static [PortDecl] =
+        &[PortDecl::input("a"), PortDecl::input("b"), PortDecl::output("y")];
 
     fn netlist_rehydrate<'a>(
         row: &Row<Self>,

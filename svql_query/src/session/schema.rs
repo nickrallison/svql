@@ -318,16 +318,16 @@ impl ColumnDef {
     }
 }
 
-/// Description of a pattern port.
+/// Description of a pattern port declaration.
 #[derive(Debug, Clone, Copy)]
-pub struct Port {
+pub struct PortDecl {
     /// Name matching the netlist or alias.
     pub name: &'static str,
     /// Flow direction.
     pub direction: PortDirection,
 }
 
-impl Port {
+impl PortDecl {
     /// Declares an input port.
     #[must_use]
     pub const fn input(name: &'static str) -> Self {
@@ -450,32 +450,29 @@ impl ColumnEntry {
         match self {
             Self::Sub(idx) => Some(*idx),
             Self::Metadata(id) => Some(id.storage_key()),
-            Self::Wire(wire) => wire.nets().first().and_then(|n| n.as_net()),
+            Self::Wire(wire) => wire.cell_id().map(|id| id.storage_key()),
             _ => None,
         }
     }
 
     /// Create a wire entry
     #[must_use]
-    pub const fn wire(nets: Vec<WireRef>, direction: PortDirection) -> Self {
-        Self::Wire(Wire::new(nets, direction))
+    pub const fn wire(wire: Wire) -> Self {
+        Self::Wire(wire)
     }
 
     /// Create a single net wire entry
     #[must_use]
-    pub fn single_net(net: u32, direction: PortDirection) -> Self {
-        Self::Wire(Wire::single(net, direction))
+    pub fn single_net(net_idx: u32) -> Self {
+        let net = prjunnamed_netlist::Net::from_cell_index(net_idx as usize);
+        Self::Wire(Wire::single(net))
     }
 
     /// Create a constant entry
     #[must_use]
-    pub fn constant(value: bool, direction: PortDirection) -> Self {
-        Self::Wire(Wire::constant(value, direction))
-    }
-
-    /// Create a wire column from a physical cell ID (legacy).
-    pub fn cell(id: PhysicalCellId) -> Self {
-        Self::Wire(Wire::single(id.storage_key(), PortDirection::None))
+    pub fn constant(value: bool) -> Self {
+        let trit = prjunnamed_netlist::Trit::from(value);
+        Self::Wire(Wire::constant(trit))
     }
 
     /// Create a submodule entry

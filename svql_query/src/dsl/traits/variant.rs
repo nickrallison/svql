@@ -23,7 +23,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     const NUM_VARIANTS: usize;
 
     /// Common interface ports (macro-generated)
-    const COMMON_PORTS: &'static [Port];
+    const COMMON_PORTS: &'static [PortDecl];
 
     /// Port mappings for each variant arm (macro-generated)
     const PORT_MAPPINGS: &'static [&'static [PortMap]];
@@ -335,6 +335,7 @@ mod test {
 
     use crate::{
         Wire,
+        prelude::PortDecl,
         selector::Selector,
         session::ExecInfo,
         traits::{Netlist, Pattern, composite::Composite},
@@ -384,8 +385,11 @@ mod test {
     impl Variant for ManualAndOrAnd2 {
         const NUM_VARIANTS: usize = 2;
 
-        const COMMON_PORTS: &'static [Port] =
-            &[Port::input("a"), Port::input("b"), Port::output("y")];
+        const COMMON_PORTS: &'static [PortDecl] = &[
+            PortDecl::input("a"),
+            PortDecl::input("b"),
+            PortDecl::output("y"),
+        ];
 
         const PORT_MAPPINGS: &'static [&'static [PortMap]] = &[
             &[

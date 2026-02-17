@@ -54,7 +54,7 @@ impl Component for RecAnd {
 impl Recursive for RecAnd {
     type Base = AndGate;
 
-    const PORTS: &'static [Port] = &[Port::output("y")];
+    const PORTS: &'static [PortDecl] = &[PortDecl::output("y")];
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
@@ -384,7 +384,7 @@ impl Component for RecOr {
 impl Recursive for RecOr {
     type Base = OrGate;
 
-    const PORTS: &'static [Port] = &[Port::output("y")];
+    const PORTS: &'static [PortDecl] = &[PortDecl::output("y")];
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<OrGate as Pattern>::EXEC_INFO];
 

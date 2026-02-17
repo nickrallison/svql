@@ -25,7 +25,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
     const FILE_PATH: &'static str;
 
     /// Port declarations (macro-generated)
-    const PORTS: &'static [Port];
+    const PORTS: &'static [PortDecl];
 
     /// Schema accessor (macro generates this with `OnceLock` pattern)
     fn netlist_schema() -> &'static crate::session::PatternSchema {
@@ -162,23 +162,13 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             // TRANSLATION: Map local search node to stable physical ID
             let haystack_physical = haystack_index.resolve_physical(*h_node);
 
-            match needle_wrapper.get() {
+            match needle_wrapper.get().as_ref() {
                 prjunnamed_netlist::Cell::Input(name, _) => {
-                    let err_msg = format!(
-                        "Needle Cell name: {name} should exist in schema for: {} at {}",
-                        Self::MODULE_NAME,
-                        Self::FILE_PATH
-                    );
-                    let col_idx = schema.index_of(name).expect(&err_msg);
-                    entries[col_idx] = ColumnEntry::cell(haystack_physical);
+                    let col_idx = schema.index_of(name).expect("Input name in schema");
+                    entries[col_idx] = ColumnEntry::Wire(Wire::from(haystack_physical));
                 }
                 prjunnamed_netlist::Cell::Output(name, output_value) => {
-                    let err_msg = format!(
-                        "Needle Cell name: {name} should exist in schema for: {} at {}",
-                        Self::MODULE_NAME,
-                        Self::FILE_PATH
-                    );
-                    let col_idx = schema.index_of(name).expect(&err_msg);
+                    let col_idx = schema.index_of(name).expect("Output name in schema");
                     let needle_output_driver_id: u32 =
                         value_to_cell_id(output_value).expect("Output should have driver");
                     let haystack_output_driver = assignment
@@ -194,8 +184,9 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                         .map(|(_n_idx, h_idx)| h_idx)
                         .expect("Should find haystack driver for output");
 
-                    entries[col_idx] =
-                        ColumnEntry::cell(haystack_index.resolve_physical(*haystack_output_driver));
+                    entries[col_idx] = ColumnEntry::Wire(Wire::from(
+                        haystack_index.resolve_physical(*haystack_output_driver),
+                    ));
                 }
                 _ => {
                     // Internal cell — store in metadata column if we have one
@@ -465,7 +456,7 @@ where
 /// Internal unit tests for the `Netlist` trait.
 pub(crate) mod test {
 
-    use crate::Wire;
+    use crate::{Wire, prelude::PortDecl};
 
     use super::{Component, Driver, DriverKey, Netlist, Port, Row, Store, kind};
 
@@ -517,7 +508,11 @@ pub(crate) mod test {
         const MODULE_NAME: &'static str = "and_gate";
         const FILE_PATH: &'static str = "examples/fixtures/basic/and/verilog/and_gate.v";
 
-        const PORTS: &'static [Port] = &[Port::input("a"), Port::input("b"), Port::output("y")];
+        const PORTS: &'static [PortDecl] = &[
+            PortDecl::input("a"),
+            PortDecl::input("b"),
+            PortDecl::output("y"),
+        ];
 
         fn netlist_rehydrate(
             row: &Row<Self>,

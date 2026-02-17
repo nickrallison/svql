@@ -9,9 +9,9 @@ pub use tracing;
 pub use crate::run_query;
 
 pub use crate::session::{
-    Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, ConnectionBuilder, EntryArray, ExecInfo,
-    ExecutionContext, ExecutionPlan, PatternSchema, Port, PortMap, QueryError, Ref, Row, SearchFn,
-    Store, Submodule, Table,
+    Alias, AnyTable, ColumnDef, ColumnEntry, ColumnKind, EntryArray, ExecInfo, ExecutionContext,
+    ExecutionPlan, PatternSchema, PortDecl, PortMap, QueryError, Ref, Row, SearchFn, Store,
+    Submodule, Table,
 };
 
 pub use crate::session::execution::TableSlot;
@@ -35,10 +35,7 @@ pub use crate::selector::Selector;
 
 pub use common::*;
 
-pub use subgraph::{
-    AssignmentSet, SingleAssignment,
-    cell::{CellKind, SourceLocation},
-};
+pub use subgraph::{AssignmentSet, SingleAssignment};
 
 pub use driver::{Driver, DriverKey};
 

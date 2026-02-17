@@ -1,160 +1,135 @@
-//! Wire and net abstractions for hardware connectivity.
-//!
-//! Provides types for representing physical wires, primary ports,
-//! and constants, along with their relative directions (Input/Output).
+use crate::HashSet;
+use crate::design::cell::PhysicalCellId;
+use prjunnamed_netlist::{Net, Trit, Value};
+use std::fmt;
 
-use crate::*;
-
-/// A reference to a single net in the design.
-/// This is the atomic unit of connectivity.
+/// A bundle of one or more nets representing a hardware signal.
+/// This type does not carry direction information; use `Port` for that.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum WireRef {
-    /// A specific net index (bit).
-    Net(u32),
-    /// A constant value (0 or 1).
-    Constant(bool),
-}
-
-impl WireRef {
-    /// Check if this is a net reference
-    #[must_use]
-    pub const fn is_net(&self) -> bool {
-        matches!(self, Self::Net(_))
-    }
-
-    /// Get the net index if this is a net reference
-    #[must_use]
-    pub const fn as_net(&self) -> Option<u32> {
-        match self {
-            Self::Net(idx) => Some(*idx),
-            _ => None,
-        }
-    }
-}
-
-impl std::fmt::Display for WireRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Net(idx) => write!(f, "Net({})", idx),
-            Self::Constant(value) => write!(f, "{}", if *value { "1'b1" } else { "1'b0" }),
-        }
-    }
-}
-
-/// A signal in the design, composed of one or more WireRefs (nets).
-/// This represents a bus or a single-bit wire.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Wire {
-    /// The nets making up this wire.
-    nets: Vec<WireRef>,
-    /// Direction relative to the pattern port.
-    direction: PortDirection,
-}
-
-impl std::fmt::Display for Wire {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.nets.is_empty() {
-            return write!(f, "empty");
-        }
-
-        if self.nets.len() == 1 {
-            return write!(f, "{}", self.nets[0]);
-        }
-
-        write!(f, "{{")?;
-        for (i, r) in self.nets.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", r)?;
-        }
-        write!(f, "}}")
-    }
-}
+pub struct Wire(pub Value);
 
 impl Wire {
-    /// Create a new wire from a vector of nets and a direction.
-    pub const fn new(nets: Vec<WireRef>, direction: PortDirection) -> Self {
-        Self { nets, direction }
-    }
-
-    /// Create a single-bit wire.
-    pub fn single(net: u32, direction: PortDirection) -> Self {
-        Self {
-            nets: vec![WireRef::Net(net)],
-            direction,
-        }
-    }
-
-    /// Create a constant wire.
-    pub fn constant(value: bool, direction: PortDirection) -> Self {
-        Self {
-            nets: vec![WireRef::Constant(value)],
-            direction,
-        }
-    }
-
-    /// Get the direction of the wire.
+    /// Creates a new wire from a value.
     #[must_use]
-    pub const fn direction(&self) -> PortDirection {
-        self.direction
+    pub const fn new(val: Value) -> Self {
+        Self(val)
     }
 
-    /// Get the nets that make up this wire.
+    /// Creates a single-bit wire from a net.
     #[must_use]
-    pub fn nets(&self) -> &[WireRef] {
-        &self.nets
+    pub fn single(net: Net) -> Self {
+        Self(Value::from(net))
     }
 
-    /// Check if the wire has no nets.
+    /// Creates a constant wire.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.nets.is_empty()
+    pub fn constant(trit: Trit) -> Self {
+        Self(Value::from(trit))
     }
 
-    /// Helper to check if this wire drives another wire (intersection of nets)
-    #[must_use]
-    pub fn drives(&self, other: &Self) -> bool {
-        self.nets.iter().any(|n| other.nets.contains(n))
-    }
-
-    /// Check if this is a constant
+    /// Returns true if the wire consists entirely of constant bits (0, 1, or X).
     #[must_use]
     pub fn is_constant(&self) -> bool {
-        self.nets.iter().all(|n| matches!(n, WireRef::Constant(_)))
+        self.0.iter().all(|n| n.is_const())
     }
 
-    /// Helper to get the first net as a cell ID (for compatibility with 1-bit primitives)
+    /// Returns true if any net in this wire is driven by the other wire.
+    #[must_use]
+    pub fn drives(&self, other: &Self) -> bool {
+        let other_nets: HashSet<Net> = other.0.iter().collect();
+        self.0.iter().any(|n| other_nets.contains(&n))
+    }
+
+    /// Returns the number of bits in the wire.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if the wire has no bits.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the individual nets.
+    pub fn iter(&self) -> impl Iterator<Item = Net> + '_ {
+        self.0.iter()
+    }
+
+    /// Helper to get the first net as a cell ID.
     #[must_use]
     pub fn cell_id(&self) -> Option<PhysicalCellId> {
-        self.nets()
-            .first()
-            .and_then(|n| n.as_net())
-            .map(PhysicalCellId::new)
+        self.0.iter().next().and_then(|n| {
+            n.as_cell_index()
+                .ok()
+                .map(|idx| PhysicalCellId::new(idx as u32))
+        })
+    }
+
+    /// Access the underlying Value
+    pub const fn value(&self) -> &Value {
+        &self.0
     }
 }
 
-/// Defines the direction of a port column.
+impl From<PhysicalCellId> for Wire {
+    fn from(cell_id: PhysicalCellId) -> Self {
+        Self::single(Net::from_cell_index(cell_id.storage_key() as usize))
+    }
+}
+
+impl From<Net> for Wire {
+    fn from(net: Net) -> Self {
+        Self::single(net)
+    }
+}
+
+impl fmt::Display for Wire {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// A wire with an associated direction (Input, Output, Inout).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Port {
+    /// The underlying wire value.
+    pub wire: Wire,
+    /// The direction of the port.
+    pub direction: PortDirection,
+}
+
+impl Port {
+    /// Creates a new port.
+    #[must_use]
+    pub const fn new(wire: Wire, direction: PortDirection) -> Self {
+        Self { wire, direction }
+    }
+}
+
+/// Defines the direction of a port.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PortDirection {
-    /// Not a port (internal wire, submodule reference, or metadata).
+    /// Internal signal.
     None,
-    /// Input port (receives signal).
+    /// Input port.
     Input,
-    /// Output port (drives signal).
+    /// Output port.
     Output,
     /// Bidirectional port.
     Inout,
 }
 
-impl std::fmt::Display for PortDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::None => write!(f, "None"),
-            Self::Input => write!(f, "Input"),
-            Self::Output => write!(f, "Output"),
-            Self::Inout => write!(f, "Inout"),
-        }
+impl fmt::Display for PortDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::None => "None",
+            Self::Input => "Input",
+            Self::Output => "Output",
+            Self::Inout => "Inout",
+        };
+        write!(f, "{s}")
     }
 }
 
@@ -163,45 +138,39 @@ mod property_tests {
     use super::*;
     use quickcheck::{Arbitrary, Gen, quickcheck};
 
-    #[derive(Clone, Debug)]
-    struct ArbitraryWireRef(WireRef);
+    #[derive(Debug, Clone)]
+    struct ArbitraryNet(Net);
 
-    impl Arbitrary for ArbitraryWireRef {
+    // Helper to generate arbitrary Nets for testing
+    impl Arbitrary for ArbitraryNet {
         fn arbitrary(g: &mut Gen) -> Self {
-            let variant = u8::arbitrary(g) % 2;
-            let wire = match variant {
-                0 => WireRef::Net(u32::arbitrary(g)),
-                _ => WireRef::Constant(bool::arbitrary(g)),
-            };
-            Self(wire)
-        }
-    }
-
-    #[derive(Clone, Debug, Copy)]
-    struct ArbitraryPortDirection(PortDirection);
-
-    impl Arbitrary for ArbitraryPortDirection {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let variants = [
-                PortDirection::None,
-                PortDirection::Input,
-                PortDirection::Output,
-                PortDirection::Inout,
-            ];
-            Self(*g.choose(&variants).unwrap())
+            let variant = u8::arbitrary(g) % 3;
+            match variant {
+                0 => Self(Net::ZERO),
+                1 => Self(Net::ONE),
+                _ => Self(Net::from_cell_index(u32::arbitrary(g) as usize % 1000)),
+            }
         }
     }
 
     quickcheck! {
-        fn prop_wire_direction_preserved(wr: ArbitraryWireRef, dir: ArbitraryPortDirection) -> bool {
-            let wire = Wire::new(vec![wr.0], dir.0);
-            wire.direction() == dir.0
+        fn prop_wire_len_consistency(nets: Vec<ArbitraryNet>) -> bool {
+            let nets: Vec<Net> = nets.into_iter().map(|an| an.0).collect();
+            let wire = Wire::new(Value::from(nets.clone()));
+            wire.len() == nets.len()
         }
 
-        fn prop_wire_net_consistency(wr: ArbitraryWireRef) -> bool {
-            let is_net = matches!(wr.0, WireRef::Net(_));
-            let wire = Wire::new(vec![wr.0], PortDirection::None);
-            wire.nets().first().map(|n| n.is_net()).unwrap_or(false) == is_net
+        fn prop_wire_is_empty(nets: Vec<ArbitraryNet>) -> bool {
+            let nets: Vec<Net> = nets.into_iter().map(|an| an.0).collect();
+            let wire = Wire::new(Value::from(nets.clone()));
+            wire.is_empty() == nets.is_empty()
+        }
+
+        fn prop_wire_drives_self(nets: Vec<ArbitraryNet>) -> bool {
+            let nets: Vec<Net> = nets.into_iter().map(|an| an.0).collect();
+            let wire = Wire::new(Value::from(nets));
+            // A wire should always drive itself (intersection is non-empty)
+            wire.drives(&wire)
         }
     }
 }

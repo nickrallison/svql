@@ -45,14 +45,14 @@ svql_cli = { path = "svql_cli" }
 ###############
 # PRJUNNAMED
 ###############
-prjunnamed-generic = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-graphviz = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-lut = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-memory = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-netlist = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-pattern = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-siliconblue = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
-prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", branch = "dev" }
+# prjunnamed-generic = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+# prjunnamed-graphviz = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+# prjunnamed-lut = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+# prjunnamed-memory = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+prjunnamed-netlist = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+# prjunnamed-pattern = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+# prjunnamed-siliconblue = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
+prjunnamed-yosys_json = { git = "https://github.com/nickrallison/prjunnamed", rev = "2d8829bf6df1215aa471064033ea7f8084b8d701" }
 
 ###############
 # OTHER LIBRARIES

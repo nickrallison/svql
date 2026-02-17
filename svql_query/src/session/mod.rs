@@ -12,16 +12,14 @@
 pub mod execution;
 pub mod storage;
 
-/// Logic for recording and validating connections between pattern fields.
-pub mod connection_builder;
 mod error;
 pub mod schema;
 
-pub use connection_builder::ConnectionBuilder;
 pub use error::QueryError;
 pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use schema::{
-    Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, Port, PortMap, Submodule,
+    Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, PortDecl, PortMap,
+    Submodule,
 };
 pub use storage::{AnyTable, ColumnStore, Ref, Row, Store, Table};
 

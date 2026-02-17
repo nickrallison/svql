@@ -52,12 +52,12 @@ pub enum Direction {
 }
 
 impl Direction {
-    /// Generates code that calls the appropriate `Port` constructor for this direction.
+    /// Generates code that calls the appropriate `PortDecl` constructor for this direction.
     pub fn as_port_constructor(self) -> TokenStream {
         match self {
-            Self::Input => quote! { svql_query::session::Port::input },
-            Self::Output => quote! { svql_query::session::Port::output },
-            Self::Inout => quote! { svql_query::session::Port::inout },
+            Self::Input => quote! { svql_query::session::PortDecl::input },
+            Self::Output => quote! { svql_query::session::PortDecl::output },
+            Self::Inout => quote! { svql_query::session::PortDecl::inout },
         }
     }
 }

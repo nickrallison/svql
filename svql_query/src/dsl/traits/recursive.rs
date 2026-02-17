@@ -122,7 +122,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
     ///
     /// Typically includes at least the output port. Inputs may be implicit
     /// (derived from leaf nodes during rehydration).
-    const PORTS: &'static [Port];
+    const PORTS: &'static [PortDecl];
 
     /// Execution dependencies (typically just the base pattern).
     ///
@@ -387,7 +387,7 @@ mod tests {
     impl Recursive for RecAnd {
         type Base = AndGate;
 
-        const PORTS: &'static [Port] = &[Port::output("y")];
+        const PORTS: &'static [PortDecl] = &[PortDecl::output("y")];
 
         const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 

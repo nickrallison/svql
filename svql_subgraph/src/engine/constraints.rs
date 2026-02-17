@@ -18,7 +18,11 @@ impl SubgraphMatcherCore<'_, '_, '_> {
     ) -> bool {
         let needle_wrapper = self.needle_index.get_cell_by_index(needle_cell);
         let haystack_wrapper = self.haystack_index.get_cell_by_index(haystack_cell);
-        self.cells_match_fan_in(needle_wrapper.get(), haystack_wrapper.get(), mapping)
+        self.cells_match_fan_in(
+            needle_wrapper.get().as_ref(),
+            haystack_wrapper.get().as_ref(),
+            mapping,
+        )
     }
 
     /// Dispatches fan-in matching based on the specific cell primitive type.

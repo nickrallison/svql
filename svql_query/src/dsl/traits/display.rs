@@ -151,7 +151,7 @@ pub fn wire_to_report_node(
         if let Some(cell) = cell_wrapper {
             let kind = cell.cell_type();
             if kind.is_input() {
-                let port_name = cell.input_name().unwrap_or("<unnamed>");
+                let port_name = cell.input_name().unwrap_or_else(|| "<unnamed>".to_string());
                 return ReportNode {
                     name: name.to_string(),
                     type_name: format!("{:?}", direction),
@@ -160,7 +160,9 @@ pub fn wire_to_report_node(
                     children: vec![],
                 };
             } else if kind.is_output() {
-                let port_name = cell.output_name().unwrap_or("<unnamed>");
+                let port_name = cell
+                    .output_name()
+                    .unwrap_or_else(|| "<unnamed>".to_string());
                 return ReportNode {
                     name: name.to_string(),
                     type_name: format!("{:?}", direction),
@@ -189,15 +191,10 @@ pub fn wire_to_report_node(
             }
         }
     } else if wire.is_constant() {
-        let value = wire
-            .nets()
-            .first()
-            .map(|n| matches!(n, WireRef::Constant(true)))
-            .unwrap_or(false);
         ReportNode {
             name: name.to_string(),
             type_name: format!("{:?}", direction),
-            details: Some(format!("Const: {}", value)),
+            details: Some(format!("Const: {}", wire)),
             source_loc: None,
             children: vec![],
         }
@@ -205,7 +202,7 @@ pub fn wire_to_report_node(
         ReportNode {
             name: name.to_string(),
             type_name: format!("{:?}", direction),
-            details: Some(format!("Wire (nets={:?})", wire.nets())),
+            details: Some(format!("Wire (nets={})", wire)),
             source_loc: None,
             children: vec![],
         }
@@ -286,14 +283,9 @@ pub fn render_wire_compact<T: Pattern + Component>(
     let type_info = wire.cell_id().map_or_else(
         || {
             if wire.is_constant() {
-                let value = wire
-                    .nets()
-                    .first()
-                    .map(|n| matches!(n, WireRef::Constant(true)))
-                    .unwrap_or(false);
-                format!("const_{}", value)
+                format!("const_{}", wire)
             } else {
-                format!("wire_n{}", wire.nets().len())
+                format!("wire_n{}", wire)
             }
         },
         |id| format!("cell_{}", id.storage_key()),

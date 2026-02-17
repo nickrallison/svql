@@ -57,7 +57,7 @@ impl Component for LogicCone {
 impl Recursive for LogicCone {
     type Base = AnyLogicGate;
 
-    const PORTS: &'static [Port] = &[Port::output("y")];
+    const PORTS: &'static [PortDecl] = &[PortDecl::output("y")];
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AnyLogicGate as Pattern>::EXEC_INFO];
 
     fn recursive_to_defs() -> Vec<ColumnDef> {
@@ -170,8 +170,7 @@ impl Recursive for LogicCone {
                     } else {
                         // It is NOT a logic gate -> leaf input
                         let pred_wrapper = index.get_cell_by_index(*pred_node);
-                        let pred_id = pred_wrapper.debug_index().storage_key();
-                        let wire = Wire::single(pred_id, PortDirection::None);
+                        let wire = Wire::from(pred_wrapper.debug_index());
                         new_leaf_inputs.push(wire);
                     }
                 }
