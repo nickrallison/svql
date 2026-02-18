@@ -32,7 +32,10 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => abort!(input, "Netlist derive only supports structs with named fields"),
+            _ => abort!(
+                input,
+                "Netlist derive only supports structs with named fields"
+            ),
         },
         _ => abort!(input, "Netlist derive only supports structs"),
     };
@@ -145,7 +148,10 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
 /// Parses the `#[netlist(file = "...", module = "...")]` attribute.
 fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
     let attr = find_attr(&input.attrs, "netlist").unwrap_or_else(|| {
-        abort!(input, "Missing #[netlist(file = \"...\", module = \"...\")] attribute")
+        abort!(
+            input,
+            "Missing #[netlist(file = \"...\", module = \"...\")] attribute"
+        )
     });
 
     let mut file = None;
@@ -166,8 +172,12 @@ fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
                 .unwrap_or_default();
 
             match key.as_str() {
-                "file" => file = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e))),
-                "module" => module = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e))),
+                "file" => {
+                    file = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)))
+                }
+                "module" => {
+                    module = Some(get_string_value(&nv).unwrap_or_else(|e| abort!(nv, "{}", e)))
+                }
                 other => abort!(nv, "Unknown netlist attribute key: {}", other),
             }
         }
@@ -197,11 +207,18 @@ fn parse_port_fields(
 
         let (direction, rename) = parse_port_attr(port_attr);
 
-        ports.push(PortField { name: field_name, direction, rename });
+        ports.push(PortField {
+            name: field_name,
+            direction,
+            rename,
+        });
     }
 
     if ports.is_empty() {
-        abort!(fields, "At least one field must have a #[port(...)] attribute");
+        abort!(
+            fields,
+            "At least one field must have a #[port(...)] attribute"
+        );
     }
 
     ports

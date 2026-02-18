@@ -64,7 +64,10 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => abort!(input, "Composite derive only supports structs with named fields"),
+            _ => abort!(
+                input,
+                "Composite derive only supports structs with named fields"
+            ),
         },
         _ => abort!(input, "Composite derive only supports structs"),
     };
@@ -252,7 +255,9 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
 
     for attr in find_all_attrs(&input.attrs, "connection") {
         if let Some(conn) = parse_single_connection(attr) {
-            groups.push(OrGroup { connections: vec![conn] });
+            groups.push(OrGroup {
+                connections: vec![conn],
+            });
         }
     }
 
@@ -307,7 +312,11 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     });
 
     match (from, to) {
-        (Some(f), Some(t)) => Some(Connection { from: f, to: t, kind }),
+        (Some(f), Some(t)) => Some(Connection {
+            from: f,
+            to: t,
+            kind,
+        }),
         _ => abort!(attr, "connection attribute requires both 'from' and 'to'"),
     }
 }
@@ -337,7 +346,11 @@ fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
 
     let connections = to_options
         .into_iter()
-        .map(|to| Connection { from: from.clone(), to, kind: None })
+        .map(|to| Connection {
+            from: from.clone(),
+            to,
+            kind: None,
+        })
         .collect();
 
     Some(OrGroup { connections })
@@ -368,7 +381,11 @@ fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
 
     let connections = from_options
         .into_iter()
-        .map(|from| Connection { from, to: to.clone(), kind: None })
+        .map(|from| Connection {
+            from,
+            to: to.clone(),
+            kind: None,
+        })
         .collect();
 
     Some(OrGroup { connections })
@@ -399,14 +416,20 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
                         match key.as_str() {
                             "from" => from = Some(PathSelector::from_expr_array(arr)?),
                             "to" => to = Some(PathSelector::from_expr_array(arr)?),
-                            _ => return Err(syn::Error::new_spanned(&nv, "Expected 'from' or 'to'")),
+                            _ => {
+                                return Err(syn::Error::new_spanned(&nv, "Expected 'from' or 'to'"));
+                            }
                         }
                     }
                 }
             }
 
             if let (Some(f), Some(t)) = (from, to) {
-                connections.push(Connection { from: f, to: t, kind: None });
+                connections.push(Connection {
+                    from: f,
+                    to: t,
+                    kind: None,
+                });
             }
         }
         Ok(())
@@ -431,7 +454,11 @@ fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
 fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
     let expr = match attr.parse_args::<syn::Expr>() {
         Ok(expr) => expr,
-        Err(e) => abort!(attr, "filter attribute expects a function path or closure: {}", e),
+        Err(e) => abort!(
+            attr,
+            "filter attribute expects a function path or closure: {}",
+            e
+        ),
     };
 
     match &expr {
@@ -453,7 +480,10 @@ fn parse_submodule_fields(
         .iter()
         .filter(|f| find_attr(&f.attrs, "submodule").is_some())
         .map(|f| SubmoduleField {
-            name: f.ident.clone().unwrap_or_else(|| abort!(f, "Submodule fields must be named")),
+            name: f
+                .ident
+                .clone()
+                .unwrap_or_else(|| abort!(f, "Submodule fields must be named")),
             ty: f.ty.clone(),
         })
         .collect()
@@ -495,11 +525,18 @@ fn parse_alias_fields(
         });
 
         let direction = direction.unwrap_or_else(|| {
-            abort!(attr, "Alias must specify direction: input, output, or inout")
+            abort!(
+                attr,
+                "Alias must specify direction: input, output, or inout"
+            )
         });
         let target = target.unwrap_or_else(|| abort!(attr, "Alias must specify target path"));
 
-        aliases.push(AliasField { name, direction, target });
+        aliases.push(AliasField {
+            name,
+            direction,
+            target,
+        });
     }
 
     aliases
