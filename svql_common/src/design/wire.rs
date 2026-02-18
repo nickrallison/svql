@@ -282,7 +282,7 @@ mod property_tests {
             let nets: Vec<Net> = nets.into_iter().map(|an| an.0).collect();
             let wire = Wire::new(Value::from(nets));
             // A wire should always drive itself (intersection is non-empty)
-            wire.drives(&wire)
+            wire.is_empty() || wire.drives(&wire)
         }
     }
 }

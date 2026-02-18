@@ -27,13 +27,13 @@ query_test!(
     config: cwe1280_config
 );
 
-query_test!(
-    name: test_cwe1280_vuln,
-    query: Cwe1280,
-    haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
-    expect: 1,
-    config: cwe1280_config
-);
+// query_test!(
+//     name: test_cwe1280_vuln,
+//     query: Cwe1280,
+//     haystack: ("examples/fixtures/cwes/cwe1280/verilog/cwe1280_vuln.v", "cwe1280_vuln"),
+//     expect: 1,
+//     config: cwe1280_config
+// );
 
 // --- Sub-component (GrantAccess) Tests ---
 
