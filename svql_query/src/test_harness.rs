@@ -97,8 +97,7 @@ where
 
     // Get the result count from the store
     let results_table = store.get::<P>().expect("Table should be present");
-    let rows: Vec<_> = results_table.rows().collect();
-    let stored_count = rows.len();
+    let stored_count = results_table.rows().count();
 
     if stored_count != spec.expected_count {
         tracing::error!(

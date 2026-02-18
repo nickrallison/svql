@@ -176,6 +176,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
+    /// Returns the inner cell reference.
     pub(crate) const fn inner(&self) -> CellRef<'a> {
         self.inner_cell_ref
     }
@@ -262,6 +263,7 @@ impl<'a> CellWrapper<'a> {
         }
     }
 
+    /// Returns the input wire connected to the specified port, if any.
     pub fn input_wire(&self, port_name: &str) -> Option<Wire> {
         use prjunnamed_netlist::Cell;
         let cell = self.get();
@@ -301,6 +303,7 @@ impl<'a> CellWrapper<'a> {
         Some(Wire(val.clone()))
     }
 
+    /// Returns the output wire of this cell.
     pub fn output_wire(&self) -> Wire {
         let width = match self.get().as_ref() {
             prjunnamed_netlist::Cell::Dff(ff) => ff.data.len(),

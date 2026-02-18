@@ -139,11 +139,18 @@ where
         Some(Row::from_parts(row_idx, entry_array))
     }
 
+    /// Get a single row by its numeric index.
+    ///
+    /// Returns `None` if the index is out of bounds.
     pub fn row_at(&self, idx: u32) -> Option<Row<T>> {
         self.row(Ref::new(RowIndex::new(idx)))
     }
 
     /// Iterate over all (Ref<T>, Row<T>) pairs in the table.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a row index is somehow invalid (should not happen).
     pub fn rows(&self) -> impl Iterator<Item = (Ref<T>, Row<T>)> + '_ {
         (0..self.len() as u32).map(|i| {
             let idx = RowIndex::new(i);

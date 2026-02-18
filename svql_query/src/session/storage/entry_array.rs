@@ -7,16 +7,23 @@ use crate::session::{
     schema::{error::SchemaError, pattern_schema::PatternSchema},
 };
 
+/// An array of column entries representing a single row.
 pub struct EntryArray {
+    /// The entries in this row.
+    #[allow(dead_code)]
     entries: Vec<ColumnEntry>,
 }
 
+/// A builder for constructing entry arrays with schema validation.
 pub struct EntryArrayBuilder<'schema> {
+    /// The schema used for validation.
     schema: &'schema PatternSchema,
+    /// The entries being built.
     entries: Vec<ColumnEntry>,
 }
 
 impl<'schema> EntryArrayBuilder<'schema> {
+    /// Create a new builder for the given schema.
     pub fn new(schema: &'schema PatternSchema) -> Self {
         Self {
             schema,
@@ -24,6 +31,13 @@ impl<'schema> EntryArrayBuilder<'schema> {
         }
     }
 
+    /// Set a wire value for a column.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The column name is not found in the schema
+    /// - The column is not a port column
     pub fn set_wire(mut self, name: &str, wire: Wire) -> Result<Self, SchemaError> {
         let (idx, col) = self
             .schema
@@ -40,6 +54,13 @@ impl<'schema> EntryArrayBuilder<'schema> {
         Ok(self)
     }
 
+    /// Set a wire array value for a column.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The column name is not found in the schema
+    /// - The column is not a wire array column
     pub fn set_wire_array(mut self, name: &str, wires: Vec<Wire>) -> Result<Self, SchemaError> {
         let (idx, col) = self
             .schema
@@ -56,6 +77,14 @@ impl<'schema> EntryArrayBuilder<'schema> {
         Ok(self)
     }
 
+    /// Set a sub-entry (row reference) for a column.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The column name is not found in the schema
+    /// - The column is not a sub column
+    /// - The target type does not match the expected type
     pub fn set_sub<S: 'static>(mut self, name: &str, row: RowIndex) -> Result<Self, SchemaError> {
         let (idx, col) = self
             .schema
@@ -77,6 +106,13 @@ impl<'schema> EntryArrayBuilder<'schema> {
         Ok(self)
     }
 
+    /// Set a metadata value for a column.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The column name is not found in the schema
+    /// - The column is not a metadata column
     pub fn set_meta(mut self, name: &str, value: MetaValue) -> Result<Self, SchemaError> {
         let (idx, col) = self
             .schema
@@ -93,6 +129,11 @@ impl<'schema> EntryArrayBuilder<'schema> {
         Ok(self)
     }
 
+    /// Finish building the entry array, validating that all required columns are set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any required (non-nullable) column was not set.
     pub fn finish(self) -> Result<EntryArray, SchemaError> {
         for (i, (entry, col)) in self
             .entries
@@ -112,6 +153,7 @@ impl<'schema> EntryArrayBuilder<'schema> {
         })
     }
 
+    /// Finish building the entry array without validation.
     pub fn finish_partial(self) -> EntryArray {
         EntryArray {
             entries: self.entries,

@@ -7,17 +7,25 @@ use syn::{Data, DeriveInput, Fields, Meta, Token, parse_macro_input};
 
 use crate::parsing::{Direction, find_attr, get_string_value};
 
+/// Attributes parsed from the `#[netlist(...)]` derive attribute.
 struct NetlistAttr {
+    /// Path to the netlist JSON file.
     file: String,
+    /// Name of the module in the netlist.
     module: String,
 }
 
+/// Represents a port field in the struct.
 struct PortField {
+    /// The Rust field name.
     name: syn::Ident,
+    /// The port direction (input/output).
     direction: Direction,
+    /// Optional rename for the port in the netlist.
     rename: Option<String>,
 }
 
+/// Implementation of the `Netlist` derive macro.
 pub fn netlist_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
@@ -134,6 +142,7 @@ pub fn netlist_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Parses the `#[netlist(file = "...", module = "...")]` attribute.
 fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
     let attr = find_attr(&input.attrs, "netlist").unwrap_or_else(|| {
         abort!(input, "Missing #[netlist(file = \"...\", module = \"...\")] attribute")
@@ -170,6 +179,7 @@ fn parse_netlist_attr(input: &DeriveInput) -> NetlistAttr {
     }
 }
 
+/// Extracts port fields from the struct fields.
 fn parse_port_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<PortField> {
@@ -197,6 +207,7 @@ fn parse_port_fields(
     ports
 }
 
+/// Parses the `#[port(...)]` attribute on a field.
 fn parse_port_attr(attr: &syn::Attribute) -> (Direction, Option<String>) {
     let mut direction = None;
     let mut rename = None;

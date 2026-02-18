@@ -26,16 +26,18 @@ where
     T: Pattern + svql_query::traits::Component,
 {
     /// Create a new row. Only called by `Table` internals.
+    #[allow(dead_code)]
     #[must_use]
-    pub(super) fn new(idx: RowIndex) -> Self {
+    pub(super) const fn new(idx: RowIndex) -> Self {
         Self {
             idx,
-            entry_array: EntryArray::with_capacity(T::schema().defs.len()),
+            entry_array: EntryArray::empty(),
             _marker: PhantomData,
         }
     }
 
-    pub(crate) fn from_parts(idx: RowIndex, entry_array: EntryArray) -> Self {
+    /// Create a row from its constituent parts.
+    pub(crate) const fn from_parts(idx: RowIndex, entry_array: EntryArray) -> Self {
         Self {
             idx,
             entry_array,
@@ -49,7 +51,7 @@ where
     /// `Table::row()` to retrieve this row again.
     #[inline]
     #[must_use]
-    pub fn as_ref(&self) -> Ref<T> {
+    pub const fn as_ref(&self) -> Ref<T> {
         Ref::new(self.idx)
     }
 
@@ -247,6 +249,10 @@ where
     }
 
     /// Validate that a selector path exists in the schema.
+    ///
+    /// # Panics
+    ///
+    /// May panic if the schema index lookup fails unexpectedly.
     pub fn validate_selector_path(selector: Selector<'_>) -> bool {
         if selector.is_empty() {
             tracing::warn!(

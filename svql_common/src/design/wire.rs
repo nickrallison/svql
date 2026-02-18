@@ -28,10 +28,12 @@ impl Wire {
         Self(Value::from(trit))
     }
 
+    /// Creates a new wire by slicing this wire at the specified range.
     pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
         Self(self.0.slice(range))
     }
 
+    /// Concatenates two wires to form a wider wire.
     pub fn concat(&self, other: &Self) -> Self {
         Self(self.0.concat(other.0.clone()))
     }
@@ -144,19 +146,24 @@ pub enum PortDirection {
     Inout,
 }
 
+/// A port declaration with a name and direction.
 #[derive(Debug, Clone, Copy)]
 pub struct PortDecl {
+    /// The port name.
     pub name: &'static str,
+    /// The port direction.
     pub direction: PortDirection,
 }
 
 impl PortDecl {
+    /// Creates a new input port declaration.
     pub const fn input(name: &'static str) -> Self {
         Self {
             name,
             direction: PortDirection::Input,
         }
     }
+    /// Creates a new output port declaration.
     pub const fn output(name: &'static str) -> Self {
         Self {
             name,

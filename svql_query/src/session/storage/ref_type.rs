@@ -86,6 +86,7 @@ impl<T> Ref<T> {
     /// Construct a reference from a raw index.
     /// Internal crate only — prevents external patterns from manually
     /// creating row indices which could lead to type confusion.
+    #[allow(dead_code)]
     #[inline]
     pub(crate) const fn from_raw(index: RowIndex) -> Self {
         Self {
@@ -96,7 +97,7 @@ impl<T> Ref<T> {
 
     /// Read the raw index.
     #[inline]
-    pub(crate) fn raw_index(self) -> RowIndex {
+    pub(crate) const fn raw_index(self) -> RowIndex {
         self.index
     }
 

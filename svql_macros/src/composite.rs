@@ -11,35 +11,53 @@ use syn::{
 
 use crate::parsing::{Direction, PathSelector, find_all_attrs, find_attr, parse_nested_paths};
 
+/// Represents a connection between two paths in a composite pattern.
 struct Connection {
+    /// The source path of the connection.
     from: PathSelector,
+    /// The destination path of the connection.
     to: PathSelector,
+    /// Optional connection kind modifier.
     kind: Option<ConnectionKind>,
 }
 
+/// Specifies the matching behavior for a connection.
 enum ConnectionKind {
+    /// Match if any element in a set satisfies the connection.
     AnyInSet,
 }
 
+/// A group of connections where at least one must be satisfied.
 struct OrGroup {
+    /// The connections in this OR group.
     connections: Vec<Connection>,
 }
 
+/// A custom filter expression for validation.
 struct Filter {
+    /// The filter expression to evaluate.
     expr: syn::Expr,
 }
 
+/// Represents a submodule field in a composite pattern.
 struct SubmoduleField {
+    /// The field name.
     name: syn::Ident,
+    /// The field type.
     ty: syn::Type,
 }
 
+/// Represents an alias field in a composite pattern.
 struct AliasField {
+    /// The alias field name.
     name: syn::Ident,
+    /// The port direction (input/output).
     direction: Direction,
+    /// The target path this alias points to.
     target: PathSelector,
 }
 
+/// Implementation of the `Composite` derive macro.
 pub fn composite_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
@@ -228,6 +246,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Parses OR groups from derive input attributes.
 fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     let mut groups = Vec::new();
 
@@ -258,6 +277,7 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     groups
 }
 
+/// Parses a single connection attribute.
 fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     let mut from = None;
     let mut to = None;
@@ -292,6 +312,7 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     }
 }
 
+/// Parses an `or_to` attribute with one source and multiple destinations.
 fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from = None;
     let mut to_options: Vec<PathSelector> = Vec::new();
@@ -322,6 +343,7 @@ fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Parses an `or_from` attribute with multiple sources and one destination.
 fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from_options: Vec<PathSelector> = Vec::new();
     let mut to = None;
@@ -352,6 +374,7 @@ fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Parses an `or_group` attribute containing multiple connections.
 fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut connections = Vec::new();
 
@@ -396,6 +419,7 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
+/// Parses all filter attributes from the derive input.
 fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
     find_all_attrs(&input.attrs, "filter")
         .into_iter()
@@ -403,6 +427,7 @@ fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
         .collect()
 }
 
+/// Parses a single filter attribute.
 fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
     let expr = match attr.parse_args::<syn::Expr>() {
         Ok(expr) => expr,
@@ -420,6 +445,7 @@ fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
     Some(Filter { expr })
 }
 
+/// Extracts submodule fields from the struct fields.
 fn parse_submodule_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<SubmoduleField> {
@@ -433,6 +459,7 @@ fn parse_submodule_fields(
         .collect()
 }
 
+/// Extracts alias fields from the struct fields.
 fn parse_alias_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<AliasField> {
@@ -478,6 +505,7 @@ fn parse_alias_fields(
     aliases
 }
 
+/// Generates the code for custom filter validation.
 fn generate_validate_custom(filters: &[Filter]) -> proc_macro2::TokenStream {
     let filter_calls: Vec<_> = filters
         .iter()

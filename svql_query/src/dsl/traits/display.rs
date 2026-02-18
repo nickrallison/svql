@@ -251,7 +251,7 @@ pub fn render_wire<T: Pattern + Component>(
     let wire = row.wire(wire_name)?;
     let direction = T::schema().get(wire_name)?.direction;
 
-    let node = wire_to_report_node(wire_name, &wire, direction, driver, key, config);
+    let node = wire_to_report_node(wire_name, wire, direction, driver, key, config);
 
     Some(node.render())
 }
@@ -269,7 +269,7 @@ pub fn render_wire_compact<T: Pattern + Component>(
     let direction = T::schema().get(wire_name)?.direction;
 
     let config = Config::default();
-    let source_loc = wire_source_location(&wire, driver, key, &config);
+    let source_loc = wire_source_location(wire, driver, key, &config);
 
     let type_info = wire.cell_id().map_or_else(
         || {
@@ -307,7 +307,7 @@ pub fn render_wire_source_only<T: Pattern + Component>(
 ) -> Option<String> {
     let wire = row.wire(wire_name)?;
     let config = Config::default();
-    let source_loc = wire_source_location(&wire, driver, key, &config)?;
+    let source_loc = wire_source_location(wire, driver, key, &config)?;
 
     let mut output = String::new();
     output.push_str(&format!("{}:\n", source_loc.file));

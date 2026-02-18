@@ -3,6 +3,11 @@ use std::hash::Hash;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
+/// Reads all lines from a file into a vector.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened or read.
 pub fn read_file_lines(path: &str) -> std::io::Result<Vec<String>> {
     let file = File::open(path)?;
     BufReader::new(file).lines().collect::<Result<_, _>>()

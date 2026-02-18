@@ -205,11 +205,11 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
-        config: &svql_common::Config,
+        _config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
-        let schema = Self::variant_schema();
+        let _schema = Self::variant_schema();
         let type_name = std::any::type_name::<Self>();
         let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
 
@@ -225,12 +225,12 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             .unwrap_or(0) as usize;
 
         // Dispatch to active variant using metadata
-        if (discrim as usize) < Self::NUM_VARIANTS {
-            let arm = &Self::VARIANT_ARMS[discrim as usize];
+        if discrim < Self::NUM_VARIANTS {
+            let arm = &Self::VARIANT_ARMS[discrim];
 
             if let Some(mut node) = store
                 .get_from_tid(arm.type_id)
-                .and_then(|table| table.row_to_report_node(inner_ref as usize, store, driver, key))
+                .and_then(|table| table.row_to_report_node(inner_ref, store, driver, key))
             {
                 // Add variant type to details
                 node.details = Some(format!("{}::{}", short_name, arm.type_name));

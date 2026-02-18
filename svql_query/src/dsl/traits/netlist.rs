@@ -242,7 +242,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
             if let Some(wire) = row.wire(port.name) {
                 children.push(wire_to_report_node(
                     port.name,
-                    &wire,
+                    wire,
                     port.direction,
                     driver,
                     key,

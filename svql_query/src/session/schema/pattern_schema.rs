@@ -4,8 +4,8 @@ use svql_common::PortDirection;
 
 use crate::session::schema::column::{ColIdx, SchemaColumn, SubIdx};
 
+use gxhash::{HashMap, HashMapExt};
 use std::any::TypeId;
-use std::collections::HashMap;
 
 /// A validated, indexed schema for a pattern's result table.
 ///
@@ -33,6 +33,7 @@ pub struct PatternSchema {
     /// Indices of Sub columns, in declaration order.
     submodules: Vec<ColIdx>,
     /// Indices of Meta columns.
+    #[allow(dead_code)]
     metas: Vec<ColIdx>,
 
     /// For Sub columns: maps column name → position within `submodules`
@@ -108,7 +109,7 @@ impl PatternSchema {
     }
 
     /// All columns in declaration order.
-    pub fn columns(&self) -> &[SchemaColumn] {
+    pub const fn columns(&self) -> &[SchemaColumn] {
         self.columns
     }
 
@@ -142,11 +143,12 @@ impl PatternSchema {
     }
 
     /// Total number of columns.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.columns.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    /// Check if the schema is empty.
+    pub const fn is_empty(&self) -> bool {
         self.columns.is_empty()
     }
 }

@@ -3,8 +3,6 @@
 //! Implements the incremental join algorithm and cost-based planner
 //! used to resolve connections between multiple pattern instances.
 
-use std::marker::PhantomData;
-
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
@@ -655,7 +653,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
-        config: &svql_common::Config,
+        _config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
@@ -684,7 +682,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             if let Some(wire) = row.wire(alias.port_name) {
                 children.push(wire_to_report_node(
                     alias.port_name,
-                    &wire,
+                    wire,
                     alias.direction,
                     driver,
                     key,
@@ -713,6 +711,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Create a partial entry array with a single submodule reference.
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries = vec![ColumnEntry::Null; Self::SUBMODULES.len() + Self::ALIASES.len()];

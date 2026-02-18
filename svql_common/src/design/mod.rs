@@ -1,6 +1,7 @@
 //! Core hardware abstractions and design primitives.
 
 pub mod cell;
+/// Hierarchical path selectors for navigating netlist structures.
 pub mod selector;
 /// Source location tracking and reporting.
 pub mod source;

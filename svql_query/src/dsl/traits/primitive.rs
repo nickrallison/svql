@@ -108,7 +108,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
             if let Some(wire) = row.wire(port.name) {
                 children.push(wire_to_report_node(
                     port.name,
-                    &wire,
+                    wire,
                     port.direction,
                     driver,
                     key,

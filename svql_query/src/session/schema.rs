@@ -3,8 +3,11 @@
 //! These types define the schema for pattern result tables, including
 //! wire references, submodule references, and metadata columns.
 
+/// Column type definitions.
 pub mod column;
+/// Schema validation errors.
 pub mod error;
+/// Pattern schema types.
 pub mod pattern_schema;
 
 use std::any::TypeId;
@@ -140,27 +143,32 @@ pub enum ColumnKind {
 
 impl ColumnKind {
     /// Create a `Sub` column kind for a specific pattern type.
-    pub fn sub<T: 'static>() -> Self {
+    pub const fn sub<T: 'static>() -> Self {
         Self::Sub(TypeId::of::<T>())
     }
 
-    pub fn is_wire(&self) -> bool {
+    /// Check if this is a wire column kind.
+    pub const fn is_wire(&self) -> bool {
         matches!(self, Self::Wire)
     }
 
-    pub fn is_sub(&self) -> bool {
+    /// Check if this is a sub-column kind.
+    pub const fn is_sub(&self) -> bool {
         matches!(self, Self::Sub(_))
     }
 
-    pub fn is_meta(&self) -> bool {
+    /// Check if this is a metadata column kind.
+    pub const fn is_meta(&self) -> bool {
         matches!(self, Self::Meta)
     }
 
-    pub fn is_wire_array(&self) -> bool {
+    /// Check if this is a wire array column kind.
+    pub const fn is_wire_array(&self) -> bool {
         matches!(self, Self::WireArray)
     }
 
-    pub fn sub_type(&self) -> Option<TypeId> {
+    /// Get the target type ID if this is a sub-column.
+    pub const fn sub_type(&self) -> Option<TypeId> {
         match self {
             Self::Sub(tid) => Some(*tid),
             _ => None,
@@ -228,7 +236,7 @@ impl ColumnDef {
     }
 
     /// Create a metadata column (non-nullable by default).
-    pub fn meta(name: &'static str) -> Self {
+    pub const fn meta(name: &'static str) -> Self {
         Self::new(name, ColumnKind::Meta, false)
     }
 
@@ -410,19 +418,20 @@ impl ColumnEntry {
     /// Internal crate only — allows generators and core traits to
     /// manufacture references while keeping them opaque to end users.
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) const fn sub(index: RowIndex) -> Self {
         Self::Sub(index)
     }
 
     /// Create a metadata entry.
     #[must_use]
-    pub fn meta(val: MetaValue) -> Self {
+    pub const fn meta(val: MetaValue) -> Self {
         Self::Meta(val)
     }
 
     /// Access as a wire reference, returning `None` for other variants.
     #[must_use]
-    pub fn as_wire(&self) -> Option<&Wire> {
+    pub const fn as_wire(&self) -> Option<&Wire> {
         match self {
             Self::Wire(w) => Some(w),
             _ => None,
@@ -440,7 +449,7 @@ impl ColumnEntry {
 
     /// Access as a metadata value.
     #[must_use]
-    pub fn as_meta(&self) -> Option<&MetaValue> {
+    pub const fn as_meta(&self) -> Option<&MetaValue> {
         match self {
             Self::Meta(m) => Some(m),
             _ => None,
@@ -450,8 +459,9 @@ impl ColumnEntry {
     /// Access as a row index.
     /// Only available within the `storage` module — prevents external
     /// code from extracting raw integers from `Sub` entries.
+    #[allow(dead_code)]
     #[must_use]
-    pub(super) fn as_row_index(&self) -> Option<RowIndex> {
+    pub(super) const fn as_row_index(&self) -> Option<RowIndex> {
         match self {
             Self::Sub(idx) => Some(*idx),
             _ => None,
@@ -459,8 +469,12 @@ impl ColumnEntry {
     }
 
     /// Returns the raw row index for type-erased sub-entry access.
-    pub(crate) fn as_sub_raw(&self) -> Option<u32> {
-        self.as_row_index().map(|ri| ri.raw())
+    #[allow(dead_code)]
+    pub(crate) const fn as_sub_raw(&self) -> Option<u32> {
+        match self {
+            Self::Sub(idx) => Some(idx.raw()),
+            _ => None,
+        }
     }
 }
 
@@ -542,6 +556,7 @@ impl EntryArray {
     ///
     /// This is the only way external code (pattern implementations) can
     /// write a sub-row reference — they must go through a typed `Ref<T>`.
+    #[allow(dead_code)]
     pub(crate) fn set_sub<T>(&mut self, col_idx: usize, r: Ref<T>) {
         self.entries[col_idx] = ColumnEntry::Sub(r.raw_index());
     }

@@ -211,7 +211,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
-        config: &svql_common::Config,
+        _config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
         let config = Config::default();
@@ -249,7 +249,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
             if let Some(wire) = row.wire(port.name) {
                 children.push(wire_to_report_node(
                     port.name,
-                    &wire,
+                    wire,
                     port.direction,
                     driver,
                     key,

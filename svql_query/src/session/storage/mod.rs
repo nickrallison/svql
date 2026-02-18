@@ -1,13 +1,22 @@
 //! Columnar storage for query results.
 
+/// Columnar storage implementation.
 mod columnar;
+/// Column entry types.
 mod entry;
+/// Entry array builder.
 mod entry_array;
+/// Metadata values.
 pub mod meta_value;
+/// Typed references to rows.
 mod ref_type;
+/// Row data type.
 mod row;
+/// Row index type.
 mod row_index;
+/// Store container.
 mod store;
+/// Table wrapper.
 mod table;
 
 pub use columnar::ColumnStore;

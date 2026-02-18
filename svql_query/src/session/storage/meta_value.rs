@@ -48,7 +48,7 @@ pub enum MetaValue {
 impl MetaValue {
     /// Extract the cell reference if this is `CellRef`.
     #[must_use]
-    pub fn as_cell_ref(&self) -> Option<PhysicalCellId> {
+    pub const fn as_cell_ref(&self) -> Option<PhysicalCellId> {
         match self {
             Self::CellRef(id) => Some(*id),
             _ => None,
@@ -57,7 +57,7 @@ impl MetaValue {
 
     /// Extract the variant discriminant index if this is `Discriminant`.
     #[must_use]
-    pub fn as_discriminant(&self) -> Option<VariantIndex> {
+    pub const fn as_discriminant(&self) -> Option<VariantIndex> {
         match self {
             Self::Discriminant(idx) => Some(*idx),
             _ => None,

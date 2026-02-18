@@ -14,6 +14,7 @@ pub mod bridge;
 mod config;
 pub mod design;
 pub mod index;
+/// Utility functions for type name manipulation.
 pub mod util;
 
 pub use crate::bridge::yosys::*;
