@@ -109,10 +109,10 @@ where
             spec.haystack_path
         );
         let mut rehydrated: Vec<P> = Vec::new();
-        for row in rows.iter() {
-            let item = P::rehydrate(row, &store, &driver, &spec.get_key());
+        for (_ref, row) in rows.iter() {
+            let item = P::rehydrate(row, &store, &driver, &spec.get_key(), &config);
             if item.is_none() {
-                tracing::error!("Failed to rehydrate row: {}", row);
+                tracing::error!("Failed to rehydrate row index");
                 continue;
             }
             rehydrated.push(item.unwrap());
@@ -146,8 +146,8 @@ where
 
         // tracing::trace!("Cell List: {}", cells_str);
         if let Some(table) = store.get::<P>() {
-            for (i, row) in table.rows().enumerate() {
-                tracing::trace!("Match #{}: {}", i, row);
+            for (i, (_, _row)) in table.rows().enumerate() {
+                tracing::trace!("Match #{}", i);
             }
         }
     }

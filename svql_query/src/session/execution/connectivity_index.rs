@@ -13,10 +13,10 @@ use crate::prelude::*;
 /// - `reverse[b_row]` = set of A rows that can drive `b.x`
 pub struct BipartiteIndex {
     /// Maps source row index → set of valid target row indices
-    pub forward: HashMap<u32, HashSet<u32>>,
+    pub forward: HashMap<RowIndex, HashSet<RowIndex>>,
 
     /// Maps target row index → set of valid source row indices
-    pub reverse: HashMap<u32, HashSet<u32>>,
+    pub reverse: HashMap<RowIndex, HashSet<RowIndex>>,
 
     /// Total number of valid edges in the bipartite graph
     pub edge_count: usize,
@@ -34,8 +34,8 @@ impl BipartiteIndex {
         connection: &Connection,
         ctx: &ExecutionContext,
     ) -> Self {
-        let mut forward: HashMap<u32, HashSet<u32>> = HashMap::new();
-        let mut reverse: HashMap<u32, HashSet<u32>> = HashMap::new();
+        let mut forward: HashMap<RowIndex, HashSet<RowIndex>> = HashMap::new();
+        let mut reverse: HashMap<RowIndex, HashSet<RowIndex>> = HashMap::new();
         let mut edge_count = 0;
 
         match connection.kind {
@@ -56,8 +56,10 @@ impl BipartiteIndex {
 
                         match (&a_cell, &b_cell) {
                             (Some(src), Some(dst)) if src.drives(dst) => {
-                                forward.entry(a_idx).or_default().insert(b_idx);
-                                reverse.entry(b_idx).or_default().insert(a_idx);
+                                let a_row_idx = RowIndex::from_raw(a_idx);
+                                let b_row_idx = RowIndex::from_raw(b_idx);
+                                forward.entry(a_row_idx).or_default().insert(b_row_idx);
+                                reverse.entry(b_row_idx).or_default().insert(a_row_idx);
                                 edge_count += 1;
                             }
                             _ => {}
@@ -83,8 +85,10 @@ impl BipartiteIndex {
                         if let (Some(src), Some(bundle)) = (&a_cell, &b_bundle) {
                             // Check if src is in the bundle
                             if bundle.iter().any(|w| src.drives(w)) {
-                                forward.entry(a_idx).or_default().insert(b_idx);
-                                reverse.entry(b_idx).or_default().insert(a_idx);
+                                let a_row_idx = RowIndex::from_raw(a_idx);
+                                let b_row_idx = RowIndex::from_raw(b_idx);
+                                forward.entry(a_row_idx).or_default().insert(b_row_idx);
+                                reverse.entry(b_row_idx).or_default().insert(a_row_idx);
                                 edge_count += 1;
                             }
                         }
@@ -110,19 +114,19 @@ impl BipartiteIndex {
 
     /// Get all valid target rows for a given source row.
     #[inline]
-    pub fn targets(&self, source_row: u32) -> Option<&HashSet<u32>> {
+    pub fn targets(&self, source_row: RowIndex) -> Option<&HashSet<RowIndex>> {
         self.forward.get(&source_row)
     }
 
     /// Get all valid source rows for a given target row.
     #[inline]
-    pub fn sources(&self, target_row: u32) -> Option<&HashSet<u32>> {
+    pub fn sources(&self, target_row: RowIndex) -> Option<&HashSet<RowIndex>> {
         self.reverse.get(&target_row)
     }
 
     /// Check if a specific (source, target) pair is valid.
     #[inline]
-    pub fn is_valid(&self, source_row: u32, target_row: u32) -> bool {
+    pub fn is_valid(&self, source_row: RowIndex, target_row: RowIndex) -> bool {
         self.forward
             .get(&source_row)
             .is_some_and(|targets| targets.contains(&target_row))

@@ -67,7 +67,7 @@ impl Recursive for LogicCone {
             ColumnDef::sub_nullable::<Self>("child_1"),
             ColumnDef::sub_nullable::<Self>("child_2"),
             ColumnDef::output("y"),
-            ColumnDef::metadata("depth"),
+            ColumnDef::meta("depth"),
             ColumnDef::wire_array("leaf_inputs"),
         ]
     }
@@ -100,7 +100,7 @@ impl Recursive for LogicCone {
         // Resolve GraphNodeIdx for each gate's output
         let nodes: Vec<GraphNodeIdx> = logic_table
             .rows()
-            .filter_map(|row| {
+            .filter_map(|(_, row)| {
                 row.wire("y")
                     .and_then(|w| w.cell_id())
                     .and_then(|id| index.resolve_node(id))
@@ -126,7 +126,7 @@ impl Recursive for LogicCone {
             .iter()
             .enumerate()
             .map(|(idx, &node)| {
-                let y_wire = logic_table.row(idx as u32).unwrap().wire("y").unwrap();
+                let y_wire = logic_table.row_at(idx as u32).unwrap().wire("y").unwrap().clone();
                 LogicEntry {
                     base_node: node,
                     children: [None, None, None],
@@ -233,12 +233,12 @@ impl Recursive for LogicCone {
             .enumerate()
             .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-                arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                arr.set_sub_raw(base_idx, RowIndex::from_u32(entry_index as u32));
 
                 // Helper to map node to entry index
                 let resolve_child = |n: Option<GraphNodeIdx>| -> ColumnEntry {
                     n.and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| ColumnEntry::Sub(idx as u32))
+                        .map(|&idx| ColumnEntry::Sub(RowIndex::from_u32(idx as u32)))
                         .unwrap_or(ColumnEntry::Null)
                 };
 
@@ -247,7 +247,7 @@ impl Recursive for LogicCone {
                 arr.entries[c2_idx] = resolve_child(e.children[2]);
 
                 arr.entries[y_idx] = ColumnEntry::Wire(e.y.clone());
-                arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                arr.entries[depth_idx] = ColumnEntry::meta(MetaValue::Count(e.depth));
                 arr.entries[leaf_idx] = ColumnEntry::WireArray(e.leaf_inputs.clone());
                 arr
             })
@@ -256,17 +256,17 @@ impl Recursive for LogicCone {
         Table::new(row_entries)
     }
 
-    fn recursive_rehydrate(row: &Row<Self>, _: &Store, _: &Driver, _: &DriverKey) -> Option<Self> {
+    fn recursive_rehydrate(row: &Row<Self>, _: &Store, _: &Driver, _: &DriverKey, _: &svql_common::Config) -> Option<Self> {
         Some(Self {
             base: row.sub("base")?,
             children: [row.sub("child_0"), row.sub("child_1"), row.sub("child_2")],
-            y: row.wire("y")?,
+            y: row.wire("y")?.clone(),
             depth: row
                 .entry_array()
                 .entries
                 .get(Self::recursive_schema().index_of("depth")?)?
-                .as_u32()?,
-            leaf_inputs: row.wire_bundle("leaf_inputs").unwrap_or_default(),
+                .as_meta()?.as_count()?,
+            leaf_inputs: row.wire_bundle("leaf_inputs").map(|s| s.to_vec()).unwrap_or_default(),
         })
     }
 
@@ -295,7 +295,7 @@ impl LogicCone {
                 let row = store
                     .resolve::<Self>(*c)
                     .expect("Child entry should be resolvable");
-                let rehydrate = Self::recursive_rehydrate(&row, store, driver, key)
+                let rehydrate = Self::recursive_rehydrate(&row, store, driver, key, &svql_common::Config::default())
                     .expect("Rehydration should succeed");
                 rehydrate.size(store, driver, key)
             })

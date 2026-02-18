@@ -242,8 +242,8 @@ impl std::fmt::Display for ColumnStore {
                 ColumnEntry::Null => "null".to_string(),
                 ColumnEntry::Wire(wire_ref) => format!("{wire_ref}"),
                 ColumnEntry::WireArray(wires) => format!("[{}]", wires.len()),
-                ColumnEntry::Sub(idx) => idx.to_string(),
-                ColumnEntry::Metadata(id) => id.to_string(),
+                ColumnEntry::Sub(row_idx) => format!("Ref({row_idx})"),
+                ColumnEntry::Meta(val) => format!("{val:?}"),
             }
         };
 

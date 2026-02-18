@@ -114,7 +114,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                 let debug_id = cell_wrapper.debug_index();
                 let col_name: &'static str =
                     Box::leak(format!("__internal_cell_{}", debug_id).into_boxed_str());
-                internal_defs.push(ColumnDef::metadata(col_name));
+                internal_defs.push(ColumnDef::meta(col_name));
             }
         }
 
@@ -194,7 +194,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     let col_name = format!("__internal_{}", needle_debug_id);
 
                     if let Some(col_idx) = schema.index_of(&col_name) {
-                        entries[col_idx] = ColumnEntry::Metadata(haystack_physical);
+                        entries[col_idx] = ColumnEntry::meta(MetaValue::CellRef(haystack_physical));
 
                         tracing::trace!(
                             "[NETLIST] Stored internal cell mapping: needle[{}] -> haystack[{}]",
@@ -214,6 +214,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + 'static;
@@ -227,10 +228,10 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
         _store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
-        let config = Config::default();
         let type_name = std::any::type_name::<Self>();
         let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
 
@@ -245,7 +246,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
                     port.direction,
                     driver,
                     key,
-                    &config,
+                    config,
                 ));
             }
         }
@@ -256,7 +257,7 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
         for (idx, col_def) in schema.columns().iter().enumerate() {
             // Skip non-metadata columns (ports already shown above)
-            if !col_def.kind.is_metadata() {
+            if !col_def.kind.is_meta() {
                 continue;
             }
 
@@ -267,7 +268,10 @@ pub trait Netlist: Sized + Component<Kind = kind::Netlist> + Send + Sync + 'stat
 
             // Get the haystack cell ID from the row
             let haystack_cell_id = match row.entry_array().entries.get(idx) {
-                Some(ColumnEntry::Metadata(id)) => *id,
+                Some(ColumnEntry::Meta(meta)) => match meta.as_cell_ref() {
+                    Some(id) => id,
+                    None => continue,
+                },
                 _ => continue,
             };
 
@@ -435,11 +439,12 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
-        Self::netlist_rehydrate(row, store, driver, key)
+        Self::netlist_rehydrate(row, store, driver, key, config)
     }
 
     fn internal_row_to_report_node(
@@ -447,8 +452,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
-        Self::netlist_row_to_report_node(row, store, driver, key)
+        Self::netlist_row_to_report_node(row, store, driver, key, config)
     }
 }
 
@@ -519,11 +525,12 @@ pub(crate) mod test {
             _store: &Store,
             _driver: &Driver,
             _key: &DriverKey,
+            _config: &svql_common::Config,
         ) -> Option<Self> {
             Some(Self {
-                a: row.wire("a")?,
-                b: row.wire("b")?,
-                y: row.wire("y")?,
+                a: row.wire("a")?.clone(),
+                b: row.wire("b")?.clone(),
+                y: row.wire("y")?.clone(),
             })
         }
     }

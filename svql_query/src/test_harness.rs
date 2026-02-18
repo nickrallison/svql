@@ -97,7 +97,7 @@ where
 
     // Get the result count from the store
     let results_table = store.get::<P>().expect("Table should be present");
-    let rows = results_table.rows().collect::<Vec<_>>();
+    let rows: Vec<_> = results_table.rows().collect();
     let stored_count = rows.len();
 
     if stored_count != spec.expected_count {
@@ -108,8 +108,8 @@ where
             std::any::type_name::<P>()
         );
         let mut rehydrated: Vec<P> = Vec::new();
-        for row in &rows {
-            let item = P::rehydrate(row, &store, &driver, &spec.get_key());
+        for (_, row) in results_table.rows() {
+            let item = P::rehydrate(&row, &store, &driver, &spec.get_key(), &config);
             if item.is_none() {
                 tracing::error!("Failed to rehydrate row: {}", row);
                 continue;
@@ -146,7 +146,7 @@ where
         // tracing::error!("Cell List: {}", cells_str);
         // Log match details if available
         if let Some(table) = store.get::<P>() {
-            for (i, row) in table.rows().enumerate() {
+            for (i, (_, row)) in table.rows().enumerate() {
                 tracing::error!("Match #{}: {}", i, row);
             }
         }

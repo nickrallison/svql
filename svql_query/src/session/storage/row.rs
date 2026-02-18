@@ -1,25 +1,21 @@
 //! Owned row snapshot from a pattern's result table.
-//!
-//! `Row<T>` provides an owned copy of a single row's data, avoiding
-//! lifetime complexity when iterating or passing rows around.
 
 use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::prelude::*;
+use crate::session::storage::meta_value::MetaValue;
+use crate::session::storage::row_index::RowIndex;
 
 /// An owned snapshot of a single row from a `Table<T>`.
-///
-/// This is created by `Table::row()` or during iteration, and holds
-/// all the data needed to reconstruct a `T::Match` via `Pattern::rehydrate()`.
 #[derive(Debug, Clone)]
 pub struct Row<T>
 where
     T: Pattern + svql_query::traits::Component,
 {
-    /// Row index in the source table.
-    pub(crate) idx: u32,
-    /// Wire columns: name → `PhysicalCellId` (None if NULL).
+    /// Row index in the source table — opaque outside this module.
+    pub(super) idx: RowIndex,
+    /// The column data for this row.
     pub(crate) entry_array: EntryArray,
     /// Type marker.
     pub(crate) _marker: PhantomData<T>,
@@ -29,9 +25,9 @@ impl<T> Row<T>
 where
     T: Pattern + svql_query::traits::Component,
 {
-    /// Create a new row (typically called by Table).
+    /// Create a new row. Only called by `Table` internals.
     #[must_use]
-    pub fn new(idx: u32) -> Self {
+    pub(super) fn new(idx: RowIndex) -> Self {
         Self {
             idx,
             entry_array: EntryArray::with_capacity(T::schema().defs.len()),
@@ -39,21 +35,25 @@ where
         }
     }
 
-    /// Get the row index in the source table.
-    #[inline]
-    #[must_use]
-    pub const fn index(&self) -> u32 {
-        self.idx
+    pub(crate) fn from_parts(idx: RowIndex, entry_array: EntryArray) -> Self {
+        Self {
+            idx,
+            entry_array,
+            _marker: PhantomData,
+        }
     }
 
-    /// Get this row as a typed reference.
+    /// Get a typed reference to this row.
+    ///
+    /// The returned `Ref<T>` can be stored and later passed back to
+    /// `Table::row()` to retrieve this row again.
     #[inline]
     #[must_use]
-    pub const fn as_ref(&self) -> Ref<T> {
+    pub fn as_ref(&self) -> Ref<T> {
         Ref::new(self.idx)
     }
 
-    /// Accesses the underlying fixed-size array of data for this row.
+    /// Accesses the underlying entry array for this row.
     #[inline]
     #[must_use]
     pub const fn entry_array(&self) -> &EntryArray {
@@ -63,94 +63,83 @@ where
     /// Get a wire by column name.
     ///
     /// Returns `None` if the column doesn't exist or the value is NULL.
+    /// Returns a borrowed reference to avoid cloning at the storage layer.
     #[inline]
     #[must_use]
-    pub fn wire(&self, name: &str) -> Option<Wire> {
+    pub fn wire(&self, name: &str) -> Option<&Wire> {
         let idx = T::schema().index_of(name)?;
-        match &self.entry_array.entries[idx] {
-            ColumnEntry::Wire(wire) => Some(wire.clone()),
-            _ => None,
-        }
+        self.entry_array.entries[idx].as_wire()
     }
 
     /// Get a port (wire + direction) by column name.
-    ///
-    /// Looks up the direction from the schema.
     #[inline]
     #[must_use]
     pub fn port(&self, name: &str) -> Option<Port> {
         let idx = T::schema().index_of(name)?;
         let col_def = T::schema().column(idx);
-
-        let wire = match &self.entry_array.entries[idx] {
-            ColumnEntry::Wire(w) => w.clone(),
-            _ => return None,
-        };
-
+        let wire = self.entry_array.entries[idx].as_wire()?.clone();
         Some(Port::new(wire, col_def.direction))
     }
 
     /// Get a bundle of wires by column name.
     ///
-    /// Returns `None` if the column doesn't exist or is not a WireArray.
-    /// Used for set-based connectivity checking with `#[connect_any]`.
+    /// Returns `None` if the column doesn't exist or is not a `WireArray`.
     #[inline]
     #[must_use]
-    pub fn wire_bundle(&self, name: &str) -> Option<Vec<Wire>> {
+    pub fn wire_bundle(&self, name: &str) -> Option<&[Wire]> {
         let idx = T::schema().index_of(name)?;
-
-        match &self.entry_array.entries[idx] {
-            ColumnEntry::WireArray(wires) => Some(wires.clone()),
-            _ => None,
-        }
+        self.entry_array.entries[idx].as_wire_array()
     }
 
-    /// Get a submodule reference by name (type-erased)
-    pub fn sub_any(&self, name: &str) -> Option<u32> {
+    /// Get metadata by column name.
+    ///
+    /// Returns `None` if the column doesn't exist or is not metadata.
+    #[inline]
+    #[must_use]
+    pub fn meta(&self, name: &str) -> Option<&MetaValue> {
         let idx = T::schema().index_of(name)?;
-        match &self.entry_array.entries[idx] {
-            ColumnEntry::Sub(slot_idx) => Some(*slot_idx),
-            _ => None,
+        self.entry_array.entries[idx].as_meta()
+    }
+
+    /// Get a typed submodule reference by column name.
+    ///
+    /// Returns `None` if:
+    /// - The column doesn't exist in the schema
+    /// - The column's `TypeId` doesn't match `S`
+    /// - The entry is `Null` (optional submodule not matched)
+    #[must_use]
+    pub fn sub<S: 'static>(&self, name: &str) -> Option<Ref<S>> {
+        use std::any::TypeId;
+        let idx = T::schema().index_of(name)?;
+        let col_def = T::schema().column(idx);
+
+        // Runtime type check: column must point to table of type S.
+        match &col_def.kind {
+            ColumnKind::Sub(tid) if *tid == TypeId::of::<S>() => {}
+            _ => return None,
         }
+
+        self.entry_array.entries[idx].as_row_index().map(Ref::new)
     }
 
-    /// Get all internal cell mappings from metadata columns.
+    /// Get a type-erased submodule row index.
     ///
-    /// Returns an iterator of `(needle_debug_index, haystack_cell_id)` pairs.
-    /// Only works for Netlist patterns with discovered internal cells.
-    pub fn internal_cell_mappings(&self) -> impl Iterator<Item = (usize, u32)> + '_ {
-        T::schema()
-            .columns()
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, col_def)| {
-                if !col_def.name.starts_with("__internal_cell_") {
-                    return None;
-                }
-
-                let needle_debug_id: usize = col_def
-                    .name
-                    .strip_prefix("__internal_cell_")
-                    .and_then(|s| s.parse().ok())?;
-
-                let haystack_cell_id = self.entry_array.entries.get(idx)?.as_u32()?;
-
-                Some((needle_debug_id, haystack_cell_id))
-            })
+    /// Used internally for display and report generation where the exact
+    /// submodule type isn't known at compile time.
+    /// Only available within the `session` module.
+    pub(crate) fn sub_raw(&self, name: &str) -> Option<u32> {
+        let idx = T::schema().index_of(name)?;
+        self.entry_array.entries[idx]
+            .as_row_index()
+            .map(|ri| ri.raw())
     }
 
-    /// Resolve a path to a wire using a Selector
+    // ── Path resolution ──────────────────────────────────────────────────────
+
+    /// Resolve a selector path to a wire.
     ///
-    /// # Examples
-    /// ```ignore
-    /// use svql_query::selector::Selector;
-    ///
-    /// let sel = Selector::new(&["y"]);
-    /// row.resolve(sel, ctx);  // Direct port
-    ///
-    /// let sel = Selector::new(&["and1", "y"]);
-    /// row.resolve(sel, ctx);  // Submodule port
-    /// ```
+    /// - Single segment `["y"]` → looks up `y` directly.
+    /// - Multi-segment `["sub", "y"]` → traverses into submodule `sub`, then looks up `y`.
     #[must_use]
     pub fn resolve(
         &self,
@@ -161,34 +150,27 @@ where
             return None;
         }
 
-        // Single segment: direct lookup
         if selector.len() == 1 {
-            return self.wire(selector.head()?);
+            return self.wire(selector.head()?).cloned();
         }
 
-        // Multi-segment: traverse through submodules
         let head = selector.head()?;
         let idx = T::schema().index_of(head)?;
         let col_def = T::schema().column(idx);
 
-        // Head must be a submodule reference
-        let (sub_row_idx, sub_type_id) = match &col_def.kind {
-            crate::session::ColumnKind::Sub(tid) => match &self.entry_array.entries[idx] {
-                ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
-                _ => return None,
-            },
+        let (row_idx, sub_type_id) = match &col_def.kind {
+            ColumnKind::Sub(tid) => {
+                let ri = self.entry_array.entries[idx].as_row_index()?;
+                (ri.raw() as usize, *tid)
+            }
             _ => return None,
         };
 
-        // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
+        sub_table.resolve_path(row_idx, selector.tail(), ctx)
     }
 
-    /// Resolve a path to a wire bundle using a Selector.
-    ///
-    /// Returns `None` if the path doesn't resolve to a WireArray column.
-    /// Used for set-based connectivity checking with `#[connect_any]`.
+    /// Resolve a selector path to a wire bundle.
     #[must_use]
     pub fn resolve_bundle(
         &self,
@@ -199,59 +181,38 @@ where
             return None;
         }
 
-        // Single segment: direct lookup
         if selector.len() == 1 {
-            return self.wire_bundle(selector.head()?);
+            return self.wire_bundle(selector.head()?).map(ToOwned::to_owned);
         }
 
-        // Multi-segment: traverse through submodules
         let head = selector.head()?;
         let idx = T::schema().index_of(head)?;
         let col_def = T::schema().column(idx);
 
-        // Head must be a submodule reference
-        let (sub_row_idx, sub_type_id) = match &col_def.kind {
-            crate::session::ColumnKind::Sub(tid) => match &self.entry_array.entries[idx] {
-                ColumnEntry::Sub(slot_idx) => (*slot_idx, *tid),
-                _ => return None,
-            },
+        let (row_idx, sub_type_id) = match &col_def.kind {
+            ColumnKind::Sub(tid) => {
+                let ri = self.entry_array.entries[idx].as_row_index()?;
+                (ri.raw() as usize, *tid)
+            }
             _ => return None,
         };
 
-        // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        sub_table.resolve_bundle_path(sub_row_idx as usize, selector.tail(), ctx)
+        sub_table.resolve_bundle_path(row_idx, selector.tail(), ctx)
     }
 
-    /// Get a submodule reference by column name.
-    ///
-    /// Returns `None` if the column doesn't exist or the value is NULL.
-    #[must_use]
-    pub fn sub<S>(&self, name: &str) -> Option<Ref<S>> {
-        let idx = T::schema().index_of(name)?;
-
-        match &self.entry_array.entries[idx] {
-            ColumnEntry::Sub(slot_idx) => Some(Ref::new(*slot_idx)),
-            _ => None,
-        }
-    }
-
-    // --- Builder methods (used by Table when constructing rows) ---
+    // ── Builder methods (used by Table / pattern search code) ────────────────
 
     /// Set a wire column value.
     ///
     /// # Errors
     ///
     /// Returns a `QueryError` if the column name does not exist in the schema.
-    pub fn with_wire(
-        mut self,
-        name: &'static str,
-        wire: Wire,
-    ) -> Result<Self, QueryError> {
+    pub fn with_wire(mut self, name: &'static str, wire: Wire) -> Result<Self, QueryError> {
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        self.entry_array.entries[id] = ColumnEntry::Wire(wire);
+        self.entry_array.entries[id] = ColumnEntry::wire(wire);
         Ok(self)
     }
 
@@ -281,32 +242,11 @@ where
         let id = T::schema()
             .index_of(name)
             .ok_or_else(|| QueryError::SchemaLut(name.to_string()))?;
-        self.entry_array.entries[id] = ColumnEntry::WireArray(wires);
+        self.entry_array.entries[id] = ColumnEntry::wire_array(wires);
         Ok(self)
     }
 
-    /// Set a submodule column value (with optional index).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the requested column name is missing from the pattern schema.
-    #[must_use]
-    pub fn with_sub(mut self, name: &'static str, idx: Option<u32>) -> Self {
-        let id = T::schema()
-            .index_of(name)
-            .expect("Schema LUT missing sub column");
-        self.entry_array.entries[id] = idx.map_or(ColumnEntry::Null, ColumnEntry::Sub);
-        self
-    }
-
     /// Validate that a selector path exists in the schema.
-    ///
-    /// Returns `true` if the path is valid, `false` otherwise.
-    /// Logs warnings for invalid paths to help debug connection issues.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the requested column name is missing from the pattern schema.
     pub fn validate_selector_path(selector: Selector<'_>) -> bool {
         if selector.is_empty() {
             tracing::warn!(
@@ -323,10 +263,8 @@ where
 
         let schema = T::schema();
 
-        // Check if the first segment exists in schema
         if schema.index_of(head).is_none() {
             let available: Vec<&str> = schema.columns().iter().map(|c| c.name).collect();
-
             tracing::warn!(
                 "[{}] Connection path '{}' references non-existent field/submodule.\n  \
                  Available columns: [{}]",
@@ -337,14 +275,14 @@ where
             return false;
         }
 
-        // If multi-segment, verify it's a submodule
         if selector.len() > 1 {
             let col_idx = T::schema().index_of(head).unwrap();
             let col_def = T::schema().column(col_idx);
 
             if !col_def.kind.is_sub() {
                 tracing::warn!(
-                    "[{}] Connection path '{}' tries to traverse into '{}', but it's not a submodule (it's a {:?})",
+                    "[{}] Connection path '{}' tries to traverse into '{}', \
+                     but it's not a submodule (it's a {:?})",
                     std::any::type_name::<T>(),
                     selector.path().join("."),
                     head,
@@ -358,20 +296,11 @@ where
     }
 
     /// Formats the row as a hierarchical string report.
-    pub fn render(&self, store: &Store, driver: &Driver, key: &DriverKey) -> String
+    pub fn render(&self, store: &Store, driver: &Driver, key: &DriverKey, config: &svql_common::Config) -> String
     where
         T: Pattern + svql_query::traits::Component + 'static,
     {
-        T::render_row(self, store, driver, key)
-    }
-}
-
-impl<T> Default for Row<T>
-where
-    T: Pattern + svql_query::traits::Component,
-{
-    fn default() -> Self {
-        Self::new(0)
+        T::render_row(self, store, driver, key, config)
     }
 }
 
@@ -380,7 +309,6 @@ where
     T: Pattern + svql_query::traits::Component,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Get the type name for the header
         let type_name = std::any::type_name::<T>()
             .rsplit("::")
             .next()
@@ -388,18 +316,17 @@ where
 
         writeln!(f, "{}[{}]:", type_name, self.idx)?;
 
-        // Iterate through the schema and print each column
         for (idx, col_def) in T::schema().columns().iter().enumerate() {
             let entry = self.entry_array.entries.get(idx);
 
             let value_str = match entry {
                 Some(ColumnEntry::Wire(wire)) => format!("{}", wire),
                 Some(ColumnEntry::WireArray(wires)) => {
-                    let wire_strs: Vec<String> = wires.iter().map(|w| format!("{}", w)).collect();
-                    format!("[{}]", wire_strs.join(", "))
+                    let strs: Vec<String> = wires.iter().map(|w| format!("{}", w)).collect();
+                    format!("[{}]", strs.join(", "))
                 }
-                Some(ColumnEntry::Sub(slot_idx)) => format!("ref({})", slot_idx),
-                Some(ColumnEntry::Metadata(id)) => format!("meta({id})"),
+                Some(ColumnEntry::Sub(idx)) => format!("ref({})", idx),
+                Some(ColumnEntry::Meta(m)) => format!("{}", m),
                 Some(ColumnEntry::Null) => "NULL".to_string(),
                 None => "MISSING".to_string(),
             };

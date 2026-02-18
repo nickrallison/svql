@@ -349,12 +349,10 @@ impl ExecutionPlan {
     ///
     /// Returns a `QueryError` if any table is missing from the slots.
     pub fn try_into_store(self, ctx: &ExecutionContext) -> Result<Store, QueryError> {
-        let mut store = Store::with_capacity(ctx.slots.len());
+        let mut store = Store::new();
 
-        // Clone tables from slots into the store
         for (&type_id, slot) in &ctx.slots {
             if let Some(arc_table) = slot.get() {
-                // slot.get() already returns a cloned Arc, so we can use it directly
                 store.insert_arc(type_id, arc_table);
             } else {
                 return Err(QueryError::ExecutionError(format!(

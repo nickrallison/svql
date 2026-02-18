@@ -183,7 +183,13 @@ pub trait Pattern: Sized + Send + Sync {
     ///
     /// Reconstructs a full `Self::Match` object from the row data and
     /// any referenced submodule rows in the store.
-    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
+    fn rehydrate(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Option<Self>
     where
         Self: Component + 'static;
 
@@ -193,16 +199,23 @@ pub trait Pattern: Sized + Send + Sync {
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> ReportNode
     where
         Self: Component + 'static;
 
     /// Render a match row as a formatted string.
-    fn render_row(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> String
+    fn render_row(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> String
     where
         Self: Component + 'static,
     {
-        Self::row_to_report_node(row, store, driver, key).render()
+        Self::row_to_report_node(row, store, driver, key, config).render()
     }
 }
 
@@ -264,6 +277,7 @@ pub trait PatternInternal<K>: Sized {
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
@@ -274,6 +288,7 @@ pub trait PatternInternal<K>: Sized {
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> ReportNode
     where
         Self: Component + PatternInternal<Self::Kind> + Send + Sync + 'static;
@@ -311,11 +326,17 @@ where
         T::search_table(ctx)
     }
 
-    fn rehydrate(row: &Row<Self>, store: &Store, driver: &Driver, key: &DriverKey) -> Option<Self>
+    fn rehydrate(
+        row: &Row<Self>,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> Option<Self>
     where
         Self: 'static,
     {
-        T::internal_rehydrate(row, store, driver, key)
+        T::internal_rehydrate(row, store, driver, key, config)
     }
 
     fn row_to_report_node(
@@ -323,7 +344,8 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> ReportNode {
-        T::internal_row_to_report_node(row, store, driver, key)
+        T::internal_row_to_report_node(row, store, driver, key, config)
     }
 }

@@ -21,18 +21,19 @@ impl Netlist for AndGate {
     const PORTS: &'static [PortDecl] =
         &[PortDecl::input("a"), PortDecl::input("b"), PortDecl::output("y")];
 
-    fn netlist_rehydrate<'a>(
+    fn netlist_rehydrate(
         row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Netlist> + Send + Sync + 'static,
     {
-        let a_id = row.wire("a")?;
-        let b_id = row.wire("b")?;
-        let y_id = row.wire("y")?;
+        let a_id = row.wire("a")?.clone();
+        let b_id = row.wire("b")?.clone();
+        let y_id = row.wire("y")?.clone();
 
         let and_gate = Self {
             a: a_id,
@@ -90,11 +91,12 @@ impl Composite for And2Gates {
 
     const DEPENDANCIES: &'static [&'static ExecInfo] = &[<AndGate as Pattern>::EXEC_INFO];
 
-    fn composite_rehydrate<'a>(
+    fn composite_rehydrate(
         _row: &Row<Self>,
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,

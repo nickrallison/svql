@@ -1,40 +1,41 @@
 //! Typed reference to a row in another pattern's table.
 //!
-//! `Ref<T>` is a type-safe wrapper around a u32 row index, providing
-//! compile-time guarantees that references point to the correct pattern type.
+//! `Ref<T>` is the *only* public way to hold a row index.
+//! It cannot be constructed from a raw integer outside the `storage` module,
+//! and its internal index cannot be read outside the module either.
 
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-#[allow(unused)]
-use svql_common::*;
+use super::row_index::RowIndex;
+use svql_common::util;
 
-/// A typed reference to a row in another pattern's result table.
+/// A typed, opaque reference to a row in `Table<T>`.
 ///
-/// This is the successor to `ForeignKey<T>`, providing the same type-safety
-/// with a clearer name that reflects its purpose.
+/// # Permitted external operations
 ///
-/// # Type Safety
+/// - Compare with another `Ref<T>` of the same type (`==`, `<`, etc.)
+/// - Hash
+/// - Debug / Display
+/// - Pass to `Table::row(Ref<T>)` or `Store::resolve(Ref<T>)`
+/// - Type-cast via `cast::<U>()` (semantically unsafe — use sparingly)
 ///
-/// The type parameter `T` represents the pattern type that this reference
-/// points to. This ensures at compile time that you can't accidentally
-/// use a reference to one pattern type with a different pattern's table.
+/// # Prohibited external operations
 ///
-/// # Layout
-///
-/// Internally just a `u32` row index. The `PhantomData<T>` is zero-sized
-/// and only exists for compile-time type checking.
+/// - Constructing a `Ref<T>` from a raw integer
+/// - Extracting the raw integer from a `Ref<T>`
+/// - Using a `Ref<T>` with a `Table<U>` without an explicit `cast()`
 #[repr(transparent)]
 pub struct Ref<T> {
-    /// The row index in the target table.
-    index: u32,
-    /// Phantom data to carry the type information for T.
-    _marker: PhantomData<fn() -> T>,
+    /// The row index in the target table. Opaque outside this module.
+    index: RowIndex,
+    /// Phantom data for compile-time type checking.
+    _marker: PhantomData<T>,
 }
 
-// Manual impls to avoid requiring bounds on T
+// Manual impls to avoid requiring bounds on T.
 
 impl<T> Clone for Ref<T> {
     fn clone(&self) -> Self {
@@ -71,48 +72,49 @@ impl<T> Hash for Ref<T> {
 }
 
 impl<T> Ref<T> {
-    /// Create a new reference from a row index.
+    /// Construct a new reference.
+    ///
+    /// Available within the crates session/storage module only.
     #[inline]
-    #[must_use]
-    pub const fn new(index: u32) -> Self {
+    pub(super) const fn new(index: RowIndex) -> Self {
         Self {
             index,
             _marker: PhantomData,
         }
     }
 
-    /// Get the raw row index.
+    /// Construct a reference from a raw index.
+    /// Internal crate only — prevents external patterns from manually
+    /// creating row indices which could lead to type confusion.
     #[inline]
-    #[must_use]
-    pub const fn index(self) -> u32 {
+    pub(crate) const fn from_raw(index: RowIndex) -> Self {
+        Self {
+            index,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Read the raw index.
+    #[inline]
+    pub(crate) fn raw_index(self) -> RowIndex {
         self.index
-    }
-
-    /// Get the index as usize for indexing into vectors/slices.
-    #[inline]
-    #[must_use]
-    pub const fn as_usize(self) -> usize {
-        self.index as usize
-    }
-
-    /// Create from a usize index (panics if > `u32::MAX` in debug).
-    #[inline]
-    #[must_use]
-    pub fn from_usize(index: usize) -> Self {
-        debug_assert!(u32::try_from(index).is_ok(), "Ref index overflow");
-        Self::new(index as u32)
     }
 
     /// Cast this reference to a different pattern type.
     ///
-    /// # Safety
+    /// # Safety (semantic)
     ///
-    /// This is type-safe but semantically unsafe - only use when you know
-    /// the underlying index is valid for type `U`'s table.
+    /// This is type-safe at the Rust level (no `unsafe` needed) but
+    /// semantically unsound if the resulting `Ref<U>` is used with a
+    /// `Table<U>` that doesn't correspond to the original table.
+    /// Use only when you know the underlying index is valid for `U`'s table.
     #[inline]
     #[must_use]
     pub const fn cast<U>(self) -> Ref<U> {
-        Ref::new(self.index)
+        Ref {
+            index: self.index,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -129,107 +131,59 @@ impl<T> fmt::Display for Ref<T> {
     }
 }
 
-impl<T> From<u32> for Ref<T> {
-    #[inline]
-    fn from(index: u32) -> Self {
-        Self::new(index)
-    }
-}
-
-impl<T> From<Ref<T>> for u32 {
-    #[inline]
-    fn from(r: Ref<T>) -> Self {
-        r.index
-    }
-}
-
-impl<T> Default for Ref<T> {
-    /// Default to index 0 (first row).
-    #[inline]
-    fn default() -> Self {
-        Self::new(0)
-    }
-}
-
-// Allow collecting Ref<T> into a column
-impl<T> From<Ref<T>> for i64 {
-    #[inline]
-    fn from(r: Ref<T>) -> Self {
-        Self::from(r.index)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use svql_common::HashSet;
 
-    // Dummy types for testing
     struct PatternA;
     struct PatternB;
 
-    #[test]
-    fn test_ref_creation() {
-        let r: Ref<PatternA> = Ref::new(42);
-        assert_eq!(r.index(), 42);
-        assert_eq!(r.as_usize(), 42);
-    }
-
-    #[test]
-    fn test_ref_from_usize() {
-        let r: Ref<PatternA> = Ref::from_usize(100);
-        assert_eq!(r.index(), 100);
+    fn make_ref_a(n: u32) -> Ref<PatternA> {
+        Ref::new(RowIndex::new(n))
     }
 
     #[test]
     fn test_ref_type_safety() {
-        // These are different types at compile time
-        let _a: Ref<PatternA> = Ref::new(1);
-        let _b: Ref<PatternB> = Ref::new(1);
-        // They can't be mixed without explicit cast
+        let _a: Ref<PatternA> = make_ref_a(1);
+        // Ref<PatternB> cannot be obtained from make_ref_a without cast()
     }
 
     #[test]
     fn test_ref_cast() {
-        let a: Ref<PatternA> = Ref::new(5);
+        let a: Ref<PatternA> = make_ref_a(5);
         let b: Ref<PatternB> = a.cast();
-        assert_eq!(a.index(), b.index());
+        // Internal indices are equal
+        assert_eq!(a.raw_index(), b.raw_index());
     }
 
     #[test]
     fn test_ref_debug() {
-        let r: Ref<PatternA> = Ref::new(42);
-        let debug = format!("{:?}", r);
-        assert!(debug.contains("Ref"));
-        assert!(debug.contains("42"));
-        assert!(debug.contains("PatternA"));
+        let r = make_ref_a(42);
+        let s = format!("{:?}", r);
+        assert!(s.contains("Ref"));
+        assert!(s.contains("42"));
+        assert!(s.contains("PatternA"));
     }
 
     #[test]
     fn test_ref_display() {
-        let r: Ref<PatternA> = Ref::new(42);
-        assert_eq!(format!("{}", r), "#42");
-    }
-
-    #[test]
-    fn test_ref_conversions() {
-        let r: Ref<PatternA> = 10u32.into();
-        let back: u32 = r.into();
-        assert_eq!(back, 10);
+        assert_eq!(format!("{}", make_ref_a(42)), "#42");
     }
 
     #[test]
     fn test_ref_hash() {
-        let mut set: HashSet<Ref<PatternA>> = HashSet::new();
-        set.insert(Ref::new(1));
-        set.insert(Ref::new(2));
-        set.insert(Ref::new(1)); // duplicate
+        let mut set: HashSet<Ref<PatternA>> = HashSet::default();
+        set.insert(make_ref_a(1));
+        set.insert(make_ref_a(2));
+        set.insert(make_ref_a(1)); // duplicate
         assert_eq!(set.len(), 2);
     }
 
     #[test]
     fn test_ref_ordering() {
-        let a: Ref<PatternA> = Ref::new(1);
-        let b: Ref<PatternA> = Ref::new(2);
+        let a = make_ref_a(1);
+        let b = make_ref_a(2);
         assert!(a < b);
         assert!(b > a);
     }
@@ -248,18 +202,14 @@ mod property_tests {
 
     impl Arbitrary for ArbitraryRef {
         fn arbitrary(g: &mut Gen) -> Self {
-            Self(Ref::new(u32::arbitrary(g)))
+            Self(Ref::new(RowIndex::new(u32::arbitrary(g))))
         }
     }
 
     quickcheck! {
-        fn prop_ref_index_roundtrip(r: ArbitraryRef) -> bool {
-            r.0.index() == u32::from(r.0)
-        }
-
         fn prop_ref_cast_preserves_index(r: ArbitraryRef) -> bool {
             let casted: Ref<DummyTypeB> = r.0.cast();
-            casted.index() == r.0.index()
+            casted.raw_index() == r.0.raw_index()
         }
     }
 }

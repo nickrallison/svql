@@ -72,7 +72,7 @@ impl Recursive for RecAnd {
             }),
         );
 
-        defs.push(ColumnDef::metadata("depth"));
+        defs.push(ColumnDef::meta("depth"));
         defs.push(ColumnDef::wire_array("leaf_inputs"));
 
         defs
@@ -108,7 +108,7 @@ impl Recursive for RecAnd {
         // Get GraphNodeIdx for each gate's output
         let nodes: Vec<GraphNodeIdx> = and_table
             .rows()
-            .filter_map(|row| {
+            .filter_map(|(_, row)| {
                 row.wire("y")
                     .and_then(|w| w.cell_id())
                     .and_then(|id| index.resolve_node(id))
@@ -135,10 +135,10 @@ impl Recursive for RecAnd {
 
         let gate_info: Vec<GateInfo> = and_table
             .rows()
-            .map(|row| GateInfo {
-                a: row.wire("a"), // None when input is a primary port / constant
-                b: row.wire("b"),
-                y: row.wire("y").expect("AndGate output 'y' must exist"),
+            .map(|(_, row)| GateInfo {
+                a: row.wire("a").cloned(), // None when input is a primary port / constant
+                b: row.wire("b").cloned(),
+                y: row.wire("y").expect("AndGate output 'y' must exist").clone(),
             })
             .collect();
         // gate_info[i]  ↔  and_table.row(i)  — always
@@ -299,19 +299,19 @@ impl Recursive for RecAnd {
             .enumerate()
             .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-                arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                arr.set_sub_raw(base_idx, RowIndex::from_u32(entry_index as u32));
                 arr.entries[left_idx] = e
                     .left_child
                     .and_then(|node| node_to_entry.get(&node))
-                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .map(|&idx| ColumnEntry::Sub(RowIndex::from_u32(idx as u32)))
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[right_idx] = e
                     .right_child
                     .and_then(|node| node_to_entry.get(&node))
-                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .map(|&idx| ColumnEntry::Sub(RowIndex::from_u32(idx as u32)))
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[y_idx] = ColumnEntry::Wire(e.y.clone());
-                arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                arr.entries[depth_idx] = ColumnEntry::meta(MetaValue::Count(e.depth));
                 // Store leaf_inputs as WireArray
                 arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(e.leaf_inputs.clone());
                 arr
@@ -326,18 +326,19 @@ impl Recursive for RecAnd {
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self> {
         let base: Ref<AndGate> = row.sub("base")?;
         let left_child: Option<Ref<Self>> = row.sub("left_child");
         let right_child: Option<Ref<Self>> = row.sub("right_child");
-        let y = row.wire("y")?;
+        let y = row.wire("y")?.clone();
 
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
-        let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
+        let depth = row.entry_array().entries.get(depth_idx)?.as_meta()?.as_count()?;
 
         // Get leaf_inputs from WireArray column
-        let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
+        let leaf_inputs = row.wire_bundle("leaf_inputs").map(|s| s.to_vec()).unwrap_or_default();
 
         Some(Self {
             base,
@@ -402,7 +403,7 @@ impl Recursive for RecOr {
             }),
         );
 
-        defs.push(ColumnDef::metadata("depth"));
+        defs.push(ColumnDef::meta("depth"));
         defs.push(ColumnDef::wire_array("leaf_inputs"));
 
         defs
@@ -438,7 +439,7 @@ impl Recursive for RecOr {
         // Get GraphNodeIdx for each gate's output
         let nodes: Vec<GraphNodeIdx> = or_table
             .rows()
-            .filter_map(|row| {
+            .filter_map(|(_, row)| {
                 row.wire("y")
                     .and_then(|w| w.cell_id())
                     .and_then(|id| index.resolve_node(id))
@@ -465,10 +466,10 @@ impl Recursive for RecOr {
 
         let gate_info: Vec<GateInfo> = or_table
             .rows()
-            .map(|row| GateInfo {
-                a: row.wire("a"), // None when input is a primary port / constant
-                b: row.wire("b"),
-                y: row.wire("y").expect("OrGate output 'y' must exist"),
+            .map(|(_, row)| GateInfo {
+                a: row.wire("a").cloned(), // None when input is a primary port / constant
+                b: row.wire("b").cloned(),
+                y: row.wire("y").expect("OrGate output 'y' must exist").clone(),
             })
             .collect();
         // gate_info[i]  ↔  or_table.row(i)  — always
@@ -629,19 +630,19 @@ impl Recursive for RecOr {
             .enumerate()
             .map(|(entry_index, e)| {
                 let mut arr = EntryArray::with_capacity(schema.defs.len());
-                arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                arr.set_sub_raw(base_idx, RowIndex::from_u32(entry_index as u32));
                 arr.entries[left_idx] = e
                     .left_child
                     .and_then(|node| node_to_entry.get(&node))
-                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .map(|&idx| ColumnEntry::Sub(RowIndex::from_u32(idx as u32)))
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[right_idx] = e
                     .right_child
                     .and_then(|node| node_to_entry.get(&node))
-                    .map(|&idx| ColumnEntry::Sub(idx as u32))
+                    .map(|&idx| ColumnEntry::Sub(RowIndex::from_u32(idx as u32)))
                     .unwrap_or(ColumnEntry::Null);
                 arr.entries[y_idx] = ColumnEntry::Wire(e.y.clone());
-                arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                arr.entries[depth_idx] = ColumnEntry::meta(MetaValue::Count(e.depth));
                 // Store leaf_inputs as WireArray
                 arr.entries[leaf_inputs_idx] = ColumnEntry::WireArray(e.leaf_inputs.clone());
                 arr
@@ -656,18 +657,19 @@ impl Recursive for RecOr {
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self> {
         let base: Ref<OrGate> = row.sub("base")?;
         let left_child: Option<Ref<Self>> = row.sub("left_child");
         let right_child: Option<Ref<Self>> = row.sub("right_child");
-        let y = row.wire("y")?;
+        let y = row.wire("y")?.clone();
 
         let schema = Self::recursive_schema();
         let depth_idx = schema.index_of("depth")?;
-        let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
+        let depth = row.entry_array().entries.get(depth_idx)?.as_meta()?.as_count()?;
 
         // Get leaf_inputs from WireArray column
-        let leaf_inputs = row.wire_bundle("leaf_inputs").unwrap_or_default();
+        let leaf_inputs = row.wire_bundle("leaf_inputs").map(|s| s.to_vec()).unwrap_or_default();
 
         Some(Self {
             base,
@@ -720,8 +722,8 @@ mod tests {
 
         // Collect depths
         let mut depths: Vec<u32> = Vec::new();
-        for row in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+        for (_, row) in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
             depths.push(rec.depth);
         }
 
@@ -758,8 +760,8 @@ mod tests {
 
         // Find a node with children
         let mut found_parent = false;
-        for row in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+        for (_, row) in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
 
             if rec.left_child.is_some() || rec.right_child.is_some() {
                 found_parent = true;

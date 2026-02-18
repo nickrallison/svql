@@ -49,8 +49,8 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
     #[must_use]
     fn variant_to_defs() -> Vec<ColumnDef> {
         let mut defs = vec![
-            ColumnDef::metadata("discriminant"),
-            ColumnDef::sub::<()>("inner_ref"),
+            ColumnDef::meta("discriminant"),
+            ColumnDef::meta("inner_ref"),
         ];
 
         defs.extend(
@@ -123,24 +123,20 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
             for row_idx in 0..table.len() as u32 {
                 let mut entry = EntryArray::with_capacity(2 + Self::COMMON_PORTS.len());
 
-                // Initialize all wire entries to None
-                for i in 0..(2 + Self::COMMON_PORTS.len()) {
-                    entry.entries[i] = ColumnEntry::Null;
-                }
-
                 // 1. Set discriminant
-                entry.entries[discrim_idx] =
-                    ColumnEntry::Metadata(PhysicalCellId::new(variant_idx as u32));
+                entry.entries[discrim_idx] = ColumnEntry::Meta(MetaValue::Discriminant(
+                    VariantIndex::new(variant_idx as u32),
+                ));
 
                 // 2. Set inner_ref (row index in the variant arm's table)
-                entry.entries[inner_ref_idx] = ColumnEntry::Sub(row_idx);
+                entry.entries[inner_ref_idx] = ColumnEntry::Meta(MetaValue::Count(row_idx));
 
                 // 3. Map common ports from inner table using path resolution
                 for mapping in port_maps {
                     if let Some(col_idx) = schema.index_of(mapping.common_port) {
                         let wire = table.resolve_path(row_idx as usize, mapping.inner, ctx);
                         entry.entries[col_idx] =
-                            wire.map(ColumnEntry::Wire).unwrap_or(ColumnEntry::Null);
+                            wire.map(ColumnEntry::wire).unwrap_or(ColumnEntry::Null);
                     }
                 }
 
@@ -195,6 +191,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Variant> + 'static;
@@ -208,6 +205,7 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
@@ -215,18 +213,16 @@ pub trait Variant: Sized + Component<Kind = kind::Variant> + Send + Sync + 'stat
         let type_name = std::any::type_name::<Self>();
         let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
 
-        // Get discriminant and inner_ref from schema
-        let discrim = schema
-            .index_of("discriminant")
-            .and_then(|idx| row.entry_array.entries.get(idx))
-            .and_then(|e| e.as_u32())
+        let discrim = row
+            .meta("discriminant")
+            .and_then(|m| m.as_discriminant())
+            .map(|vi| vi.raw() as usize)
             .unwrap_or(0);
 
-        let inner_ref = schema
-            .index_of("inner_ref")
-            .and_then(|idx| row.entry_array.entries.get(idx))
-            .and_then(|e| e.as_u32())
-            .unwrap_or(0);
+        let inner_ref = row
+            .meta("inner_ref")
+            .and_then(|m| m.as_count())
+            .unwrap_or(0) as usize;
 
         // Dispatch to active variant using metadata
         if (discrim as usize) < Self::NUM_VARIANTS {
@@ -312,11 +308,12 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Variant> + Send + Sync + 'static,
     {
-        Self::variant_rehydrate(row, store, driver, key)
+        Self::variant_rehydrate(row, store, driver, key, config)
     }
 
     fn internal_row_to_report_node(
@@ -324,8 +321,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
-        Self::variant_row_to_report_node(row, store, driver, key)
+        Self::variant_row_to_report_node(row, store, driver, key, config)
     }
 }
 
@@ -425,30 +423,24 @@ mod test {
             store: &Store,
             driver: &Driver,
             key: &DriverKey,
+            config: &svql_common::Config,
         ) -> Option<Self> {
-            let schema = Self::schema();
-            let discrim = row
-                .entry_array
-                .entries
-                .get(schema.index_of("discriminant")?)?
-                .as_u32()?;
-            let inner_row_idx = row
-                .entry_array
-                .entries
-                .get(schema.index_of("inner_ref")?)?
-                .as_u32()?;
+            let discrim = row.meta("discriminant")?.as_discriminant()?.raw();
+            let inner_row_idx = row.meta("inner_ref")?.as_count()?;
 
             match discrim {
                 0 => {
                     let table = store.get::<AndGate>()?;
-                    let inner_row = table.row(inner_row_idx)?;
-                    let inner = <AndGate as Pattern>::rehydrate(&inner_row, store, driver, key)?;
+                    let inner_row = table.row_at(inner_row_idx)?;
+                    let inner =
+                        <AndGate as Pattern>::rehydrate(&inner_row, store, driver, key, config)?;
                     Some(Self::AndGate(inner))
                 }
                 1 => {
                     let table = store.get::<And2Gates>()?;
-                    let inner_row = table.row(inner_row_idx)?;
-                    let inner = <And2Gates as Pattern>::rehydrate(&inner_row, store, driver, key)?;
+                    let inner_row = table.row_at(inner_row_idx)?;
+                    let inner =
+                        <And2Gates as Pattern>::rehydrate(&inner_row, store, driver, key, config)?;
                     Some(Self::And2Gates(inner))
                 }
                 _ => None,

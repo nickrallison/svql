@@ -150,7 +150,7 @@ use crate::{CellKind, PhysicalCellId, SourceLine, SourceLocation, Wire};
 // }
 
 /// A wrapper around a netlist cell reference.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct CellWrapper<'a> {
     /// The underlying netlist cell reference.
     inner_cell_ref: CellRef<'a>,
@@ -165,12 +165,6 @@ impl fmt::Debug for CellWrapper<'_> {
     }
 }
 
-impl PartialEq for CellWrapper<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner_cell_ref == other.inner_cell_ref
-    }
-}
-
 impl Eq for CellWrapper<'_> {}
 
 impl<'a> CellWrapper<'a> {
@@ -180,6 +174,10 @@ impl<'a> CellWrapper<'a> {
         Self {
             inner_cell_ref: inner,
         }
+    }
+
+    pub(crate) const fn inner(&self) -> CellRef<'a> {
+        self.inner_cell_ref
     }
 
     /// Returns the categorized type of the underlying cell.

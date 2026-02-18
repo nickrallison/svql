@@ -33,8 +33,8 @@ fn test_logic_cone() -> Result<(), Box<dyn std::error::Error>> {
     // expects 1 logic cone of size 3 and 2 logic cones of size 1
     let mut expected_size = vec![(3, 1), (1, 2)];
 
-    for (i, row) in rows.iter().enumerate() {
-        let logic_cone = LogicCone::rehydrate(row, &store, &driver, &spec.get_key()).unwrap();
+    for (i, (_ref, row)) in rows.iter().enumerate() {
+        let logic_cone = LogicCone::rehydrate(row, &store, &driver, &spec.get_key(), &config).unwrap();
         let size = logic_cone.size(&store, &driver, &spec.get_key());
         tracing::trace!("Row #{}: size = {}", i, size);
 

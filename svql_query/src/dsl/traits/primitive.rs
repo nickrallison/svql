@@ -82,6 +82,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
         _store: &Store,
         _driver: &Driver,
         _key: &DriverKey,
+        _config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Primitive> + 'static;
@@ -94,10 +95,10 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
         _store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
-        let config = Config::default();
         let type_name = std::any::type_name::<Self>();
         let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
 
@@ -111,7 +112,7 @@ pub trait Primitive: Sized + Component<Kind = kind::Primitive> + Send + Sync + '
                     port.direction,
                     driver,
                     key,
-                    &config,
+                    config,
                 ));
             }
         }
@@ -230,11 +231,12 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Primitive> + Send + Sync + 'static,
     {
-        Self::primitive_rehydrate(row, store, driver, key)
+        Self::primitive_rehydrate(row, store, driver, key, config)
     }
 
     fn internal_row_to_report_node(
@@ -242,8 +244,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
-        Self::primitive_row_to_report_node(row, store, driver, key)
+        Self::primitive_row_to_report_node(row, store, driver, key, config)
     }
 }
 
@@ -297,6 +300,7 @@ macro_rules! define_primitive {
                 _store: &$crate::session::Store,
                 _driver: &$crate::driver::Driver,
                 _key: &$crate::driver::DriverKey,
+                _config: &svql_common::Config,
             ) -> Option<Self>
             where
                 Self: $crate::traits::Component +
@@ -304,7 +308,7 @@ macro_rules! define_primitive {
                       Send + Sync + 'static,
             {
                 Some($name {
-                    $($port: row.wire(stringify!($port))?),*
+                    $($port: row.wire(stringify!($port))?.clone()),*
                 })
 
             }
@@ -383,6 +387,7 @@ macro_rules! define_dff_primitive {
                 _store: &$crate::session::Store,
                 _driver: &$crate::driver::Driver,
                 _key: &$crate::driver::DriverKey,
+                _config: &svql_common::Config,
             ) -> Option<Self>
             where
                 Self: $crate::traits::Component +
@@ -391,7 +396,7 @@ macro_rules! define_dff_primitive {
             {
                 Some($name {
                     $(
-                        $port: row.wire(stringify!($port))?,
+                        $port: row.wire(stringify!($port))?.clone(),
                     )*
                 })
             }
@@ -437,9 +442,9 @@ mod tests {
         let table = store.get::<TestAndGate>().expect("Table should exist");
 
         // Verify we can rehydrate and access fields
-        let first_row = table.rows().next().expect("Should have at least one match");
+        let (_ref, first_row) = table.rows().next().expect("Should have at least one match");
         let gate = <TestAndGate as svql_query::traits::Pattern>::rehydrate(
-            &first_row, &store, &driver, &key,
+            &first_row, &store, &driver, &key, &config,
         )
         .expect("Should rehydrate");
 

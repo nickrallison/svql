@@ -164,7 +164,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
             }),
         );
 
-        defs.push(ColumnDef::metadata("depth"));
+        defs.push(ColumnDef::meta("depth"));
 
         defs
     }
@@ -191,6 +191,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>;
 
     /// Preload required designs into the driver.
@@ -210,6 +211,7 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
         let config = Config::default();
@@ -219,12 +221,12 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         let mut children = Vec::new();
 
         // 1. Show base pattern
-        if let Some(base_row) = row.sub::<Self::Base>("base").and_then(|base_ref| {
-            store
-                .get::<Self::Base>()
-                .and_then(|t| t.row(base_ref.index()))
-        }) {
-            let mut base_node = Self::Base::row_to_report_node(&base_row, store, driver, key);
+        if let Some(base_row) = row
+            .sub::<Self::Base>("base")
+            .and_then(|base_ref| store.get::<Self::Base>().and_then(|t| t.row(base_ref)))
+        {
+            let mut base_node =
+                Self::Base::row_to_report_node(&base_row, store, driver, key, &config);
             base_node.name = "base".to_string();
             children.push(base_node);
         }
@@ -233,10 +235,10 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
         for child_name in ["left_child", "right_child"] {
             if let Some(child_row) = row
                 .sub::<Self>(child_name)
-                .and_then(|child_ref| store.get::<Self>().and_then(|t| t.row(child_ref.index())))
+                .and_then(|child_ref| store.get::<Self>().and_then(|t| t.row(child_ref)))
             {
                 let mut child_node =
-                    Self::recursive_row_to_report_node(&child_row, store, driver, key);
+                    Self::recursive_row_to_report_node(&child_row, store, driver, key, &config);
                 child_node.name = child_name.to_string();
                 children.push(child_node);
             }
@@ -263,7 +265,8 @@ pub trait Recursive: Sized + Component<Kind = kind::Recursive> + Send + Sync + '
                 .entry_array
                 .entries
                 .last()
-                .and_then(|e| e.as_u32())
+                .and_then(|e| e.as_meta())
+                .and_then(|m| m.as_count())
                 .map(|d| format!("depth: {d}")),
             source_loc: None,
             children,
@@ -316,8 +319,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self> {
-        Self::recursive_rehydrate(row, store, driver, key)
+        Self::recursive_rehydrate(row, store, driver, key, config)
     }
 
     fn internal_row_to_report_node(
@@ -325,8 +329,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
-        Self::recursive_row_to_report_node(row, store, driver, key)
+        Self::recursive_row_to_report_node(row, store, driver, key, config)
     }
 }
 
@@ -421,7 +426,7 @@ mod tests {
             // Get GraphNodeIdx for each gate's output
             let nodes: Vec<GraphNodeIdx> = and_table
                 .rows()
-                .filter_map(|row| {
+                .filter_map(|(_, row)| {
                     row.wire("y")
                         .and_then(|w| w.cell_id())
                         .and_then(|id| index.resolve_node(id))
@@ -445,10 +450,10 @@ mod tests {
 
             let gate_info: Vec<GateInfo> = and_table
                 .rows()
-                .map(|row| GateInfo {
-                    a: row.wire("a"), // None when input is a primary port / constant
-                    b: row.wire("b"),
-                    y: row.wire("y").expect("AndGate output 'y' must exist"),
+                .map(|(_, row)| GateInfo {
+                    a: row.wire("a").cloned(), // None when input is a primary port / constant
+                    b: row.wire("b").cloned(),
+                    y: row.wire("y").expect("AndGate output 'y' must exist").clone(),
                 })
                 .collect();
             // gate_info[i]  ↔  and_table.row(i)  — always
@@ -563,19 +568,19 @@ mod tests {
                 .enumerate()
                 .map(|(entry_index, e)| {
                     let mut arr = EntryArray::with_capacity(schema.defs.len());
-                    arr.entries[base_idx] = ColumnEntry::Sub(entry_index as u32);
+                    arr.set_sub_raw(base_idx, RowIndex::from_raw(entry_index as u32));
                     arr.entries[left_idx] = e
                         .left_child
                         .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| ColumnEntry::Sub(idx as u32))
+                        .map(|&idx| ColumnEntry::sub(RowIndex::from_raw(idx as u32)))
                         .unwrap_or(ColumnEntry::Null);
                     arr.entries[right_idx] = e
                         .right_child
                         .and_then(|node| node_to_entry.get(&node))
-                        .map(|&idx| ColumnEntry::Sub(idx as u32))
+                        .map(|&idx| ColumnEntry::sub(RowIndex::from_raw(idx as u32)))
                         .unwrap_or(ColumnEntry::Null);
-                    arr.entries[y_idx] = ColumnEntry::Wire(e.y.clone());
-                    arr.entries[depth_idx] = ColumnEntry::Metadata(PhysicalCellId::new(e.depth));
+                    arr.entries[y_idx] = ColumnEntry::wire(e.y.clone());
+                    arr.entries[depth_idx] = ColumnEntry::meta(MetaValue::Count(e.depth));
                     arr
                 })
                 .collect();
@@ -588,15 +593,19 @@ mod tests {
             _store: &Store,
             _driver: &Driver,
             _key: &DriverKey,
+            _config: &svql_common::Config,
         ) -> Option<Self> {
             let base: Ref<AndGate> = row.sub("base")?;
             let left_child: Option<Ref<Self>> = row.sub("left_child");
             let right_child: Option<Ref<Self>> = row.sub("right_child");
-            let y = row.wire("y")?;
+            let y = row.wire("y")?.clone();
 
             let schema = Self::recursive_schema();
             let depth_idx = schema.index_of("depth")?;
-            let depth = row.entry_array().entries.get(depth_idx)?.as_u32()?;
+            let depth = match row.entry_array().entries.get(depth_idx)? {
+                ColumnEntry::Meta(MetaValue::Count(c)) => Some(*c),
+                _ => None,
+            }?;
 
             Some(Self {
                 base,
@@ -640,8 +649,8 @@ mod tests {
 
         // Collect depths
         let mut depths: Vec<u32> = Vec::new();
-        for row in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+        for (_, row) in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
             depths.push(rec.depth);
         }
 
@@ -678,8 +687,8 @@ mod tests {
 
         // Find a node with children
         let mut found_parent = false;
-        for row in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key).expect("Should rehydrate");
+        for (_, row) in table.rows() {
+            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
 
             if rec.left_child.is_some() || rec.right_child.is_some() {
                 found_parent = true;

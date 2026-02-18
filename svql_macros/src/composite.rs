@@ -1,7 +1,4 @@
 //! Procedural macro implementation for the `Composite` derive.
-//!
-//! Handles the parsing of connectivity attributes and generates
-//! code for joining submodule tables into hierarchical matches.
 
 #![allow(clippy::too_many_lines, clippy::unnecessary_wraps)]
 
@@ -14,97 +11,63 @@ use syn::{
 
 use crate::parsing::{Direction, PathSelector, find_all_attrs, find_attr, parse_nested_paths};
 
-/// A single connection constraint
 struct Connection {
-    /// The source port/wire in the connection.
     from: PathSelector,
-    /// The destination port/wire in the connection.
     to: PathSelector,
-    /// The kind of connection (None = Exact, Some = specified kind)
     kind: Option<ConnectionKind>,
 }
 
-/// Connection kind for set-based connectivity
 enum ConnectionKind {
-    /// Set membership: A in Set(B) where B is a WireArray
     AnyInSet,
 }
 
-/// An OR group of connections (at least one must be satisfied)
 struct OrGroup {
-    /// List of alternative connections.
     connections: Vec<Connection>,
 }
 
-/// A custom filter constraint
 struct Filter {
-    /// The filter expression - can be a function path or closure
     expr: syn::Expr,
 }
 
-/// Parsed submodule field
 struct SubmoduleField {
-    /// Field identifier.
     name: syn::Ident,
-    /// Field type.
     ty: syn::Type,
 }
 
-/// Parsed alias field
 struct AliasField {
-    /// Field identifier.
     name: syn::Ident,
-    /// Port direction.
     direction: Direction,
-    /// Path to the target wire or port.
     target: PathSelector,
 }
 
-/// Implementation of the `Composite` procedural macro.
 pub fn composite_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
-    // Ensure it's a struct
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => abort!(
-                input,
-                "Composite derive only supports structs with named fields"
-            ),
+            _ => abort!(input, "Composite derive only supports structs with named fields"),
         },
         _ => abort!(input, "Composite derive only supports structs"),
     };
 
-    // Parse struct-level connection attributes
     let or_groups = parse_or_groups(&input);
-
-    // Parse filter attributes
     let filters = parse_filters(&input);
-
-    // Parse submodule fields
     let submodules = parse_submodule_fields(fields);
-
-    // Parse alias fields
     let aliases = parse_alias_fields(fields);
 
-    // Generate implementation
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    // Generate SUBMODULES array
     let submodule_entries: Vec<_> = submodules
         .iter()
         .map(|s| {
             let field_name = s.name.to_string();
             let ty = &s.ty;
-            quote! {
-                svql_query::session::Submodule::of::<#ty>(#field_name)
-            }
+            quote! { svql_query::session::Submodule::of::<#ty>(#field_name) }
         })
         .collect();
 
-    // Generate ALIASES array
     let alias_entries: Vec<_> = aliases
         .iter()
         .map(|a| {
@@ -112,17 +75,12 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
             let target = a.target.to_selector_tokens();
             let constructor = match a.direction {
                 Direction::Output => quote! { svql_query::session::Alias::output },
-                Direction::Input | Direction::Inout => {
-                    quote! { svql_query::session::Alias::input }
-                } // Treat as input for now
+                Direction::Input | Direction::Inout => quote! { svql_query::session::Alias::input },
             };
-            quote! {
-                #constructor(#port_name, #target)
-            }
+            quote! { #constructor(#port_name, #target) }
         })
         .collect();
 
-    // Generate CONNECTIONS in CNF form
     let connection_groups: Vec<_> = or_groups
         .iter()
         .map(|group| {
@@ -142,24 +100,18 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                     }
                 })
                 .collect();
-            quote! {
-                &[#(#connections),*]
-            }
+            quote! { &[#(#connections),*] }
         })
         .collect();
 
-    // Generate DEPENDANCIES array
     let dep_entries: Vec<_> = submodules
         .iter()
         .map(|s| {
             let ty = &s.ty;
-            quote! {
-                <#ty as svql_query::traits::Pattern>::EXEC_INFO
-            }
+            quote! { <#ty as svql_query::traits::Pattern>::EXEC_INFO }
         })
         .collect();
 
-    // Generate rehydrate field assignments for submodules
     let submodule_rehydrate: Vec<_> = submodules
         .iter()
         .map(|s| {
@@ -170,8 +122,8 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 let #field_name = {
                     let sub_ref = row.sub::<#ty>(#field_str)?;
                     let sub_table = store.get::<#ty>()?;
-                    let sub_row = sub_table.row(sub_ref.index())?;
-                    #ty::rehydrate(&sub_row, store, driver, key)?
+                    let sub_row = sub_table.row(sub_ref)?;
+                    #ty::rehydrate(&sub_row, store, driver, key, config)?
                 };
             }
         })
@@ -183,7 +135,7 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
             let field_name = &a.name;
             let field_str = field_name.to_string();
             quote! {
-                let #field_name = row.wire(#field_str)?;
+                let #field_name = row.wire(#field_str)?.clone();
             }
         })
         .collect();
@@ -191,7 +143,6 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     let submodule_names: Vec<_> = submodules.iter().map(|s| &s.name).collect();
     let alias_names: Vec<_> = aliases.iter().map(|a| &a.name).collect();
 
-    // Generate preload_driver calls
     let preload_calls: Vec<_> = submodules
         .iter()
         .map(|s| {
@@ -202,11 +153,9 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Generate validate_custom implementation
     let validate_custom_impl = if !filters.is_empty() {
         generate_validate_custom(&filters)
     } else {
-        // No filters, use default implementation (implicit)
         quote! {}
     };
 
@@ -240,7 +189,6 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 })
             }
 
-            // Include validate_custom if filters present
             #validate_custom_impl
 
             fn composite_rehydrate(
@@ -248,13 +196,14 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
                 store: &svql_query::session::Store,
                 driver: &svql_query::driver::Driver,
                 key: &svql_query::driver::DriverKey,
+                config: &svql_query::common::Config,
             ) -> Option<Self> {
                 #(#submodule_rehydrate)*
-                #(#alias_rehydrate)*  // ADD THIS LINE
+                #(#alias_rehydrate)*
 
                 Some(Self {
                     #(#submodule_names,)*
-                    #(#alias_names),*  // ADD THIS LINE
+                    #(#alias_names),*
                 })
             }
 
@@ -279,35 +228,27 @@ pub fn composite_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Extracts all `OR` connection groups defined on the struct attributes.
 fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     let mut groups = Vec::new();
 
-    // Parse #[connection(from = [...], to = [...])] - single required connection
-    // Also supports #[connection(from = [...], to = [...], kind = "any")] for set membership
     for attr in find_all_attrs(&input.attrs, "connection") {
         if let Some(conn) = parse_single_connection(attr) {
-            groups.push(OrGroup {
-                connections: vec![conn],
-            });
+            groups.push(OrGroup { connections: vec![conn] });
         }
     }
 
-    // Parse #[or_to(from = [...], to = [[...], [...]])] - single source, OR destinations
     for attr in find_all_attrs(&input.attrs, "or_to") {
         if let Some(group) = parse_or_to(attr) {
             groups.push(group);
         }
     }
 
-    // Parse #[or_from(from = [[...], [...]], to = [...])] - OR sources, single destination
     for attr in find_all_attrs(&input.attrs, "or_from") {
         if let Some(group) = parse_or_from(attr) {
             groups.push(group);
         }
     }
 
-    // Parse #[or_group(connection(...), connection(...))] - arbitrary OR group
     for attr in find_all_attrs(&input.attrs, "or_group") {
         if let Some(group) = parse_or_group(attr) {
             groups.push(group);
@@ -317,8 +258,6 @@ fn parse_or_groups(input: &DeriveInput) -> Vec<OrGroup> {
     groups
 }
 
-/// Parses a single `#[connection(...)]` attribute into a `Connection` struct.
-/// Supports optional `kind = "any"` parameter for set membership connections.
 fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     let mut from = None;
     let mut to = None;
@@ -348,18 +287,11 @@ fn parse_single_connection(attr: &syn::Attribute) -> Option<Connection> {
     });
 
     match (from, to) {
-        (Some(f), Some(t)) => Some(Connection {
-            from: f,
-            to: t,
-            kind,
-        }),
-        _ => {
-            abort!(attr, "connection attribute requires both 'from' and 'to'");
-        }
+        (Some(f), Some(t)) => Some(Connection { from: f, to: t, kind }),
+        _ => abort!(attr, "connection attribute requires both 'from' and 'to'"),
     }
 }
 
-/// Parses an `#[or_to(...)]` attribute into an `OrGroup`.
 fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from = None;
     let mut to_options: Vec<PathSelector> = Vec::new();
@@ -384,17 +316,12 @@ fn parse_or_to(attr: &syn::Attribute) -> Option<OrGroup> {
 
     let connections = to_options
         .into_iter()
-        .map(|to| Connection {
-            from: from.clone(),
-            to,
-            kind: None,
-        })
+        .map(|to| Connection { from: from.clone(), to, kind: None })
         .collect();
 
     Some(OrGroup { connections })
 }
 
-/// Parses an `#[or_from(...)]` attribute into an `OrGroup`.
 fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut from_options: Vec<PathSelector> = Vec::new();
     let mut to = None;
@@ -419,21 +346,15 @@ fn parse_or_from(attr: &syn::Attribute) -> Option<OrGroup> {
 
     let connections = from_options
         .into_iter()
-        .map(|from| Connection {
-            from,
-            to: to.clone(),
-            kind: None,
-        })
+        .map(|from| Connection { from, to: to.clone(), kind: None })
         .collect();
 
     Some(OrGroup { connections })
 }
 
-/// Parses an `#[or_group(...)]` attribute into an `OrGroup`.
 fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     let mut connections = Vec::new();
 
-    // Parse nested connection(...) items
     let _ = attr.parse_nested_meta(|meta| {
         if meta.path.is_ident("connection") {
             let content;
@@ -455,23 +376,14 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
                         match key.as_str() {
                             "from" => from = Some(PathSelector::from_expr_array(arr)?),
                             "to" => to = Some(PathSelector::from_expr_array(arr)?),
-                            _ => {
-                                return Err(syn::Error::new_spanned(
-                                    &nv,
-                                    "Expected 'from' or 'to'",
-                                ));
-                            }
+                            _ => return Err(syn::Error::new_spanned(&nv, "Expected 'from' or 'to'")),
                         }
                     }
                 }
             }
 
             if let (Some(f), Some(t)) = (from, to) {
-                connections.push(Connection {
-                    from: f,
-                    to: t,
-                    kind: None,
-                });
+                connections.push(Connection { from: f, to: t, kind: None });
             }
         }
         Ok(())
@@ -484,75 +396,43 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
     Some(OrGroup { connections })
 }
 
-/// Extracts all custom logic filter attributes from the struct.
 fn parse_filters(input: &DeriveInput) -> Vec<Filter> {
-    let mut filters = Vec::new();
-
-    // Parse all #[filter(...)] attributes
-    for attr in find_all_attrs(&input.attrs, "filter") {
-        if let Some(filter) = parse_single_filter(attr) {
-            filters.push(filter);
-        }
-    }
-
-    filters
+    find_all_attrs(&input.attrs, "filter")
+        .into_iter()
+        .filter_map(parse_single_filter)
+        .collect()
 }
 
-/// Parses a `#[filter(...)]` attribute into a `Filter` struct.
 fn parse_single_filter(attr: &syn::Attribute) -> Option<Filter> {
-    // The attribute can be either:
-    // #[filter(check_fanin_has_not_gates)]  <- function path
-    // #[filter(|row, ctx| { ... })]         <- closure
-
     let expr = match attr.parse_args::<syn::Expr>() {
         Ok(expr) => expr,
-        Err(e) => {
-            abort!(
-                attr,
-                "filter attribute expects a function path or closure: {}",
-                e
-            );
-        }
+        Err(e) => abort!(attr, "filter attribute expects a function path or closure: {}", e),
     };
 
-    // Validate that it looks like a callable (path or closure)
     match &expr {
-        syn::Expr::Path(_) => {}    // Function name - OK
-        syn::Expr::Closure(_) => {} // Closure - OK
-        _ => {
-            abort!(
-                attr,
-                "filter must be a function path (e.g., check_filter) or closure (e.g., |row, ctx| ...)"
-            );
-        }
+        syn::Expr::Path(_) | syn::Expr::Closure(_) => {}
+        _ => abort!(
+            attr,
+            "filter must be a function path or closure (e.g., |row, ctx| ...)"
+        ),
     }
 
     Some(Filter { expr })
 }
 
-/// Identifies fields marked with `#[submodule]` which represent nested pattern components.
 fn parse_submodule_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<SubmoduleField> {
-    let mut submodules = Vec::new();
-
-    for field in fields {
-        if find_attr(&field.attrs, "submodule").is_some() {
-            let name = field
-                .ident
-                .clone()
-                .unwrap_or_else(|| abort!(field, "Submodule fields must be named"));
-            submodules.push(SubmoduleField {
-                name,
-                ty: field.ty.clone(),
-            });
-        }
-    }
-
-    submodules
+    fields
+        .iter()
+        .filter(|f| find_attr(&f.attrs, "submodule").is_some())
+        .map(|f| SubmoduleField {
+            name: f.ident.clone().unwrap_or_else(|| abort!(f, "Submodule fields must be named")),
+            ty: f.ty.clone(),
+        })
+        .collect()
 }
 
-/// Identifies fields marked with `#[alias]` which export internal wires to the composite interface.
 fn parse_alias_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Vec<AliasField> {
@@ -588,24 +468,16 @@ fn parse_alias_fields(
         });
 
         let direction = direction.unwrap_or_else(|| {
-            abort!(
-                attr,
-                "Alias must specify direction: input, output, or inout"
-            )
+            abort!(attr, "Alias must specify direction: input, output, or inout")
         });
         let target = target.unwrap_or_else(|| abort!(attr, "Alias must specify target path"));
 
-        aliases.push(AliasField {
-            name,
-            direction,
-            target,
-        });
+        aliases.push(AliasField { name, direction, target });
     }
 
     aliases
 }
 
-/// Generate the validate_custom implementation
 fn generate_validate_custom(filters: &[Filter]) -> proc_macro2::TokenStream {
     let filter_calls: Vec<_> = filters
         .iter()
@@ -624,7 +496,6 @@ fn generate_validate_custom(filters: &[Filter]) -> proc_macro2::TokenStream {
             row: &svql_query::session::Row<Self>,
             ctx: &svql_query::session::ExecutionContext,
         ) -> bool {
-            // Call each filter function/closure and AND them together
             #(#filter_calls)*
             true
         }

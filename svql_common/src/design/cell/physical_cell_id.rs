@@ -1,14 +1,16 @@
 use contracts::*;
-use prjunnamed_netlist::{Net, Trit};
+use prjunnamed_netlist::{CellRef, Net, Trit};
 use std::fmt;
 use std::hash::Hash;
 
-// ---------------------------------------------------------------------------
-// PhysicalCellId
-// ---------------------------------------------------------------------------
+use crate::CellWrapper;
 
 /// Persistent ID from the netlist source (e.g., debug_index from prjunnamed).
 /// This is used for storage in Tables and cross-referencing between queries.
+///
+/// This is recived from the debug_index of the CellRef in prjunnamed, and as such,
+/// it is not supposed to be created manually by users, but rather
+/// obtained through the API when processing cells and wires.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PhysicalCellId {
     /// The underlying raw integer ID.
@@ -18,7 +20,7 @@ pub struct PhysicalCellId {
 impl PhysicalCellId {
     /// Creates a new persistent cell ID from a raw integer.
     #[ensures(ret.inner == id)]
-    pub const fn new(id: u32) -> Self {
+    pub(crate) const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
@@ -26,6 +28,20 @@ impl PhysicalCellId {
     #[ensures(ret == self.inner)]
     pub const fn storage_key(&self) -> u32 {
         self.inner
+    }
+}
+
+impl From<CellWrapper<'_>> for PhysicalCellId {
+    fn from(wrapper: CellWrapper<'_>) -> Self {
+        Self::from(wrapper.inner())
+    }
+}
+
+impl From<CellRef<'_>> for PhysicalCellId {
+    fn from(cell_ref: CellRef<'_>) -> Self {
+        Self {
+            inner: cell_ref.debug_index() as u32,
+        }
     }
 }
 

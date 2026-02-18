@@ -3,9 +3,15 @@
 //! These types define the schema for pattern result tables, including
 //! wire references, submodule references, and metadata columns.
 
+pub mod column;
+pub mod error;
+pub mod pattern_schema;
+
 use std::any::TypeId;
 
 use crate::prelude::*;
+use crate::session::MetaValue;
+use crate::session::RowIndex;
 use contracts::*;
 
 /// A smart wrapper around the raw column definitions.
@@ -120,54 +126,41 @@ impl PatternSchema {
 }
 
 /// The kind of data stored in a column.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ColumnKind {
-    /// A wire bundle pointing into the design.
+    /// Stores a single physical wire reference (`Ref<Wire>`).
     Wire,
-    /// A submodule reference (`Ref<T>`) pointing into another pattern table.
-    /// For self-referential types (like `RecOr` trees), use `Sub(TypeId::of::<Self>())`.
-    Sub(TypeId),
-    /// Metadata column (e.g., depth, flags) - not a reference to other data.
-    Metadata,
-    /// A bundle of wire references (e.g., all leaf inputs to a logic cone).
-    /// Used for set-based connectivity checking with `#[connect_any]`.
+    /// Stores an array of physical wire references (`Vec<Wire>`).
     WireArray,
+    /// Stores a reference to a submodule match (`Ref<T>`).
+    Sub(TypeId),
+    /// Stores a typed application metadata value (`MetaValue`).
+    Meta,
 }
 
 impl ColumnKind {
     /// Create a `Sub` column kind for a specific pattern type.
-    #[must_use]
-    pub const fn sub<T: 'static>() -> Self {
+    pub fn sub<T: 'static>() -> Self {
         Self::Sub(TypeId::of::<T>())
     }
 
-    /// Check if this is a wire column.
-    #[must_use]
-    pub const fn is_wire(&self) -> bool {
+    pub fn is_wire(&self) -> bool {
         matches!(self, Self::Wire)
     }
 
-    /// Check if this is a submodule reference column.
-    #[must_use]
-    pub const fn is_sub(&self) -> bool {
+    pub fn is_sub(&self) -> bool {
         matches!(self, Self::Sub(_))
     }
 
-    /// Check if this is a metadata column.
-    #[must_use]
-    pub const fn is_metadata(&self) -> bool {
-        matches!(self, Self::Metadata)
+    pub fn is_meta(&self) -> bool {
+        matches!(self, Self::Meta)
     }
 
-    /// Check if this is a wire array column.
-    #[must_use]
-    pub const fn is_wire_array(&self) -> bool {
+    pub fn is_wire_array(&self) -> bool {
         matches!(self, Self::WireArray)
     }
 
-    /// Get the target `TypeId` for a Sub column, if applicable.
-    #[must_use]
-    pub const fn sub_type(&self) -> Option<TypeId> {
+    pub fn sub_type(&self) -> Option<TypeId> {
         match self {
             Self::Sub(tid) => Some(*tid),
             _ => None,
@@ -235,14 +228,8 @@ impl ColumnDef {
     }
 
     /// Create a metadata column (non-nullable by default).
-    #[must_use]
-    pub const fn metadata(name: &'static str) -> Self {
-        Self {
-            name,
-            kind: ColumnKind::Metadata,
-            nullable: false,
-            direction: PortDirection::None,
-        }
+    pub fn meta(name: &'static str) -> Self {
+        Self::new(name, ColumnKind::Meta, false)
     }
 
     /// Create a wire array column (for bundled wires / set-based connectivity).
@@ -268,7 +255,6 @@ impl ColumnDef {
     }
 
     /// Create a submodule reference column.
-    /// Note: Cannot be `const` because `TypeId::of::<T>()` is not const-stable.
     #[must_use]
     pub const fn sub<T: 'static>(name: &'static str) -> Self {
         Self {
@@ -398,61 +384,83 @@ pub enum ColumnEntry {
     Null,
     /// A wire (bundle of nets).
     Wire(Wire),
-    /// A row index referencing another table.
-    Sub(u32),
-    /// Pattern metadata.
-    Metadata(PhysicalCellId),
     /// A bundle of wires (e.g., list of leaf inputs).
     WireArray(Vec<Wire>),
+    /// A row index referencing another table.
+    /// The raw `RowIndex` is not accessible outside the `storage` module.
+    Sub(RowIndex),
+    /// Typed metadata value.
+    Meta(MetaValue),
 }
 
 impl ColumnEntry {
-    /// Helper to extract u32 for backward compatibility/sorting
-    pub fn as_u32(&self) -> Option<u32> {
-        match self {
-            Self::Sub(idx) => Some(*idx),
-            Self::Metadata(id) => Some(id.storage_key()),
-            Self::Wire(wire) => wire.cell_id().map(|id| id.storage_key()),
-            _ => None,
-        }
-    }
-
-    /// Create a wire entry
+    /// Create a wire entry.
     #[must_use]
     pub const fn wire(wire: Wire) -> Self {
         Self::Wire(wire)
     }
 
-    /// Create a single net wire entry
-    #[must_use]
-    pub fn single_net(net_idx: u32) -> Self {
-        let net = prjunnamed_netlist::Net::from_cell_index(net_idx as usize);
-        Self::Wire(Wire::single(net))
-    }
-
-    /// Create a constant entry
-    #[must_use]
-    pub fn constant(value: bool) -> Self {
-        let trit = prjunnamed_netlist::Trit::from(value);
-        Self::Wire(Wire::constant(trit))
-    }
-
-    /// Create a submodule entry
-    #[must_use]
-    pub const fn sub(id: u32) -> Self {
-        Self::Sub(id)
-    }
-
-    /// Create a metadata entry
-    #[must_use]
-    pub const fn metadata(id: PhysicalCellId) -> Self {
-        Self::Metadata(id)
-    }
-
-    /// Create a wire array entry
+    /// Create a wire array entry.
     #[must_use]
     pub const fn wire_array(wires: Vec<Wire>) -> Self {
         Self::WireArray(wires)
+    }
+
+    /// Create a submodule entry from a row index.
+    /// Internal crate only — allows generators and core traits to
+    /// manufacture references while keeping them opaque to end users.
+    #[must_use]
+    pub(crate) const fn sub(index: RowIndex) -> Self {
+        Self::Sub(index)
+    }
+
+    /// Create a metadata entry.
+    #[must_use]
+    pub fn meta(val: MetaValue) -> Self {
+        Self::Meta(val)
+    }
+
+    /// Access as a wire reference, returning `None` for other variants.
+    #[must_use]
+    pub fn as_wire(&self) -> Option<&Wire> {
+        match self {
+            Self::Wire(w) => Some(w),
+            _ => None,
+        }
+    }
+
+    /// Access as a wire array slice.
+    #[must_use]
+    pub fn as_wire_array(&self) -> Option<&[Wire]> {
+        match self {
+            Self::WireArray(wires) => Some(wires),
+            _ => None,
+        }
+    }
+
+    /// Access as a metadata value.
+    #[must_use]
+    pub fn as_meta(&self) -> Option<&MetaValue> {
+        match self {
+            Self::Meta(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// Access as a row index.
+    /// Only available within the `storage` module — prevents external
+    /// code from extracting raw integers from `Sub` entries.
+    #[must_use]
+    pub(super) fn as_row_index(&self) -> Option<RowIndex> {
+        match self {
+            Self::Sub(idx) => Some(*idx),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw row index for type-erased sub-entry access.
+    pub(crate) fn as_sub_raw(&self) -> Option<u32> {
+        self.as_row_index().map(|ri| ri.raw())
     }
 }
 
@@ -461,6 +469,23 @@ impl ColumnEntry {
 pub struct EntryArray {
     /// Ordered list of data corresponding to the pattern's schema.
     pub entries: Vec<ColumnEntry>,
+}
+
+/// A stable signature for deduplication.
+///
+/// Uses typed entries rather than raw integers.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct EntrySignature(Vec<SignatureEntry>);
+
+/// A single typed entry in a deduplication signature.
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum SignatureEntry {
+    /// A wire identified by its physical cell ID.
+    Wire(PhysicalCellId),
+    /// A submodule row reference (opaque).
+    Sub(RowIndex),
+    /// A metadata value.
+    Meta(MetaValue),
 }
 
 impl EntryArray {
@@ -472,44 +497,59 @@ impl EntryArray {
         }
     }
 
-    /// Pre-allocates an array with specific capacity.
+    /// Pre-allocates an array with specific capacity, filled with `Null`.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             entries: vec![ColumnEntry::Null; capacity],
         }
     }
+
     /// Creates a new entry array from a vector of entries.
     pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
         Self { entries }
     }
 
-    /// Generate a signature for deduplication that includes all cell IDs and submodule refs.
+    /// Generate a typed signature for deduplication.
     ///
-    /// Used for automatic deduplication - considers all wire references, submodule references,
-    /// and metadata in the entry. Includes column index to distinguish entries with same values
-    /// in different positions.
+    /// Considers all wire references, submodule references, and metadata.
+    /// The column index is included so entries with the same value in
+    /// different positions produce distinct signatures.
     #[must_use]
-    pub fn signature(&self) -> Vec<(usize, u32)> {
-        let mut sig: Vec<(usize, u32)> = self
+    pub fn signature(&self) -> EntrySignature {
+        let entries = self
             .entries
             .iter()
-            .enumerate()
-            .filter_map(|(col_idx, entry)| match entry {
-                ColumnEntry::Wire(wire) => wire.cell_id().map(|id| (col_idx, id.storage_key())),
-                ColumnEntry::WireArray(wires) => {
-                    // Include all wires in the array in the signature
-                    wires
-                        .iter()
-                        .filter_map(|w| w.cell_id().map(|id| (col_idx, id.storage_key())))
-                        .next()
-                }
-                ColumnEntry::Sub(slot_idx) => Some((col_idx, *slot_idx)),
-                ColumnEntry::Metadata(id) => Some((col_idx, id.storage_key())),
+            .filter_map(|e| match e {
+                ColumnEntry::Wire(w) => w.cell_id().map(SignatureEntry::Wire),
+                ColumnEntry::Sub(idx) => Some(SignatureEntry::Sub(*idx)),
+                ColumnEntry::Meta(m) => Some(SignatureEntry::Meta(m.clone())),
                 _ => None,
             })
             .collect();
-        sig.sort_unstable();
-        sig
+        EntrySignature(entries)
+    }
+}
+
+// ─── Builder helpers for EntryArray ──────────────────────────────────────────
+
+/// Convenience constructors used by pattern search implementations.
+///
+/// These live on `EntryArray` rather than on `ColumnEntry` so that the
+/// storage-internal `Sub(RowIndex)` variant is never exposed.
+impl EntryArray {
+    /// Set a `Sub` entry at position `col_idx` using a `Ref<T>`.
+    ///
+    /// This is the only way external code (pattern implementations) can
+    /// write a sub-row reference — they must go through a typed `Ref<T>`.
+    pub(crate) fn set_sub<T>(&mut self, col_idx: usize, r: Ref<T>) {
+        self.entries[col_idx] = ColumnEntry::Sub(r.raw_index());
+    }
+
+    /// Set a `Sub` entry at position `col_idx` using a raw `RowIndex`.
+    ///
+    /// Available to external implementors of `Recursive::build_recursive`.
+    pub fn set_sub_raw(&mut self, col_idx: usize, idx: RowIndex) {
+        self.entries[col_idx] = ColumnEntry::Sub(idx);
     }
 }

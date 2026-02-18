@@ -121,34 +121,41 @@ where
         self.store.get_cell(col_name, row_idx).clone()
     }
 
-    /// Get a single row by index.
+    /// Get a single row by its typed reference.
     ///
     /// Returns `None` if the index is out of bounds.
-    #[ensures(ret.is_some() == ((row_idx as usize) < self.len()))]
-    pub fn row(&self, row_idx: u32) -> Option<Row<T>> {
-        let row_idx_usize = row_idx as usize;
-        if row_idx_usize >= self.store.height() {
+    pub fn row(&self, r: Ref<T>) -> Option<Row<T>> {
+        let row_idx = r.raw_index();
+        let idx = row_idx.raw() as usize;
+        if idx >= self.store.height() {
             return None;
         }
-
-        let mut row = Row::new(row_idx);
-
-        // Extract entries directly from the store
-        for (idx, col) in T::schema().columns().iter().enumerate() {
-            row.entry_array.entries[idx] = self.get_entry(row_idx_usize, col.name);
+        let mut entry_array = EntryArray::with_capacity(T::schema().defs.len());
+        for (col_idx, column) in T::schema().columns().iter().enumerate() {
+            if let Some(entry) = self.store.column(column.name).map(|c| &c[idx]) {
+                entry_array.entries[col_idx] = entry.clone();
+            }
         }
-
-        Some(row)
+        Some(Row::from_parts(row_idx, entry_array))
     }
 
-    /// Iterate over all rows in the table.
-    pub fn rows(&self) -> impl Iterator<Item = Row<T>> + '_ {
-        (0..self.len() as u32).filter_map(|idx| self.row(idx))
+    pub fn row_at(&self, idx: u32) -> Option<Row<T>> {
+        self.row(Ref::new(RowIndex::new(idx)))
+    }
+
+    /// Iterate over all (Ref<T>, Row<T>) pairs in the table.
+    pub fn rows(&self) -> impl Iterator<Item = (Ref<T>, Row<T>)> + '_ {
+        (0..self.len() as u32).map(|i| {
+            let idx = RowIndex::new(i);
+            let r = Ref::new(idx);
+            let row = self.row(r).expect("Index must be valid");
+            (r, row)
+        })
     }
 
     /// Iterate over references to all rows.
     pub fn refs(&self) -> impl Iterator<Item = Ref<T>> {
-        (0..self.len() as u32).map(Ref::new)
+        (0..self.len() as u32).map(|i| Ref::new(RowIndex::new(i)))
     }
 
     /// Export this table to a CSV file.
@@ -175,29 +182,21 @@ where
             QueryError::ExecutionError(format!("Failed to create CSV writer: {}", e))
         })?;
 
-        // Write header
         writer
             .write_record(self.store.column_names())
             .map_err(|e| {
                 QueryError::ExecutionError(format!("Failed to write CSV header: {}", e))
             })?;
 
-        // Write data rows
-        for row_idx in 0..self.len() {
-            let mut record = Vec::with_capacity(self.store.column_names().len());
-            for col_name in self.store.column_names() {
-                if let Some(col) = self.store.column(col_name) {
-                    match &col[row_idx] {
-                        ColumnEntry::Null => record.push(String::new()),
-                        ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
-                        ColumnEntry::WireArray(wires) => {
-                            let wire_strs: Vec<String> =
-                                wires.iter().map(|w| format!("{w:?}")).collect();
-                            record.push(format!("[{}]", wire_strs.join(", ")));
-                        }
-                        ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
-                        ColumnEntry::Metadata(id) => record.push(format!("{id}")),
-                    }
+        for (_, row) in self.rows() {
+            let mut record = Vec::with_capacity(T::schema().columns().len());
+            for (idx, _col) in T::schema().columns().iter().enumerate() {
+                match &row.entry_array.entries[idx] {
+                    ColumnEntry::Null => record.push(String::new()),
+                    ColumnEntry::Wire(w) => record.push(format!("{}", w)),
+                    ColumnEntry::WireArray(ws) => record.push(format!("{:?}", ws)),
+                    ColumnEntry::Sub(idx) => record.push(format!("ref({})", idx)),
+                    ColumnEntry::Meta(m) => record.push(format!("{}", m)),
                 }
             }
             writer.write_record(&record).map_err(|e| {
@@ -224,29 +223,21 @@ where
         {
             let mut writer = csv::Writer::from_writer(&mut buffer);
 
-            // Write header
             writer
                 .write_record(self.store.column_names())
                 .map_err(|e| {
                     QueryError::ExecutionError(format!("Failed to write CSV header: {}", e))
                 })?;
 
-            // Write data rows
-            for row_idx in 0..self.len() {
-                let mut record = Vec::with_capacity(self.store.column_names().len());
-                for col_name in self.store.column_names() {
-                    if let Some(col) = self.store.column(col_name) {
-                        match &col[row_idx] {
-                            ColumnEntry::Null => record.push(String::new()),
-                            ColumnEntry::Wire(wire_ref) => record.push(format!("{wire_ref:?}")),
-                            ColumnEntry::WireArray(wires) => {
-                                let wire_strs: Vec<String> =
-                                    wires.iter().map(|w| format!("{w:?}")).collect();
-                                record.push(format!("[{}]", wire_strs.join(", ")));
-                            }
-                            ColumnEntry::Sub(slot_idx) => record.push(format!("Ref({slot_idx})")),
-                            ColumnEntry::Metadata(id) => record.push(format!("{id}")),
-                        }
+            for (_, row) in self.rows() {
+                let mut record = Vec::with_capacity(T::schema().columns().len());
+                for (idx, _col) in T::schema().columns().iter().enumerate() {
+                    match &row.entry_array.entries[idx] {
+                        ColumnEntry::Null => record.push(String::new()),
+                        ColumnEntry::Wire(w) => record.push(format!("{}", w)),
+                        ColumnEntry::WireArray(ws) => record.push(format!("{:?}", ws)),
+                        ColumnEntry::Sub(idx) => record.push(format!("ref({})", idx)),
+                        ColumnEntry::Meta(m) => record.push(format!("{}", m)),
                     }
                 }
                 writer.write_record(&record).map_err(|e| {
@@ -257,7 +248,7 @@ where
             writer.flush().map_err(|e| {
                 QueryError::ExecutionError(format!("Failed to flush CSV writer: {}", e))
             })?;
-        } // writer is dropped here, releasing the borrow on buffer
+        }
 
         String::from_utf8(buffer).map_err(|e| {
             QueryError::ExecutionError(format!("Failed to convert CSV to string: {}", e))
@@ -319,7 +310,7 @@ pub trait AnyTable: Send + Sync + std::fmt::Display + 'static {
     fn pattern_type_id(&self) -> std::any::TypeId;
 
     /// Get a submodule reference (Row Index + `TypeId`) for a given column.
-    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)>;
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(RowIndex, std::any::TypeId)>;
 
     /// Get a wire by single column name (no path traversal).
     fn get_wire(&self, row_idx: usize, col_name: &str) -> Option<Wire>;
@@ -391,17 +382,18 @@ where
         driver: &Driver,
         key: &DriverKey,
     ) -> Option<crate::traits::display::ReportNode> {
-        let row = self.row(row_idx as u32)?;
-        Some(T::row_to_report_node(&row, store, driver, key))
+        let row = self.row(Ref::new(RowIndex::new(row_idx as u32)))?;
+        let config = svql_common::Config::default();
+        Some(T::row_to_report_node(&row, store, driver, key, &config))
     }
 
-    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(u32, std::any::TypeId)> {
+    fn get_sub_ref(&self, row_idx: usize, col_name: &str) -> Option<(RowIndex, std::any::TypeId)> {
         let col_idx = T::schema().index_of(col_name)?;
         let col_def = T::schema().column(col_idx);
         let target_type = col_def.as_submodule()?;
 
         match self.store.get_cell(col_name, row_idx) {
-            ColumnEntry::Sub(slot_idx) => Some((*slot_idx, target_type)),
+            ColumnEntry::Sub(idx) => Some((*idx, target_type)),
             _ => None,
         }
     }
@@ -419,7 +411,11 @@ where
 
         // Single segment: direct wire lookup
         if selector.len() == 1 {
-            return self.get_wire(row_idx, selector.head()?);
+            let col_name = selector.head()?;
+            match self.store.get_cell(col_name, row_idx) {
+                ColumnEntry::Wire(w) => return Some(w.clone()),
+                _ => return None,
+            }
         }
 
         // Multi-segment: traverse through submodules
@@ -432,13 +428,13 @@ where
 
         // Get the submodule row index directly from the column
         let sub_row_idx = match self.store.get_cell(head, row_idx) {
-            ColumnEntry::Sub(slot_idx) => *slot_idx,
+            ColumnEntry::Sub(idx) => idx.raw() as usize,
             _ => return None,
         };
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        sub_table.resolve_path(sub_row_idx as usize, selector.tail(), ctx)
+        sub_table.resolve_path(sub_row_idx, selector.tail(), ctx)
     }
 
     fn resolve_bundle_path(
@@ -477,13 +473,13 @@ where
 
         // Get the submodule row index directly from the column
         let sub_row_idx = match self.store.get_cell(head, row_idx) {
-            ColumnEntry::Sub(slot_idx) => slot_idx,
+            ColumnEntry::Sub(idx) => idx.raw() as usize,
             _ => return None,
         };
 
         // Get the submodule's table and continue resolution
         let sub_table = ctx.get_any_table(sub_type_id)?;
-        sub_table.resolve_bundle_path((*sub_row_idx) as usize, selector.tail(), ctx)
+        sub_table.resolve_bundle_path(sub_row_idx, selector.tail(), ctx)
     }
 
     fn to_csv(&self, path: &std::path::Path) -> Result<(), QueryError> {

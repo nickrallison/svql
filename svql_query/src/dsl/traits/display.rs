@@ -225,7 +225,7 @@ pub fn get_wire_info<T: Pattern + Component>(
     key: &DriverKey,
     config: &Config,
 ) -> Option<WireInfo> {
-    let wire = row.wire(wire_name)?;
+    let wire = row.wire(wire_name)?.clone();
     let direction = T::schema().get(wire_name)?.direction;
     let source_loc = wire_source_location(&wire, driver, key, config);
 
@@ -355,7 +355,7 @@ mod tests {
 
         let store = crate::run_query::<TestAndGate>(&driver, &key, &config)?;
         let table = store.get::<TestAndGate>().ok_or("Table not found")?;
-        let row = table.rows().next().ok_or("No rows found")?;
+        let (_, row) = table.rows().next().ok_or("No rows found")?;
 
         // Test render_wire
         let report = render_wire(&row, "y", &driver, &key, &config).ok_or("render_wire failed")?;

@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<Cwe1280>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -52,14 +52,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<Cwe1280>()
+        .get::<Cwe1234>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();
 
     let reports = rows
         .par_iter()
-        .map(|row| row.render(&store, &driver, &design_key))
+        .map(|(_ref, row)| row.render(&store, &driver, &design_key, &config))
         .collect::<Vec<_>>();
 
     for (i, report) in reports.iter().enumerate() {

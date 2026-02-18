@@ -20,7 +20,9 @@ pub use execution::{ExecInfo, ExecutionContext, ExecutionPlan, SearchFn};
 pub use schema::{
     Alias, ColumnDef, ColumnEntry, ColumnKind, EntryArray, PatternSchema, PortMap, Submodule,
 };
-pub use storage::{AnyTable, ColumnStore, Ref, Row, Store, Table};
+pub use storage::{
+    AnyTable, ColumnStore, MetaValue, Ref, Row, RowIndex, Store, Table, VariantIndex,
+};
 
 use thiserror::Error;
 

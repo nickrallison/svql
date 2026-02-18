@@ -8,9 +8,7 @@ use std::marker::PhantomData;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use crate::{
-    prelude::*, session::execution::join_planner::ConnectivityCache,
-};
+use crate::{prelude::*, session::execution::join_planner::ConnectivityCache};
 
 /// The kind of connection constraint.
 #[derive(Debug, Clone, Copy)]
@@ -645,6 +643,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>;
 
     /// Create a hierarchical report node from a match row
@@ -656,6 +655,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
         use crate::traits::display::*;
 
@@ -668,7 +668,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Recursively display each submodule using metadata
         for sub in Self::SUBMODULES {
             if let Some(mut sub_node) = row
-                .sub_any(sub.name)
+                .sub_raw(sub.name)
                 .and_then(|sub_ref| store.get_from_tid(sub.type_id).map(|t| (sub_ref, t)))
                 .and_then(|(sub_ref, table)| {
                     table.row_to_report_node(sub_ref as usize, store, driver, key)
@@ -713,11 +713,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         config: &svql_common::Config,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
-    /// Creates a boilerplate search entry for a single submodule.
     #[must_use]
     fn create_partial_entry(sub_indices: &[usize], join_idx: usize, row_idx: u32) -> EntryArray {
         let mut entries = vec![ColumnEntry::Null; Self::SUBMODULES.len() + Self::ALIASES.len()];
-        entries[sub_indices[join_idx]] = ColumnEntry::Sub(row_idx);
+        entries[sub_indices[join_idx]] = ColumnEntry::Sub(RowIndex::from_raw(row_idx));
         EntryArray::new(entries)
     }
 
@@ -813,7 +812,9 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Get valid candidates from connectivity indices
         let valid_new_rows = if connected_subs.is_empty() {
             // No constraints - try all rows
-            (0..new_table.len() as u32).collect()
+            (0..new_table.len() as u32)
+                .map(RowIndex::from_raw)
+                .collect()
         } else {
             // Intersect valid sets from all connections
             Self::compute_valid_candidates(
@@ -829,14 +830,10 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         // Only enumerate the valid candidates
         valid_new_rows.into_iter().filter_map(move |new_row_idx| {
             let mut candidate = partial_entry.clone();
-            candidate.entries[col_idx] = ColumnEntry::Sub(new_row_idx);
+            candidate.set_sub_raw(col_idx, new_row_idx);
 
             // Still need to validate (handles CNF OR groups, custom filters, etc.)
-            let row = Row::<Self> {
-                idx: 0,
-                entry_array: candidate.clone(),
-                _marker: PhantomData,
-            };
+            let row = Row::<Self>::from_parts(RowIndex::from_raw(0), candidate.clone());
 
             Self::validate(&row, ctx).then_some(candidate)
         })
@@ -877,8 +874,8 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         sub_indices: &[usize],
         connectivity_cache: &ConnectivityCache,
         new_table_len: usize,
-    ) -> Vec<u32> {
-        let mut valid_sets: Vec<HashSet<u32>> = Vec::new();
+    ) -> Vec<RowIndex> {
+        let mut valid_sets: Vec<HashSet<RowIndex>> = Vec::new();
 
         for (existing_sub_idx, cnf_idx, is_new_sub_from) in connected_subs {
             // Get the row index of the already-joined submodule
@@ -916,7 +913,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         // Intersect all constraint sets
         if valid_sets.is_empty() {
-            (0..new_table_len as u32).collect()
+            (0..new_table_len as u32).map(RowIndex::from_raw).collect()
         } else {
             let mut result = valid_sets[0].clone();
             for other_set in &valid_sets[1..] {
@@ -949,11 +946,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             let final_entries = entries
                 .into_par_iter()
                 .map(|mut entry| {
-                    let row = Row::<Self> {
-                        idx: 0,
-                        entry_array: entry.clone(),
-                        _marker: PhantomData,
-                    };
+                    let row = Row::<Self>::from_parts(RowIndex::from_raw(0), entry.clone());
 
                     for alias in Self::ALIASES {
                         let wire = row.resolve(alias.target, ctx);
@@ -974,11 +967,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         let final_entries = entries
             .into_iter()
             .map(|mut entry| {
-                let row = Row::<Self> {
-                    idx: 0,
-                    entry_array: entry.clone(),
-                    _marker: PhantomData,
-                };
+                let row = Row::<Self>::from_parts(RowIndex::from_raw(0), entry.clone());
 
                 for alias in Self::ALIASES {
                     let wire = row.resolve(alias.target, ctx);
@@ -1058,11 +1047,12 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> Option<Self>
     where
         Self: Component + PatternInternal<kind::Composite> + Send + Sync + 'static,
     {
-        Self::composite_rehydrate(row, store, driver, key)
+        Self::composite_rehydrate(row, store, driver, key, config)
     }
 
     fn internal_row_to_report_node(
@@ -1070,8 +1060,9 @@ where
         store: &Store,
         driver: &Driver,
         key: &DriverKey,
+        config: &svql_common::Config,
     ) -> crate::traits::display::ReportNode {
-        Self::composite_row_to_report_node(row, store, driver, key)
+        Self::composite_row_to_report_node(row, store, driver, key, config)
     }
 }
 
@@ -1174,27 +1165,28 @@ pub(crate) mod test {
             store: &Store,
             driver: &Driver,
             key: &DriverKey,
+            config: &svql_common::Config,
         ) -> Option<Self> {
             let and1 = {
                 let sub_ref = row.sub::<AndGate>("and1")?;
                 let sub_table = store.get::<AndGate>()?;
-                let sub_row = sub_table.row(sub_ref.index())?;
-                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key)?
+                let sub_row = sub_table.row(sub_ref)?;
+                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key, config)?
             };
 
             let and2 = {
                 let sub_ref = row.sub::<AndGate>("and2")?;
                 let sub_table = store.get::<AndGate>()?;
-                let sub_row = sub_table.row(sub_ref.index())?;
-                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key)?
+                let sub_row = sub_table.row(sub_ref)?;
+                <AndGate as Pattern>::rehydrate(&sub_row, store, driver, key, config)?
             };
 
             Some(Self {
                 and1,
                 and2,
-                a: row.wire("a")?,
-                b: row.wire("b")?,
-                y: row.wire("y")?,
+                a: row.wire("a")?.clone(),
+                b: row.wire("b")?.clone(),
+                y: row.wire("y")?.clone(),
             })
         }
 
