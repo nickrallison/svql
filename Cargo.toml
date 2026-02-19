@@ -4,21 +4,21 @@ cargo-features = ["profile-rustflags"]
 resolver = "3"
 
 members = [
-    "svql_driver",
-    "svql_query",
-    "svql_subgraph",
-    "svql_common",
-    "svql_macros",
-    "svql_query_lib", 
+    # "svql_driver",
+    # "svql_query",
+    # "svql_subgraph",
+    # "svql_common",
+    # "svql_macros",
+    # "svql_query_lib", 
     "svql_cli"
-    ]
+]
 
 default-members = [
-    "svql_driver",
-    "svql_query",
-    "svql_query_lib",
-    "svql_subgraph",
-    "svql_common",
+    # "svql_driver",
+    # "svql_query",
+    # "svql_query_lib",
+    # "svql_subgraph",
+    # "svql_common",
     "svql_cli"
 ]
 
@@ -34,12 +34,12 @@ version = "0.1.0"
 ###############
 # SVQL
 ###############
-svql_common = { path = "svql_common" }
-svql_driver = { path = "svql_driver" }
-svql_query = { path = "svql_query" }
-svql_query_lib = { path = "svql_query_lib" }
-svql_macros = { path = "svql_macros" }
-svql_subgraph = { path = "svql_subgraph" }
+svql_common = { git = "https://github.com/nickrallison/svql", branch = "main"  }
+svql_driver = { git = "https://github.com/nickrallison/svql", branch = "main" }
+svql_query = { git = "https://github.com/nickrallison/svql", branch = "main", features = ["parallel"] }
+svql_query_lib = { git = "https://github.com/nickrallison/svql", branch = "main" }
+svql_macros = { git = "https://github.com/nickrallison/svql", branch = "main" }
+svql_subgraph = { git = "https://github.com/nickrallison/svql", branch = "main", features = ["rayon"] } 
 svql_cli = { path = "svql_cli" }
 
 ###############
