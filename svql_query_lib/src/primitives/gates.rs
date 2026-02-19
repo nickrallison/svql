@@ -5,14 +5,11 @@
 
 use svql_query::prelude::*;
 
-// Logic gates
+svql_query::define_primitive!(NotGate, Not, [(a, input), (y, output)]);
+
 svql_query::define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
 
 svql_query::define_primitive!(OrGate, Or, [(a, input), (b, input), (y, output)]);
-
-svql_query::define_primitive!(NotGate, Not, [(a, input), (y, output)]);
-
-svql_query::define_primitive!(BufGate, Buf, [(a, input), (y, output)]);
 
 svql_query::define_primitive!(XorGate, Xor, [(a, input), (b, input), (y, output)]);
 
@@ -22,14 +19,51 @@ svql_query::define_primitive!(
     [(a, input), (b, input), (sel, input), (y, output)]
 );
 
-// Arithmetic gates
-svql_query::define_primitive!(EqGate, Eq, [(a, input), (b, input), (y, output)]);
-
-svql_query::define_primitive!(LtGate, ULt, [(a, input), (b, input), (y, output)]);
-
 svql_query::define_primitive!(AdcGate, Adc, [(a, input), (b, input), (y, output)]);
 
+svql_query::define_primitive!(EqGate, Eq, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(ULtGate, ULt, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(SLtGate, SLt, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(ShlGate, Shl, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(UShrGate, UShr, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(SShrGate, SShr, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(XShrGate, XShr, [(a, input), (b, input), (y, output)]);
+
 svql_query::define_primitive!(MulGate, Mul, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(UDivGate, UDiv, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(UModGate, UMod, [(a, input), (b, input), (y, output)]);
+
+svql_query::define_primitive!(
+    SDivTruncGate,
+    SDivTrunc,
+    [(a, input), (b, input), (y, output)]
+);
+
+svql_query::define_primitive!(
+    SDivFloorGate,
+    SDivFloor,
+    [(a, input), (b, input), (y, output)]
+);
+
+svql_query::define_primitive!(
+    SModTruncGate,
+    SModTrunc,
+    [(a, input), (b, input), (y, output)]
+);
+
+svql_query::define_primitive!(
+    SModFloorGate,
+    SModFloor,
+    [(a, input), (b, input), (y, output)]
+);
 
 #[cfg(test)]
 mod tests {
