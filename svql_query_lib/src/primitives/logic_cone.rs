@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use crate::primitives::{AdcGate, AndGate, LtGate, MulGate, MuxGate, NotGate, OrGate, XorGate};
+use crate::primitives::{AdcGate, AndGate, MulGate, MuxGate, NotGate, OrGate, ULtGate, XorGate};
 use svql_query::prelude::*;
 
 /// A variant matching any standard combinational logic gate.
@@ -23,7 +23,7 @@ pub enum AnyLogicGate {
     #[map(a = ["a"], b = ["b"], c = ["sel"], y = ["y"])]
     Mux(MuxGate),
     #[map(a = ["a"], b = ["b"], y = ["y"])]
-    Lt(LtGate),
+    ULt(ULtGate),
     #[map(a = ["a"], b = ["b"], c = ["cin"], y = ["y"])]
     Adc(AdcGate),
     #[map(a = ["a"], b = ["b"], y = ["y"])]
@@ -126,7 +126,12 @@ impl Recursive for LogicCone {
             .iter()
             .enumerate()
             .map(|(idx, &node)| {
-                let y_wire = logic_table.row_at(idx as u32).unwrap().wire("y").unwrap().clone();
+                let y_wire = logic_table
+                    .row_at(idx as u32)
+                    .unwrap()
+                    .wire("y")
+                    .unwrap()
+                    .clone();
                 LogicEntry {
                     base_node: node,
                     children: [None, None, None],
@@ -256,7 +261,13 @@ impl Recursive for LogicCone {
         Table::new(row_entries)
     }
 
-    fn recursive_rehydrate(row: &Row<Self>, _: &Store, _: &Driver, _: &DriverKey, _: &svql_common::Config) -> Option<Self> {
+    fn recursive_rehydrate(
+        row: &Row<Self>,
+        _: &Store,
+        _: &Driver,
+        _: &DriverKey,
+        _: &svql_common::Config,
+    ) -> Option<Self> {
         Some(Self {
             base: row.sub("base")?,
             children: [row.sub("child_0"), row.sub("child_1"), row.sub("child_2")],
@@ -265,8 +276,12 @@ impl Recursive for LogicCone {
                 .entry_array()
                 .entries
                 .get(Self::recursive_schema().index_of("depth")?)?
-                .as_meta()?.as_count()?,
-            leaf_inputs: row.wire_bundle("leaf_inputs").map(|s| s.to_vec()).unwrap_or_default(),
+                .as_meta()?
+                .as_count()?,
+            leaf_inputs: row
+                .wire_bundle("leaf_inputs")
+                .map(|s| s.to_vec())
+                .unwrap_or_default(),
         })
     }
 
@@ -295,8 +310,14 @@ impl LogicCone {
                 let row = store
                     .resolve::<Self>(*c)
                     .expect("Child entry should be resolvable");
-                let rehydrate = Self::recursive_rehydrate(&row, store, driver, key, &svql_common::Config::default())
-                    .expect("Rehydration should succeed");
+                let rehydrate = Self::recursive_rehydrate(
+                    &row,
+                    store,
+                    driver,
+                    key,
+                    &svql_common::Config::default(),
+                )
+                .expect("Rehydration should succeed");
                 rehydrate.size(store, driver, key)
             })
             .sum::<usize>()
