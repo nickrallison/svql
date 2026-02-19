@@ -302,7 +302,13 @@ where
     }
 
     /// Formats the row as a hierarchical string report.
-    pub fn render(&self, store: &Store, driver: &Driver, key: &DriverKey, config: &svql_common::Config) -> String
+    pub fn render(
+        &self,
+        store: &Store,
+        driver: &Driver,
+        key: &DriverKey,
+        config: &svql_common::Config,
+    ) -> String
     where
         T: Pattern + svql_query::traits::Component + 'static,
     {

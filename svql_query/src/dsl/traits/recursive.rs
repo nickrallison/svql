@@ -453,7 +453,10 @@ mod tests {
                 .map(|(_, row)| GateInfo {
                     a: row.wire("a").cloned(), // None when input is a primary port / constant
                     b: row.wire("b").cloned(),
-                    y: row.wire("y").expect("AndGate output 'y' must exist").clone(),
+                    y: row
+                        .wire("y")
+                        .expect("AndGate output 'y' must exist")
+                        .clone(),
                 })
                 .collect();
             // gate_info[i]  ↔  and_table.row(i)  — always
@@ -650,7 +653,8 @@ mod tests {
         // Collect depths
         let mut depths: Vec<u32> = Vec::new();
         for (_, row) in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
+            let rec =
+                RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
             depths.push(rec.depth);
         }
 
@@ -688,7 +692,8 @@ mod tests {
         // Find a node with children
         let mut found_parent = false;
         for (_, row) in table.rows() {
-            let rec = RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
+            let rec =
+                RecAnd::rehydrate(&row, &store, &driver, &key, &config).expect("Should rehydrate");
 
             if rec.left_child.is_some() || rec.right_child.is_some() {
                 found_parent = true;

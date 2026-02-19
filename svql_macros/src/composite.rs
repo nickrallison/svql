@@ -417,7 +417,10 @@ fn parse_or_group(attr: &syn::Attribute) -> Option<OrGroup> {
                             "from" => from = Some(PathSelector::from_expr_array(arr)?),
                             "to" => to = Some(PathSelector::from_expr_array(arr)?),
                             _ => {
-                                return Err(syn::Error::new_spanned(&nv, "Expected 'from' or 'to'"));
+                                return Err(syn::Error::new_spanned(
+                                    &nv,
+                                    "Expected 'from' or 'to'",
+                                ));
                             }
                         }
                     }

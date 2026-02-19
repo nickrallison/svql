@@ -219,7 +219,10 @@ fn parse_variant_ports(input: &DeriveInput) -> Vec<CommonPort> {
         syn::parenthesized!(content in meta.input);
         let port_name: Ident = content.parse()?;
 
-        ports.push(CommonPort { name: port_name.to_string(), direction });
+        ports.push(CommonPort {
+            name: port_name.to_string(),
+            direction,
+        });
 
         Ok(())
     });
@@ -274,7 +277,10 @@ fn parse_port_mappings(attr: &syn::Attribute) -> Vec<PortMapping> {
         let value: ExprArray = meta.value()?.parse()?;
         let inner_path = PathSelector::from_expr_array(&value)?;
 
-        mappings.push(PortMapping { common_port: port_name, inner_path });
+        mappings.push(PortMapping {
+            common_port: port_name,
+            inner_path,
+        });
 
         Ok(())
     });
