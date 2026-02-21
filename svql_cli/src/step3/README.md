@@ -1,18 +1,33 @@
-### README.md
-#### Grammar
-Composites join multiple submodules via connectivity constraints.
+# Step 3: Variants
+
+## Grammar
+Variants define a common interface for multiple different implementations. The query engine will union the results of all arms.
+
+**Variant Attributes:**
+- `#[variant_ports(input(p1), output(p2))]`: Defines the common interface ports for the variant.
+- `#[map(common_p = ["inner_p"])]`: Maps a common interface port to a specific field or port in the underlying pattern.
+
+#### Example
 ```rust
-#[derive(Composite)]
-#[connection(from = ["sub1", "out"], to = ["sub2", "in"])]
-pub struct Parent {
-    #[submodule] pub sub1: Child1,
-    #[submodule] pub sub2: Child2,
-    #[alias(input, target = ["sub1", "in"])] pub top_in: Wire,
+#[derive(Variant)]
+#[variant_ports(input(a), input(b), output(y))]
+pub enum AnyLogicGate {
+    // Direct mapping to a primitive
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    And(AndGate),
+    
+    // Mapping to a composite with different internal names
+    #[map(a = ["in_0"], b = ["in_1"], y = ["out_val"])]
+    Complex(MyCustomComposite),
+    
+    // Mapping where one input is unused in this specific implementation
+    #[map(a = ["a"], y = ["y"])]
+    Inverter(NotGate),
 }
 ```
 
 #### Directions
-1. Create a `FullAdderComposite`.
-2. Instantiate two `HalfAdder` submodules (`ha1`, `ha2`) and one `OrGate` (`final_or`).
-3. Connect `ha1.sum` to `ha2.a`.
-4. Connect `ha1.carry` and `ha2.carry` to the `final_or` inputs.
+1. Define `AnyHalfAdder` as a Variant.
+2. Add two arms: `Structural` (using `HalfAdder` from Step 2) and `Primitive` (using `AdcGate` from Step 1).
+3. Map the common ports `a`, `b`, `sum`, and `carry`.
+4. For the `AdcGate` arm, map `sum` to its `y` port and `carry` to `["null"]` (since the primitive adder doesn't expose a carry bit).

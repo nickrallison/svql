@@ -23,7 +23,7 @@ use svql_query::prelude::*;
 use svql_query_lib::security::Cwe1280;
 use tracing::info;
 
-use crate::step1::AdcGate;
+use crate::step1::{AdcGate, AdcWithCarry};
 use args::Args;
 
 /// Executes the SVQL pattern matcher.
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<AdcGate>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<AdcWithCarry>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<AdcGate>()
+        .get::<AdcWithCarry>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();

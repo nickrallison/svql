@@ -2,6 +2,13 @@ use crate::step2::HalfAdder;
 use svql_query::prelude::*;
 use svql_query_lib::OrGate;
 
+// # Task: Define `FullAdderComposite`.
+// 1. Define `FullAdderComposite`.
+// 2. Instantiate two `HalfAdder` submodules (`ha1`, `ha2`) and one `OrGate` (`final_or`).
+// 3. Use `#[connection]` to link `ha1.sum` to `ha2.a`.
+// 4. Use `#[connection]` to link `ha1.carry` to `final_or.a` and `ha2.carry` to `final_or.b`.
+// 5. Use `#[alias]` to expose the top-level ports: `a`, `b`, `cin`, `sum`, and `cout`.
+
 #[derive(Debug, Clone, Composite)]
 #[connection(from = ["ha1", "sum"], to = ["ha2", "a"])]
 #[connection(from = ["ha1", "carry"], to = ["final_or", "a"])]
