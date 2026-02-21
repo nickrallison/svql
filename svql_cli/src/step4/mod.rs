@@ -1,13 +1,27 @@
-use crate::step1::AdcGate;
-use crate::step3::FullAdderComposite;
+use crate::step3::AnyHalfAdder;
 use svql_query::prelude::*;
+use svql_query_lib::OrGate;
 
-#[derive(Debug, Clone, Variant)]
-#[variant_ports(input(a), input(b), input(cin), output(sum), output(cout))]
-pub enum AnyFullAdder {
-    #[map(a = ["a"], b = ["b"], cin = ["cin"], sum = ["sum"], cout = ["cout"])]
-    Structural(FullAdderComposite),
+#[derive(Debug, Clone, Composite)]
+#[connection(from = ["ha1", "sum"], to = ["ha2", "a"])]
+#[connection(from = ["ha1", "carry"], to = ["final_or", "a"])]
+#[connection(from = ["ha2", "carry"], to = ["final_or", "b"])]
+pub struct FullAdderComposite {
+    #[submodule]
+    pub ha1: AnyHalfAdder,
+    #[submodule]
+    pub ha2: AnyHalfAdder,
+    #[submodule]
+    pub final_or: OrGate,
 
-    #[map(a = ["a"], b = ["b"], cin = ["cin"], sum = ["y"], cout = ["null"])]
-    Primitive(AdcGate),
+    #[alias(input, target = ["ha1", "a"])]
+    pub a: Wire,
+    #[alias(input, target = ["ha1", "b"])]
+    pub b: Wire,
+    #[alias(input, target = ["ha2", "b"])]
+    pub cin: Wire,
+    #[alias(output, target = ["ha2", "sum"])]
+    pub sum: Wire,
+    #[alias(output, target = ["final_or", "y"])]
+    pub cout: Wire,
 }

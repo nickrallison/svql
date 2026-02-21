@@ -29,8 +29,6 @@ impl Primitive for AdcWithCarry {
     ];
 
     fn resolve(wrapper: &CellWrapper<'_>) -> EntryArray {
-        let cell = wrapper.get();
-        println!("Resolving cell: {:?}", cell);
         let y = wrapper.output_wire();
         let size_y = y.len();
         let mut entries = vec![ColumnEntry::Null; 4];

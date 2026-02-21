@@ -9,7 +9,7 @@ Variants define a common interface for multiple different implementations. The q
 
 #### Example
 ```rust
-#[derive(Variant)]
+#[derive(Clone, Debug, Variant)]
 #[variant_ports(input(a), input(b), output(y))]
 pub enum AnyLogicGate {
     // Direct mapping to a primitive
@@ -26,8 +26,8 @@ pub enum AnyLogicGate {
 }
 ```
 
+
 #### Directions
 1. Define `AnyHalfAdder` as a Variant.
-2. Add two arms: `Structural` (using `HalfAdder` from Step 2) and `Primitive` (using `AdcGate` from Step 1).
+2. Add two arms: `Structural` (using `HalfAdder` from Step 2) and `Primitive` (using `AdcWithCarry` from Step 1).
 3. Map the common ports `a`, `b`, `sum`, and `carry`.
-4. For the `AdcGate` arm, map `sum` to its `y` port and `carry` to `["null"]` (since the primitive adder doesn't expose a carry bit).

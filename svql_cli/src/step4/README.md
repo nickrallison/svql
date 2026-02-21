@@ -18,12 +18,12 @@ Composites combine multiple sub-patterns. Connectivity is defined using struct-l
 ```rust
 
 fn other_filter(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
-    let clk1 = row.resolve(Selector::static_path(&["ha", "clk"]), ctx);
-    let clk2 = row.resolve(Selector::static_path(&["out_reg", "clk"]), ctx);
+    let clk1: Wire = row.resolve(Selector::static_path(&["ha", "clk"]), ctx);
+    let clk2: Wire = row.resolve(Selector::static_path(&["out_reg", "clk"]), ctx);
     clk1 != clk2
 }
 
-#[derive(Composite)]
+#[derive(Debug, Clone, Composite)]
 // Standard connection
 #[connection(from = ["ha", "sum"], to = ["out_reg", "d"])]
 // Set membership (is ha.cout one of the inputs to the logic cone?)
@@ -38,7 +38,7 @@ fn other_filter(row: &Row<Self>, ctx: &ExecutionContext) -> bool {
     let clk2 = row.resolve(Selector::static_path(&["out_reg", "clk"]), ctx);
     clk1 != clk2
 })]
-// Can also write filter as 
+// Can also write filter using function name
 #[filter(other_filter)]
 pub struct ExampleComposite {
     #[submodule] 

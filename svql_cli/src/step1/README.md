@@ -32,4 +32,4 @@ let rows = store
 
 3. Run the tool to find all hardware adders/subtractors.
 
-`cargo run --release --bin svql_cli -- --design-path svql_cli/src/step1/adc_test.v --design-module adc_test --parallel`
+`cargo run --bin svql_cli -- --design-path svql_cli/src/step1/primitive_ha_test.v --design-module primitive_ha_test --parallel`
