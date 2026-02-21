@@ -269,27 +269,59 @@ impl<'a> CellWrapper<'a> {
         let cell = self.get();
 
         let val = match cell.as_ref() {
+            // Binary operators with two Value inputs
             Cell::And(a, b)
             | Cell::Or(a, b)
             | Cell::Xor(a, b)
             | Cell::Eq(a, b)
             | Cell::ULt(a, b)
             | Cell::SLt(a, b)
-            | Cell::Mul(a, b) => match port_name {
+            | Cell::Mul(a, b)
+            | Cell::UDiv(a, b)
+            | Cell::UMod(a, b)
+            | Cell::SDivTrunc(a, b)
+            | Cell::SDivFloor(a, b)
+            | Cell::SModTrunc(a, b)
+            | Cell::SModFloor(a, b) => match port_name {
                 "a" => a,
                 "b" => b,
                 _ => return None,
             },
+            // Unary operators with one Value input
             Cell::Not(a) | Cell::Buf(a) => match port_name {
                 "a" => a,
                 _ => return None,
             },
+            // Mux with select (Net) and two Value inputs
             Cell::Mux(s, a, b) => match port_name {
                 "sel" => return Some(Wire::single(*s)),
                 "a" => a,
                 "b" => b,
                 _ => return None,
             },
+            // Adc with two Value inputs and carry-in (Net)
+            Cell::Adc(a, b, ci) => match port_name {
+                "a" => a,
+                "b" => b,
+                "ci" | "cin" => return Some(Wire::single(*ci)),
+                _ => return None,
+            },
+            // Shifts with Value (data) and Value (shift amount)
+            Cell::Shl(a, b, _)
+            | Cell::UShr(a, b, _)
+            | Cell::SShr(a, b, _)
+            | Cell::XShr(a, b, _) => match port_name {
+                "a" => a,
+                "b" => b,
+                _ => return None,
+            },
+            // Aig with two ControlNet inputs (treated as single-bit nets)
+            Cell::Aig(a, b) => match port_name {
+                "a" => return Some(Wire::single(a.net())),
+                "b" => return Some(Wire::single(b.net())),
+                _ => return None,
+            },
+            // Dff (already handled in original)
             Cell::Dff(ff) => match port_name {
                 "clk" => return Some(Wire::single(ff.clock.net())),
                 "d" | "data_in" => &ff.data,
@@ -297,7 +329,17 @@ impl<'a> CellWrapper<'a> {
                 "reset" | "rst" => return Some(Wire::single(ff.reset.net())),
                 _ => return None,
             },
-            _ => return None,
+            // Complex cells without simple named ports (return None)
+            Cell::Match(_)
+            | Cell::Assign(_)
+            | Cell::Memory(_)
+            | Cell::IoBuf(_)
+            | Cell::Target(_)
+            | Cell::Other(_) => return None,
+            // Design-level cells without traditional inputs (return None)
+            Cell::Input(_, _) | Cell::Output(_, _) | Cell::Name(_, _) | Cell::Debug(_, _) => {
+                return None;
+            }
         };
 
         Some(Wire(val.clone()))
