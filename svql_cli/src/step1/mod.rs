@@ -1,5 +1,3 @@
-//! this step doesnt need any code
-
 pub use svql_query_lib::gates::AdcGate;
 
 use svql_query::prelude::*;
@@ -34,6 +32,7 @@ impl Primitive for AdcWithCarry {
         let cell = wrapper.get();
         println!("Resolving cell: {:?}", cell);
         let y = wrapper.output_wire();
+        let size_y = y.len();
         let mut entries = vec![ColumnEntry::Null; 4];
         entries[0] = wrapper
             .input_wire("a")
@@ -43,8 +42,8 @@ impl Primitive for AdcWithCarry {
             .input_wire("b")
             .map(ColumnEntry::Wire)
             .unwrap_or(ColumnEntry::Null);
-        entries[2] = ColumnEntry::Wire(y.slice(0..1));
-        entries[3] = ColumnEntry::Wire(y.slice(1..2));
+        entries[2] = ColumnEntry::Wire(y.slice(0..size_y - 1));
+        entries[3] = ColumnEntry::Wire(y.slice(size_y - 1..size_y));
         EntryArray::new(entries)
     }
 
