@@ -18,5 +18,7 @@ svql_driver.workspace = true
 svql_query.workspace = true
 svql_query_lib.workspace = true
 
+prjunnamed-netlist.workspace = true
+
 [lints]
 workspace = true

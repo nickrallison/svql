@@ -11,12 +11,19 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod args;
 
+pub mod step1;
+// pub mod step2;
+// pub mod step3;
+// pub mod step4;
+// pub mod step5;
+
 use clap::Parser;
 use rayon::prelude::*;
 use svql_query::prelude::*;
-use svql_query_lib::security::{Cwe1280, cwe1234::Cwe1234};
+use svql_query_lib::security::Cwe1280;
 use tracing::info;
 
+use crate::step1::AdcGate;
 use args::Args;
 
 /// Executes the SVQL pattern matcher.
@@ -41,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<Cwe1234>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<AdcGate>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -52,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<Cwe1234>()
+        .get::<AdcGate>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();

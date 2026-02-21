@@ -966,6 +966,7 @@ name = "svql_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "prjunnamed-netlist",
  "rayon",
  "svql_common",
  "svql_driver",
