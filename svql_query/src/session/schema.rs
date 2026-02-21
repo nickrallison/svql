@@ -520,7 +520,7 @@ impl EntryArray {
     }
 
     /// Creates a new entry array from a vector of entries.
-    pub(crate) const fn new(entries: Vec<ColumnEntry>) -> Self {
+    pub const fn new(entries: Vec<ColumnEntry>) -> Self {
         Self { entries }
     }
 

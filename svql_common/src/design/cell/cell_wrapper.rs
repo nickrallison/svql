@@ -305,10 +305,7 @@ impl<'a> CellWrapper<'a> {
 
     /// Returns the output wire of this cell.
     pub fn output_wire(&self) -> Wire {
-        let width = match self.get().as_ref() {
-            prjunnamed_netlist::Cell::Dff(ff) => ff.data.len(),
-            _ => 1,
-        };
+        let width = self.get().as_ref().output_len();
         let base = self.debug_index().storage_key() as usize;
         (0..width)
             .map(|i| prjunnamed_netlist::Net::from_cell_index(base + i))
