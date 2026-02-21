@@ -1,7 +1,7 @@
 use svql_query::prelude::*;
 
 #[derive(Debug, Clone, Netlist)]
-#[netlist(file = "examples/fixtures/logic/half_adder.v", module = "half_adder")]
+#[netlist(file = "svql_cli/src/step2/half_adder.v", module = "half_adder")]
 pub struct HalfAdder {
     #[port(input)]
     pub a: Wire,

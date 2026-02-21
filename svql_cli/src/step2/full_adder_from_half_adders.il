@@ -2,7 +2,7 @@
 autoidx 6
 attribute \top 1
 attribute \src "svql_cli/src/step2/full_adder_from_half_adders.v:1.1-29.10"
-module \full_adder
+module \full_adder_from_half_adders
   attribute \src "svql_cli/src/step2/full_adder_from_half_adders.v:38.20-38.25"
   wire $flatten\ha1.$and$svql_cli/src/step2/full_adder_from_half_adders.v:38$3_Y
   attribute \src "svql_cli/src/step2/full_adder_from_half_adders.v:37.18-37.23"

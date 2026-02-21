@@ -21,7 +21,7 @@ use rayon::prelude::*;
 use svql_query::prelude::*;
 use tracing::info;
 
-use crate::step1::AdcWithCarry;
+use crate::{step1::AdcWithCarry, step2::HalfAdder};
 use args::Args;
 
 /// Executes the SVQL pattern matcher.
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<AdcWithCarry>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<HalfAdder>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<AdcWithCarry>()
+        .get::<HalfAdder>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();

@@ -27,3 +27,8 @@ pub struct MyLogicPattern {
 2. Use `#[derive(Netlist)]` to enable subgraph matching.
 3. Point the `#[netlist]` attribute to `svql_cli/src/step2/half_adder.v` and the module `half_adder`.
 4. Map the fields `a`, `b`, `sum`, and `carry` to their respective ports using the `#[port]` attribute.
+5. Run the tool and find the Half adders in svql_cli/src/step2/full_adder_from_half_adders.il
+    1. Modify the main file to search for the `HalfAdder` as was done in step 1
+    2. Run the tool
+
+`cargo run --bin svql_cli -- --design-path svql_cli/src/step2/full_adder_from_half_adders.il --design-module full_adder_from_half_adders --parallel`

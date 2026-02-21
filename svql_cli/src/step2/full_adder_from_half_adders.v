@@ -1,4 +1,4 @@
-module full_adder(
+module full_adder_from_half_adders(
     input a,
     input b,
     input cin,
