@@ -21,6 +21,7 @@ pub struct FullAdderFlat {
 
 #[derive(Debug, Clone, Variant)]
 #[variant_ports(input(a), input(b), input(cin), output(sum), output(cout))]
+#[allow(clippy::large_enum_variant)]
 pub enum AnyFullAdder {
     #[map(a = ["a"], b = ["b"], cin = ["cin"], sum = ["sum"], cout = ["cout"])]
     Hierarchical(FullAdderHierarchical),

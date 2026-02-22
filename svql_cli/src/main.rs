@@ -22,7 +22,7 @@ use tracing::info;
 
 use args::Args;
 
-use crate::step1::HalfAdder;
+use crate::{step1::HalfAdder, step3::AnyFullAdder};
 
 /// Executes the SVQL pattern matcher.
 ///
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<HalfAdder>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<AnyFullAdder>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<HalfAdder>()
+        .get::<AnyFullAdder>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();
