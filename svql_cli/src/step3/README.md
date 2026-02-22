@@ -27,7 +27,13 @@ pub enum AnyLogicGate {
 ```
 
 
-#### Directions
-1. Define `AnyHalfAdder` as a Variant.
-2. Add two arms: `Structural` (using `HalfAdder` from Step 2) and `Primitive` (using `AdcWithCarry` from Step 1).
-3. Map the common ports `a`, `b`, `sum`, and `carry`.
+## Directions:
+
+**Netlist:**
+1. Define `FullAdderFlat` pointing to `full_adder_flat.v`.
+2. This demonstrates matching the same logical function implemented with different structural boundaries.
+
+**Variant:**
+3. Define `AnyFullAdder` as an enum.
+4. Add `Hierarchical` and `Flat` arms.
+5. Map all ports to the common interface.

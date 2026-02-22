@@ -1,35 +1,28 @@
-### README.md
-#### Grammar
-Primitives match single cells in the design index.
+# Step 2: Netlists
+
+## Grammar
+Netlists map a Rust struct to a specific Verilog or RTLIL module. The query engine uses subgraph isomorphism to find all instances of that module's logic within the design.
+
+**Netlist Attributes:**
+- `#[netlist(file = "path/to/file.v", module = "module_name")]`: Specifies the source file and the target module name to match.
+- `#[port(direction)]`: Maps a struct field to a module port. Directions: `input`, `output`, `inout`.
+- `#[port(direction, rename = "y_out")]`: Maps a struct field to a module port. Renames from the netlist port name "y_out" to the field name.
+
+## Example
 ```rust
-define_primitive!(
-    RustTypeName, 
-    PrjunnamedCellKind, 
-    [(port_name, direction), ...]
-);
+#[derive(Clone, Debug, Netlist)]
+#[netlist(file = "svql_cli/src/step2/example.v", module = "my_logic")]
+pub struct MyLogicPattern {
+    #[port(input)]
+    pub clk: Wire,
+    #[port(input)]
+    pub reset_n: Wire,
+    #[port(output, rename = "other_data_out")]
+    pub data_out: Wire,
+}
 ```
 
-#### Example
-```rust
-define_primitive!(AndGate, And, [(a, input), (b, input), (y, output)]);
-```
-
-#### Directions
-1. Open `svql_cli/src/main.rs`.
-2. Replace the generics with `AdcWithCarry` in the `run_query` call and the `store.get` call in the `svql_cli/src/main.rs` file.
-
-```rust
-// ...
-let store = svql_query::run_query::<AdcWithCarry>(&driver, &design_key, &config)?;
-// ...
-let rows = store
-    .get::<AdcWithCarry>()
-    .expect("Store should have table")
-    .rows()
-    .collect::<Vec<_>>();
-// ...
-```
-
-3. Run the tool to find all hardware adders/subtractors.
-
-`cargo run --bin svql_cli -- --design-path svql_cli/src/step1/primitive_ha_test.v --design-module primitive_ha_test --parallel`
+## Directions:
+1. Define `FullAdderHierarchical` using two `HalfAdder` submodules and an `OrGate`.
+2. Link `ha1.sum` to `ha2.a`.
+3. Link both carries to the `final_or` gate.

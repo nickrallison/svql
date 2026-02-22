@@ -1,27 +1,25 @@
-use crate::step3::AnyHalfAdder;
 use svql_query::prelude::*;
-use svql_query_lib::OrGate;
+use svql_query_lib::primitives::{DffAny, LogicCone};
+
+fn check_clocks(src_clk: Option<Wire>, dst_clk: Option<Wire>) -> bool {
+    match (src_clk, dst_clk) {
+        (Some(s), Some(d)) => s.cell_id() != d.cell_id(),
+        _ => false,
+    }
+}
 
 #[derive(Debug, Clone, Composite)]
-#[connection(from = ["ha1", "sum"], to = ["ha2", "a"])]
-#[connection(from = ["ha1", "carry"], to = ["final_or", "a"])]
-#[connection(from = ["ha2", "carry"], to = ["final_or", "b"])]
-pub struct FullAdderComposite {
+#[connection(from = ["source", "q"], to = ["logic_cone", "leaf_inputs"], kind = "any")]
+#[connection(from = ["logic_cone", "y"], to = ["dest", "d"])]
+#[filter(|row: &Row<Self>, ctx: &ExecutionContext| check_clocks(
+    row.resolve(Selector::static_path(&["source", "clk"]), ctx),
+    row.resolve(Selector::static_path(&["dest", "clk"]), ctx)
+))]
+pub struct CdcViolation {
     #[submodule]
-    pub ha1: AnyHalfAdder,
+    pub source: DffAny,
     #[submodule]
-    pub ha2: AnyHalfAdder,
+    pub logic_cone: LogicCone,
     #[submodule]
-    pub final_or: OrGate,
-
-    #[alias(input, target = ["ha1", "a"])]
-    pub a: Wire,
-    #[alias(input, target = ["ha1", "b"])]
-    pub b: Wire,
-    #[alias(input, target = ["ha2", "b"])]
-    pub cin: Wire,
-    #[alias(output, target = ["ha2", "sum"])]
-    pub sum: Wire,
-    #[alias(output, target = ["final_or", "y"])]
-    pub cout: Wire,
+    pub dest: DffAny,
 }

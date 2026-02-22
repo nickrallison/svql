@@ -14,14 +14,16 @@ pub mod step1;
 pub mod step2;
 pub mod step3;
 pub mod step4;
-pub mod step5;
+pub mod step4;
 
 use clap::Parser;
 use rayon::prelude::*;
 use svql_query::prelude::*;
 use tracing::info;
 
-use crate::{step1::AdcWithCarry, step2::HalfAdder, step3::AnyHalfAdder};
+use crate::{
+    step1::AdcWithCarry, step2::HalfAdder, step3::AnyHalfAdder, step4::FullAdderComposite,
+};
 use args::Args;
 
 /// Executes the SVQL pattern matcher.
@@ -46,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading design: {:?}", design_key);
     info!("Executing query with DataFrame API...");
 
-    let store = svql_query::run_query::<AnyHalfAdder>(&driver, &design_key, &config)?;
+    let store = svql_query::run_query::<FullAdderComposite>(&driver, &design_key, &config)?;
 
     println!("\n=== DataFrame API Results ===");
     println!("{store}");
@@ -57,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let rows = store
-        .get::<AnyHalfAdder>()
+        .get::<FullAdderComposite>()
         .expect("Store should have table")
         .rows()
         .collect::<Vec<_>>();
