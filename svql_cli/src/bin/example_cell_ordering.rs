@@ -5,7 +5,8 @@ use std::borrow::Cow;
 use svql_common::YosysModule;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let design_module: YosysModule = YosysModule::new("svql_cli/src/step1/adc_test.v", "adc_test")?;
+    let design_module: YosysModule =
+        YosysModule::new("svql_cli/src/step3/mixed_ha_test.il", "mixed_ha_test")?;
 
     let design = design_module.import_design(&svql_common::ModuleConfig::default())?;
 

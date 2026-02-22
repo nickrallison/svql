@@ -57,7 +57,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["--design-path", "svql_cli/src/step1/adc_test.v", "--design-module", "adc_test"],
+            "args": ["--design-path", "svql_cli/src/step3/mixed_ha_test.il", "--design-module", "mixed_ha_test"],
             "cwd": "${workspaceFolder}",
             "sourceLanguages": ["rust"],
             "expressions": "native"
