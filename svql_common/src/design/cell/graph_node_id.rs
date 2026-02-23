@@ -12,13 +12,13 @@ pub struct GraphNodeIdx {
 
 impl GraphNodeIdx {
     /// Creates a new local graph index from a raw integer.
-    #[ensures(ret.inner == id)]
+    #[debug_ensures(ret.inner == id)]
     pub const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
     /// Returns the index as a usize for array access.
-    #[ensures(ret == self.inner as usize)]
+    #[debug_ensures(ret == self.inner as usize)]
     pub const fn as_usize(self) -> usize {
         self.inner as usize
     }

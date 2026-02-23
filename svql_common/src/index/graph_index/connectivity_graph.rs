@@ -57,8 +57,8 @@ impl ConnectivityGraph {
     }
 }
 
-#[invariant(self.fanin_map.len() == self.fanout_map.len())]
-#[invariant(self.is_symmetric())]
+#[debug_invariant(self.fanin_map.len() == self.fanout_map.len())]
+#[debug_invariant(self.is_symmetric())]
 impl ConnectivityGraph {
     /// Builds the connectivity index using design cells and a translation map.
     #[must_use]
@@ -76,7 +76,7 @@ impl ConnectivityGraph {
         let fanout_indices = Self::precompute_indices(&fanout_map);
         let fanin_indices = Self::precompute_indices(&fanin_map);
 
-        Self {
+        let graph = Self {
             fanin_map,
             fanout_map,
             fanout_sets,
@@ -84,7 +84,12 @@ impl ConnectivityGraph {
             fanout_indices,
             fanin_indices,
             intersect_fanout_of_fanin: Arc::new(DashMap::new()),
-        }
+        };
+
+        debug_assert_eq!(graph.fanin_map.len(), graph.fanout_map.len());
+        debug_assert!(graph.is_symmetric());
+
+        graph
     }
 
     /// Calculates the intersection of all fan-outs for a given cell's fan-in neighbors.

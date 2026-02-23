@@ -35,7 +35,7 @@ impl ModuleConfig {
 
     /// Sets whether to flatten the module hierarchy.
     #[must_use]
-    #[ensures(ret.flatten == flatten)]
+    #[debug_ensures(ret.flatten == flatten)]
     pub fn with_flatten(mut self, flatten: bool) -> Self {
         self.flatten = flatten;
         self
@@ -43,7 +43,7 @@ impl ModuleConfig {
 
     /// Sets whether to run the `opt_clean` pass.
     #[must_use]
-    #[ensures(ret.opt_clean == opt_clean)]
+    #[debug_ensures(ret.opt_clean == opt_clean)]
     pub fn with_opt_clean(mut self, opt_clean: bool) -> Self {
         self.opt_clean = opt_clean;
         self
@@ -51,7 +51,7 @@ impl ModuleConfig {
 
     /// Sets whether to run the `opt` pass.
     #[must_use]
-    #[ensures(ret.opt == opt)]
+    #[debug_ensures(ret.opt == opt)]
     pub fn with_opt(mut self, opt: bool) -> Self {
         self.opt = opt;
         self
@@ -59,7 +59,7 @@ impl ModuleConfig {
 
     /// Adds a parameter override.
     #[must_use]
-    #[ensures(ret.params.get(param) == Some(&value.to_string()))]
+    #[debug_ensures(ret.params.get(param) == Some(&value.to_string()))]
     pub fn with_param(mut self, param: &str, value: &str) -> Self {
         self.params.insert(param.to_owned(), value.to_owned());
         self
@@ -67,7 +67,7 @@ impl ModuleConfig {
 
     /// Adds a custom Yosys step command.
     #[must_use]
-    #[ensures(ret.other_steps.last() == Some(&step.to_string()))]
+    #[debug_ensures(ret.other_steps.last() == Some(&step.to_string()))]
     pub fn with_step(mut self, step: &str) -> Self {
         self.other_steps.push(step.to_owned());
         self
@@ -75,7 +75,7 @@ impl ModuleConfig {
 
     /// Sets whether to use Verific for parsing.
     #[must_use]
-    #[ensures(ret.verific == verific)]
+    #[debug_ensures(ret.verific == verific)]
     pub fn with_verific(mut self, verific: bool) -> Self {
         self.verific = verific;
         self
@@ -83,7 +83,7 @@ impl ModuleConfig {
 
     /// Sets whether to skip Yosys processing and load the raw JSON.
     #[must_use]
-    #[ensures(ret.load_raw == load_raw)]
+    #[debug_ensures(ret.load_raw == load_raw)]
     pub fn with_load_raw(mut self, load_raw: bool) -> Self {
         self.load_raw = load_raw;
         self

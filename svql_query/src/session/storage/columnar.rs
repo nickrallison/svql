@@ -41,7 +41,7 @@ impl ColumnStore {
 
     /// Create an empty ColumnStore with the given column names.
     #[must_use]
-    #[ensures(ret.is_valid_state())]
+    #[debug_ensures(ret.is_valid_state())]
     pub fn new(column_names: Vec<String>) -> Self {
         let mut columns = HashMap::with_capacity(column_names.len());
         for name in &column_names {
@@ -62,7 +62,7 @@ impl ColumnStore {
     ///
     /// Returns an error if the number of column names does not match the data or
     /// if columns have inconsistent lengths.
-    #[ensures(ret.as_ref().is_ok_and(|s| s.is_valid_state()))]
+    #[debug_ensures(ret.as_ref().is_ok_and(|s| s.is_valid_state()))]
     pub fn from_columns(
         column_names: Vec<String>,
         data: Vec<Vec<ColumnEntry>>,
@@ -122,7 +122,7 @@ impl ColumnStore {
     /// # Panics
     ///
     /// Panics if the column name does not exist in the store schema.
-    #[ensures(self.is_valid_state())]
+    #[debug_ensures(self.is_valid_state())]
     pub fn push_row(&mut self, row: EntryArray) {
         for (name, entry) in self.column_names.iter().zip(row.entries.into_iter()) {
             self.columns.get_mut(name).unwrap().push(entry);

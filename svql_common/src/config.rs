@@ -103,7 +103,7 @@ impl Default for ConfigBuilder {
 impl ConfigBuilder {
     /// Sets the match length requirement.
     #[must_use]
-    #[ensures(ret.match_length == value)]
+    #[debug_ensures(ret.match_length == value)]
     pub const fn match_length(mut self, value: MatchLength) -> Self {
         self.match_length = value;
         self
@@ -111,7 +111,7 @@ impl ConfigBuilder {
 
     /// Sets the Yosys configuration for the needle and forces flattening.
     #[must_use]
-    #[ensures(ret.needle_options.flatten)]
+    #[debug_ensures(ret.needle_options.flatten)]
     pub fn needle_options(mut self, options: ModuleConfig) -> Self {
         self.needle_options = options;
         self.needle_options = self.needle_options.with_flatten(true);
@@ -193,7 +193,7 @@ impl ConfigBuilder {
 
     /// Configures whether pattern variables can match design constants.
     #[must_use]
-    #[ensures(ret.pattern_vars_match_design_consts == allow)]
+    #[debug_ensures(ret.pattern_vars_match_design_consts == allow)]
     pub const fn pattern_vars_match_design_consts(mut self, allow: bool) -> Self {
         self.pattern_vars_match_design_consts = allow;
         self
@@ -201,7 +201,7 @@ impl ConfigBuilder {
 
     /// Sets the maximum recursion depth for the search algorithm.
     #[must_use]
-    #[ensures(ret.max_recursion_depth == depth)]
+    #[debug_ensures(ret.max_recursion_depth == depth)]
     pub const fn max_recursion_depth(mut self, depth: Option<usize>) -> Self {
         self.max_recursion_depth = depth;
         self
@@ -209,7 +209,7 @@ impl ConfigBuilder {
 
     /// Sets whether to run the search in parallel.
     #[must_use]
-    #[ensures(ret.parallel == parallel)]
+    #[debug_ensures(ret.parallel == parallel)]
     pub const fn parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self

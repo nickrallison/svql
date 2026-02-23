@@ -25,7 +25,7 @@ impl DriverKey {
     ///
     /// * `path` - File path to the design
     /// * `module_name` - Name of the top-level module
-    #[requires(!module_name.as_ref().is_empty())]
+    #[debug_requires(!module_name.as_ref().is_empty())]
     pub fn new<P, S>(path: P, module_name: S) -> Self
     where
         P: Into<PathBuf>,

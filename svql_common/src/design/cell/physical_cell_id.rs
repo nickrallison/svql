@@ -19,13 +19,13 @@ pub struct PhysicalCellId {
 
 impl PhysicalCellId {
     /// Creates a new persistent cell ID from a raw integer.
-    #[ensures(ret.inner == id)]
+    #[debug_ensures(ret.inner == id)]
     pub(crate) const fn new(id: u32) -> Self {
         Self { inner: id }
     }
 
     /// Access for table packing logic.
-    #[ensures(ret == self.inner)]
+    #[debug_ensures(ret == self.inner)]
     pub const fn storage_key(&self) -> u32 {
         self.inner
     }

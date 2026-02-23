@@ -98,7 +98,7 @@ where
 
     /// Check if the table is empty.
     #[inline]
-    #[ensures(ret == (self.len() == 0))]
+    #[debug_ensures(ret == (self.len() == 0))]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -116,7 +116,7 @@ where
     }
 
     /// Retrieves a specific entry from the table by row and column name.
-    #[requires(row_idx < self.len())]
+    #[debug_requires(row_idx < self.len())]
     pub fn get_entry(&self, row_idx: usize, col_name: &str) -> ColumnEntry {
         self.store.get_cell(col_name, row_idx).clone()
     }

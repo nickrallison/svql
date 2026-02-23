@@ -64,7 +64,7 @@ impl SingleAssignment {
     }
 
     /// Creates a new, empty mapping between needle and haystack.
-    #[ensures(ret.is_consistent())]
+    #[debug_ensures(ret.is_consistent())]
     pub(super) fn new() -> Self {
         Self {
             needle_to_haystack: HashMap::default(),
@@ -73,7 +73,7 @@ impl SingleAssignment {
     }
 
     /// Record a match between a needle node and a haystack node.
-    #[ensures(self.is_consistent())]
+    #[debug_ensures(self.is_consistent())]
     pub(super) fn assign(&mut self, needle: GraphNodeIdx, haystack: GraphNodeIdx) {
         self.remove_by_needle(needle);
         self.needle_to_haystack.insert(needle, haystack);
@@ -85,7 +85,7 @@ impl SingleAssignment {
 
     /// Removes an assignment by its needle index.
     #[allow(dead_code)]
-    #[ensures(self.is_consistent())]
+    #[debug_ensures(self.is_consistent())]
     pub(super) fn remove_by_needle(&mut self, needle: GraphNodeIdx) -> Option<GraphNodeIdx> {
         if let Some(haystack_idx) = self.needle_to_haystack.remove(&needle) {
             if let Some(needles) = self.haystack_to_needle.get_mut(&haystack_idx) {

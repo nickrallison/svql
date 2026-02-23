@@ -56,7 +56,7 @@ impl Driver {
     /// # Errors
     ///
     /// Returns `DriverError::YosysNotFound` if the yosys executable cannot be located in PATH.
-    #[requires(root.as_ref().exists())]
+    #[debug_requires(root.as_ref().exists())]
     pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, DriverError> {
         let yosys = which::which("yosys").map_err(|e| DriverError::YosysNotFound(e.to_string()))?;
 
@@ -113,8 +113,8 @@ impl Driver {
     /// # Errors
     ///
     /// Returns `DriverError::YosysNotFound` if the yosys binary path does not exist.
-    #[requires(root.as_ref().exists())]
-    #[requires(yosys.as_ref().exists())]
+    #[debug_requires(root.as_ref().exists())]
+    #[debug_requires(yosys.as_ref().exists())]
     pub fn with_yosys<P: AsRef<Path>, Y: AsRef<Path>>(
         root: P,
         yosys: Y,
@@ -186,7 +186,7 @@ impl Driver {
     /// # Panics
     ///
     /// Panics if the internal design registry lock is poisoned.
-    #[ensures(ret.is_ok() -> self.check_registry(key).is_some())]
+    #[debug_ensures(ret.is_ok() -> self.check_registry(key).is_some())]
     pub fn get_design(
         &self,
         key: &DriverKey,

@@ -35,8 +35,8 @@ impl YosysModule {
     ///
     /// Returns an error if the design path cannot be categorized or contains
     /// invalid characters.
-    #[requires(path.as_ref().to_str().is_some())]
-    #[ensures(ret.is_ok() -> ret.as_ref().unwrap().module_name() == module.as_ref())]
+    #[debug_requires(path.as_ref().to_str().is_some())]
+    #[debug_ensures(ret.is_ok() -> ret.as_ref().unwrap().module_name() == module.as_ref())]
     pub fn new<P: AsRef<Path>, S: AsRef<str>>(
         path: P,
         module: S,

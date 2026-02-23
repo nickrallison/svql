@@ -46,7 +46,7 @@ impl PatternSchema {
     /// Get a column definition by index.
     #[inline]
     #[must_use]
-    #[requires(index < self.defs.len())]
+    #[debug_requires(index < self.defs.len())]
     pub fn column(&self, index: usize) -> &ColumnDef {
         &self.defs[index]
     }
@@ -61,7 +61,7 @@ impl PatternSchema {
     /// Construct a new `PatternSchema` from raw definitions.
     /// This is typically called inside a `OnceLock::get_or_init`.
     #[must_use]
-    #[ensures(ret.defs.len() == ret.name_map.len())]
+    #[debug_ensures(ret.defs.len() == ret.name_map.len())]
     pub fn new(defs: &'static [ColumnDef]) -> Self {
         let mut name_map = HashMap::new();
         let mut submodules = Vec::new();
@@ -100,7 +100,7 @@ impl PatternSchema {
     /// Get the index of a column by name in O(1).
     #[inline]
     #[must_use]
-    #[ensures(ret.is_some() -> ret.unwrap() < self.defs.len())]
+    #[debug_ensures(ret.is_some() -> ret.unwrap() < self.defs.len())]
     pub fn index_of(&self, name: &str) -> Option<usize> {
         self.name_map.get(name).copied()
     }
