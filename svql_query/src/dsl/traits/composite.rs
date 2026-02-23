@@ -3,7 +3,6 @@
 //! Implements the incremental join algorithm and cost-based planner
 //! used to resolve connections between multiple pattern instances.
 
-#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::{prelude::*, session::execution::join_planner::ConnectivityCache};
@@ -348,7 +347,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
             schema.column(sub_indices[first_idx]).name
         );
 
-        #[cfg(feature = "parallel")]
         let mut entries: Vec<EntryArray> = if ctx.config().parallel {
             (0..first_table.len() as u32)
                 .into_par_iter()
@@ -359,11 +357,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
                 .collect()
         };
-
-        #[cfg(not(feature = "parallel"))]
-        let mut entries: Vec<EntryArray> = (0..first_table.len() as u32)
-            .map(|row_idx| Self::create_partial_entry(sub_indices, first_idx, row_idx))
-            .collect();
 
         tracing::debug!("[COMPOSITE] Initial entries created: {}", entries.len());
 
@@ -737,7 +730,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
 
         let start = std::time::Instant::now();
 
-        #[cfg(feature = "parallel")]
         let result: Vec<EntryArray> = if ctx.config().parallel {
             entries
                 .into_par_iter()
@@ -767,21 +759,6 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
                 })
                 .collect()
         };
-
-        #[cfg(not(feature = "parallel"))]
-        let result: Vec<EntryArray> = entries
-            .into_iter()
-            .flat_map(|entry| {
-                Self::expand_with_index(
-                    entry,
-                    join_idx,
-                    table,
-                    sub_indices,
-                    ctx,
-                    connectivity_cache,
-                )
-            })
-            .collect();
 
         tracing::debug!(
             "[JOIN] Join complete: {} candidates in {:?}",
@@ -940,8 +917,9 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         entries: Vec<EntryArray>,
         ctx: &ExecutionContext,
     ) -> Result<Vec<EntryArray>, QueryError> {
-        #[cfg(feature = "parallel")]
         if ctx.config().parallel {
+            use rayon::prelude::*;
+
             let final_entries = entries
                 .into_par_iter()
                 .map(|mut entry| {

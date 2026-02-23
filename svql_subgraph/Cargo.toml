@@ -45,7 +45,7 @@ tempfile.workspace = true
 which.workspace = true
 contracts.workspace = true
 itertools.workspace = true
-rayon = { workspace = true, optional = true }
+rayon.workspace = true
 
 [dev-dependencies]
 svql_common.workspace = true
@@ -58,7 +58,6 @@ tracing-subscriber.workspace = true
 [features]
 default = []
 profiling = []
-rayon = ["dep:rayon"]
 
 [lints]
 workspace = true

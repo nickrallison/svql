@@ -229,18 +229,10 @@ impl ExecutionPlan {
 
     /// Execute nodes in parallel using rayon.
     fn execute_parallel(&self, ctx: &ExecutionContext) -> Result<(), QueryError> {
-        #[cfg(feature = "parallel")]
         use rayon::prelude::*;
 
-        // Execute all nodes - OnceLock ensures each runs exactly once
-        #[cfg(feature = "parallel")]
         self.nodes
             .par_iter()
-            .try_for_each(|node| Self::execute_node(node, ctx))?;
-
-        #[cfg(not(feature = "parallel"))]
-        self.nodes
-            .iter()
             .try_for_each(|node| Self::execute_node(node, ctx))?;
 
         Ok(())
@@ -395,13 +387,6 @@ impl ExecutionContext {
         config: svql_common::Config,
         slots: HashMap<TypeId, TableSlot>,
     ) -> Self {
-        #[cfg(not(feature = "parallel"))]
-        if config.parallel {
-            tracing::warn!(
-                "Parallel execution requested but 'parallel' feature is not enabled. Falling back to sequential execution."
-            );
-        }
-
         Self {
             driver,
             design_key,

@@ -17,6 +17,7 @@ svql_common.workspace = true
 svql_driver.workspace = true
 svql_query.workspace = true
 svql_query_lib.workspace = true
+svql_subgraph.workspace = true
 
 [lints]
 workspace = true

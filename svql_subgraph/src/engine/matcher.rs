@@ -10,7 +10,6 @@ use svql_common::*;
 use prjunnamed_netlist::Design;
 use svql_common::Config;
 
-#[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
 use super::assignment::{AssignmentSet, SingleAssignment};
@@ -147,13 +146,6 @@ impl<'needle, 'haystack, 'cfg> SubgraphMatcher<'needle, 'haystack, 'cfg> {
 impl SubgraphMatcherCore<'_, '_, '_> {
     /// Executes the matching process and applies deduplication.
     pub fn enumerate_assignments(&self) -> AssignmentSet {
-        #[cfg(not(feature = "rayon"))]
-        if self.config.parallel {
-            tracing::warn!(
-                "Parallel execution requested but 'rayon' feature is not enabled. Falling back to sequential execution."
-            );
-        }
-
         tracing::info!(
             "[{} -> {}] starting subgraph search: needle cells: {}, haystack cells: {}",
             self.needle_name,
@@ -232,7 +224,6 @@ impl SubgraphMatcherCore<'_, '_, '_> {
 
         self.active_branches.fetch_add(1, Ordering::SeqCst);
 
-        #[cfg(feature = "rayon")]
         if self.config.parallel {
             let results: Vec<_> = candidates
                 .into_par_iter()
@@ -298,7 +289,6 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             return self.match_input_cells(assignment, input_queue, output_queue);
         }
 
-        #[cfg(feature = "rayon")]
         if self.config.parallel {
             return candidates
                 .into_par_iter()
@@ -343,7 +333,6 @@ impl SubgraphMatcherCore<'_, '_, '_> {
             return vec![];
         }
 
-        #[cfg(feature = "rayon")]
         if self.config.parallel {
             return candidates
                 .into_par_iter()
