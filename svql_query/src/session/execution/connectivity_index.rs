@@ -26,8 +26,7 @@ impl BipartiteIndex {
     /// Build the index for a single connection between two tables.
     ///
     /// # Performance
-    /// - Time: O(|A| × |B|) connectivity checks (done once)
-    /// - Space: O(valid_edges) (sparse for typical hardware graphs)
+    /// - Time: O(|A| + |B| + E)
     pub fn build(
         a_table: &dyn AnyTable,
         b_table: &dyn AnyTable,
@@ -38,56 +37,54 @@ impl BipartiteIndex {
         let mut reverse: HashMap<RowIndex, HashSet<RowIndex>> = HashMap::new();
         let mut edge_count = 0;
 
+        let mut net_to_b_rows: HashMap<prjunnamed_netlist::Net, Vec<RowIndex>> = HashMap::new();
+
         match connection.kind {
             ConnectionKind::Exact => {
-                // Exact connection: source wire must equal target wire
-                for a_idx in 0..a_table.len() as u32 {
-                    for b_idx in 0..b_table.len() as u32 {
-                        let a_cell = a_table.resolve_path(
-                            a_idx as usize,
-                            connection.from.selector.tail(),
-                            ctx,
-                        );
-                        let b_cell = b_table.resolve_path(
-                            b_idx as usize,
-                            connection.to.selector.tail(),
-                            ctx,
-                        );
-
-                        match (&a_cell, &b_cell) {
-                            (Some(src), Some(dst)) if src.drives(dst) => {
-                                let a_row_idx = RowIndex::from_raw(a_idx);
-                                let b_row_idx = RowIndex::from_raw(b_idx);
-                                forward.entry(a_row_idx).or_default().insert(b_row_idx);
-                                reverse.entry(b_row_idx).or_default().insert(a_row_idx);
-                                edge_count += 1;
+                for b_idx in 0..b_table.len() as u32 {
+                    if let Some(b_cell) =
+                        b_table.resolve_path(b_idx as usize, connection.to.selector.tail(), ctx)
+                    {
+                        let b_row_idx = RowIndex::from_raw(b_idx);
+                        for net in b_cell.iter() {
+                            let vec = net_to_b_rows.entry(net).or_default();
+                            if vec.last() != Some(&b_row_idx) {
+                                vec.push(b_row_idx);
                             }
-                            _ => {}
                         }
                     }
                 }
             }
             ConnectionKind::AnyInSet => {
-                // Set membership: source wire must be in target WireArray
-                for a_idx in 0..a_table.len() as u32 {
-                    for b_idx in 0..b_table.len() as u32 {
-                        let a_cell = a_table.resolve_path(
-                            a_idx as usize,
-                            connection.from.selector.tail(),
-                            ctx,
-                        );
-                        let b_bundle = b_table.resolve_bundle_path(
-                            b_idx as usize,
-                            connection.to.selector.tail(),
-                            ctx,
-                        );
+                for b_idx in 0..b_table.len() as u32 {
+                    if let Some(b_bundle) = b_table.resolve_bundle_path(
+                        b_idx as usize,
+                        connection.to.selector.tail(),
+                        ctx,
+                    ) {
+                        let b_row_idx = RowIndex::from_raw(b_idx);
+                        for wire in b_bundle {
+                            for net in wire.iter() {
+                                let vec = net_to_b_rows.entry(net).or_default();
+                                if vec.last() != Some(&b_row_idx) {
+                                    vec.push(b_row_idx);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-                        if let (Some(src), Some(bundle)) = (&a_cell, &b_bundle) {
-                            // Check if src is in the bundle
-                            if bundle.iter().any(|w| src.drives(w)) {
-                                let a_row_idx = RowIndex::from_raw(a_idx);
-                                let b_row_idx = RowIndex::from_raw(b_idx);
-                                forward.entry(a_row_idx).or_default().insert(b_row_idx);
+        for a_idx in 0..a_table.len() as u32 {
+            if let Some(a_cell) =
+                a_table.resolve_path(a_idx as usize, connection.from.selector.tail(), ctx)
+            {
+                let a_row_idx = RowIndex::from_raw(a_idx);
+                for net in a_cell.iter() {
+                    if let Some(b_rows) = net_to_b_rows.get(&net) {
+                        for &b_row_idx in b_rows {
+                            if forward.entry(a_row_idx).or_default().insert(b_row_idx) {
                                 reverse.entry(b_row_idx).or_default().insert(a_row_idx);
                                 edge_count += 1;
                             }
