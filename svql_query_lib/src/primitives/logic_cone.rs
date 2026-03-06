@@ -3,7 +3,11 @@
 
 use std::sync::OnceLock;
 
-use crate::primitives::{AdcGate, AndGate, MulGate, MuxGate, NotGate, OrGate, ULtGate, XorGate};
+use crate::primitives::{
+    AdcGate, AndGate, EqGate, MulGate, MuxGate, NotGate, OrGate, SDivFloorGate, SDivTruncGate,
+    SLtGate, SModFloorGate, SModTruncGate, SShrGate, ShlGate, UDivGate, ULtGate, UModGate,
+    UShrGate, XShrGate, XorGate,
+};
 use svql_query::prelude::*;
 
 /// A variant matching any standard combinational logic gate.
@@ -28,6 +32,30 @@ pub enum AnyLogicGate {
     Adc(AdcGate),
     #[map(a = ["a"], b = ["b"], y = ["y"])]
     Mul(MulGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    Eq(EqGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SLt(SLtGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    Shl(ShlGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    UShr(UShrGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SShr(SShrGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    XShr(XShrGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    UDiv(UDivGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    UMod(UModGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SDivTrunc(SDivTruncGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SDivFloor(SDivFloorGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SModTrunc(SModTruncGate),
+    #[map(a = ["a"], b = ["b"], y = ["y"])]
+    SModFloor(SModFloorGate),
 }
 
 /// A recursive tree of combinational logic gates.
