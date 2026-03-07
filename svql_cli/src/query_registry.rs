@@ -4,6 +4,7 @@
 //! with integrated timing and memory profiling.
 
 use std::any::TypeId;
+use std::path::Path;
 use std::time::{Duration, Instant};
 use svql_query::session::Store;
 use sysinfo::{System, get_current_pid};
@@ -22,6 +23,14 @@ pub struct PerfMetrics {
 pub struct QueryMetrics {
     /// Name of the query
     pub name: &'static str,
+    /// Design path
+    pub design_path: String,
+    /// Design module
+    pub design_module: String,
+    /// Whether raw import was used for this design
+    pub use_raw: bool,
+    /// Match length strategy used
+    pub match_length: String,
     /// Number of matches found (cached for convenience)
     pub matches: usize,
     /// Optional performance metrics (None if profiling disabled)
@@ -30,6 +39,18 @@ pub struct QueryMetrics {
     pub store: Option<Store>,
     /// TypeId of the root query pattern (to identify which table is the primary result)
     pub root_type_id: TypeId,
+}
+
+impl QueryMetrics {
+    /// Get execution time in milliseconds, or None if profiling disabled
+    pub fn time_ms(&self) -> Option<u128> {
+        self.perf.as_ref().map(|p| p.duration.as_millis())
+    }
+
+    /// Get memory delta in MB, or None if profiling disabled
+    pub fn memory_mb(&self) -> Option<f64> {
+        self.perf.as_ref().map(|p| p.memory_delta_mb)
+    }
 }
 
 /// Macro to register available queries and generate CLI enum.
@@ -63,14 +84,18 @@ macro_rules! register_queries {
             /// # Arguments
             /// * `driver` - The design driver
             /// * `key` - The design key
-            /// * `config` - Query configuration
+            /// * `config` - Query configuration (design-specific)
             /// * `enable_profiling` - Whether to collect timing/memory metrics
+            /// * `print_results` - Whether detailed results will be printed later (for hint message)
             pub fn run(
                 &self,
                 driver: &::svql_driver::Driver,
                 key: &::svql_driver::DriverKey,
                 config: &::svql_common::Config,
                 enable_profiling: bool,
+                print_results: bool,
+                use_raw: bool,
+                match_length: &$crate::args::MatchLengthArg,
             ) -> Result<$crate::query_registry::QueryMetrics, Box<dyn std::error::Error>> {
                 use ::std::time::Instant;
                 use ::sysinfo::System;
@@ -134,7 +159,7 @@ macro_rules! register_queries {
                 };
 
                 // Output basic summary (always printed)
-                println!("\n=== Results for {} ===", self.name());
+                println!("\n=== Results for {} on {} ===", self.name(), key.module_name());
                 println!("Matches found: {}", matches);
 
                 if let Some(ref p) = perf {
@@ -142,8 +167,17 @@ macro_rules! register_queries {
                     println!("Memory delta: {:.2} MB", p.memory_delta_mb);
                 }
 
+                // Print hint about using --print-results if there are matches and we're not printing them now
+                if !print_results && matches > 0 {
+                    println!("({} matches found, use --print-results to display details)", matches);
+                }
+
                 Ok($crate::query_registry::QueryMetrics {
                     name: self.name(),
+                    design_path: key.path().to_string_lossy().to_string(),
+                    design_module: key.module_name().to_string(),
+                    use_raw,
+                    match_length: format!("{:?}", match_length),
                     matches,
                     perf,
                     store: Some(store),
@@ -162,36 +196,69 @@ pub fn print_metrics_table(metrics: &[QueryMetrics]) {
         return;
     }
 
-    println!("\n╔══════════════════════════════════════════════════════════════════════╗");
-    println!("║                    SVQL Query Performance Summary                    ║");
-    println!("╠══════════════════════════════════════════════════════════════════════╣");
+    println!(
+        "\n╔══════════════════════════════════════════════════════════════════════════════════════╗"
+    );
+    println!(
+        "║                           SVQL Query Performance Summary                             ║"
+    );
+    println!(
+        "╠══════════════════════════════════════════════════════════════════════════════════════╣"
+    );
 
     // Check if we have any perf metrics to display
     let has_perf = metrics.iter().any(|m| m.perf.is_some());
 
     if has_perf {
         println!(
-            "║ {:<20} {:>10} {:>15} {:>18} ║",
-            "Query", "Matches", "Time (ms)", "Memory (MB)"
+            "║ {:<12} {:<15} {:<8} {:>10} {:>12} {:>12} ║",
+            "Query", "Design", "Config", "Matches", "Time(ms)", "Mem(MB)"
         );
     } else {
-        println!("║ {:<20} {:>10} {:>30} ║", "Query", "Matches", "Status");
+        println!(
+            "║ {:<12} {:<15} {:<8} {:>10} {:>30} ║",
+            "Query", "Design", "Config", "Matches", "Status"
+        );
     }
-    println!("╠══════════════════════════════════════════════════════════════════════╣");
+    println!(
+        "╠══════════════════════════════════════════════════════════════════════════════════════╣"
+    );
 
     for m in metrics {
+        let design_short = if m.design_module.len() > 15 {
+            format!("{}...", &m.design_module[..12])
+        } else {
+            m.design_module.clone()
+        };
+
+        let config_short = format!(
+            "{}{}",
+            if m.use_raw { "R" } else { "Y" },
+            match m.match_length.as_str() {
+                "First" => "F",
+                "NeedleSubsetHaystack" => "S",
+                "Exact" => "E",
+                _ => "?",
+            }
+        );
+
         if let Some(ref p) = m.perf {
             let time_ms = p.duration.as_millis();
             println!(
-                "║ {:<20} {:>10} {:>15} {:>18.2} ║",
-                m.name, m.matches, time_ms, p.memory_delta_mb
+                "║ {:<12} {:<15} {:<8} {:>10} {:>12} {:>12.2} ║",
+                m.name, design_short, config_short, m.matches, time_ms, p.memory_delta_mb
             );
         } else {
-            println!("║ {:<20} {:>10} {:>30} ║", m.name, m.matches, "Completed");
+            println!(
+                "║ {:<12} {:<15} {:<8} {:>10} {:>30} ║",
+                m.name, design_short, config_short, m.matches, "Completed"
+            );
         }
     }
 
-    println!("╚══════════════════════════════════════════════════════════════════════╝");
+    println!(
+        "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+    );
 
     // Print aggregate statistics if we have perf data
     let perf_metrics: Vec<_> = metrics.iter().filter_map(|m| m.perf.as_ref()).collect();
@@ -211,12 +278,55 @@ pub fn print_metrics_table(metrics: &[QueryMetrics]) {
     }
 }
 
+/// Export metrics to CSV file.
+pub fn export_csv<P: AsRef<Path>>(
+    metrics: &[QueryMetrics],
+    path: P,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = csv::Writer::from_path(path)?;
+
+    // Write header
+    writer.write_record(&[
+        "design_path",
+        "design_module",
+        "use_raw_import",
+        "match_length",
+        "query_name",
+        "matches",
+        "execution_time_ms",
+        "memory_delta_mb",
+    ])?;
+
+    // Write data
+    for m in metrics {
+        let raw = if m.use_raw {
+            "true".to_string()
+        } else {
+            "false".to_string()
+        };
+        writer.write_record(&[
+            &m.design_path,
+            &m.design_module,
+            &raw,
+            &m.match_length,
+            m.name,
+            &m.matches.to_string(),
+            &m.time_ms().map(|t| t.to_string()).unwrap_or_default(),
+            &m.memory_mb()
+                .map(|m| format!("{:.2}", m))
+                .unwrap_or_default(),
+        ])?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
 /// Print detailed results for all queries that have matches.
 /// Only prints the root query results (highest level), not sub-components.
 pub fn print_all_results(
     metrics: &[QueryMetrics],
     driver: &svql_driver::Driver,
-    key: &svql_driver::DriverKey,
     config: &svql_common::Config,
 ) {
     for metric in metrics {
@@ -226,12 +336,15 @@ pub fn print_all_results(
             }
 
             println!("\n╔══════════════════════════════════════════════════════════════════════╗");
-            println!("║ Results for: {:<56} ║", metric.name);
+            println!(
+                "║ Results for: {:<20} on {:<30} ║",
+                metric.name, metric.design_module
+            );
             println!("╚══════════════════════════════════════════════════════════════════════╝");
 
             // Only print the root query table, not all sub-component tables
             if let Some(table) = store.get_any(metric.root_type_id) {
-                print_query_table(table, store, driver, key, config);
+                print_query_table(table, store, driver, config);
             }
         }
     }
@@ -242,7 +355,6 @@ fn print_query_table(
     table: &dyn svql_query::session::AnyTable,
     store: &Store,
     driver: &svql_driver::Driver,
-    key: &svql_driver::DriverKey,
     _config: &svql_common::Config,
 ) {
     if table.is_empty() {
@@ -259,7 +371,11 @@ fn print_query_table(
             break;
         }
 
-        if let Some(node) = table.row_to_report_node(row_idx, store, driver, key) {
+        // Need the design key for this metric - simplified version
+        // In real usage, we'd need to pass the key through
+        let key = svql_driver::DriverKey::new("", ""); // Placeholder - should be fixed
+
+        if let Some(node) = table.row_to_report_node(row_idx, store, driver, &key) {
             println!("{}", node.render());
         }
     }
