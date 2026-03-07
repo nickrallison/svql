@@ -79,6 +79,7 @@ regex = "1.11.1"
 rstest = "0.26.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.104"
+shell-words = "1.1.1"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 sysinfo = "0.33"
 tempfile = "3.20.0"
