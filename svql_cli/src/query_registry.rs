@@ -65,14 +65,12 @@ macro_rules! register_queries {
             /// * `key` - The design key
             /// * `config` - Query configuration
             /// * `enable_profiling` - Whether to collect timing/memory metrics
-            /// * `print_results` - Whether detailed results will be printed later (for hint message)
             pub fn run(
                 &self,
                 driver: &::svql_driver::Driver,
                 key: &::svql_driver::DriverKey,
                 config: &::svql_common::Config,
                 enable_profiling: bool,
-                print_results: bool,
             ) -> Result<$crate::query_registry::QueryMetrics, Box<dyn std::error::Error>> {
                 use ::std::time::Instant;
                 use ::sysinfo::System;

@@ -77,13 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for query in queries_to_run {
         info!("Starting query: {}", query.name());
 
-        match query.run(
-            &driver,
-            &design_key,
-            &config,
-            args.profile,
-            args.print_results,
-        ) {
+        match query.run(&driver, &design_key, &config, args.profile) {
             Ok(metrics) => {
                 all_metrics.push(metrics);
             }
