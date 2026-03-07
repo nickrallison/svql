@@ -1,11 +1,23 @@
 //! CLI argument parsing and configuration mapping.
 //!
 //! This module defines the command-line interface for the SVQL tool,
-//! handling design paths, module selection, and execution constraints.
+//! handling design paths, module selection, query selection, and execution constraints.
 
 use clap::Parser;
 use svql_common::*;
 use svql_driver::DriverKey;
+
+// Import the registration macro
+use crate::register_queries;
+
+// Register available queries here
+// Add new queries to this list to make them available via CLI
+register_queries!(QueryArg {
+    Cwe1234 => svql_query_lib::security::cwe1234::Cwe1234,
+    Cwe1271 => svql_query_lib::security::cwe1271::Cwe1271,
+    Cwe1280 => svql_query_lib::security::cwe1280::Cwe1280,
+    // Add additional queries here as they are implemented
+});
 
 /// SVQL Pattern Matcher - Search for hardware security vulnerabilities
 #[derive(Parser, Debug)]
@@ -35,6 +47,23 @@ pub struct Args {
     /// Set match length constraint
     #[arg(long, value_enum, default_value = "needle-subset-haystack")]
     pub match_length: MatchLengthArg,
+
+    /// Query types to run (can be specified multiple times).
+    /// If omitted, all registered queries are executed.
+    #[arg(short = 'q', long = "query", value_enum)]
+    pub queries: Vec<QueryArg>,
+
+    /// List available queries and exit
+    #[arg(long = "list-queries")]
+    pub list_queries: bool,
+
+    /// Enable profiling output (timing and memory usage)
+    #[arg(long = "profile")]
+    pub profile: bool,
+
+    /// Print detailed results for all matches (not just summary)
+    #[arg(long = "print-results")]
+    pub print_results: bool,
 }
 
 impl Args {

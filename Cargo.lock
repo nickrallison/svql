@@ -972,6 +972,7 @@ dependencies = [
  "svql_query",
  "svql_query_lib",
  "svql_subgraph",
+ "sysinfo",
  "tikv-jemallocator",
  "tracing",
  "tracing-subscriber",
