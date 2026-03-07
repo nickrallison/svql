@@ -65,12 +65,14 @@ macro_rules! register_queries {
             /// * `key` - The design key
             /// * `config` - Query configuration
             /// * `enable_profiling` - Whether to collect timing/memory metrics
+            /// * `print_results` - Whether detailed results will be printed later (for hint message)
             pub fn run(
                 &self,
                 driver: &::svql_driver::Driver,
                 key: &::svql_driver::DriverKey,
                 config: &::svql_common::Config,
                 enable_profiling: bool,
+                print_results: bool,
             ) -> Result<$crate::query_registry::QueryMetrics, Box<dyn std::error::Error>> {
                 use ::std::time::Instant;
                 use ::sysinfo::System;
@@ -133,33 +135,13 @@ macro_rules! register_queries {
                     None
                 };
 
-                // Output results
+                // Output basic summary (always printed)
                 println!("\n=== Results for {} ===", self.name());
                 println!("Matches found: {}", matches);
 
                 if let Some(ref p) = perf {
                     println!("Execution time: {:.2?}", p.duration);
                     println!("Memory delta: {:.2} MB", p.memory_delta_mb);
-                }
-
-                // Render detailed results for small match sets
-                if matches > 0 && matches <= 5 {
-                    match self {
-                        $(Self::$variant => {
-                            use ::svql_query::traits::Pattern;
-                            if let Some(table) = store.get::<$type>() {
-                                for (i, (_, row)) in table.rows().enumerate() {
-                                    println!("\n--- Match #{} ---", i);
-                                    let report = <$type as Pattern>::render_row(
-                                        &row, &store, driver, key, config
-                                    );
-                                    println!("{}", report);
-                                }
-                            }
-                        })*
-                    }
-                } else if matches > 5 {
-                    println!("({} matches found, use --profile for summary)", matches);
                 }
 
                 Ok($crate::query_registry::QueryMetrics {
