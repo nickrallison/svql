@@ -3,21 +3,29 @@
 //! Entry point for the SVQL command-line tool. Loads hardware designs and executes
 //! pattern matching queries to identify security vulnerabilities or design patterns.
 
-#![allow(unused_imports)]
+#![allow(missing_docs, clippy::missing_docs_in_private_items)]
 
 #[global_allocator]
-/// Global allocator using jemalloc for better performance in parallel workloads.
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod args;
 mod query_registry;
 
+pub mod step1;
+pub mod step2;
+pub mod step3;
+pub mod step4;
+
 use args::{Args, QueryArg};
 use clap::Parser;
 use query_registry::{export_csv, print_metrics_table};
+
+use svql_query::prelude::*;
 use tracing::info;
 
 use crate::query_registry::export_latex;
+
+use crate::{step1::HalfAdder, step3::AnyFullAdder, step4::CdcViolation};
 
 /// Executes the SVQL pattern matcher.
 fn main() -> Result<(), Box<dyn std::error::Error>> {

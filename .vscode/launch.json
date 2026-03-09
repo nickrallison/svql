@@ -45,19 +45,19 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'example_query'",
+            "name": "Debug executable 'svql_cli'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=example_query",
-                    "--package=svql_query_lib"
+                    "--bin=svql_cli",
+                    "--package=svql_cli"
                 ],
                 "filter": {
-                    "name": "example_query",
+                    "name": "svql_cli",
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": ["--design-path", "svql_cli/src/step3/mixed_ha_test.il", "--design-module", "mixed_ha_test"],
             "cwd": "${workspaceFolder}",
             "sourceLanguages": ["rust"],
             "expressions": "native"

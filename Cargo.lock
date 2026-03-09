@@ -973,6 +973,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "csv",
+ "prjunnamed-netlist",
  "rayon",
  "shell-words",
  "svql_common",

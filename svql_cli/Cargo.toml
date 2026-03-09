@@ -22,5 +22,7 @@ svql_query_lib.workspace = true
 svql_subgraph.workspace = true
 shell-words.workspace = true
 
+prjunnamed-netlist.workspace = true
+
 [lints]
 workspace = true

@@ -8,12 +8,14 @@ use svql_driver::DriverKey;
 // Import the registration macro
 use crate::register_queries;
 
-register_queries!(QueryArg {
-    Cwe1234 => svql_query_lib::security::cwe1234::Cwe1234,
-    Cwe1271 => svql_query_lib::security::cwe1271::Cwe1271,
-    Cwe1280 => svql_query_lib::security::cwe1280::Cwe1280,
-    LockedRegister => svql_query_lib::security::locked_register::LockedRegister,
+use crate::step4::CdcViolation;
 
+register_queries!(QueryArg {
+    // Cwe1234 => svql_query_lib::security::cwe1234::Cwe1234,
+    // Cwe1271 => svql_query_lib::security::cwe1271::Cwe1271,
+    // Cwe1280 => svql_query_lib::security::cwe1280::Cwe1280,
+    LockedRegister => svql_query_lib::security::locked_register::LockedRegister,
+    CdcViolation => CdcViolation,
 });
 
 /// Specification for a single design with its own sub-flags.
