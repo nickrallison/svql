@@ -87,6 +87,7 @@ macro_rules! register_queries {
             /// * `config` - Query configuration (design-specific)
             /// * `enable_profiling` - Whether to collect timing/memory metrics
             /// * `print_results` - Whether detailed results will be printed later (for hint message)
+            #[allow(clippy::too_many_arguments)]
             pub fn run(
                 &self,
                 driver: &::svql_driver::Driver,
@@ -286,7 +287,7 @@ pub fn export_csv<P: AsRef<Path>>(
     let mut writer = csv::Writer::from_path(path)?;
 
     // Write header
-    writer.write_record(&[
+    writer.write_record([
         "design_path",
         "design_module",
         "use_raw_import",
@@ -304,7 +305,7 @@ pub fn export_csv<P: AsRef<Path>>(
         } else {
             "false".to_string()
         };
-        writer.write_record(&[
+        writer.write_record([
             &m.design_path,
             &m.design_module,
             &raw,

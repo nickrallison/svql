@@ -175,9 +175,9 @@ impl From<MatchLengthArg> for MatchLength {
 impl fmt::Display for MatchLengthArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MatchLengthArg::First => write!(f, "first"),
-            MatchLengthArg::NeedleSubsetHaystack => write!(f, "subset"),
-            MatchLengthArg::Exact => write!(f, "exact"),
+            Self::First => write!(f, "first"),
+            Self::NeedleSubsetHaystack => write!(f, "subset"),
+            Self::Exact => write!(f, "exact"),
         }
     }
 }
