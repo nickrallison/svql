@@ -17,6 +17,8 @@ use clap::Parser;
 use query_registry::{export_csv, print_metrics_table};
 use tracing::info;
 
+use crate::query_registry::export_latex;
+
 /// Executes the SVQL pattern matcher.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -86,7 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        info!("Design loaded: {} gates", container.index().num_cells());
+        let gates = container.index().num_cells(); // Get gate count
+        info!("Design loaded: {} gates", gates);
 
         for query in &queries_to_run {
             info!("Starting query: {} on {}", query.name(), key.module_name());
@@ -99,6 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 args.print_results,
                 design_input.use_raw,
                 &design_input.match_length,
+                gates,
             ) {
                 Ok(metrics) => {
                     all_metrics.push(metrics);
@@ -167,6 +171,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Exporting results to CSV: {}", csv_path);
         export_csv(&all_metrics, &csv_path)?;
         println!("Results exported to: {}", csv_path);
+    }
+
+    if let Some(latex_path) = args.output_latex {
+        info!("Exporting results to LaTeX: {}", latex_path);
+        export_latex(&all_metrics, &latex_path)?;
+        println!("Results exported to: {}", latex_path);
     }
 
     if had_errors {

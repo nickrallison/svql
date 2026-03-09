@@ -12,6 +12,8 @@ register_queries!(QueryArg {
     Cwe1234 => svql_query_lib::security::cwe1234::Cwe1234,
     Cwe1271 => svql_query_lib::security::cwe1271::Cwe1271,
     Cwe1280 => svql_query_lib::security::cwe1280::Cwe1280,
+    LockedRegister => svql_query_lib::security::locked_register::LockedRegister,
+
 });
 
 /// Specification for a single design with its own sub-flags.
@@ -152,6 +154,10 @@ pub struct Args {
     /// Output CSV file path for results
     #[arg(short = 'o', long = "output-csv")]
     pub output_csv: Option<String>,
+
+    /// Output LaTeX file path for results (requires multirow package)
+    #[arg(long = "output-latex")]
+    pub output_latex: Option<String>,
 }
 
 /// Enumeration of supported match length strategies.

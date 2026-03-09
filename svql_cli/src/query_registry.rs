@@ -3,6 +3,8 @@
 //! Provides the `register_queries!` macro to expose query types to the CLI
 //! with integrated timing and memory profiling.
 
+#![allow(clippy::literal_string_with_formatting_args)]
+
 use std::any::TypeId;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -39,6 +41,8 @@ pub struct QueryMetrics {
     pub store: Option<Store>,
     /// TypeId of the root query pattern (to identify which table is the primary result)
     pub root_type_id: TypeId,
+    /// Number of gates in the design (for LaTeX table generation)
+    pub gates: usize,
 }
 
 impl QueryMetrics {
@@ -53,7 +57,6 @@ impl QueryMetrics {
     }
 }
 
-/// Macro to register available queries and generate CLI enum.
 #[macro_export]
 macro_rules! register_queries {
     ($enum_name:ident { $($variant:ident => $type:ty),* $(,)? }) => {
@@ -86,7 +89,10 @@ macro_rules! register_queries {
             /// * `key` - The design key
             /// * `config` - Query configuration (design-specific)
             /// * `enable_profiling` - Whether to collect timing/memory metrics
-            /// * `print_results` - Whether detailed results will be printed later (for hint message)
+            /// * `print_results` - Whether detailed results will be printed later
+            /// * `use_raw` - Whether raw import was used
+            /// * `match_length` - Match length strategy used
+            /// * `gates` - Number of gates in the design
             #[allow(clippy::too_many_arguments)]
             pub fn run(
                 &self,
@@ -97,6 +103,7 @@ macro_rules! register_queries {
                 print_results: bool,
                 use_raw: bool,
                 match_length: &$crate::args::MatchLengthArg,
+                gates: usize,
             ) -> Result<$crate::query_registry::QueryMetrics, Box<dyn std::error::Error>> {
                 use ::std::time::Instant;
                 use ::sysinfo::System;
@@ -104,7 +111,7 @@ macro_rules! register_queries {
 
                 let mut sys = System::new_all();
 
-                // Get current PID - handle the Result properly
+                // Get current PID
                 let pid = ::sysinfo::get_current_pid()
                     .map_err(|e| format!("Failed to get current PID: {}", e))?;
 
@@ -149,7 +156,6 @@ macro_rules! register_queries {
 
                 // Build performance metrics if enabled
                 let perf = if enable_profiling {
-                    // Use f64::max for float subtraction to avoid negative values
                     let memory_delta = (final_mem - initial_mem).max(0.0);
                     Some($crate::query_registry::PerfMetrics {
                         duration,
@@ -185,6 +191,7 @@ macro_rules! register_queries {
                     root_type_id: match self {
                         $(Self::$variant => TypeId::of::<$type>(),)*
                     },
+                    gates,
                 })
             }
         }
@@ -320,6 +327,111 @@ pub fn export_csv<P: AsRef<Path>>(
     }
 
     writer.flush()?;
+    Ok(())
+}
+
+/// Export metrics to LaTeX table format.
+///
+/// Generates a table using the multirow package to group queries by design.
+/// Note: Requires \usepackage{multirow} in your LaTeX preamble.
+pub fn export_latex<P: AsRef<Path>>(
+    metrics: &[QueryMetrics],
+    path: P,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::collections::BTreeMap;
+    use std::io::Write;
+
+    let mut file = std::fs::File::create(path)?;
+
+    // Group metrics by design module to handle multirow
+    let mut design_groups: BTreeMap<String, Vec<&QueryMetrics>> = BTreeMap::new();
+    for m in metrics {
+        design_groups
+            .entry(m.design_module.clone())
+            .or_default()
+            .push(m);
+    }
+
+    writeln!(file, "\\begin{{table}}[t]")?;
+    writeln!(file, "    \\centering")?;
+    writeln!(file, "    \\caption{{SVQL Performance Metrics}}")?;
+    writeln!(file, "    \\label{{tab:performance}}")?;
+    writeln!(file, "    \\resizebox{{\\columnwidth}}{{!}}{{")?;
+    writeln!(file, "    \\setlength{{\\tabcolsep}}{{3pt}}")?;
+    writeln!(file, "    \\begin{{tabular}}{{l r r c r}}")?;
+    writeln!(file, "        \\toprule")?;
+    writeln!(
+        file,
+        "        \\textbf{{Design}} & \\textbf{{Gates}} & \\textbf{{Memory (MB)}} & \\textbf{{Query}} & \\textbf{{Time (ms)}} \\\\"
+    )?;
+    writeln!(file, "        \\midrule")?;
+
+    for (_design, queries) in design_groups {
+        let num_queries = queries.len();
+        if num_queries == 0 {
+            continue;
+        }
+
+        let gates = queries.first().map(|q| q.gates).unwrap_or(0);
+        let design_escaped = queries
+            .first()
+            .map(|q| q.design_module.replace("_", "\\_"))
+            .unwrap_or_default();
+
+        for (i, m) in queries.iter().enumerate() {
+            let memory_mb = m.memory_mb().unwrap_or(0.0);
+            let time_ms = m.time_ms().unwrap_or(0);
+            let query_escaped = m.name.replace("_", "\\_");
+
+            // Format gates with commas for thousands separator manually
+            let gates_formatted = format!("{}", gates)
+                .as_bytes()
+                .rchunks(3)
+                .rev()
+                .map(|chunk| std::str::from_utf8(chunk).map(|s| s.to_string()))
+                .collect::<Result<Vec<String>, _>>()
+                .unwrap_or_else(|_| vec![format!("{}", gates)])
+                .join(",");
+
+            if i == 0 {
+                // First row for this design - use multirow if multiple queries
+                if num_queries > 1 {
+                    writeln!(
+                        file,
+                        "        \\multirow{{{}}}{{*}}{{{}}} & \\multirow{{{}}}{{*}}{{{}}} & {:.2} & {} & {} \\\\",
+                        num_queries,
+                        design_escaped,
+                        num_queries,
+                        gates_formatted,
+                        memory_mb,
+                        query_escaped,
+                        time_ms
+                    )?;
+                } else {
+                    writeln!(
+                        file,
+                        "        {} & {} & {:.2} & {} & {} \\\\",
+                        design_escaped, gates_formatted, memory_mb, query_escaped, time_ms
+                    )?;
+                }
+            } else {
+                // Subsequent rows - only memory, query and time
+                writeln!(
+                    file,
+                    "        & & {:.2} & {} & {} \\\\",
+                    memory_mb, query_escaped, time_ms
+                )?;
+            }
+        }
+
+        writeln!(file, "        \\midrule")?;
+    }
+
+    writeln!(file, "    \\end{{tabular}}%")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "    \\vspace{{-1em}}")?;
+    writeln!(file, "\\end{{table}}")?;
+
     Ok(())
 }
 

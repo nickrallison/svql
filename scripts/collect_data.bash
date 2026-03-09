@@ -22,5 +22,6 @@ cargo run --profile release --package svql_cli --bin svql_cli -- \
     --design "examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json --module e203_soc_top --raw" \
     --parallel \
     --profile \
-    --output-csv bin/results.csv
+    --output-csv bin/results.csv \
+    --output-latex bin/results.tex
 
