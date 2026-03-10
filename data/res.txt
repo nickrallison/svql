@@ -1,0 +1,18 @@
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║                           SVQL Query Performance Summary                             ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║ Query        Design          Config      Matches     Time(ms)      Mem(MB) ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║ LockedRegister cv32e40p_fp_... YS               16           30         0.53 ║
+║ CdcViolation cv32e40p_fp_... YS                0          169         3.62 ║
+║ LockedRegister soc_intercon... YS             1261            9        19.05 ║
+║ CdcViolation soc_intercon... YS                0        43036       254.22 ║
+║ LockedRegister soc_peripherals RS             2914           32        22.88 ║
+║ CdcViolation soc_peripherals RS              127         1831        34.84 ║
+║ LockedRegister udma_core       RS                0            0         0.00 ║
+║ CdcViolation udma_core       RS                8           23         0.00 ║
+║ LockedRegister tile            RS              401          114        78.83 ║
+║ CdcViolation tile            RS                1        76641       397.39 ║
+║ LockedRegister e203            RS              0           127         1.12 ║
+║ CdcViolation e203            RS                NA        NA       NA ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
