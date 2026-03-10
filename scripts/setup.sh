@@ -45,4 +45,4 @@ gzip -d -k -f examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netli
 
 # Reflatten Piton
 sh scripts/flatten_json.sh examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json tile
-sh scripts/flatten_json.sh examples/fixtures/larger_designs/json/hackatdac21/openpiton_noc1encoder.json noc1encoder
+# sh scripts/flatten_json.sh examples/fixtures/larger_designs/json/hackatdac21/openpiton_noc1encoder.json noc1encoder

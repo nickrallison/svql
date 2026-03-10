@@ -19,7 +19,7 @@ svql_query::define_primitive!(
     [(a, input), (b, input), (sel, input), (y, output)]
 );
 
-svql_query::define_primitive!(AdcGate, Adc, [(a, input), (b, input), (y, output)]);
+svql_query::define_primitive!(AdcGate, Adc, [(a, input), (b, input), (cin, input), (y, output)]);
 
 svql_query::define_primitive!(EqGate, Eq, [(a, input), (b, input), (y, output)]);
 
