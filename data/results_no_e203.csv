@@ -1,0 +1,11 @@
+design_path,design_module,use_raw_import,match_length,query_name,matches,execution_time_ms,memory_delta_mb
+examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v,cv32e40p_fp_wrapper,false,NeedleSubsetHaystack,LockedRegister,16,30,0.53
+examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v,cv32e40p_fp_wrapper,false,NeedleSubsetHaystack,CdcViolation,0,169,3.62
+examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v,soc_interconnect_wrap,false,NeedleSubsetHaystack,LockedRegister,1261,9,19.05
+examples/fixtures/larger_designs/verilog/hackatdac18/soc_interconnect_wrap_netlist.v,soc_interconnect_wrap,false,NeedleSubsetHaystack,CdcViolation,0,43036,254.22
+examples/fixtures/larger_designs/json/hackatdac18/soc_peripherals_netlist.json,soc_peripherals,true,NeedleSubsetHaystack,LockedRegister,2914,32,22.88
+examples/fixtures/larger_designs/json/hackatdac18/soc_peripherals_netlist.json,soc_peripherals,true,NeedleSubsetHaystack,CdcViolation,127,1831,34.84
+examples/fixtures/larger_designs/json/hackatdac18/udma_core_netlist.json,udma_core,true,NeedleSubsetHaystack,LockedRegister,0,0,0.00
+examples/fixtures/larger_designs/json/hackatdac18/udma_core_netlist.json,udma_core,true,NeedleSubsetHaystack,CdcViolation,8,23,0.00
+examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json,tile,true,NeedleSubsetHaystack,LockedRegister,401,114,78.83
+examples/fixtures/larger_designs/json/hackatdac21/openpiton_tile.json,tile,true,NeedleSubsetHaystack,CdcViolation,1,76641,397.39

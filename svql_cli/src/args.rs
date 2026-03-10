@@ -15,7 +15,7 @@ register_queries!(QueryArg {
     // Cwe1271 => svql_query_lib::security::cwe1271::Cwe1271,
     // Cwe1280 => svql_query_lib::security::cwe1280::Cwe1280,
     LockedRegister => svql_query_lib::security::locked_register::LockedRegister,
-    CdcViolation => CdcViolation,
+    // CdcViolation => CdcViolation,
 });
 
 /// Specification for a single design with its own sub-flags.

@@ -1,0 +1,2 @@
+design_path,design_module,use_raw_import,match_length,query_name,matches,execution_time_ms,memory_delta_mb
+examples/fixtures/larger_designs/json/hummingbirdv2/e203_soc_netlist.json,e203_soc_top,true,NeedleSubsetHaystack,LockedRegister,0,127,1.12
