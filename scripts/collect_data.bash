@@ -25,3 +25,10 @@ cargo run --profile release --package svql_cli --bin svql_cli -- \
     --output-csv bin/results.csv \
     --output-latex bin/results.tex
 
+cargo run --profile release --package svql_cli --bin svql_cli -- \
+    --design "examples/fixtures/larger_designs/verilog/hackatdac18/cv32e40p_fp_wrapper_netlist.v --module cv32e40p_fp_wrapper" \
+    --parallel \
+    --profile \
+    --output-csv bin/results.csv \
+    --output-latex bin/results.tex \
+    -q cdc-violation

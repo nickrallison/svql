@@ -163,12 +163,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Create a dummy key for display - in production you'd store the key in metrics
                     let key =
                         svql_driver::DriverKey::new(&metric.design_path, &metric.design_module);
-                    if let Some(node) = table.row_to_report_node(0, store, &driver, &key) {
-                        println!("{}", node.render());
-                        if table.len() > 1 {
-                            println!("... and {} more matches", table.len() - 1);
+                    for i in 0..table.len() {
+                        if let Some(node) = table.row_to_report_node(i, store, &driver, &key) {
+                            println!("{}", node.render());
                         }
                     }
+                    // if let Some(node) = table.row_to_report_node(0, store, &driver, &key) {
+                    //     println!("{}", node.render());
+                    //     if table.len() > 1 {
+                    //         println!("... and {} more matches", table.len() - 1);
+                    //     }
+                    // }
                 }
             }
         }
