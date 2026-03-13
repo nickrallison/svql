@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         "cwe1234_multi_width",
     )?;
     let needle_module: YosysModule = YosysModule::new(
-        "examples/patterns/security/access_control/locked_reg/rtlil/async_mux.il",
+        "examples/patterns/security/access_control/dff_enable/rtlil/async_mux.il",
         "async_mux",
     )?;
 
