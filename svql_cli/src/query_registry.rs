@@ -116,14 +116,15 @@ macro_rules! register_queries {
                     .map_err(|e| format!("Failed to get current PID: {}", e))?;
 
                 // Initial memory measurement
-                let initial_mem = if enable_profiling {
-                    sys.refresh_all();
-                    sys.process(pid)
-                        .map(|p| p.memory() as f64 / 1024.0 / 1024.0)
-                        .unwrap_or(0.0)
-                } else {
-                    0.0
-                };
+                // let initial_mem = if enable_profiling {
+                //     sys.refresh_all();
+                //     sys.process(pid)
+                //         .map(|p| p.memory() as f64 / 1024.0 / 1024.0)
+                //         .unwrap_or(0.0)
+                // } else {
+                //     0.0
+                // };
+                let initial_mem = 0.0;
 
                 let start = Instant::now();
 

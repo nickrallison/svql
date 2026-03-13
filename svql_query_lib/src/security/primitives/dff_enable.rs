@@ -3,7 +3,7 @@ use svql_query::prelude::*;
 
 // 1. Define the primitive DFF with enable
 svql_query::define_dff_primitive!(
-    LockedRegEn,
+    DffEnCell,
     [
         (clk, input),
         (data_in, input),
@@ -88,7 +88,7 @@ pub enum DffEnable {
         resetn = ["resetn"],
         write_en = ["write_en"]
     )]
-    En(LockedRegEn),
+    En(DffEnCell),
 
     /// Implementation using an asynchronous mux.
     #[map(
