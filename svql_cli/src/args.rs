@@ -8,7 +8,7 @@ use svql_driver::DriverKey;
 // Import the registration macro
 use crate::register_queries;
 
-use crate::step4::CdcViolation;
+// use crate::step4::CdcViolation;
 
 register_queries!(QueryArg {
     Cwe1234 => svql_query_lib::security::cwe1234::Cwe1234,

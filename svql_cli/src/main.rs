@@ -25,7 +25,7 @@ use tracing::info;
 
 use crate::query_registry::export_latex;
 
-use crate::{step1::HalfAdder, step3::AnyFullAdder, step4::CdcViolation};
+// use crate::{step1::HalfAdder, step3::AnyFullAdder, step4::CdcViolation};
 
 /// Executes the SVQL pattern matcher.
 fn main() -> Result<(), Box<dyn std::error::Error>> {

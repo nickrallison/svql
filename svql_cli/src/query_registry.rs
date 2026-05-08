@@ -7,9 +7,8 @@
 
 use std::any::TypeId;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use svql_query::session::Store;
-use sysinfo::{System, get_current_pid};
 
 /// Performance metrics collected during query execution.
 #[derive(Debug, Clone)]
@@ -150,7 +149,6 @@ macro_rules! register_queries {
                 // Extract match count
                 let matches = match self {
                     $(Self::$variant => {
-                        use ::svql_query::session::Store;
                         store.get::<$type>().map(|t| t.len()).unwrap_or(0)
                     },)*
                 };
@@ -438,6 +436,7 @@ pub fn export_latex<P: AsRef<Path>>(
 
 /// Print detailed results for all queries that have matches.
 /// Only prints the root query results (highest level), not sub-components.
+#[allow(dead_code)]
 pub fn print_all_results(
     metrics: &[QueryMetrics],
     driver: &svql_driver::Driver,
@@ -465,6 +464,7 @@ pub fn print_all_results(
 }
 
 /// Print a single query table with limited output.
+#[allow(dead_code)]
 fn print_query_table(
     table: &dyn svql_query::session::AnyTable,
     store: &Store,
