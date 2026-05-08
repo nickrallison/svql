@@ -660,7 +660,7 @@ pub trait Composite: Sized + Component<Kind = kind::Composite> + Send + Sync + '
         for sub in Self::SUBMODULES {
             if let Some(mut sub_node) = row
                 .sub_raw(sub.name)
-                .and_then(|sub_ref| store.get_from_tid(sub.type_id).map(|t| (sub_ref, t)))
+                .zip(store.get_from_tid(sub.type_id))
                 .and_then(|(sub_ref, table)| {
                     table.row_to_report_node(sub_ref as usize, store, driver, key)
                 })
